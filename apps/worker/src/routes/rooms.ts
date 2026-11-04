@@ -97,7 +97,9 @@ export async function createRoom(
           roomCode,
           playerId: joined.member.playerId,
           wsUrl: `${originBase}/api/v1/rooms/${roomCode}/ws`,
+          maxPlayers,
           settings: { maxPlayers, mode, mapId, isPrivate },
+          expiresAt: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
         },
         { status: 201 },
       );
@@ -110,6 +112,47 @@ export async function createRoom(
   throw new ProblemError("internal", "Could not allocate a room code");
 }
 
+/** Join an existing room by code (`US-ROOM-002`). The roster lives in the Durable Object. */
+export async function joinRoomByCode(
+  request: Request,
+  env: Env,
+  session: SessionToken,
+  roomCode: string,
+  originBase: string,
+): Promise<Response> {
+  if (!isValidRoomCode(roomCode)) throw new ProblemError("room-not-found", "Room codes are six characters");
+  const body = await readJson(request);
+  const field = new Field([]);
+  const displayName = field.string(body["displayName"] ?? "Player", "displayName", { min: 2, max: 16 });
+  const mobileId = field.string(body["mobileId"] ?? "mbl-01", "mobileId");
+  const avatarId = field.string(body["avatarId"] ?? "avatar-01", "avatarId");
+  field.done();
+
+  const joined = await callRoom<{ room: { settings: RoomSettings; status: string }; member: { playerId: string } }>(
+    stubFor(env, roomCode),
+    "join",
+    {
+      playerId: crypto.randomUUID(),
+      accountId: session.sub.accountId,
+      guestId: session.sub.guestId,
+      displayName,
+      avatarId,
+      mobileId,
+      roomCode,
+    },
+  );
+  return Response.json(
+    {
+      roomCode,
+      playerId: joined.member.playerId,
+      wsUrl: `${originBase}/api/v1/rooms/${roomCode}/ws`,
+      maxPlayers: joined.room.settings.maxPlayers,
+      settings: joined.room.settings,
+    },
+    { status: 200 },
+  );
+}
+
 export async function roomPreview(env: Env, roomCode: string): Promise<Response> {
   if (!isValidRoomCode(roomCode)) throw new ProblemError("room-not-found", "Room codes are six characters");
   const state = await callRoom<Record<string, unknown>>(stubFor(env, roomCode), "state");
@@ -120,17 +163,28 @@ export async function roomPreview(env: Env, roomCode: string): Promise<Response>
       status: state["status"],
       settings: state["settings"],
       joined: members.length,
+      playerCount: members.length,
+      maxPlayers: (state["settings"] as { maxPlayers?: number } | undefined)?.maxPlayers ?? members.length,
+      joinable: state["status"] === "lobby",
+      hostDisplayName:
+        (members.find((member) => member["playerId"] === state["hostPlayerId"])?.["displayName"] as string) ?? null,
       host: members.find((member) => member["role"] === "host") !== undefined,
     },
     { headers: { "cache-control": "no-store" } },
   );
 }
 
-/** The socket is proxied, not parsed — the DO owns the handshake and the message protocol. */
+/**
+ * The socket is proxied, not parsed — the DO owns the handshake and the message protocol.
+ *
+ * A browser cannot set an `Authorization` header on a WebSocket, so the session token travels in the
+ * first `auth` frame and the DO verifies it there (`docs/02-reference/api/signaling.md`). This route
+ * therefore requires no bearer header; it only filters the upgrade through to the room.
+ */
 export async function roomSocket(env: Env, roomCode: string, request: Request): Promise<Response> {
   if (!isValidRoomCode(roomCode)) throw new ProblemError("room-not-found", "Room codes are six characters");
   return await stubFor(env, roomCode).fetch(`https://room.internal/ws`, {
-    headers: request.headers,
+    headers: { upgrade: request.headers.get("upgrade") ?? "websocket" },
   });
 }
 

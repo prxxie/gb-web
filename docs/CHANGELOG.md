@@ -1,5 +1,22 @@
 # Changelog
 
+## 2026-11-05 — joinable rooms, verified realtime path, ground-anchored camera
+
+- **Added** `POST /api/v1/rooms/{code}/join` — without it a second player had no way into an existing room
+  (`docs/02-reference/api/rooms.md`).
+- **Changed** WebSocket authentication: the socket carries no bearer header (a browser cannot set one), so the
+  Durable Object verifies the session token from the first `auth` frame and binds the socket to that subject
+  (`docs/02-reference/api/signaling.md`).
+- **Changed** the default camera framing follows the active mobile with its feet ~70 % down the frame, instead of
+  centring on the map (`docs/02-reference/gameplay/tunables.md` § camera).
+- **Fixed** a practice match that could end on the first turn (it had no opponent seat), the guest-seat identity clash
+  that made the bot play the player's turn, the stale power ring after a release, and two un-interpolated copy strings
+  on the results and waiting banners.
+- **Verified** the room protocol end to end against a real Durable Object: join, team assignment, `match_started`
+  with seed and assignments, snapshot relay, host migration to generation 2.
+- **Note** local development now requires `apps/worker/.dev.vars` with `SESSION_TOKEN_SECRET`
+  (`docs/01-overview/environment-setup.md` § 3).
+
 ## 2026-11-05 — implementation wave — the backlog is built
 
 - **All 53 stories implemented** as a single delivery wave (client request "ship all"): engine, worker API, Durable

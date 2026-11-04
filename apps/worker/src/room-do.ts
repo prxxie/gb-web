@@ -9,6 +9,7 @@
  * Wire protocol: `docs/02-reference/api/signaling.md`.
  */
 import {
+  RULESET_VERSION,
   canStart,
   createRoom,
   electHost,
@@ -19,10 +20,12 @@ import {
   isRoomExpired,
   type JoinRequest,
   type RoomMember,
+  type RoomSettings,
   type RoomState,
   type Snapshot,
 } from "@gbw/core";
 import type { Env } from "./lib/db.js";
+import { verifySession, type SessionSubject } from "./lib/session.js";
 
 const AUTH_TIMEOUT_MS = 5_000;
 const CLOSE_UNAUTHENTICATED = 4401;
@@ -30,9 +33,9 @@ const CLOSE_ROOM_NOT_FOUND = 4404;
 const CLOSE_ROOM_CLOSED = 4410;
 
 type ClientMessage =
-  | { t: "auth"; playerId: string; sessionToken: string }
-  | { t: "signal"; to: string; data: unknown }
-  | { t: "team_assign"; playerId: string; team: "A" | "B" | null }
+  | { t: "auth"; token?: string; mobileId?: string; displayName?: string; avatarId?: string }
+  | { t: "signal"; to: string; payload: unknown }
+  | { t: "team_assign"; assignments: readonly { playerId: string; team: "A" | "B" | null }[] }
   | { t: "start_match" }
   | { t: "snapshot_push"; snapshot: Snapshot }
   | { t: "match_end"; winner: "A" | "B" | null }
@@ -42,6 +45,9 @@ type ClientMessage =
 interface SocketMeta {
   playerId: string | null;
   authed: boolean;
+  /** Identity the Worker verified for this connection; the client cannot set these headers (`NFR-11`). */
+  accountId: string | null;
+  guestId: string | null;
 }
 
 export class Room implements DurableObject {
@@ -51,9 +57,8 @@ export class Room implements DurableObject {
 
   constructor(
     private readonly ctx: DurableObjectState,
-    env: Env,
+    private readonly env: Env,
   ) {
-    void env;
     this.room = createRoom({ roomCode: "AAAAAA", now: Date.now() });
     void this.ctx.blockConcurrencyWhile(async () => {
       const stored = await this.ctx.storage.get<RoomState>("room");
@@ -91,9 +96,20 @@ export class Room implements DurableObject {
 
   /** The web app joins the room *before* opening the socket, so the roster exists when `room_state` lands. */
   private async handleJoin(request: Request): Promise<Response> {
-    const body = (await request.json()) as JoinRequest & { roomCode?: string };
-    if (body.roomCode && body.roomCode !== this.room.roomCode) {
-      this.room = { ...this.room, roomCode: body.roomCode };
+    const body = (await request.json()) as JoinRequest & {
+      roomCode?: string;
+      settings?: Partial<RoomSettings>;
+    };
+    // The first join names the room: the object is created by the Worker before it knows the code, so the
+    // code and the requested settings arrive with the host's first request (`docs/02-reference/data/room-state.md`).
+    if (this.room.members.length === 0) {
+      this.room = {
+        ...this.room,
+        ...(body.roomCode ? { roomCode: body.roomCode } : {}),
+        ...(body.settings && this.room.status === "lobby"
+          ? { settings: { ...this.room.settings, ...body.settings } }
+          : {}),
+      };
     }
     const outcome = joinRoom(this.room, { ...body, now: Date.now() });
     if (outcome.rejection) {
@@ -160,14 +176,15 @@ export class Room implements DurableObject {
     return Response.json({ room: this.publicState() });
   }
 
-  private async handleUpgrade(_request: Request): Promise<Response> {
+  private async handleUpgrade(request: Request): Promise<Response> {
     if (this.room.status === "ended" || this.room.status === "abandoned") {
       return new Response("room closed", { status: 410 });
     }
     const pair = new WebSocketPair();
     const [client, server] = Object.values(pair) as [WebSocket, WebSocket];
+    void request;
     this.ctx.acceptWebSocket(server);
-    this.meta.set(server, { playerId: null, authed: false });
+    this.meta.set(server, { playerId: null, authed: false, accountId: null, guestId: null });
     setTimeout(() => {
       const meta = this.meta.get(server);
       if (meta && !meta.authed && server.readyState === 1) {
@@ -186,7 +203,7 @@ export class Room implements DurableObject {
       this.send(ws, { t: "error", code: "unsupported-message", detail: "body is not JSON" });
       return;
     }
-    const meta = this.meta.get(ws) ?? { playerId: null, authed: false };
+    const meta = this.meta.get(ws) ?? { playerId: null, authed: false, accountId: null, guestId: null };
     if (message.t === "auth") {
       await this.authenticate(ws, message);
       return;
@@ -202,7 +219,7 @@ export class Room implements DurableObject {
           this.send(ws, { t: "error", code: "unsupported-message", detail: "peer is not connected" });
           return;
         }
-        this.send(target, { t: "signal", from: meta.playerId, data: message.data });
+        this.send(target, { t: "signal", from: meta.playerId, payload: message.payload });
         return;
       }
       case "team_assign": {
@@ -210,11 +227,13 @@ export class Room implements DurableObject {
           this.send(ws, { t: "error", code: "not-host" });
           return;
         }
+        const assignments = message.assignments ?? [];
         this.room = this.withActivity({
           ...this.room,
-          members: this.room.members.map((member) =>
-            member.playerId === message.playerId ? { ...member, team: message.team } : member,
-          ),
+          members: this.room.members.map((member) => {
+            const found = assignments.find((assignment) => assignment.playerId === member.playerId);
+            return found ? { ...member, team: found.team } : member;
+          }),
         });
         await this.persist();
         this.broadcast({ t: "room_state", room: this.publicState() });
@@ -229,7 +248,22 @@ export class Room implements DurableObject {
         const seed = crypto.getRandomValues(new Uint32Array(1))[0] ?? 1;
         this.room = this.withActivity({ ...this.room, status: "playing" });
         await this.persist();
-        this.broadcast({ t: "match_started", startedAt: Date.now(), seed, room: this.publicState() });
+        this.broadcast({
+          t: "match_started",
+          startedAt: Date.now(),
+          seed,
+          hostPlayerId: this.room.hostPlayerId,
+          hostGeneration: this.room.hostGeneration,
+          rulesetVersion: RULESET_VERSION,
+          assignments: this.room.members.map((member) => ({
+            playerId: member.playerId,
+            slot: member.slot,
+            team: member.team,
+            mobileId: member.mobileId,
+            accountId: member.accountId,
+          })),
+          room: this.publicState(),
+        });
         return;
       }
       case "snapshot_push": {
@@ -277,30 +311,61 @@ export class Room implements DurableObject {
     }
   }
 
-  private async authenticate(ws: WebSocket, message: { playerId: string; sessionToken: string }): Promise<void> {
-    const member = this.room.members.find((candidate) => candidate.playerId === message.playerId);
+  /**
+   * Bind the socket to the member the Worker already authenticated (`docs/02-reference/api/signaling.md`).
+   * The mobile id and display name arrive on the frame; identity comes from the proxy headers.
+   */
+  private async authenticate(
+    ws: WebSocket,
+    message: { token?: string; mobileId?: string; displayName?: string },
+  ): Promise<void> {
+    const meta = this.meta.get(ws);
+    if (!meta) return;
+    if (!message.token) {
+      ws.close(CLOSE_UNAUTHENTICATED, "auth token required");
+      return;
+    }
+    let subject: SessionSubject;
+    try {
+      subject = (await verifySession(message.token, this.env.SESSION_TOKEN_SECRET)).sub;
+    } catch {
+      ws.close(CLOSE_UNAUTHENTICATED, "invalid session token");
+      return;
+    }
+    const member = this.room.members.find(
+      (candidate) =>
+        (subject.accountId !== null && candidate.accountId === subject.accountId) ||
+        (subject.guestId !== null && candidate.guestId === subject.guestId),
+    );
     if (!member) {
       ws.close(CLOSE_ROOM_NOT_FOUND, "unknown player");
       return;
     }
-    const previous = this.sockets.get(message.playerId);
+    const playerId = member.playerId;
+    const previous = this.sockets.get(playerId);
     if (previous && previous !== ws) {
       this.send(previous, { t: "error", code: "unsupported-message", detail: "replaced by a newer connection" });
       previous.close(4408, "replaced");
     }
-    this.meta.set(ws, { playerId: message.playerId, authed: true });
-    this.sockets.set(message.playerId, ws);
+    this.meta.set(ws, { ...meta, playerId, authed: true });
+    this.sockets.set(playerId, ws);
     this.room = this.withActivity({
       ...this.room,
       members: this.room.members.map((candidate) =>
-        candidate.playerId === message.playerId
-          ? { ...candidate, connectionState: "connected", seenConnected: true }
+        candidate.playerId === playerId
+          ? {
+              ...candidate,
+              connectionState: "connected",
+              seenConnected: true,
+              ...(message.mobileId ? { mobileId: message.mobileId } : {}),
+              ...(message.displayName ? { displayName: message.displayName } : {}),
+            }
           : candidate,
       ),
     });
     await this.persist();
-    this.send(ws, { t: "room_state", room: this.publicState(), you: message.playerId });
-    this.broadcast({ t: "peer_joined", playerId: message.playerId, room: this.publicState() }, message.playerId);
+    this.send(ws, { t: "room_state", room: this.publicState(), you: { playerId, slot: member.slot } });
+    this.broadcast({ t: "peer_joined", playerId, slot: member.slot, room: this.publicState() }, playerId);
     if (this.room.status === "playing" && this.room.lastSnapshot) {
       this.send(ws, { t: "snapshot_state", snapshot: this.room.lastSnapshot });
     }

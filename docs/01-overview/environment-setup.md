@@ -43,15 +43,27 @@ If the repo still has no remote, `git init` first and commit the scaffold as des
 | `D1_BINDING` / `DB` | binding, not a var | `GBW_DB` | D1 database binding in `wrangler.jsonc` |
 
 Web variables live in `apps/web/.env.local` (git-ignored); worker secrets are set with
-`pnpm exec wrangler secret put SESSION_TOKEN_SECRET` and never committed. `.env.example` lists the names only — no values,
-no real keys (`06-security.md` § 1).
+`pnpm exec wrangler secret put SESSION_TOKEN_SECRET` and never committed. `.env.example` and
+`apps/worker/.dev.vars.example` list the names only — no values, no real keys (`06-security.md` § 1).
+
+For local development copy the worker example once and give the secret a throwaway value:
+
+```bash
+cp apps/worker/.dev.vars.example apps/worker/.dev.vars   # already set to a throwaway value
+```
+
+Without it every session call fails with `500 internal` and the log line
+`Imported HMAC key length (0) must be a non-zero value`; the Worker now refuses to start a session instead of
+producing an invalid key. In `ENVIRONMENT=development` the Worker also accepts `http://localhost:*` and
+`http://127.0.0.1:*` origins in addition to `ALLOWED_ORIGINS`, so the Vite dev server works on any port; production
+stays an explicit list (`NFR-11`).
 
 ## 4. First-time Cloudflare resources
 
 ```bash
 pnpm exec wrangler d1 create gbw-db                 # paste the database_id into wrangler.jsonc
-pnpm exec wrangler d1 migrations apply gbw-db --local
-pnpm exec wrangler d1 migrations apply gbw-db --remote
+pnpm --filter @gbw/worker exec wrangler d1 migrations apply GBW_DB --local
+pnpm --filter @gbw/worker exec wrangler d1 migrations apply GBW_DB --remote
 ```
 
 `--local` is what tests and `wrangler dev` use; `--remote` only for preview/production.
@@ -62,8 +74,11 @@ Two processes, two terminals:
 
 ```bash
 pnpm dev:worker     # wrangler dev on :8787 (API + Durable Object + local D1)
-pnpm dev            # vite on :5173 (SPA, proxies nothing — talks to VITE_API_BASE_URL)
+pnpm dev            # vite on :5173 (SPA, proxies /api to :8787)
 ```
+
+If port 5173 is taken, pass another one — the browser suite reads the same value:
+`pnpm dev --port 5199 --strictPort` and `E2E_BASE_URL=http://127.0.0.1:5199 E2E_WEB_PORT=5199 npx playwright test`.
 
 Open `http://localhost:5173`. Two browser windows (one normal, one private) are enough to play a 1v1; the DO runs in the
 local miniflare instance, so WebRTC works on `localhost` without TURN.

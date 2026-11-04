@@ -98,4 +98,4 @@ use `miniflare`'s `SELF.fetch` for the upgrade and a raw `WebSocketPair` harness
 
 ## Delivery status — 2026-11-05
 
-**in-progress.** join, slot assignment and the `room_state` push are implemented; the WebSocket path needs a running Worker (`wrangler dev`) — `tests/e2e/lobby.spec.ts` covers it but was not executed here.
+**in-progress.** `POST /api/v1/rooms/{code}/join` seats the guest, the lobby opens `GET /rooms/{code}/ws`, the DO verifies the session token from the `auth` frame and pushes `room_state` with `you`. Proven against a real Durable Object with two clients (join → teams → start → snapshot → host migration). Remaining: the two-phone pass on real devices.

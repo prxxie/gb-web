@@ -1,0 +1,6 @@
+# Copy to .dev.vars for local work. Never commit a real value (rule 06).
+SESSION_TOKEN_SECRET=dev-only-change-me
+CLERK_ISSUER=
+TURN_KEY_ID=
+TURN_KEY_API_TOKEN=
+VERSION=dev

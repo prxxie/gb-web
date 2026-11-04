@@ -24,11 +24,34 @@ export interface RulerLayout {
 }
 
 /** Default window is half the map in each direction: 1,000 × 600 units. */
+/**
+ * The opening view: half the map wide, half the map tall, **anchored to the ground line**.
+ *
+ * Centring vertically would frame empty sky and cut the terrain off — the ground band sits at the
+ * bottom of the map, so the window sits on the bottom edge (`docs/02-reference/gameplay/tunables.md` § 9).
+ */
 export function defaultWindow(aspect: number): CameraWindow {
   const width = TUNABLES.viewDefaultWidth;
   const height = Math.min(TUNABLES.viewDefaultHeight, width / aspect);
-  return { x: (TUNABLES.mapWidth - width) / 2, y: (TUNABLES.mapHeight - height) / 2, width, height };
+  return { x: (TUNABLES.mapWidth - width) / 2, y: TUNABLES.mapHeight - height, width, height };
 }
+
+/** Follow a player: centre horizontally, keep the ground anchored (clamped inside the map). */
+export function windowOn(
+  targetX: number,
+  aspect: number,
+  groundY: number = TUNABLES.mapHeight,
+  width = TUNABLES.viewDefaultWidth,
+): CameraWindow {
+  const height = Math.min(TUNABLES.viewDefaultHeight, width / aspect);
+  // Anchor the frame just under the target's feet, so the mobile sits in the lower third with room to
+  // lob upward, and the frame never scrolls past the map's ground line.
+  const bottom = Math.min(TUNABLES.mapHeight, groundY + height * GROUND_MARGIN);
+  return clampWindow({ x: targetX - width / 2, y: bottom - height, width, height });
+}
+
+/** How far below the target's feet the frame extends, as a fraction of the window height. */
+const GROUND_MARGIN = 0.3;
 
 /** Zoom is expressed as a window width: 250 (closest) … 2,000 (whole map). */
 export function windowFromZoom(zoomWidth: number, aspect: number, anchorX: number, anchorY: number): CameraWindow {

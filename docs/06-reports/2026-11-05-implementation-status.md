@@ -14,9 +14,9 @@ every acceptance criterion.
 | Area | Location | State |
 |---|---|---|
 | Engine (`NFR-22`) | `packages/core/src` — 20 modules: ballistics, combat, terrain, turn queue, weather, gimmicks, movement, items, modes, avatars, mobiles, maps, snapshot codec, bot, room rules, camera, rating, match | complete, unit-tested |
-| API + realtime | `apps/worker` — router, 12 endpoints, Durable Object room, D1 migrations, session/JWT/Clerk verification, RFC 9457 errors, rate limits, structured logs | complete, library layer unit-tested |
+| API + realtime | `apps/worker` — router, 13 endpoints (incl. `POST /rooms/{code}/join`), Durable Object room with in-DO session verification, D1 migrations, Clerk JWT verification, RFC 9457 errors, rate limits, structured logs | complete; library layer unit-tested and the HTTP + WebSocket path exercised against `wrangler dev` |
 | Client | `apps/web` — React 19 shell, 7 routes, vi/en tables, Phaser 4 scene, camera/zoom/ruler, power ring, four-way pad, WebRTC star mesh, PWA, landscape gate | complete, component layer unit-tested |
-| Quality | `packages/core/tests`, `apps/worker/tests`, `apps/web/tests`, `tests/meta`, `tests/e2e` | 100 automated cases, 13 spec files |
+| Quality | `packages/core/tests`, `apps/worker/tests`, `apps/web/tests`, `tests/meta`, `tests/e2e` | 102 unit cases in 12 spec files plus 6 browser scenarios in 3 Playwright specs |
 
 ## 3. Verification actually performed
 
@@ -24,7 +24,10 @@ every acceptance criterion.
 |---|---|---|
 | Typecheck | `npx tsc -b` | clean, all three projects |
 | Lint | `npx eslint .` | clean |
-| Unit and integration tests | `npx vitest run` | **100 passed / 100**, 13 files |
+| Unit and integration tests | `npx vitest run` | **102 passed / 102**, 12 files |
+| Browser scenarios | `npx playwright test` | **6 passed** (battlefield mounts, pull raises power, host creates + guest joins, cold results redirect, no fullscreen meta, a11y targets) |
+| API smoke (local Worker) | `wrangler dev` + curl | health `200`, guest session `201`, room create `201`, room preview `200`, WS upgrade `101`, leaderboard `200` |
+| Two-client room flow | script over two sockets | join, team assignment, `match_started` (seed + assignments), snapshot relay, host migration to generation 2 |
 | Production build | `pnpm build` | web 1.86 MB precache (first load 470 kB), worker 111 KiB upload / 29.8 KiB gzip |
 | Documentation gate | `node .agents/scripts/verify-docs.mjs` | 0 errors, 0 warnings |
 | Case traceability | `tests/meta/traceability.test.ts` | 72 of 162 documented cases have an automated test; no test cites an undocumented id |
@@ -36,7 +39,7 @@ every acceptance criterion.
 |---|---|
 | Clerk sign-in, profile, account deletion (`US-AUTH-002/003/004`) | needs a Clerk application and its publishable key |
 | Two-phone touch pass, landscape rotation, PWA install (`US-MATCH-*`, `US-PWA-001/003`) | needs physical devices |
-| WebRTC play between two players (`US-NET-*`) | needs two browsers and a deployed signalling Worker |
+| WebRTC play between two players (`US-NET-*`) | signalling, host election and snapshot relay are proven; the peer-to-peer `RTCPeerConnection` leg needs two browsers plus a TURN deployment |
 | Durable Object reconnect, host migration on a live room (`US-ROOM-002/004/006`) | needs `wrangler dev` with D1 and the DO namespace |
 | Match recording against D1, leaderboard (`US-RANK-001/003/004`) | needs a migrated D1 database |
 | Preview and production deployment (`US-FND-004`) | needs a GitHub remote and Cloudflare credentials |

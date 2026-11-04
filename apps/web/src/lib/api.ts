@@ -170,6 +170,8 @@ export interface RoomResponse {
   readonly roomCode: string;
   readonly playerId: string;
   readonly wsUrl: string;
+  readonly maxPlayers?: number;
+  readonly settings?: { readonly maxPlayers: number; readonly mode: string; readonly mapId: string };
 }
 
 export interface TurnCredentials {
@@ -215,6 +217,11 @@ export const api = {
     token: string,
     body: { displayName: string; mobileId: string; avatarId: string; maxPlayers: number; mode: string; mapId: string },
   ) => request<RoomResponse>("/rooms", { method: "POST", body, token }),
+  joinRoom: (
+    token: string,
+    roomCode: string,
+    body: { displayName: string; mobileId: string; avatarId: string },
+  ) => request<RoomResponse>(`/rooms/${roomCode}/join`, { method: "POST", body, token }),
   roomPreview: (roomCode: string) => request<{ roomCode: string; status: string; joined: number }>(`/rooms/${roomCode}`),
   turnCredentials: (token: string) => request<TurnCredentials>("/turn-credentials", { token }),
   submitMatch: (token: string, body: unknown, idempotencyKey: string) =>

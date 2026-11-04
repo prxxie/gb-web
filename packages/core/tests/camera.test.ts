@@ -10,6 +10,7 @@ import {
   powerRingRadius,
   rulerLayout,
   windowFromZoom,
+  windowOn,
   zoomOf,
 } from "../src/camera.js";
 import { MAP_BOUNDS } from "../src/data/maps.js";
@@ -27,6 +28,29 @@ describe("TC-MATCH-918: the window", () => {
     const tall = defaultWindow(1);
     expect(tall.height).toBeLessThanOrEqual(MAP_BOUNDS.height / 2);
     expect(tall.width).toBeLessThanOrEqual(MAP_BOUNDS.width / 2);
+  });
+
+  it("sits on the ground line so the battlefield is visible, not the sky", () => {
+    const window = defaultWindow(WIDE);
+    // The bottom edge is the map's ground line, so terrain and mobiles are always in frame.
+    expect(window.y + window.height).toBeCloseTo(MAP_BOUNDS.height, 0);
+    expect(window.y).toBeGreaterThanOrEqual(MAP_BOUNDS.height / 2);
+  });
+
+  it("frames a target horizontally and stays on the ground line", () => {
+    const centred = windowOn(MAP_BOUNDS.width / 2, WIDE);
+    expect(centred.x + centred.width / 2).toBeCloseTo(MAP_BOUNDS.width / 2, 0);
+    expect(centred.y + centred.height).toBeCloseTo(MAP_BOUNDS.height, 0);
+    const edge = windowOn(0, WIDE);
+    expect(edge.x).toBe(0);
+  });
+
+  it("puts the shooter's feet in the lower third when a ground height is given", () => {
+    const groundY = MAP_BOUNDS.height * 0.55;
+    const framed = windowOn(MAP_BOUNDS.width * 0.3, WIDE, groundY);
+    const feetFromTop = (groundY - framed.y) / framed.height;
+    expect(feetFromTop).toBeGreaterThan(0.6);
+    expect(feetFromTop).toBeLessThan(0.8);
   });
 
   it("never leaves the map", () => {

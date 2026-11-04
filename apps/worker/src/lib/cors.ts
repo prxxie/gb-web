@@ -15,7 +15,11 @@ export function decideCors(request: Request, allowedOrigins: readonly string[]):
   const origin = request.headers.get("origin");
   if (!origin) return { allowed: true, origin: null };
   const normalised = origin.replace(/\/$/, "");
-  const allowed = allowedOrigins.some((candidate) => candidate.replace(/\/$/, "") === normalised);
+  const allowed = allowedOrigins.some((candidate) => {
+    const pattern = candidate.replace(/\/$/, "");
+    if (pattern.endsWith(":*")) return normalised.startsWith(`${pattern.slice(0, -2)}:`);
+    return pattern === normalised;
+  });
   return { allowed, origin: allowed ? normalised : null };
 }
 
@@ -34,4 +38,13 @@ export function corsHeaders(origin: string | null, requestMethod: string): Recor
 /** Preflight answers are always `204` and never touch auth or the database. */
 export function preflight(origin: string | null): Response {
   return new Response(null, { status: 204, headers: corsHeaders(origin, "OPTIONS") });
+}
+
+/** Copy a response so its headers carry the CORS decision; the body is reused, not re-read. */
+export function withCors(response: Response, origin: string): Response {
+  const headers = new Headers(response.headers);
+  for (const [name, value] of Object.entries(corsHeaders(origin, response.status === 204 ? "OPTIONS" : "GET"))) {
+    headers.set(name, value);
+  }
+  return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
 }

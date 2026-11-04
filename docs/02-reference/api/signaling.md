@@ -19,7 +19,7 @@ the budget (`NFR-04`), and readability is worth more at this stage.
 
 | `t` | Fields | Rule |
 |-----|--------|------|
-| `auth` | `token`, `displayName?`, `avatarId?`, `accountId?`, `guestId?` | First frame, within 5 s, else the socket closes with `4401`. The token is the session token; `accountId` must match the token's `sub` when `kind = 'account'` |
+| `auth` | `token`, `mobileId?`, `displayName?`, `avatarId?` | First frame, within 5 s, else the socket closes with `4401`. The DO verifies `token` itself and binds the socket to the member whose `accountId`/`guestId` matches the token subject — identity never comes from the frame, and the bearer header cannot be used here because a browser cannot set one on a WebSocket |
 | `signal` | `to` (playerId), `payload` (`{ sdp }` or `{ candidate }`) | Relayed verbatim to `to`; the DO never parses SDP. Max 8 KB per payload |
 | `team_assign` | `assignments: [{ playerId, team }]` | Host only (`403 not-host`). Lobby only; must produce equal team sizes at `start_match` |
 | `start_match` | `rulesetVersion` | Host only; all members `connected`; both teams non-empty and equal → `status: 'playing'` |
@@ -33,10 +33,10 @@ the budget (`NFR-04`), and readability is worth more at this stage.
 | `t` | Fields | Meaning |
 |-----|--------|---------|
 | `room_state` | `RoomState` (as in [room-state.md](../data/room-state.md), without sockets), `you: { playerId, slot }` | Sent after successful `auth` and on every membership/team/host change |
-| `peer_joined` | `playerId`, `slot`, `displayName`, `avatarId` | Fast path for the lobby UI (also reflected in the next `room_state`) |
+| `peer_joined` | `playerId`, `slot`, `room` | Fast path for the lobby UI (also reflected in the next `room_state`) |
 | `peer_left` | `playerId`, `reason`: `'left' \| 'grace' \| 'disconnected'` | Mirrors `connectionState` |
 | `signal` | `from` (playerId), `payload` | Relay of a peer's `signal` |
-| `match_started` | `startedAt`, `hostPlayerId`, `hostGeneration`, `rulesetVersion`, `assignments[]` | Both peers and host switch to the match scene on this |
+| `match_started` | `startedAt`, `seed`, `hostPlayerId`, `hostGeneration`, `rulesetVersion`, `assignments[]` (`{ playerId, slot, team, mobileId, accountId }`), `room` | Both peers and host switch to the match scene on this; `seed` makes weather and spawns reproducible on every client |
 | `host_changed` | `hostPlayerId`, `hostGeneration`, `lastSnapshot: { seq, payload } \| null`, `gracedPlayerId` | Migration event; peers discard snapshots with a lower `hostGeneration` |
 | `match_recorded` | `matchId`, `ranked`, `ratings[]` | Host's confirmation; broadcast to members so the results screen can show deltas |
 | `pong` | `at` | Echoes the client's `at` + server `now` for RTT display |

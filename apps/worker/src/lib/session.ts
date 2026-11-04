@@ -38,6 +38,11 @@ function fromB64url(value: string): Uint8Array {
 }
 
 async function key(secret: string): Promise<CryptoKey> {
+  // An empty secret produces a zero-length HMAC key, which WebCrypto rejects with a cryptic
+  // DataError. A missing binding is a configuration fault, so it is named as one (`rule 06`).
+  if (secret.trim() === "") {
+    throw new ProblemError("internal", "SESSION_TOKEN_SECRET is not configured");
+  }
   return crypto.subtle.importKey("raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, [
     "sign",
     "verify",

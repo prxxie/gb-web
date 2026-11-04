@@ -28,6 +28,7 @@
   "lobby.map": "Bản đồ",
   "lobby.reconnecting": "Mất kết nối — thử lại sau {seconds}s",
   "match.yourTurn": "Lượt của bạn",
+  "match.bot": "Máy",
   "match.waitingTurn": "Đang chờ {name}",
   "match.power": "Lực",
   "match.angle.up": "Tăng góc",

@@ -26,7 +26,7 @@ export function MainPage(): JSX.Element {
   const mapId = useMemo(() => MAPS[0]?.mapId ?? "map-01", []);
 
   const startBot = (): void => {
-    if (!session) return;
+    // A bot match runs entirely on the device (`NFR-21`), so it needs no session and works offline.
     const plan: PlannedMatch = {
       kind: "bot",
       roomCode: makeRoomCode(() => Math.floor(Math.random() * 31)),
@@ -36,10 +36,12 @@ export function MainPage(): JSX.Element {
         {
           slot: 0,
           team: "A",
-          accountId: session.subject.accountId ?? null,
-          displayName: session.subject.displayName,
+          accountId: session?.subject.accountId ?? null,
+          displayName: session?.subject.displayName ?? t("signIn.guest"),
           mobileId,
         },
+        // A practice match always has an opponent, or the team check would end it on the first turn.
+        { slot: 1, team: "B", accountId: null, displayName: t("match.bot"), mobileId: "mbl-04" },
       ],
       seed: Math.floor(Math.random() * 0xffffff),
       mapId,
@@ -64,6 +66,8 @@ export function MainPage(): JSX.Element {
         mode,
         mapId,
       });
+      // The lobby reuses the seat this call created instead of creating a second one.
+      sessionStorage.setItem(`gbw.room.${room.roomCode}`, room.playerId);
       navigate(`/lobby/${room.roomCode}`);
     } catch {
       setError(t("common.retry"));
@@ -106,7 +110,7 @@ export function MainPage(): JSX.Element {
             ))}
           </select>
         </label>
-        <button type="button" className="primary" data-testid="play-bot" onClick={startBot} disabled={!session}>
+        <button type="button" className="primary" data-testid="play-bot" onClick={startBot}>
           {t("main.playBot")}
         </button>
         <p className="muted">{t("main.offline")}</p>

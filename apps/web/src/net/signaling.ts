@@ -18,19 +18,31 @@ export type ClientMessage =
   | { readonly t: "ping" };
 
 export type ServerMessage =
-  | { readonly t: "room_state"; readonly room: RoomState; readonly lastSnapshot?: Snapshot | null }
-  | { readonly t: "peer_joined"; readonly playerId: string; readonly slot: number }
+  | {
+      readonly t: "room_state";
+      readonly room: RoomState;
+      readonly you?: { readonly playerId: string; readonly slot: number };
+      readonly lastSnapshot?: Snapshot | null;
+    }
+  | { readonly t: "peer_joined"; readonly playerId: string; readonly slot: number; readonly room: RoomState }
   | { readonly t: "peer_left"; readonly playerId: string }
   | { readonly t: "signal"; readonly from: string; readonly kind: "offer" | "answer" | "candidate"; readonly payload: unknown }
   | { readonly t: "host_changed"; readonly hostPlayerId: string; readonly hostGeneration: number; readonly lastSnapshot: Snapshot | null }
   | {
       readonly t: "match_started";
-      readonly seed: number;
-      readonly mapId: string;
-      readonly mode: string;
       readonly startedAt: number;
-      readonly turnOrder: readonly number[];
+      readonly seed: number;
+      readonly hostPlayerId: string | null;
       readonly hostGeneration: number;
+      readonly rulesetVersion: string;
+      readonly assignments: readonly {
+        readonly playerId: string;
+        readonly slot: number;
+        readonly team: "A" | "B" | null;
+        readonly mobileId?: string;
+        readonly accountId: string | null;
+      }[];
+      readonly room: RoomState;
     }
   | { readonly t: "snapshot_state"; readonly snapshot: Snapshot }
   | { readonly t: "pong" }

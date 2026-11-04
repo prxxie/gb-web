@@ -9,6 +9,7 @@ import Phaser from "phaser";
 import {
   TUNABLES,
   defaultWindow,
+  windowOn,
   panBy,
   pinchTo,
   powerRingRadius,
@@ -55,20 +56,34 @@ class BattleScene extends Phaser.Scene {
   private pullAngle = 0;
   private pointerHandlers: Array<{ type: string; handler: (event: PointerEvent) => void }> = [];
 
+
   constructor(state: MatchState, localSlot: number, callbacks: BattleCallbacks) {
     super("battle");
     this.state = state;
     this.localSlot = localSlot;
     this.callbacks = callbacks;
+    // The camera is framed in `create()`: Phaser has no `scale` until the scene is booted.
     this.window = defaultWindow(16 / 9);
   }
 
   setState(state: MatchState, localSlot: number): void {
+    const previous = this.state.turn.activeSlot;
     this.state = state;
     this.localSlot = localSlot;
+    // The camera follows whoever is shooting until the player pans; a shot that never leaves the screen
+    // does not exist, so the view settles on the active mobile at the start of each turn.
+    if (state.turn.activeSlot !== previous) this.frameOn(state.turn.activeSlot, state);
+  }
+
+  /** Centre horizontally on the active mobile and keep the ground line anchored. */
+  private frameOn(slot: number, state: MatchState): void {
+    const player = state.players.find((candidate) => candidate.slot === slot);
+    if (!player) return;
+    this.window = windowOn(player.x, this.scale.width / Math.max(1, this.scale.height), player.y);
   }
 
   create(): void {
+    this.frameOn(this.state.turn.activeSlot, this.state);
     this.graphics = this.add.graphics();
     this.cameras.main.setBackgroundColor("#0b1220");
     this.attachPointerHandlers();
@@ -118,6 +133,9 @@ class BattleScene extends Phaser.Scene {
         if (power >= TUNABLES.powerDeadzone) this.callbacks.onRelease(power, angle);
         else this.callbacks.onCancel();
       }
+      // The pull is spent: clear the ring and the predicted arc until the next gesture starts.
+      this.pullPower = 0;
+      this.pullAngle = 0;
       this.origin = null;
       this.previousSpread = null;
       if (this.pointers.pointers.length === 0) this.pointers = clearPointers();
@@ -145,7 +163,7 @@ class BattleScene extends Phaser.Scene {
     return player?.facing ?? 1;
   }
 
-  private interpret(point: Point): void {
+  private interpret(_point: Point): void {
     const gesture = classify(this.pointers, {
       origin: this.origin,
       facing: this.facing(),
@@ -159,10 +177,9 @@ class BattleScene extends Phaser.Scene {
       return;
     }
     if (gesture.kind === "pan") {
-      const world = screenToWorld(this.window, viewportFor(this.window, this.scale.width, this.scale.height), point.x, point.y);
+      // Two fingers pan the window; the camera then stays where the player put it until the next turn.
       this.window = panBy(this.window, gesture.dx, gesture.dy, this.scale.width);
       this.callbacks.onCamera(this.window);
-      void world;
       return;
     }
     if (gesture.kind === "zoom") {
@@ -220,39 +237,97 @@ class BattleScene extends Phaser.Scene {
     void height;
   }
 
+  /**
+   * A vector mobile: treads, hull in the team colour, a turret whose barrel follows the aim, a health bar
+   * with the shield ring around it, and a name plate. Placeholder art — `US-CORE-007` swaps in sprites.
+   */
   private drawPlayer(graphics: Phaser.GameObjects.Graphics, player: PlayerState): void {
     const mobile = getMobile(player.mobileId);
-    const bodyWidth = 44;
-    const bodyHeight = 20;
+    const halfWidth = 26;
+    const hullHeight = 16;
+    const groundY = player.y;
+
     if (player.eliminated) {
-      graphics.lineStyle(3, 0x7a4a4a, 0.9);
-      graphics.lineBetween(player.x - bodyWidth / 2, player.y - bodyHeight / 2, player.x + bodyWidth / 2, player.y + bodyHeight / 2);
-      graphics.lineBetween(player.x + bodyWidth / 2, player.y - bodyHeight / 2, player.x - bodyWidth / 2, player.y + bodyHeight / 2);
+      graphics.lineStyle(3, 0x6b3f3f, 0.9);
+      graphics.lineBetween(player.x - halfWidth, groundY - 6, player.x + halfWidth, groundY - 26);
+      graphics.lineBetween(player.x + halfWidth, groundY - 6, player.x - halfWidth, groundY - 26);
       return;
     }
+
     const accent = player.team === "A" ? 0x4f9dff : 0xff7043;
+    const active = player.slot === this.state.turn.activeSlot;
+
+    // Drop shadow and treads.
+    graphics.fillStyle(0x000000, 0.28);
+    graphics.fillEllipse(player.x, groundY - 1, halfWidth * 2.4, 9);
+    graphics.fillStyle(0x1b2531, 1);
+    graphics.fillRoundedRect(player.x - halfWidth - 4, groundY - 12, (halfWidth + 4) * 2, 12, 5);
+    graphics.lineStyle(1, 0x33465c, 0.9);
+    for (let tick = -halfWidth; tick <= halfWidth; tick += 8) {
+      graphics.lineBetween(player.x + tick, groundY - 11, player.x + tick, groundY - 2);
+    }
+
+    // Hull with a lighter top deck, then the turret and barrel.
     graphics.fillStyle(accent, 1);
-    graphics.fillRoundedRect(player.x - bodyWidth / 2, player.y - bodyHeight, bodyWidth, bodyHeight, 4);
-    graphics.lineStyle(3, 0x101820, 1);
-    const barrelLength = 34;
-    const muzzleAngle = ((this.pullAngleFor(player) * Math.PI) / 180) * -1;
+    graphics.fillRoundedRect(player.x - halfWidth, groundY - 12 - hullHeight, halfWidth * 2, hullHeight, 5);
+    graphics.fillStyle(0xffffff, 0.18);
+    graphics.fillRoundedRect(player.x - halfWidth + 3, groundY - 11 - hullHeight, halfWidth * 2 - 6, 5, 3);
+
+    const turretY = groundY - 12 - hullHeight - 2;
+    const aim = ((this.pullAngleFor(player) * Math.PI) / 180) * -1;
+    const barrel = 30;
+    graphics.lineStyle(7, 0x16202b, 1);
     graphics.lineBetween(
       player.x,
-      player.y - bodyHeight,
-      player.x + Math.cos(muzzleAngle) * barrelLength * player.facing,
-      player.y - bodyHeight + Math.sin(muzzleAngle) * barrelLength,
+      turretY,
+      player.x + Math.cos(aim) * barrel * player.facing,
+      turretY + Math.sin(aim) * barrel,
     );
-    // Health bar.
-    const ratio = Math.max(0, Math.min(1, player.hp / Math.max(1, getMobile(player.mobileId).maxHp)));
-    graphics.fillStyle(0x101820, 0.9);
-    graphics.fillRect(player.x - 24, player.y - bodyHeight - 14, 48, 6);
+    graphics.lineStyle(3, accent, 1);
+    graphics.lineBetween(
+      player.x,
+      turretY,
+      player.x + Math.cos(aim) * (barrel - 4) * player.facing,
+      turretY + Math.sin(aim) * (barrel - 4),
+    );
+    graphics.fillStyle(0x16202b, 1);
+    graphics.fillCircle(player.x, turretY, 8);
+    graphics.fillStyle(accent, 1);
+    graphics.fillCircle(player.x, turretY, 5);
+
+    // Health bar, shield arc and the active-player ring.
+    const ratio = Math.max(0, Math.min(1, player.hp / Math.max(1, mobile.maxHp)));
+    const barY = turretY - 22;
+    graphics.fillStyle(0x0b1220, 0.9);
+    graphics.fillRoundedRect(player.x - 26, barY, 52, 7, 3);
     graphics.fillStyle(ratio > 0.5 ? 0x5cd67a : ratio > 0.25 ? 0xf2c14e : 0xe5544b, 1);
-    graphics.fillRect(player.x - 24, player.y - bodyHeight - 14, 48 * ratio, 6);
-    if (player.shield > 0) {
-      graphics.lineStyle(2, 0x7fd6ff, 0.8);
-      graphics.strokeCircle(player.x, player.y - bodyHeight / 2, 30);
+    graphics.fillRoundedRect(player.x - 26, barY, 52 * ratio, 7, 3);
+    if (ratio < 1) {
+      graphics.lineStyle(1, 0xffffff, 0.25);
+      graphics.strokeRoundedRect(player.x - 26, barY, 52, 7, 3);
     }
-    void mobile;
+    if (player.shield > 0) {
+      const shieldRatio = Math.max(0, Math.min(1, player.shield / Math.max(1, mobile.maxShield)));
+      graphics.lineStyle(3, 0x7fd6ff, 0.85);
+      graphics.beginPath();
+      graphics.arc(player.x, turretY, 30, Math.PI, Math.PI + Math.PI * shieldRatio, false);
+      graphics.strokePath();
+    }
+    if (active) {
+      graphics.lineStyle(2, 0xffffff, 0.8);
+      graphics.strokeCircle(player.x, turretY, 34);
+      graphics.fillStyle(0xffffff, 0.9);
+      graphics.fillTriangle(
+        player.x - 6,
+        turretY - 46,
+        player.x + 6,
+        turretY - 46,
+        player.x,
+        turretY - 38,
+      );
+    }
+    graphics.lineStyle(1, 0xffffff, 0.12);
+    graphics.lineBetween(player.x - halfWidth, groundY, player.x + halfWidth, groundY);
   }
 
   private pullAngleFor(player: PlayerState): number {

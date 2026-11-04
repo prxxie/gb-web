@@ -104,10 +104,16 @@ export function ResultsPage(): JSX.Element {
     <div className="screen">
       <header className="card">
         <h1 data-testid="result-banner">
-          {payload.winnerTeam === null ? t("results.draw") : `${t("results.winner")} — ${payload.winnerTeam}`}
+          {payload.winnerTeam === null
+            ? t("results.draw")
+            : t("results.winner", { team: payload.winnerTeam })}
         </h1>
         <p className="muted">
-          {ranked ? t("results.ranked") : `${t("results.unranked")}${submission?.rankedReason ? ` (${submission.rankedReason})` : ""}`}
+          {ranked
+            ? t("results.ranked")
+            : t("results.unranked", {
+                reason: submission?.rankedReason ?? (session?.subject.accountId ? "pending" : "guest"),
+              })}
         </p>
         {error ? <p className="muted">{error}</p> : null}
       </header>

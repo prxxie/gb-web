@@ -28,6 +28,7 @@
   "lobby.map": "Map",
   "lobby.reconnecting": "Disconnected — retrying in {seconds}s",
   "match.yourTurn": "Your turn",
+  "match.bot": "Bot",
   "match.waitingTurn": "Waiting for {name}",
   "match.power": "Power",
   "match.angle.up": "Raise angle",

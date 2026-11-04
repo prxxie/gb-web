@@ -6,7 +6,7 @@
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { MAPS, MOBILES, canStart, defaultSettings, type RoomState } from "@gbw/core";
+import { MOBILES, canStart, defaultSettings, type RoomState } from "@gbw/core";
 import { useLocale, useSession } from "../app/providers";
 import { api } from "../lib/api";
 import { connectRoom, type RoomSocket, type ServerMessage } from "../net/signaling";
@@ -33,79 +33,78 @@ export function LobbyPage(): JSX.Element {
     if (!session || joined.current) return;
     joined.current = true;
     const base = window.location.origin.replace(/^http/, "ws");
-    const planned: PlannedMatch = {
-      kind: "online",
-      roomCode: code,
-      localSlot: 0,
-      playerId: "",
-      seats: [],
-      seed: 0,
-      mapId: MAPS[0]?.mapId ?? "map-01",
-      mode: "solo",
-      maxPlayers: 2,
-      hostPlayerId: "",
+    const stored = sessionStorage.getItem(`gbw.room.${code}`);
+    let cancelled = false;
+
+    /** The first arrival joins with its own identity; anyone returning keeps the playerId the room gave it. */
+    const enter = async (): Promise<string | null> => {
+      if (stored) return stored;
+      try {
+        const joinedRoom = await api.joinRoom(session.token, code, {
+          displayName: session.subject.displayName,
+          mobileId,
+          avatarId: session.subject.avatarId ?? "default",
+        });
+        sessionStorage.setItem(`gbw.room.${code}`, joinedRoom.playerId);
+        return joinedRoom.playerId;
+      } catch {
+        return null;
+      }
     };
-    sessionStorage.setItem("gbw.lobby", JSON.stringify(planned));
 
-    void api.createRoom(session.token, {
-      displayName: session.subject.displayName,
-      mobileId,
-      avatarId: session.subject.avatarId ?? "default",
-      maxPlayers: 2,
-      mode: "solo",
-      mapId: MAPS[0]?.mapId ?? "map-01",
-    }).catch(() => undefined);
-
-    socket.current = connectRoom({
-      wsUrl: `${base}/api/v1/rooms/${code}/ws`,
-      token: session.token,
-      displayName: session.subject.displayName,
-      mobileId,
-      avatarId: session.subject.avatarId ?? "default",
-      onMessage: (message: ServerMessage) => {
-        if (message.t === "room_state") {
-          setRoom(message.room);
-          setStatus("live");
-          if (!playerId) {
-            const mine = message.room.members.find((member) => member.accountId === session.subject.accountId)
-              ?? message.room.members[message.room.members.length - 1]
-              ?? null;
-            if (mine) setPlayerId(mine.playerId);
+    void enter().then((selfId) => {
+      if (cancelled || !selfId) {
+        setStatus("closed");
+        return;
+      }
+      setPlayerId(selfId);
+      socket.current = connectRoom({
+        wsUrl: `${base}/api/v1/rooms/${code}/ws`,
+        token: session.token,
+        displayName: session.subject.displayName,
+        mobileId,
+        avatarId: session.subject.avatarId ?? "default",
+        onMessage: (message: ServerMessage) => {
+          if (message.t === "room_state") {
+            setRoom(message.room);
+            setStatus("live");
+            if (message.you) setPlayerId(message.you.playerId);
+            return;
           }
-          return;
-        }
-        if (message.t === "peer_left") {
-          setGrace(20);
-          return;
-        }
-        if (message.t === "match_started") {
-          const plan: PlannedMatch = {
-            kind: "online",
-            roomCode: code,
-            localSlot: self?.slot ?? 0,
-            playerId: playerId ?? "",
-            seats:
-              room?.members.map((member) => ({
+          if (message.t === "peer_left") {
+            setGrace(20);
+            return;
+          }
+          if (message.t === "match_started") {
+            const mine = message.room.members.find((member) => member.playerId === selfId) ?? null;
+            const plan: PlannedMatch = {
+              kind: "online",
+              roomCode: code,
+              localSlot: mine?.slot ?? 0,
+              playerId: selfId,
+              seats: message.room.members.map((member) => ({
                 slot: member.slot,
                 team: member.team ?? "A",
                 accountId: member.accountId,
                 displayName: member.displayName,
                 mobileId: member.mobileId ?? mobileId,
-              })) ?? [],
-            seed: message.seed,
-            mapId: message.mapId,
-            mode: message.mode as PlannedMatch["mode"],
-            maxPlayers: (room?.settings.maxPlayers ?? 2) as PlannedMatch["maxPlayers"],
-            hostPlayerId: room?.hostPlayerId ?? "",
-          };
-          sessionStorage.setItem("gbw.match", JSON.stringify(plan));
-          navigate(`/match/${code}`);
-        }
-      },
-      onClose: () => setStatus("closed"),
+              })),
+              seed: message.seed,
+              mapId: message.room.settings.mapId,
+              mode: message.room.settings.mode as PlannedMatch["mode"],
+              maxPlayers: message.room.settings.maxPlayers as PlannedMatch["maxPlayers"],
+              hostPlayerId: message.room.hostPlayerId ?? "",
+            };
+            sessionStorage.setItem("gbw.match", JSON.stringify(plan));
+            navigate(`/match/${code}`);
+          }
+        },
+        onClose: () => setStatus("closed"),
+      });
     });
 
     return () => {
+      cancelled = true;
       socket.current?.close();
       socket.current = null;
       joined.current = false;

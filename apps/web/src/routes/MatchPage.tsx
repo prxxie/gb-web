@@ -144,11 +144,15 @@ export function MatchPage(): JSX.Element {
     [navigate],
   );
 
-  const commit = useCallback((next: MatchState, events: readonly MatchEvent[]) => {
-    setState(next);
-    if (events.length > 0) setFeed((previous) => [...previous, ...events].slice(-4));
-    if (next.status === "ended") finish(next);
-  }, [finish]);
+  const commit = useCallback(
+    (next: MatchState, events: readonly MatchEvent[] = []) => {
+      stateRef.current = next;
+      setState(next);
+      if (events.length > 0) setFeed((previous) => [...previous, ...events].slice(-6));
+      if (next.status === "ended") finish(next);
+    },
+    [finish],
+  );
 
   // Create the match once, then mount the renderer.
   useEffect(() => {
@@ -213,8 +217,9 @@ export function MatchPage(): JSX.Element {
   // Bot opponent: think for a moment, then shoot.
   useEffect(() => {
     if (!plan || plan.kind !== "bot" || !state || state.status !== "playing") return;
-    const bot = state.players.find((player) => player.accountId === null);
-    if (!bot || state.turn.activeSlot !== bot.slot) return;
+    // A guest seat also has `accountId: null`, so the opponent is identified by its slot, never by identity.
+    const bot = state.players.find((player) => player.slot !== plan.localSlot);
+    if (!bot || bot.eliminated || state.turn.activeSlot !== bot.slot) return;
     const timer = window.setTimeout(() => {
       const current = stateRef.current;
       if (!current) return;
@@ -394,7 +399,13 @@ export function MatchPage(): JSX.Element {
             <div className="match__power-value" data-testid="power-value" aria-live="polite">
               {power.toFixed(2)}
             </div>
-            <div className="muted">{isMyTurn ? t("match.yourTurn") : t("match.waitingTurn")}</div>
+            <div className="muted">
+              {isMyTurn
+                ? t("match.yourTurn")
+                : t("match.waitingTurn", {
+                    name: state?.players.find((player) => player.slot === state.turn.activeSlot)?.displayName ?? "…",
+                  })}
+            </div>
           </div>
 
           <DirectionPad
@@ -432,7 +443,8 @@ function clampAngle(angle: number, mobile: { angleMin: number; angleMax: number 
 function describeEvent(event: MatchEvent, locale: string): string {
   switch (event.kind) {
     case "shot":
-      return locale === "vi" ? `Bắn ${event.power}` : `Shot ${event.power}`;
+      // `power` is the weapon's damage power; the player's own input is the pull strength, shown on the HUD.
+      return locale === "vi" ? `Bắn (đạn ${event.power})` : `Shot (power ${event.power})`;
     case "weather":
       return locale === "vi" ? `Thời tiết: gió ${event.weather.wind.magnitude}` : `Weather: wind ${event.weather.wind.magnitude}`;
     case "turn":

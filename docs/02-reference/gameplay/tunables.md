@@ -289,6 +289,7 @@ the numbers behind it.
 | Constant | Value | Why |
 |---|---|---|
 | `viewDefault` | 1000 × 600 units | exactly half the map each way — the whole battlefield is reachable in two pans |
+| framing | follows the active mobile | at the start of a turn the window centres on the shooting mobile and keeps its feet ~70 % down the frame, so the shot has room to arc; a pan by the player overrides it until the next turn |
 | `zoomMin` (widest) | whole map, 2000 × 1200 | the strategic view |
 | `zoomMax` (closest) | 250 × 150 units (4 × default) | a 44-unit crater fills the ring, so aim can be placed precisely |
 | `panClamp` | window edge never leaves `mapBounds` | no lost player, no off-map void |
