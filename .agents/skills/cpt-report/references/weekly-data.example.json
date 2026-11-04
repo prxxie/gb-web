@@ -1,0 +1,92 @@
+{
+  "meta": {
+    "project": "CLAIMS",
+    "period": { "from": "2026-10-19", "to": "2026-10-23", "label": "Week 2 of Sprint 1" },
+    "nextPeriod": { "from": "2026-10-26", "to": "2026-10-30" },
+    "sprint": "Sprint 1 · 2026.10.12 ~ 2026.10.23 (closes this week) · Sprint 2 starts 2026.10.26",
+    "overallStatus": "Sprint 1 closed 3 of the 4 committed stories (US-CLAIM-001…003 merged to main). US-CLAIM-004 moves to Sprint 2: it waits for OQ-02 (who may reopen a closed claim), due 2026.10.28.",
+    "preparedBy": "Project Manager",
+    "issued": "2026-10-23",
+    "measuredOn": "2026-10-23",
+    "measuredAgainst": "main @ 4f2c9a1"
+  },
+  "progress": [
+    {
+      "phase": "Requirement & Analysis",
+      "task": "Brief, stories and open questions",
+      "current": "1. OQ-01 answered: claims are listed newest first\n2. US-CLAIM-004 refined with the reopen rule as an assumption\n* Ref. docs/04-decisions/open-questions.md",
+      "next": "1. Get OQ-02 answered by 2026.10.28\n2. Refine Sprint 2 stories with the client"
+    },
+    {
+      "phase": "Development",
+      "task": "EPIC-01 Claims",
+      "current": "1. US-CLAIM-001 list claims — Done\n2. US-CLAIM-002 register claim — Done\n3. US-CLAIM-003 move claim between states — Done",
+      "next": "1. US-CLAIM-004 reopen claim (after OQ-02)\n2. US-CLAIM-005 attach documents"
+    },
+    {
+      "phase": "Quality",
+      "task": "Tests and documentation integrity",
+      "current": "1. 64 unit tests pass, coverage 87 %\n2. verify-docs: 0 errors",
+      "next": "1. First end-to-end test for the claim lifecycle"
+    }
+  ],
+  "people": [
+    {
+      "role": "Developer",
+      "name": "Developer A",
+      "contribution": "Implemented US-CLAIM-001 and US-CLAIM-002 → merged to main, Done, 2026.10.21",
+      "plan": "Implement US-CLAIM-005 attachments → merged to main by 2026.10.30"
+    },
+    {
+      "role": "Developer",
+      "name": "Developer B",
+      "contribution": "Implemented US-CLAIM-003 state transitions → merged to main, Done, 2026.10.23",
+      "plan": "Implement US-CLAIM-004 reopen → in review by 2026.10.30, once OQ-02 is answered"
+    }
+  ],
+  "capacityNote": "Next week has 9.5 of 10 man-days available (Developer B is off on Monday morning). Committed Sprint 2 load is 7 story-days, so the gap is the buffer for US-CLAIM-004 if OQ-02 is answered late.",
+  "leave": [
+    { "role": "Developer", "name": "Developer A", "current": "No leave", "next": "No leave", "impact": "Full availability both weeks" },
+    { "role": "Developer", "name": "Developer B", "current": "2026/10/20 – Afternoon", "next": "2026/10/26 – Morning", "impact": "Taken this week; planned next week. Developer A covers reviews on Monday morning" }
+  ],
+  "capacity": [
+    { "week": "Current week · 2026.10.19 ~ 2026.10.23 - Sprint 1 - Week 2", "workingDays": 5, "note": "Leave taken" },
+    { "week": "Next week · 2026.10.26 ~ 2026.10.30 - Sprint 2 - Week 1", "workingDays": 5, "note": "Leave planned" }
+  ],
+  "tasks": [
+    { "storyId": "US-CLAIM-001", "task": "List claims", "module": "Claims", "assignee": "Developer A", "status": "Done", "notes": "Newest first, as answered in OQ-01; paging at 50 rows" },
+    { "storyId": "US-CLAIM-002", "task": "Register a claim", "module": "Claims", "assignee": "Developer A", "status": "Done", "notes": "Duplicate policy number + date is rejected with a field error, not a 500" },
+    { "storyId": "US-CLAIM-003", "task": "Move a claim between states", "module": "Claims", "assignee": "Developer B", "status": "Done", "notes": "Only the transitions in the state machine are allowed; others return 409" },
+    { "storyId": "US-CLAIM-004", "task": "Reopen a closed claim", "module": "Claims", "assignee": "Developer B", "status": "To Do", "notes": "Blocked by OQ-02 (who may reopen) — the client's decision, due 2026.10.28" }
+  ],
+  "wbs": {
+    "sprintWeeks": 2,
+    "sprints": [
+      { "name": "S1", "from": "2026-10-12", "to": "2026-10-23" },
+      { "name": "S2", "from": "2026-10-26", "to": "2026-11-06" },
+      { "name": "S3", "from": "2026-11-09", "to": "2026-11-20" }
+    ],
+    "rows": [
+      { "phase": "EPIC-01  Claims  (3 of 6)", "owner": "Dev team", "status": "In progress", "md": { "S1": 6, "S2": 7 } },
+      { "phase": "EPIC-02  Documents  (0 of 3)", "owner": "Dev team", "status": "Planned", "md": { "S2": 2.5, "S3": 7 } },
+      { "phase": "UAT", "owner": "Client", "status": "Planned", "md": { "S3": 3 } }
+    ],
+    "milestones": [
+      { "name": "Sprint 1 review", "endDate": "2026-10-23", "scope": "Claims list, registration and state transitions demo-able" },
+      { "name": "UAT start", "endDate": "2026-11-16", "scope": "Claims and documents end to end" }
+    ]
+  },
+  "metrics": [
+    { "metric": "Unit tests", "result": "64 passed, 0 failed", "target": "All pass", "status": "Pass", "notes": "python3 -m pytest -q" },
+    { "metric": "Coverage", "result": "87 %", "target": "≥ 80 %", "status": "Pass", "notes": "pytest --cov" },
+    { "metric": "End-to-end tests", "result": "0", "target": "≥ 1 per epic", "status": "Needs Improvement", "notes": "First one planned for Sprint 2" },
+    { "metric": "Documentation integrity", "result": "0 errors, 0 warnings", "target": "0 errors", "status": "Pass", "notes": "verify-docs.py --strict" }
+  ],
+  "qualityNote": "Unit coverage stays above target. The gap is end-to-end coverage: none exists yet, so Sprint 2 adds one for the claim lifecycle before UAT planning.",
+  "risks": [
+    { "ref": "OQ-02", "item": "Who may reopen a closed claim?", "impact": "US-CLAIM-004 cannot ship; Sprint 2 scope drops by 2.5 days", "raised": "2026-10-14", "due": "2026-10-28", "owner": "Client product owner", "severity": "High" },
+    { "ref": "OQ-03", "item": "Maximum attachment size", "impact": "US-CLAIM-005 uses a 10 MB default until answered", "raised": "2026-10-20", "due": "Sprint 2", "owner": "Client product owner", "severity": "Medium" },
+    { "ref": "OQ-01", "item": "Default order of the claim list", "impact": "Answered 2026-10-15: newest first — shipped in US-CLAIM-001", "raised": "2026-10-12", "due": "2026-10-16", "owner": "Client product owner", "severity": "Resolved" }
+  ],
+  "actionRequired": "OQ-02 by 2026.10.28 (client product owner). If unanswered, US-CLAIM-004 moves to Sprint 3 and only the product owner may reopen claims until then."
+}

@@ -1,0 +1,1 @@
+../../.agents/rules/02-docs-navigation.md

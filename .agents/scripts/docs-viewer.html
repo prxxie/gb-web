@@ -1,0 +1,666 @@
+<!doctype html>
+<!--
+  CPT docs viewer: renders docs/*.md in the browser. Static page, libraries from a pinned CDN, no build step.
+  Serve the project root over HTTP (browsers block fetch() on file://), then open this page:
+    python3 -m http.server 8000
+    http://localhost:8000/.agents/scripts/docs-viewer.html
+  Files are discovered from the server's directory listing (python's http.server provides one); without a listing the
+  viewer follows the .md links reachable from docs/README.md.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Docs</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Schibsted+Grotesk:wght@600;700&display=swap">
+<script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/js-yaml@4.1.0/dist/js-yaml.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
+<style>
+:root {
+  --bg: #f6f7f9; --panel: #ffffff; --fg: #1b2230; --muted: #5c6678; --line: #dfe3ea;
+  --accent: #2554c7; --accent-soft: #e8eefb; --code-bg: #f0f2f6;
+  --s-draft: #6b7280; --s-draft-bg: #eef0f3; --s-ready: #1d5fd1; --s-ready-bg: #e5edfc;
+  --s-prog: #a35d00; --s-prog-bg: #fdf1dc; --s-done: #187a3e; --s-done-bg: #e1f4e8;
+  --s-block: #b4232c; --s-block-bg: #fbe5e6;
+  --f-display: "Schibsted Grotesk", "Segoe UI", system-ui, sans-serif;
+  --f-body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Consolas, monospace;
+  --top-h: 53px;
+}
+@media (prefers-color-scheme: dark) { :root {
+  --bg: #11151c; --panel: #171c25; --fg: #e3e8f0; --muted: #98a2b3; --line: #2a3140;
+  --accent: #7da2ff; --accent-soft: #1e2a45; --code-bg: #1d2330;
+  --s-draft: #a3abb8; --s-draft-bg: #262c37; --s-ready: #8fb2ff; --s-ready-bg: #1d2a46;
+  --s-prog: #f0b35a; --s-prog-bg: #3a2c15; --s-done: #6fd39a; --s-done-bg: #173323;
+  --s-block: #ff8a8f; --s-block-bg: #3d1c20; color-scheme: dark } }
+
+* { box-sizing: border-box }
+body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.6 var(--f-body) }
+a { color: var(--accent); text-decoration: none }
+a:hover { text-decoration: underline }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 3px }
+code, .mono { font-family: var(--f-mono); font-size: .86em }
+:not(pre) > code { background: var(--code-bg); padding: .1em .35em; border-radius: 4px }
+img { max-width: 100% }
+
+.top { position: sticky; top: 0; z-index: 5; height: var(--top-h); background: var(--panel); border-bottom: 1px solid var(--line);
+  display: flex; align-items: center; gap: 16px; padding: 0 16px }
+.brand { display: flex; align-items: baseline; gap: 10px; white-space: nowrap; color: var(--fg) }
+.brand:hover { text-decoration: none }
+.brand b { font: 700 17px/1 var(--f-display); letter-spacing: -.01em }
+.brand span { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .08em }
+.search { flex: 1; max-width: 460px; position: relative }
+.search input { width: 100%; font: inherit; font-size: 14px; color: var(--fg); background: var(--bg); border: 1px solid var(--line);
+  border-radius: 8px; padding: 7px 12px 7px 32px }
+.search svg { position: absolute; left: 10px; top: 50%; translate: 0 -50%; width: 15px; height: 15px; fill: none; stroke: var(--muted); stroke-width: 2 }
+.results { position: absolute; top: calc(100% + 6px); left: 0; right: 0; background: var(--panel); border: 1px solid var(--line);
+  border-radius: 10px; box-shadow: 0 10px 30px rgba(0,0,0,.12); max-height: 60vh; overflow: auto; z-index: 6 }
+.results a { display: block; padding: 8px 12px; color: var(--fg); border-bottom: 1px solid var(--line) }
+.results a:last-child { border-bottom: 0 }
+.results a:hover, .results a.on { background: var(--accent-soft); text-decoration: none }
+.results small { display: block; color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
+.results mark { background: var(--s-prog-bg); color: inherit }
+.top .meta { margin-left: auto; display: flex; gap: 8px; align-items: center; font-size: 12px; color: var(--muted) }
+.menu-btn { display: none; background: none; border: 1px solid var(--line); border-radius: 6px; color: var(--fg); padding: 4px 8px; font: inherit; cursor: pointer }
+
+.shell { display: grid; grid-template-columns: 270px minmax(0, 1fr) 220px; min-height: calc(100vh - var(--top-h)) }
+nav.tree { border-right: 1px solid var(--line); background: var(--panel); padding: 18px 10px 40px 14px; font-size: 14px;
+  position: sticky; top: var(--top-h); align-self: start; height: calc(100vh - var(--top-h)); overflow: auto }
+.tree h4 { font: 600 11px/1 var(--f-body); text-transform: uppercase; letter-spacing: .09em; color: var(--muted); margin: 18px 8px 6px }
+.tree h4:first-child { margin-top: 4px }
+.tree a { display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-radius: 6px; color: var(--fg) }
+.tree a:hover { background: var(--bg); text-decoration: none }
+.tree a.on { background: var(--accent-soft); color: var(--accent); font-weight: 500 }
+.tree .id { font: 500 11px var(--f-mono); color: var(--muted); flex: none }
+.tree a.on .id { color: inherit }
+.tree .folder { font-size: 12px; color: var(--muted); padding: 6px 8px 2px }
+.tree .sub { margin-left: 14px; border-left: 1px solid var(--line); padding-left: 6px }
+.tree .lbl { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0 }
+.tree .dot { width: 7px; height: 7px; border-radius: 50%; flex: none; margin-left: auto; background: currentColor }
+
+main { min-width: 0; padding: 28px 40px 80px }
+.doc { max-width: 800px; margin: 0 auto }
+aside.toc { padding: 28px 16px; font-size: 13px; position: sticky; top: var(--top-h); align-self: start; max-height: calc(100vh - var(--top-h)); overflow: auto }
+.toc h5 { font: 600 11px/1 var(--f-body); text-transform: uppercase; letter-spacing: .09em; color: var(--muted); margin: 0 0 10px }
+.toc a { display: block; color: var(--muted); padding: 3px 0 3px 10px; border-left: 2px solid var(--line) }
+.toc a.l3 { padding-left: 22px }
+.toc .src { margin-top: 22px; padding-top: 14px; border-top: 1px solid var(--line); color: var(--muted); font-size: 12px; overflow-wrap: anywhere }
+
+.crumbs { font-size: 13px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px }
+.crumbs i { font-style: normal; opacity: .5 }
+.md h1, .page-h1 { font: 700 30px/1.2 var(--f-display); letter-spacing: -.015em; margin: 0 0 14px; text-wrap: balance }
+.md h2 { font: 600 20px/1.3 var(--f-display); margin: 36px 0 10px; text-wrap: balance }
+.md h3 { font: 600 16px/1.35 var(--f-display); margin: 26px 0 8px }
+.md h2, .md h3 { scroll-margin-top: calc(var(--top-h) + 12px) }
+.md p, .md li { max-width: 72ch }
+.md p { margin: 0 0 12px }
+.md hr { border: 0; border-top: 1px solid var(--line); margin: 28px 0 }
+.md blockquote { margin: 12px 0; padding: 4px 0 4px 14px; border-left: 3px solid var(--accent); color: var(--muted) }
+.md pre { background: var(--code-bg); border-radius: 8px; padding: 14px 16px; overflow-x: auto; font: 13px/1.55 var(--f-mono); margin: 10px 0 18px }
+.md pre code { font-size: inherit }
+.tbl { overflow-x: auto; margin: 10px 0 18px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel) }
+table { border-collapse: collapse; width: 100%; font-size: 14px; font-variant-numeric: tabular-nums }
+th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--line); vertical-align: top }
+th { font-weight: 600; font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; background: var(--bg) }
+tr:last-child td { border-bottom: 0 }
+.mermaid { overflow-x: auto; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 14px; margin: 10px 0 18px; text-align: center }
+
+.pill { display: inline-flex; align-items: center; gap: 5px; font: 500 12px/1 var(--f-body); padding: 4px 9px; border-radius: 999px; white-space: nowrap }
+.pill::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor }
+.st-draft { color: var(--s-draft); background: var(--s-draft-bg) }
+.st-ready { color: var(--s-ready); background: var(--s-ready-bg) }
+.st-prog  { color: var(--s-prog);  background: var(--s-prog-bg) }
+.st-done  { color: var(--s-done);  background: var(--s-done-bg) }
+.st-block { color: var(--s-block); background: var(--s-block-bg) }
+.tree .dot[class*="st-"], .bar i[class*="st-"] { background: currentColor }
+.tag { display: inline-block; font: 500 12px/1 var(--f-mono); padding: 4px 7px; border-radius: 5px; border: 1px solid var(--line); color: var(--muted); background: var(--panel) }
+a.tag:hover { border-color: var(--accent); text-decoration: none }
+
+.fm { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); background: var(--panel);
+  border: 1px solid var(--line); border-radius: 10px; overflow: hidden; margin: 4px 0 22px }
+.fm div { padding: 10px 14px; min-width: 0; box-shadow: 1px 1px 0 var(--line) }
+.fm dt { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; margin-bottom: 5px }
+.fm dd { margin: 0; font-size: 14px; display: flex; flex-wrap: wrap; align-items: center; gap: 5px; overflow-wrap: anywhere }
+.none { color: var(--muted) }
+
+.stats { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 10px; margin: 6px 0 8px }
+.stat { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; min-width: 0 }
+.stat b { display: block; font: 700 26px/1.1 var(--f-display); font-variant-numeric: tabular-nums }
+.stat span { font-size: 12px; color: var(--muted); text-transform: capitalize }
+.stat.total { background: var(--accent-soft); border-color: transparent }
+.stat.total b { color: var(--accent) }
+.bar { display: flex; height: 8px; border-radius: 4px; overflow: hidden; background: var(--line); margin: 12px 0 6px }
+.bar i { display: block }
+.small { font-size: 13px; color: var(--muted) }
+.callout { border: 1px solid var(--s-prog); background: var(--s-prog-bg); border-radius: 10px; padding: 12px 16px; font-size: 14px; margin: 14px 0 }
+.callout b { color: var(--s-prog) }
+.callout ul { margin: 6px 0 0; padding-left: 18px }
+.section-label { font: 600 11px/1 var(--f-body); text-transform: uppercase; letter-spacing: .09em; color: var(--muted); margin: 30px 0 18px;
+  padding-top: 20px; border-top: 1px solid var(--line) }
+
+.board { display: grid; grid-template-columns: repeat(6, minmax(170px, 1fr)); gap: 12px; overflow-x: auto; padding-bottom: 6px }
+.col { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 10px; min-height: 160px }
+.col h3 { display: flex; justify-content: space-between; align-items: center; margin: 2px 2px 10px; font: 600 13px var(--f-body) }
+.col h3 em { font-style: normal; color: var(--muted); font-weight: 400 }
+.card { display: block; border: 1px solid var(--line); background: var(--bg); border-radius: 8px; padding: 10px; color: var(--fg); margin-bottom: 8px; font-size: 13.5px }
+.card:hover { border-color: var(--accent); text-decoration: none }
+.card .mono { color: var(--muted); font-size: 11.5px }
+.card .row { display: flex; gap: 5px; margin-top: 8px; flex-wrap: wrap }
+.empty { color: var(--muted); font-size: 12.5px; padding: 6px 2px; margin: 0 }
+.filters { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 0 0 16px }
+.filters select { font: inherit; font-size: 13px; color: var(--fg); background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 4px 8px }
+
+.notice { max-width: 640px; margin: 40px auto; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 22px 26px }
+.notice h1 { font: 700 22px/1.3 var(--f-display); margin: 0 0 10px }
+.notice pre { background: var(--code-bg); border-radius: 8px; padding: 12px 14px; overflow-x: auto; font: 13px/1.55 var(--f-mono) }
+
+@media (max-width: 1180px) { .shell { grid-template-columns: 250px minmax(0, 1fr) } aside.toc { display: none } .stats { grid-template-columns: repeat(4, minmax(0, 1fr)) } }
+@media (max-width: 760px) {
+  .shell { grid-template-columns: minmax(0, 1fr) }
+  nav.tree { position: fixed; inset: var(--top-h) auto 0 0; width: min(290px, 85vw); z-index: 4; max-height: none; display: none; box-shadow: 4px 0 24px rgba(0,0,0,.15) }
+  body.nav-open nav.tree { display: block }
+  .menu-btn { display: inline-block }
+  .top .meta { display: none }
+  main { padding: 20px 16px 60px }
+  .stats { grid-template-columns: repeat(2, minmax(0, 1fr)) }
+  .md h1, .page-h1 { font-size: 24px }
+}
+@media (prefers-reduced-motion: no-preference) { .tree a, .card { transition: background .12s, border-color .12s } }
+</style>
+</head>
+<body>
+<header class="top">
+  <button class="menu-btn" id="menuBtn" aria-label="Show document list">☰</button>
+  <a class="brand" href="#"><b id="projectName">Docs</b><span>docs</span></a>
+  <div class="search">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+    <input id="q" type="search" placeholder="Search docs, ids, questions…  ( / )" aria-label="Search docs" autocomplete="off">
+    <div class="results" id="results" hidden></div>
+  </div>
+  <div class="meta" id="meta"></div>
+</header>
+<div class="shell">
+  <nav class="tree" id="tree" aria-label="Documents"></nav>
+  <main id="main"><p class="small">Loading docs…</p></main>
+  <aside class="toc" id="toc"></aside>
+</div>
+
+<script>
+"use strict";
+// Where docs/ sits relative to this page (.agents/scripts/docs-viewer.html → ../../docs/).
+const DOCS_ROOT = "../../docs/";
+const MAX_LISTING_DEPTH = 8;
+const MAX_SEARCH_RESULTS = 15;
+// Same order verify-docs.py uses for the stats table.
+const STORY_STATUSES = ["done", "in-progress", "ready", "blocked", "draft", "closed"];
+const BOARD_ORDER = ["draft", "ready", "in-progress", "blocked", "done", "closed"];
+const STATUS_CLASS = {
+  draft: "st-draft", closed: "st-draft", withdrawn: "st-draft", proposed: "st-draft", deprecated: "st-draft", superseded: "st-draft",
+  ready: "st-ready", "in-progress": "st-prog", open: "st-prog", blocked: "st-block",
+  done: "st-done", answered: "st-done", accepted: "st-done", confirmed: "st-done"
+};
+
+const state = { docs: new Map(), byId: new Map() };
+
+const $ = sel => document.querySelector(sel);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+const pill = status => `<span class="pill ${STATUS_CLASS[status] || "st-draft"}">${esc(status)}</span>`;
+const docHref = (path, anchor) => "#/" + path.split("/").map(encodeURIComponent).join("/") + (anchor ? "#" + anchor : "");
+const stories = () => [...state.docs.values()].filter(d => d.isStory);
+
+// ---------- paths ----------
+function resolvePath(baseDir, rel) {
+  const parts = baseDir ? baseDir.split("/") : [];
+  for (const seg of rel.split("/")) {
+    if (seg === "" || seg === ".") continue;
+    if (seg === ".." && parts.length && parts[parts.length - 1] !== "..") parts.pop();
+    else parts.push(seg);
+  }
+  return parts.join("/");
+}
+const dirOf = path => path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : "";
+
+// ---------- discovery ----------
+async function listDir(rel, depth) {
+  if (depth > MAX_LISTING_DEPTH) return [];
+  const res = await fetch(DOCS_ROOT + rel);
+  if (!res.ok || !(res.headers.get("content-type") || "").includes("text/html")) return [];
+  const html = new DOMParser().parseFromString(await res.text(), "text/html");
+  const files = [];
+  for (const a of html.querySelectorAll("a[href]")) {
+    const href = a.getAttribute("href");
+    if (/^([a-z]+:|\/|\?|#|\.\.)/i.test(href)) continue;
+    const name = decodeURIComponent(href.split(/[?#]/)[0]);
+    if (name.startsWith(".")) continue;
+    if (name.endsWith("/")) files.push(...await listDir(rel + name, depth + 1));
+    else if (name.toLowerCase().endsWith(".md")) files.push(rel + name);
+  }
+  return files;
+}
+
+async function crawlLinks(start) {
+  const seen = new Set(), queue = [start], texts = new Map();
+  while (queue.length) {
+    const path = queue.shift();
+    if (seen.has(path)) continue;
+    seen.add(path);
+    const text = await fetchText(path);
+    if (text === null) continue;
+    texts.set(path, text);
+    for (const m of text.matchAll(/\]\(([^)\s#]+\.md)(#[^)\s]*)?\)/g)) {
+      const target = resolvePath(dirOf(path), decodeURIComponent(m[1]));
+      if (!target.startsWith("..")) queue.push(target);
+    }
+  }
+  return texts;
+}
+
+async function fetchText(path) {
+  try {
+    const res = await fetch(DOCS_ROOT + path.split("/").map(encodeURIComponent).join("/"));
+    return res.ok ? await res.text() : null;
+  } catch (err) {
+    console.error(`docs-viewer: cannot load ${path}`, err);
+    return null;
+  }
+}
+
+async function loadDocs() {
+  let files = [];
+  try {
+    files = await listDir("", 0);
+  } catch (err) {
+    console.warn("docs-viewer: no directory listing, following links from README.md", err);
+  }
+  let texts;
+  if (files.length) {
+    const loaded = await Promise.all(files.map(async f => [f, await fetchText(f)]));
+    texts = new Map(loaded.filter(([, t]) => t !== null));
+  } else {
+    texts = await crawlLinks("README.md");
+  }
+  for (const [path, text] of texts) addDoc(path, text);
+}
+
+// ---------- parsing ----------
+function splitFrontmatter(text) {
+  const m = text.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?/);
+  if (!m) return { meta: {}, body: text, fmError: null };
+  const body = text.slice(m[0].length);
+  try {
+    const meta = jsyaml.load(m[1]);
+    return { meta: meta && typeof meta === "object" ? meta : {}, body, fmError: null };
+  } catch (err) {
+    return { meta: {}, body, fmError: err.message };
+  }
+}
+
+function addDoc(path, text) {
+  const { meta, body, fmError } = splitFrontmatter(text);
+  const h1 = body.match(/^#\s+(.+)$/m);
+  const file = path.split("/").pop().replace(/\.md$/i, "");
+  const title = h1 ? h1[1].trim() : (meta.title ? `${meta.id ? meta.id + " — " : ""}${meta.title}` : file);
+  const doc = { path, meta, body, fmError, title, isStory: Boolean(meta.epic && meta.status) };
+  state.docs.set(path, doc);
+  if (meta.id) state.byId.set(String(meta.id), doc);
+}
+
+// open-questions.md: "## OQ-NN — question" followed by "- **Field**: value" lines (rule 02 § 5).
+function parseQuestions() {
+  const doc = [...state.docs.values()].find(d => d.path.endsWith("open-questions.md"));
+  if (!doc) return { doc: null, items: [] };
+  const items = doc.body.split(/^(?=## OQ-)/m).slice(1).map(chunk => {
+    const head = chunk.match(/^## (OQ-\d+)\s+—\s+(.+)$/m);
+    if (!head) return null;
+    const fields = {};
+    for (const m of chunk.matchAll(/^- \*\*([^*]+)\*\*:\s*(.*)$/gm)) fields[m[1].trim().toLowerCase()] = m[2].trim();
+    return { id: head[1], question: head[2].trim(), heading: head[0].slice(3), status: (fields.status || "").toLowerCase(), blocks: fields.blocks || "" };
+  }).filter(Boolean);
+  return { doc, items };
+}
+
+// ---------- markdown ----------
+// GitHub-style heading anchors, so links written for the repo host keep working here.
+function slugger() {
+  const used = new Map();
+  return text => {
+    const base = text.trim().toLowerCase().replace(/[^\p{L}\p{N}\s_-]/gu, "").replace(/ /g, "-");
+    const n = used.get(base) || 0;
+    used.set(base, n + 1);
+    return n ? `${base}-${n}` : base;
+  };
+}
+
+function renderMarkdown(body, path) {
+  const root = document.createElement("div");
+  root.className = "md";
+  root.innerHTML = DOMPurify.sanitize(marked.parse(body, { gfm: true }));
+  const slug = slugger();
+  root.querySelectorAll("h1, h2, h3, h4, h5, h6").forEach(h => { h.id = slug(h.textContent); });
+  root.querySelectorAll("table").forEach(t => {
+    const wrap = document.createElement("div");
+    wrap.className = "tbl";
+    t.replaceWith(wrap);
+    wrap.appendChild(t);
+  });
+  root.querySelectorAll("pre > code.language-mermaid").forEach(code => {
+    const div = document.createElement("div");
+    div.className = "mermaid";
+    div.textContent = code.textContent;
+    code.parentElement.replaceWith(div);
+  });
+  root.querySelectorAll("a[href]").forEach(a => rewriteLink(a, path));
+  root.querySelectorAll("img[src]").forEach(img => {
+    const src = img.getAttribute("src");
+    if (!/^([a-z]+:|\/)/i.test(src)) img.src = DOCS_ROOT + resolvePath(dirOf(path), src);
+  });
+  return root;
+}
+
+// .md links inside docs/ become viewer routes; anything else opens the raw file.
+function rewriteLink(a, path) {
+  const href = a.getAttribute("href");
+  if (/^[a-z]+:/i.test(href)) { a.target = "_blank"; a.rel = "noopener"; return; }
+  const cut = href.indexOf("#");
+  const file = cut < 0 ? href : href.slice(0, cut);
+  const anchor = cut < 0 ? "" : href.slice(cut + 1);
+  if (!file) { a.setAttribute("href", docHref(path, anchor)); return; }
+  const target = resolvePath(dirOf(path), decodeURIComponent(file));
+  if (target.startsWith("..") || !target.toLowerCase().endsWith(".md")) {
+    a.setAttribute("href", DOCS_ROOT + target + (anchor ? "#" + anchor : ""));
+    a.target = "_blank";
+    return;
+  }
+  a.setAttribute("href", docHref(target, anchor));
+}
+
+async function runMermaid(root) {
+  const nodes = root.querySelectorAll(".mermaid");
+  if (!nodes.length || !window.mermaid) return;
+  try {
+    await mermaid.run({ nodes });
+  } catch (err) {
+    console.error("docs-viewer: mermaid failed to render a diagram", err);
+  }
+}
+
+// ---------- tree ----------
+function buildTree() {
+  const root = { files: [], dirs: new Map() };
+  for (const path of [...state.docs.keys()].sort()) {
+    const parts = path.split("/");
+    let node = root;
+    for (const dir of parts.slice(0, -1)) {
+      if (!node.dirs.has(dir)) node.dirs.set(dir, { files: [], dirs: new Map() });
+      node = node.dirs.get(dir);
+    }
+    node.files.push(path);
+  }
+  return root;
+}
+
+const isReadme = path => /(^|\/)README\.md$/i.test(path);
+
+function treeLink(path) {
+  const doc = state.docs.get(path);
+  const { meta } = doc;
+  const id = meta.id ? `<span class="id">${esc(meta.id)}</span>` : "";
+  const label = meta.id && meta.title ? meta.title : doc.title;
+  const dot = doc.isStory ? `<i class="dot ${STATUS_CLASS[meta.status] || "st-draft"}" title="${esc(meta.status)}"></i>` : "";
+  return `<a href="${docHref(path)}" data-path="${esc(path)}" title="${esc(doc.title)}">${id}<span class="lbl">${esc(label)}</span>${dot}</a>`;
+}
+
+// A folder's README stands for the folder; its other files and subfolders nest under it.
+function renderFolder(node) {
+  const readme = node.files.find(isReadme);
+  let html = (readme ? treeLink(readme) : "") + node.files.filter(f => f !== readme).map(treeLink).join("");
+  for (const [name, child] of node.dirs) {
+    const childReadme = child.files.find(isReadme);
+    html += childReadme ? treeLink(childReadme) : `<div class="folder">${esc(name)}</div>`;
+    const rest = { files: child.files.filter(f => f !== childReadme), dirs: child.dirs };
+    html += `<div class="sub">${renderFolder(rest)}</div>`;
+  }
+  return html;
+}
+
+function renderTree() {
+  const root = buildTree();
+  let html = `<h4>Start</h4><a href="#" data-path="README.md"><span class="lbl">Home</span></a>`;
+  if (stories().length) html += `<a href="#board" data-path="#board"><span class="lbl">Story board</span></a>`;
+  html += root.files.filter(f => f !== "README.md").map(treeLink).join("");
+  for (const [name, node] of root.dirs) {
+    html += `<h4>${esc(name.replace(/^(\d+)-/, "$1 · "))}</h4>${renderFolder(node)}`;
+  }
+  $("#tree").innerHTML = html;
+}
+
+function markTree(key) {
+  document.querySelectorAll("#tree a").forEach(a => a.classList.toggle("on", a.dataset.path === key));
+}
+
+// ---------- views ----------
+function crumbs(path) {
+  return `<div class="crumbs">docs ${path.split("/").map(p => `<i>/</i> ${esc(p)}`).join(" ")}</div>`;
+}
+
+function metaValue(key, value) {
+  if (value === null || value === undefined || value === "") return `<span class="none">—</span>`;
+  if (Array.isArray(value)) {
+    return value.length ? value.map(v => metaValue(key, v)).join("") : `<span class="none">none</span>`;
+  }
+  if (typeof value === "object") return `<code>${esc(JSON.stringify(value))}</code>`;
+  const text = String(value);
+  if (key === "status") return pill(text);
+  const ref = state.byId.get(text);
+  if (ref) return `<a class="tag" href="${docHref(ref.path)}">${esc(text)}</a>`;
+  const [refPath, refAnchor] = text.split("#");
+  if (state.docs.has(refPath)) return `<a href="${docHref(refPath, refAnchor)}">${esc(refPath.split("/").pop())}</a>`;
+  return /^[\w.-]{1,24}$/.test(text) ? `<span class="tag">${esc(text)}</span>` : esc(text);
+}
+
+function frontmatterCard(doc) {
+  const entries = Object.entries(doc.meta).filter(([k]) => k !== "id" && k !== "title");
+  if (!entries.length) return "";
+  return `<dl class="fm">${entries.map(([k, v]) =>
+    `<div><dt>${esc(k.replace(/_/g, " "))}</dt><dd>${metaValue(k, v)}</dd></div>`).join("")}</dl>`;
+}
+
+function renderToc(root, path) {
+  const heads = [...root.querySelectorAll("h2, h3")];
+  const src = `<div class="src">Source<br><span class="mono">docs/${esc(path)}</span></div>`;
+  $("#toc").innerHTML = (heads.length ? "<h5>On this page</h5>" + heads.map(h =>
+    `<a href="${docHref(path, h.id)}" class="${h.tagName === "H3" ? "l3" : ""}">${esc(h.textContent)}</a>`).join("") : "") + src;
+}
+
+function dashboard(readme) {
+  const all = stories();
+  const { doc: oqDoc, items } = parseQuestions();
+  let html = `<h1 class="page-h1">${esc(readme.title)}</h1>`;
+  if (all.length) {
+    const counts = STORY_STATUSES.map(s => [s, all.filter(d => d.meta.status === s).length]);
+    html += `<div class="stats"><div class="stat total"><b>${all.length}</b><span>Stories</span></div>` +
+      counts.map(([s, n]) => `<div class="stat"><b>${n}</b><span>${esc(s.replace("-", " "))}</span></div>`).join("") + `</div>`;
+    html += `<div class="bar" role="img" aria-label="${esc(counts.map(([s, n]) => `${n} ${s}`).join(", "))}">` +
+      counts.filter(([, n]) => n).map(([s, n]) =>
+        `<i class="${STATUS_CLASS[s]}" style="width:${(n / all.length * 100).toFixed(2)}%" title="${n} ${esc(s)}"></i>`).join("") + `</div>`;
+  }
+  if (items.length) {
+    const count = s => items.filter(q => q.status === s).length;
+    html += `<p class="small">Open questions: <b>${count("open")} open</b> · ${count("answered")} answered · ${count("withdrawn")} withdrawn` +
+      (all.length ? ` · <a href="#board">story board</a>` : "") + `</p>`;
+    const waiting = items.filter(q => q.status === "open");
+    if (waiting.length) {
+      const slug = slugger();
+      html += `<div class="callout"><b>Waiting on an answer</b><ul>` + waiting.map(q => {
+        const ids = q.blocks.match(/[A-Z]+-[A-Z0-9]+-\d+/g) || [];
+        const links = ids.map(id => state.byId.has(id) ? `<a href="${docHref(state.byId.get(id).path)}">${esc(id)}</a>` : esc(id)).join(", ");
+        return `<li><a href="${docHref(oqDoc.path, slug(q.heading))}">${esc(q.id)} — ${esc(q.question)}</a>${links ? ` — blocks ${links}` : ""}</li>`;
+      }).join("") + `</ul></div>`;
+    }
+  }
+  return html + `<div class="section-label">README.md</div>`;
+}
+
+async function showDoc(path, anchor) {
+  const doc = state.docs.get(path);
+  const main = $("#main");
+  markTree(path);
+  if (!doc) {
+    main.innerHTML = `<div class="doc"><h1 class="page-h1">Not found</h1><p>No document at <code>docs/${esc(path)}</code>.</p><p><a href="#">Back to home</a></p></div>`;
+    $("#toc").innerHTML = "";
+    return;
+  }
+  const isHome = path === "README.md";
+  // The home dashboard replaces the generated stats block, so it is not shown twice.
+  const body = isHome ? doc.body.replace(/<!-- cpt:stats -->[\s\S]*?<!-- \/cpt:stats -->/, "") : doc.body;
+  const md = renderMarkdown(body, path);
+  const h1 = md.firstElementChild?.tagName === "H1" ? md.firstElementChild : null;
+  if (isHome) h1?.remove();
+  else if (h1) h1.insertAdjacentHTML("afterend", frontmatterCard(doc));
+  else md.insertAdjacentHTML("afterbegin", `<h1>${esc(doc.title)}</h1>${frontmatterCard(doc)}`);
+
+  const article = document.createElement("article");
+  article.className = "doc";
+  article.innerHTML = crumbs(path) +
+    (doc.fmError ? `<div class="callout"><b>Frontmatter could not be read.</b> ${esc(doc.fmError)}</div>` : "") +
+    (isHome ? dashboard(doc) : "");
+  article.appendChild(md);
+  main.replaceChildren(article);
+  renderToc(md, path);
+  await runMermaid(md);
+  const target = anchor && document.getElementById(decodeURIComponent(anchor));
+  if (target) target.scrollIntoView({ block: "start" });
+  else window.scrollTo(0, 0);
+}
+
+function showBoard() {
+  const all = stories();
+  const epics = [...new Set(all.map(d => String(d.meta.epic)))].sort();
+  const selected = $("#epicFilter")?.value || "";
+  const shown = all.filter(d => !selected || String(d.meta.epic) === selected)
+    .sort((a, b) => String(a.meta.id).localeCompare(String(b.meta.id)));
+  const card = d => `<a class="card" href="${docHref(d.path)}"><span class="mono">${esc(d.meta.id)}</span><br>${esc(d.meta.title || d.title)}<div class="row">` +
+    [d.meta.priority, d.meta.size].filter(Boolean).map(v => `<span class="tag">${esc(v)}</span>`).join("") +
+    (Array.isArray(d.meta.open_questions) ? d.meta.open_questions : []).map(q => `<span class="tag">${esc(q)}</span>`).join("") + `</div></a>`;
+  $("#main").innerHTML = `<div class="crumbs">docs <i>/</i> story board</div><h1 class="page-h1">Story board</h1>
+    <div class="filters"><label class="small" for="epicFilter">Epic</label><select id="epicFilter"><option value="">All epics</option>${
+      epics.map(e => `<option${e === selected ? " selected" : ""}>${esc(e)}</option>`).join("")}</select>
+    <span class="small">Built from story frontmatter.</span></div>
+    <div class="board">${BOARD_ORDER.map(s => {
+      const col = shown.filter(d => d.meta.status === s);
+      return `<div class="col"><h3>${pill(s)}<em>${col.length}</em></h3>${col.length ? col.map(card).join("") : `<p class="empty">None</p>`}</div>`;
+    }).join("")}</div>`;
+  $("#epicFilter").addEventListener("change", showBoard);
+  $("#toc").innerHTML = `<div class="src">Source<br><span class="mono">story frontmatter</span></div>`;
+  markTree("#board");
+}
+
+// ---------- search ----------
+function search(query) {
+  const q = query.trim().toLowerCase();
+  const box = $("#results");
+  if (q.length < 2) { box.hidden = true; return; }
+  const hits = [];
+  for (const doc of state.docs.values()) {
+    const hay = `${doc.title}\n${doc.body}`;
+    const at = hay.toLowerCase().indexOf(q);
+    if (at < 0) continue;
+    const snippet = hay.slice(Math.max(0, at - 40), at + q.length + 60).replace(/\s+/g, " ");
+    hits.push({ doc, snippet, inTitle: doc.title.toLowerCase().includes(q) });
+  }
+  hits.sort((a, b) => Number(b.inTitle) - Number(a.inTitle));
+  const pattern = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi");
+  const mark = s => esc(s).replace(pattern, m => `<mark>${m}</mark>`);
+  box.innerHTML = hits.length
+    ? hits.slice(0, MAX_SEARCH_RESULTS).map((h, i) =>
+        `<a href="${docHref(h.doc.path)}"${i === 0 ? ' class="on"' : ""}>${mark(h.doc.title)}<small>${mark(h.snippet)}</small></a>`).join("")
+    : `<p class="empty" style="padding:10px 12px">No document mentions “${esc(query.trim())}”.</p>`;
+  box.hidden = false;
+}
+
+// ---------- routing ----------
+// #/path/to/doc.md#heading-anchor · #board · empty = docs/README.md
+function route() {
+  document.body.classList.remove("nav-open");
+  $("#results").hidden = true;
+  const hash = location.hash;
+  if (hash === "#board") return showBoard();
+  if (!hash.startsWith("#/")) return showDoc("README.md", "");
+  const rest = hash.slice(2);
+  const cut = rest.indexOf("#");
+  return showDoc(decodeURIComponent(cut < 0 ? rest : rest.slice(0, cut)), cut < 0 ? "" : rest.slice(cut + 1));
+}
+
+function showServeHelp(reason) {
+  $("#tree").innerHTML = "";
+  $("#toc").innerHTML = "";
+  $("#main").innerHTML = `<div class="notice"><h1>Serve the project to read its docs</h1>
+    <p>${esc(reason)}</p>
+    <p>From the project root, start a local server and open the viewer through it:</p>
+    <pre>python3 -m http.server 8000
+# then open
+http://localhost:8000/.agents/scripts/docs-viewer.html</pre></div>`;
+}
+
+async function init() {
+  if (location.protocol === "file:") {
+    return showServeHelp("Browsers do not let a page opened from disk read other files, so the viewer cannot load docs/.");
+  }
+  if (!window.marked || !window.DOMPurify || !window.jsyaml) {
+    return showServeHelp("The Markdown libraries did not load from cdn.jsdelivr.net. Check the network connection, then reload.");
+  }
+  if (window.mermaid) {
+    const dark = matchMedia("(prefers-color-scheme: dark)").matches;
+    mermaid.initialize({ startOnLoad: false, securityLevel: "strict", theme: dark ? "dark" : "default" });
+  }
+  await loadDocs();
+  if (!state.docs.size) {
+    return showServeHelp(`No Markdown files found at ${DOCS_ROOT}. Start the server from the project root, not from docs/.`);
+  }
+  const readmeTitle = state.docs.get("README.md")?.title || "";
+  // "Documentation — ClaimDesk" or "IMS documentation" → the project's name
+  const project = (readmeTitle.includes("—") ? readmeTitle.split("—").pop() : readmeTitle.replace(/\b(documentation|docs)\b/i, "")).trim() || "Docs";
+  $("#projectName").textContent = project;
+  document.title = `${project} docs`;
+  const storyCount = stories().length;
+  $("#meta").textContent = `${state.docs.size} docs${storyCount ? ` · ${storyCount} stories` : ""}`;
+  renderTree();
+  await route();
+}
+
+window.addEventListener("hashchange", route);
+$("#menuBtn").addEventListener("click", () => document.body.classList.toggle("nav-open"));
+$("#q").addEventListener("input", e => search(e.target.value));
+$("#q").addEventListener("keydown", e => {
+  const links = [...document.querySelectorAll("#results a")];
+  const cur = links.findIndex(a => a.classList.contains("on"));
+  if (e.key === "Escape") {
+    $("#results").hidden = true;
+    e.target.blur();
+  } else if (e.key === "Enter" && links[cur]) {
+    location.hash = links[cur].getAttribute("href");
+    e.target.value = "";
+  } else if ((e.key === "ArrowDown" || e.key === "ArrowUp") && links.length) {
+    e.preventDefault();
+    const next = (cur + (e.key === "ArrowDown" ? 1 : -1) + links.length) % links.length;
+    links.forEach((a, i) => a.classList.toggle("on", i === next));
+  }
+});
+$("#results").addEventListener("click", () => { $("#q").value = ""; });
+document.addEventListener("click", e => { if (!e.target.closest(".search")) $("#results").hidden = true; });
+document.addEventListener("keydown", e => {
+  if (e.key === "/" && !["INPUT", "SELECT", "TEXTAREA"].includes(document.activeElement.tagName)) {
+    e.preventDefault();
+    $("#q").focus();
+  }
+});
+init().catch(err => {
+  console.error("docs-viewer: failed to start", err);
+  showServeHelp(`The viewer failed to start: ${err.message}`);
+});
+</script>
+</body>
+</html>

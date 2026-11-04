@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node .agents/scripts/verify-docs.mjs)",
+      "Bash(node .agents/scripts/verify-docs.mjs *)"
+    ]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if [ -f \"${CLAUDE_PROJECT_DIR}/.claude/hooks/cpt-verify-docs.mjs\" ]; then exec node \"${CLAUDE_PROJECT_DIR}/.claude/hooks/cpt-verify-docs.mjs\"; fi; exit 0"
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,1 @@
+../../.agents/rules/06-security.md
