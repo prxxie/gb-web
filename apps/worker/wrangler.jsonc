@@ -7,14 +7,14 @@
   "observability": { "enabled": true },
   "vars": {
     "ENVIRONMENT": "development",
-    "CLERK_ISSUER": "https://clerk.example.com",
+    "CLERK_ISSUER": "https://heroic-bison-1878.clerk.accounts.dev",
     "ALLOWED_ORIGINS": "http://localhost:5173"
   },
   "d1_databases": [
     {
       "binding": "GBW_DB",
       "database_name": "gbw",
-      "database_id": "00000000-0000-0000-0000-000000000000",
+      "database_id": "1a3895e6-6912-4960-afe6-5d3838e2dffd",
       "migrations_dir": "migrations"
     }
   ],
