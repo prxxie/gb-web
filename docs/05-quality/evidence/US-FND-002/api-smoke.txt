@@ -1,0 +1,22 @@
+GET /health                        200
+{"status":"ok","version":"dev","environment":"development","ruleset":"2026-11-05","request_id":"ba51faab-b70b-4b45-9500-d3a195c4020c"}
+POST /sessions (host)              201
+{"sessionToken":"<session-token redacted>","expiresAt":"2026-11-05T06:34:51.179Z","subject":{"kind":"guest
+token-host: <session-token redacted>
+POST /sessions (guest)             201
+POST /rooms (host)                 201
+{"roomCode":"F5U924","playerId":"4f0e455a-7599-4003-9038-c892a873991a","wsUrl":"http://127.0.0.1:8787/api/v1/rooms/F5U924/ws","maxPlayers":4,"settings":{"maxPlayers":4,"mode":"solo","mapId":"map-01","isPrivate":false},"expiresAt":"2026-11-05T05:44:51.413Z"}
+code=F5U924
+GET /rooms/F5U924 (preview)        200
+{"roomCode":"F5U924","status":"lobby","settings":{"maxPlayers":4,"mode":"solo","mapId":"map-01","isPrivate":false},"joined":1,"playerCount":1,"maxPlayers":4,"joinable":true,"hostDisplayName":"Player","host":true}
+POST /rooms/F5U924/join (guest)    200
+{"roomCode":"F5U924","playerId":"abb08b6e-d076-4490-8790-28ae7c8813d0","wsUrl":"http://127.0.0.1:8787/api/v1/rooms/F5U924/ws","maxPlayers":4,"settings":{"maxPlayers":4,"mode":"solo","mapId":"map-01","isPrivate":false}}
+GET /turn-credentials              200
+{"iceServers":[{"urls":"stun:stun.cloudflare.com:3478"}],"ttlSeconds":3600,"turn":false}
+GET /leaderboard                   200
+{"items":[],"next_cursor":null,"has_more":false,"you":null}
+GET /me                            401
+{"type":"https://gbw.example/problems/unauthenticated","title":"Not signed in","status":401,"request_id":"ce431352-7cd1-471a-9f0e-f00629941d52","detail":"This endpoint needs a signed-in account"}
+GET /rooms/F5U924/ws (upgrade)     101
+GET /nope (RFC9457)                400
+{"type":"https://gbw.example/problems/bad-request","title":"Malformed request","status":400,"request_id":"102e5913-a1df-437d-bd60-82802c320cdd","detail":"Unknown route GET /api/v1/nope"}

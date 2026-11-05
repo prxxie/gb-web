@@ -1,0 +1,7 @@
+  ✓  1 tests/e2e/a11y.spec.ts:9:5 › TC-PWA-158: every button on the menu has an accessible name and a 44 px target (775ms)
+  ✓  2 tests/e2e/lobby.spec.ts:9:5 › TC-ROOM-071: a host creates a room and a guest joins it (1.5s)
+  ✓  3 tests/e2e/smoke.spec.ts:9:7 › solo demo path › TC-MATCH-901: the battlefield mounts and the HUD reports the turn (1.9s)
+  ✓  4 tests/e2e/smoke.spec.ts:19:7 › solo demo path › TC-MATCH-902: a one-finger pull raises the power readout (1.9s)
+  ✓  5 tests/e2e/smoke.spec.ts:34:7 › solo demo path › TC-RANK-153: a finished match lands on the result screen (371ms)
+  ✓  6 tests/e2e/smoke.spec.ts:40:7 › solo demo path › TC-PWA-063: the page asks for landscape, never for a fullscreen launch flag (369ms)
+  6 passed (8.2s)
