@@ -146,9 +146,15 @@ export interface HarnessPlayer {
 export class RoomHarness {
   readonly ctx = new FakeContext();
   readonly do: Room;
+  private readonly origin: string | null;
   private readonly members = new Map<string, RoomMember>();
 
-  constructor() {
+  /**
+   * `origin` is the public base the object posts a finished match to (`US-RANK-001`). Tests that reach
+   * `POST /matches` pass it and stub `fetch`; everything else leaves it out, so the request never happens.
+   */
+  constructor(options: { readonly origin?: string } = {}) {
+    this.origin = options.origin ?? null;
     this.do = new Room(
       this.ctx as unknown as ConstructorParameters<typeof Room>[0],
       { SESSION_TOKEN_SECRET: HARNESS_SECRET } as unknown as ConstructorParameters<typeof Room>[1],
@@ -206,7 +212,9 @@ export class RoomHarness {
     globals.Response = UpgradeResponse;
     try {
       const response = (await this.do.fetch(
-        new Request(`${ROOM_ORIGIN}/rooms/${ROOM_CODE}/ws`, { headers: { upgrade: "websocket" } }),
+        new Request(`${ROOM_ORIGIN}/rooms/${ROOM_CODE}/ws`, {
+          headers: this.origin === null ? { upgrade: "websocket" } : { upgrade: "websocket", "x-room-origin": this.origin },
+        }),
       )) as unknown as UpgradeResponse;
       if (response.status !== 101) throw new Error(`upgrade failed with ${response.status}`);
       const server = this.ctx.accepted[this.ctx.accepted.length - 1];

@@ -470,6 +470,11 @@ export interface RoomCall {
 export interface FakeRooms {
   readonly namespace: Env["ROOMS"];
   readonly calls: RoomCall[];
+  /**
+   * Make a code name a real room, so `/join` and the preview see somebody seated. `POST /rooms` treats a
+   * nameless object as a free code (`US-ROOM-001` AC2), which is the default here.
+   */
+  readonly seat: (roomCode: string, accountId: string) => void;
 }
 
 export interface FakeRoomsOptions {
@@ -486,16 +491,22 @@ export interface FakeRoomsOptions {
 /** A `ROOMS` binding whose stub answers `join`, `state` and `ws` like `room-do.ts` does. */
 export function fakeRooms(options: FakeRoomsOptions = {}): FakeRooms {
   const calls: RoomCall[] = [];
+  // Default to an object nobody has named yet: `POST /rooms` reads `/state` to see whether a code is taken
+  // (`US-ROOM-001` AC2), and a stub that always reports a room would make every allocation look like a
+  // collision. A test that needs a joinable room passes `state` (see `fakeRooms({ state })`).
   const state = options.state ?? {
-    roomCode: "ABC234",
+    roomCode: "",
     status: "lobby",
-    // A room the stubs answer for has somebody in it: an empty roster is "no such room" (`rooms.md` 404).
-    members: [{ playerId: "p1", accountId: "acc_1", guestId: null, role: "host", slot: 0, displayName: "Host" }],
+    members: [],
     hostPlayerId: null,
     settings: { maxPlayers: 4, mode: "solo", mapId: "map-01", isPrivate: false },
   };
-  const stub = {
+  // Room state is per code: `POST /rooms` probes the code it just generated, and a single shared stub would
+  // report every code as taken (`US-ROOM-001` AC2).
+  const seated = new Map<string, Record<string, unknown>>();
+  const stubFor = (code: string) => ({
     async fetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+      const active = seated.get(code) ?? state;
       // The socket route forwards a *Request* (it copies the browser's upgrade headers into it), every
       // other route forwards a URL string — both shapes reach this stub, so normalise the same way.
       const url = new URL(typeof input === "string" ? input : input instanceof URL ? input.href : input.url);
@@ -504,23 +515,37 @@ export function fakeRooms(options: FakeRoomsOptions = {}): FakeRooms {
       calls.push({ path: url.pathname, method, body });
       if (options.failure) throw options.failure;
       if (url.pathname === "/join" && body) {
-        const settings = (body["settings"] as Record<string, unknown> | undefined) ?? state["settings"];
+        const settings = (body["settings"] as Record<string, unknown> | undefined) ?? active["settings"];
         return Response.json({ room: { settings, status: "lobby" }, member: { playerId: body["playerId"] } });
       }
       if (url.pathname === "/state" && options.stateResponse) return options.stateResponse();
-      if (url.pathname === "/state") return Response.json(state);
+      if (url.pathname === "/state") return Response.json(active);
       if (url.pathname === "/ws") {
         if (options.wsResponse) return options.wsResponse();
         return new Response(null, { status: 101, webSocket: null } as ResponseInit & { webSocket: null });
       }
       return Response.json({ type: "room-not-found" }, { status: 404 });
     },
-  };
+  });
   const namespace = {
     idFromName: (name: string) => name,
-    get: () => stub,
+    get: (name: string) => stubFor(name),
   };
-  return { namespace: namespace as unknown as Env["ROOMS"], calls };
+  return {
+    namespace: namespace as unknown as Env["ROOMS"],
+    calls,
+    seat: (roomCode: string, accountId: string) => {
+      seated.set(roomCode, {
+        roomCode,
+        status: "lobby",
+        hostPlayerId: "p1",
+        settings: { maxPlayers: 4, mode: "solo", mapId: "map-01", isPrivate: false },
+        members: [
+          { playerId: "p1", accountId, guestId: null, role: "host", slot: 0, displayName: "Host", connectionState: "connected" },
+        ],
+      });
+    },
+  };
 }
 
 export interface TestEnvOptions {

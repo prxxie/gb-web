@@ -55,6 +55,53 @@ test.describe("main menu", () => {
     await expect(page).toHaveURL("/");
   });
 
+  test("TC-ROOM-133: the code box keeps only six legal characters", async ({ page }) => {
+    await page.goto("/");
+    const input = page.getByTestId("room-code-input");
+
+    // Lower case is raised, the separator is dropped, and the letters the alphabet excludes (I, O, 0, 1) never
+    // reach the box — `US-ROOM-001` §4 uses 24 letters plus 8 digits.
+    await input.fill("ab-cd 2x3");
+    await expect(input).toHaveValue("ABCD2X");
+    await expect(page.getByTestId("join-room")).toBeEnabled();
+
+    await input.fill("io01");
+    await expect(input).toHaveValue("");
+    await expect(page.getByTestId("join-room")).toBeDisabled();
+
+    await input.fill("ABC");
+    await expect(page.getByTestId("join-room")).toBeDisabled();
+  });
+
+  test("TC-ROOM-150: the lobby copies its code to the clipboard", async ({ page, context }) => {
+    await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+    await page.goto("/");
+    const code = await createRoom(page);
+
+    await page.getByTestId("copy-code").click();
+
+    expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(code);
+  });
+
+  test("TC-ROOM-136: joining a room that has closed says so instead of retrying", async ({ page }) => {
+    // The room really closing takes sixty idle seconds, so the answer is stubbed: what this asserts is the
+    // banner the menu picks for a 410 (`US-ROOM-001` AC5).
+    await page.route("**/api/v1/rooms/*", async (route) => {
+      if (route.request().method() !== "GET") return route.continue();
+      await route.fulfill({
+        status: 410,
+        contentType: "application/problem+json",
+        body: JSON.stringify({ type: "https://gbw.example/problems/room-closed", title: "Room closed", status: 410 }),
+      });
+    });
+    await page.goto("/");
+    await page.getByTestId("room-code-input").fill("ABC234");
+    await page.getByTestId("join-room").click();
+
+    await expect(page.getByText("Phòng đã đóng.")).toBeVisible();
+    await expect(page).toHaveURL("/");
+  });
+
   test("the offline hint is not shown while the player is online", async ({ page, context }) => {
     await page.goto("/");
     const hint = page.getByText("Bạn đang ngoại tuyến — chỉ chơi được với máy.");

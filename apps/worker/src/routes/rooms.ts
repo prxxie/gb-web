@@ -74,6 +74,8 @@ export async function createRoom(
   env: Env,
   session: SessionToken,
   originBase: string,
+  /** Code generator; tests pin it to force collisions (`US-ROOM-001` AC2). */
+  nextCode: () => string = () => makeRoomCode(() => crypto.getRandomValues(new Uint32Array(1))[0]! / 2 ** 32),
 ): Promise<Response> {
   const limit = ipLimit(request, env, "rooms", RULES.roomsPerIp);
   if (limit && !limit.allowed) {
@@ -94,7 +96,11 @@ export async function createRoom(
 
   const playerId = crypto.randomUUID();
   for (let attempt = 0; attempt < CODE_ATTEMPTS; attempt += 1) {
-    const roomCode = makeRoomCode(() => crypto.getRandomValues(new Uint32Array(1))[0]! / 2 ** 32);
+    const roomCode = nextCode();
+    // A code that already names a room is taken (`US-ROOM-001` AC2): joining it would seat the creator in
+    // somebody else's room, so pick another code instead.
+    const taken = await roomState(env, roomCode);
+    if (taken.roomCode) continue;
     try {
       const joined = await callRoom<{ room: unknown; member: { playerId: string } }>(stubFor(env, roomCode), "join", {
         playerId,
@@ -124,7 +130,8 @@ export async function createRoom(
       throw error;
     }
   }
-  throw new ProblemError("internal", "Could not allocate a room code");
+  // Five collisions in a row is a "come back in a moment", not a bug (`US-ROOM-001` AC2).
+  throw new ProblemError("unavailable", "Could not allocate a room code", [], 5);
 }
 
 /** Join an existing room by code (`US-ROOM-002`). The roster lives in the Durable Object. */

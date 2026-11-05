@@ -71,6 +71,8 @@ describe("endpoint index", () => {
   it("answers the documented status for each route", async () => {
     const { harness, authorization } = await signedIn();
     harness.db.matchPlayer.push({ match_id: "m1", account_id: "acc_1", result: "win", damage_dealt: 120 });
+    // A code that names no room is a 404 on `/join`, so the join case needs a seated room.
+    harness.rooms.seat("ABC234", "acc_1");
 
     const expected: [string, string, number, unknown?][] = [
       ["GET", "/health", 200],

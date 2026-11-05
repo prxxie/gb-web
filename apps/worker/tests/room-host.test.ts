@@ -4,6 +4,7 @@
  * `docs/01-overview/workflow-state-machine.md` name the exact rejection code.
  */
 import { describe, expect, it } from "vitest";
+import { RULESET_VERSION, type RoomMember } from "@gbw/core";
 import { makeSnapshot, RoomHarness, type FakeSocket } from "./support/room-harness";
 
 const IDS = ["host", "p1", "p2", "p3"] as const;
@@ -178,6 +179,88 @@ describe("room host-only commands", () => {
 
     expect(harness.state().settings).toEqual(settingsBefore);
     expect(harness.state().members.map((member) => member.team)).toEqual(teamsBefore);
+    expect(harness.state().status).toBe("playing");
+  });
+
+  it("TC-ROOM-183: team_assign broadcasts the new room_state to every member, the host included", async () => {
+    // Arrange — seats start alternating A/B/A/B, so this assignment really moves p1 and p2
+    const { harness, sockets } = await lobby();
+    const host = sockets.get("host")!;
+    expect(harness.state().members.map((member) => member.team)).toEqual(["A", "B", "A", "B"]);
+
+    // Act
+    await harness.message(host, {
+      t: "team_assign",
+      assignments: [
+        { playerId: "host", team: "A" },
+        { playerId: "p1", team: "A" },
+        { playerId: "p2", team: "B" },
+        { playerId: "p3", team: "B" },
+      ],
+    });
+
+    // Assert — the actor is not exempt from the broadcast (`US-ROOM-003` AC1)
+    for (const [id, socket] of sockets) {
+      const states = socket.framesOf("room_state");
+      expect(states, id).toHaveLength(1);
+      const members = (states[0]?.["room"] as { members: readonly RoomMember[] }).members;
+      expect(members.map((member) => `${member.playerId}:${member.team}`), id).toEqual([
+        "host:A",
+        "p1:A",
+        "p2:B",
+        "p3:B",
+      ]);
+    }
+    expect(harness.state().members.map((member) => member.team)).toEqual(["A", "A", "B", "B"]);
+  });
+
+  it("TC-ROOM-166: start_match broadcasts match_started to every member with the documented fields", async () => {
+    // Arrange
+    const { harness, sockets } = await lobby();
+    const host = sockets.get("host")!;
+    await harness.message(host, {
+      t: "team_assign",
+      assignments: [
+        { playerId: "host", team: "A" },
+        { playerId: "p1", team: "A" },
+        { playerId: "p2", team: "B" },
+        { playerId: "p3", team: "B" },
+      ],
+    });
+    harness.clearAll(sockets.values());
+
+    // Act
+    await harness.message(host, { t: "start_match" });
+
+    // Assert — every member gets the same frame, not only the sender (`US-ROOM-003` AC3)
+    for (const [id, socket] of sockets) {
+      const started = socket.framesOf("match_started");
+      expect(started, id).toHaveLength(1);
+      const frame = started[0]!;
+      expect(Object.keys(frame).sort(), id).toEqual([
+        "assignments",
+        "hostGeneration",
+        "hostPlayerId",
+        "room",
+        "rulesetVersion",
+        "seed",
+        "startedAt",
+        "t",
+      ]);
+      expect(frame["hostPlayerId"], id).toBe("host");
+      expect(frame["hostGeneration"], id).toBe(1);
+      expect(frame["rulesetVersion"], id).toBe(RULESET_VERSION);
+      const seed = frame["seed"] as number;
+      expect(Number.isInteger(seed), id).toBe(true);
+      expect(seed, id).toBeGreaterThanOrEqual(0);
+      expect(seed, id).toBeLessThanOrEqual(0xffff_ffff);
+      const assignments = frame["assignments"] as readonly { playerId: string; slot: number; team: string | null }[];
+      expect(
+        assignments.map((assignment) => `${assignment.playerId}:${assignment.slot}:${assignment.team}`),
+        id,
+      ).toEqual(["host:0:A", "p1:1:A", "p2:2:B", "p3:3:B"]);
+      expect((frame["room"] as { status: string }).status, id).toBe("playing");
+    }
     expect(harness.state().status).toBe("playing");
   });
 });

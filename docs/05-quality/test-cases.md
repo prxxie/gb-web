@@ -58,6 +58,15 @@ The `covers` column names the requirement ([nonfunctional-requirements.md](../01
 | TC-ROOM-150 | US-ROOM-001 | Copy-code control | Clipboard equals the code | e2e | `screens/lobby.md` |
 | TC-ROOM-168 | US-CORE-012 | `setRoomSettings` with a new map and mode, then a capacity below the seated members | The settings patch lands and keeps the other fields; the shrink is refused `below-seated` | unit | FR-05 |
 | TC-ROOM-169 | US-ROOM-005 | Election exhausts its candidates | Every socket gone: the room is `abandoned`, never hostless | worker | `apps/worker/src/room-do.ts` |
+| TC-ROOM-170 | US-ROOM-001 | Code generator keeps returning a taken code | Five attempts, then `503 unavailable` with `Retry-After: 5` | worker | FR-01 |
+| TC-ROOM-174 | US-ROOM-004 | A socket dies with a transient close code | Reopened after 500 ms, `onReconnected` fires once | web | NFR-07 |
+| TC-ROOM-175 | US-ROOM-004 | A socket is closed with `4401` | No retry; `onFatal(4401)` | web | NFR-07 |
+| TC-ROOM-176 | US-ROOM-004 | Transient drops keep failing for 21 s | Retries stop at the end of the grace window | web | NFR-07 |
+| TC-ROOM-177 | US-ROOM-004 | The page unmounts while the socket is dead | The retry loop stops with it | web | NFR-07 |
+| TC-ROOM-186 | US-ROOM-004 | Both seats of one team leave mid-match | The room ends `abandoned` and `POST /matches` records `abandoned: true`, winner A, `abandon` for the B seats | worker | `US-ROOM-004` AC6 |
+| TC-ROOM-183 | US-ROOM-003 | `team_assign` fan-out | Every socket, host included, receives exactly one `room_state` carrying A/A/B/B | worker | `api/signaling.md` |
+| TC-ROOM-184 | US-ROOM-004 | Reconnect 19 s into the grace window | The returning socket keeps slot 3 and team B and is re-sent `snapshot_state` with its 70 HP | worker | NFR-07 |
+| TC-ROOM-185 | US-ROOM-004 | Grace window runs out | The seat flips to `disconnected`, peers hear `peer_left {reason:"disconnected"}`, the next `room_state` shows it | worker | NFR-07 |
 | TC-ROOM-182 | US-ROOM-005 | Migration end to end on two sockets | Host socket killed mid-match: the survivor is promoted within 5 s with `hostGeneration` 2 and still pings | e2e | NFR-06 |
 | TC-ROOM-151 | US-ROOM-007 | Host selects mode, map and capacity; a non-host tries | Host writes, member is rejected, loadout caps at 11 items across two pages | e2e | `screens/lobby.md` |
 | TC-ROOM-153 | US-ROOM-007 | Two players pick the same mobile, then a guest picks one | Both are accepted in the same match, every mobile appears once in the grid, the choice survives reconnect | e2e | `data/mobiles.md` |

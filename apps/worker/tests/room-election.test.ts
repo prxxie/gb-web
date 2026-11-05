@@ -4,6 +4,7 @@
  * generation goes up by one, and every peer gets `host_changed` with the last snapshot to adopt.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { RoomMember, Snapshot } from "@gbw/core";
 import { makeSnapshot, RoomHarness, type FakeSocket } from "./support/room-harness";
 
 const BASE = 1_700_000_000_000;
@@ -150,5 +151,96 @@ describe("room host election", () => {
     expect(host.framesOf("room_state").length).toBeGreaterThanOrEqual(1);
     expect(harness.state().members.find((member) => member.playerId === "peer")?.connectionState).toBe("grace");
     expect(harness.alarmAt()).toBe(BASE + 20_000 + 20_000);
+  });
+
+  it("TC-ROOM-184: a reconnect inside the grace window returns on the same slot and team with the hp from lastSnapshot", async () => {
+    // Arrange — the host pushed a snapshot whose slot 3 is down to 70 hp
+    const { harness, sockets } = await playingRoom();
+    const host = sockets.get("host")!;
+    const base = makeSnapshot(4, 1);
+    const template = base.players[0];
+    if (!template) throw new Error("the harness snapshot has no player slot to copy");
+    const wounded: Snapshot = {
+      ...base,
+      players: [0, 1, 2, 3].map((slot) => ({ ...template, slot, hp: 100 - slot * 10 })),
+    };
+    await harness.message(host, { t: "snapshot_push", snapshot: wounded });
+    const slotBefore = harness.state().members.find((member) => member.playerId === "p3")?.slot;
+    await harness.close(sockets.get("p3")!);
+    expect(harness.state().members.find((member) => member.playerId === "p3")?.connectionState).toBe("grace");
+
+    // Act — the same subject proves a fresh token 19 s later, still inside the 20 s window
+    vi.setSystemTime(BASE + 10_000 + 19_000);
+    const again = await harness.connect("p3");
+
+    // Assert — seat, team and hp are the ones the room remembered (`US-ROOM-004` AC2)
+    const [state] = again.framesOf("room_state");
+    expect(state?.["you"]).toEqual({ playerId: "p3", slot: slotBefore });
+    const member = (state?.["room"] as { members: readonly RoomMember[] }).members.find(
+      (candidate) => candidate.playerId === "p3",
+    );
+    expect(member).toMatchObject({ slot: slotBefore, team: "B", connectionState: "connected" });
+    expect(harness.state().members.find((candidate) => candidate.playerId === "p3")?.connectionState).toBe(
+      "connected",
+    );
+    const [replay] = again.framesOf("snapshot_state");
+    const snapshot = replay?.["snapshot"] as Snapshot;
+    expect(snapshot.seq).toBe(4);
+    expect(snapshot.players.find((player) => player.slot === slotBefore)?.hp).toBe(70);
+  });
+
+  it("TC-ROOM-185: a grace window that runs out turns the seat disconnected in the host's room_state", async () => {
+    // Arrange
+    const { harness, sockets } = await playingRoom();
+    const host = sockets.get("host")!;
+    await harness.close(sockets.get("p3")!);
+    host.clear();
+
+    // Act — the 20 s alarm that the close armed
+    vi.setSystemTime(BASE + 10_000 + 20_000);
+    await harness.alarm();
+
+    // Assert — the seat is `disconnected` and the roster frame the host sees agrees.
+    // The turn clock itself is host-owned (`snapshot.turn`), so this asserts only the state the DO owns.
+    expect(harness.state().members.find((member) => member.playerId === "p3")?.connectionState).toBe(
+      "disconnected",
+    );
+    expect(host.framesOf("peer_left")).toEqual([
+      { t: "peer_left", playerId: "p3", reason: "disconnected" },
+    ]);
+    const rosters = host.framesOf("room_state");
+    expect(rosters).toHaveLength(1);
+    const members = (rosters[0]?.["room"] as { members: readonly RoomMember[] }).members;
+    expect(members.map((member) => `${member.playerId}:${member.connectionState}`)).toEqual([
+      "host:connected",
+      "p1:connected",
+      "p2:connected",
+      "p3:disconnected",
+    ]);
+    expect(harness.state().status).toBe("playing");
+  });
+
+  it("TC-ROOM-061: after the host drops, the promoted host's snapshot still reaches the survivor", async () => {
+    // Arrange — the old host pushed one snapshot, then its socket dies
+    const { harness, sockets } = await playingRoom();
+    const oldHost = sockets.get("host")!;
+    const promoted = sockets.get("p1")!;
+    const survivor = sockets.get("p3")!;
+    await harness.message(oldHost, { t: "snapshot_push", snapshot: makeSnapshot(1, 1) });
+    await harness.close(oldHost);
+    expect(harness.state().hostPlayerId).toBe("p1");
+    expect(harness.state().hostGeneration).toBe(2);
+    harness.clearAll(sockets.values());
+
+    // Act — the relay is fed by the new host, not by the one that left (`US-ROOM-005` AC6)
+    await harness.message(promoted, { t: "snapshot_push", snapshot: makeSnapshot(2, 2) });
+
+    // Assert
+    expect(promoted.errors()).toEqual([]);
+    expect(promoted.framesOf("snapshot_state")).toEqual([]);
+    expect(survivor.errors()).toEqual([]);
+    const [delivered] = survivor.framesOf("snapshot_state");
+    expect(delivered?.["snapshot"]).toMatchObject({ seq: 2, hostGeneration: 2 });
+    expect(harness.state().lastSnapshot?.seq).toBe(2);
   });
 });

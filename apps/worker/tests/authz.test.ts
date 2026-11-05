@@ -108,6 +108,8 @@ describe("TC-AUTH-065 : the guest role can still play", () => {
 
   it("joins a room", async () => {
     const { harness, authorization } = await guest();
+    // The stub must know a room at this code, or the join is a 404 before the session is even checked.
+    harness.rooms.seat("ABC234", "acc_1");
 
     const response = await call(harness, "/rooms/ABC234/join", {
       method: "POST",

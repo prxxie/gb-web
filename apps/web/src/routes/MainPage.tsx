@@ -92,7 +92,15 @@ export function MainPage(): JSX.Element {
       await api.roomPreview(code);
       navigate(`/lobby/${code}`);
     } catch (caught) {
-      setError(caught instanceof ApiError && caught.type === "room-not-found" ? t("errors.room-not-found") : t("common.retry"));
+      // A code nobody minted reads as "not found"; a room that has closed reads as closed (`US-ROOM-001` AC5).
+      const type = caught instanceof ApiError ? caught.type : null;
+      setError(
+        type === "room-not-found"
+          ? t("errors.room-not-found")
+          : type === "room-closed"
+            ? t("errors.room-closed")
+            : t("common.retry"),
+      );
     } finally {
       setBusy(false);
     }
@@ -165,7 +173,9 @@ export function MainPage(): JSX.Element {
           autoCapitalize="characters"
           autoComplete="off"
           spellCheck={false}
-          maxLength={6}
+          // Twelve, not six: the mask drops separators *after* the box has taken the keystroke, so a
+          // six-character cap would eat "ab-cd 2x3" down to four letters before sanitising it.
+          maxLength={12}
           placeholder={t("main.roomCode")}
           data-testid="room-code-input"
           value={code}

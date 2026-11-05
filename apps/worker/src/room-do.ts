@@ -26,7 +26,9 @@ import {
   type ErrorCode,
   type JoinRequest,
   type LoadoutEntry,
+  isForfeited,
   type MatchEndFrame,
+  type Team,
   type MatchStat,
   type RoomMember,
   type RoomSettings,
@@ -40,6 +42,7 @@ import { verifySession, type SessionSubject } from "./lib/session.js";
 const AUTH_TIMEOUT_MS = 5_000;
 const CLOSE_UNAUTHENTICATED = 4401;
 const CLOSE_ROOM_NOT_FOUND = 4404;
+const CLOSE_ROOM_FULL = 4409;
 const CLOSE_ROOM_CLOSED = 4410;
 const CLOSE_RATE_LIMITED = 4429;
 
@@ -592,6 +595,7 @@ export class Room implements DurableObject {
     token: string | null,
     frame: MatchEndFrame,
     endedAt: number,
+    options: { readonly abandoned?: boolean } = {},
   ): Promise<{ ok: true; value: { matchId: string; winnerTeam: "A" | "B" | null; ranked: boolean; ratings: readonly { accountId: string; before: number; after: number; delta: number }[]; players: readonly { slot: number; result: "win" | "loss" | "abandon" }[] } } | { ok: false; detail: string }> {
     const startedAt = this.matchStartedAt ?? endedAt;
     const matchId = `${this.room.roomCode}-${startedAt}`;
@@ -621,7 +625,7 @@ export class Room implements DurableObject {
         startedAt: new Date(startedAt).toISOString(),
         endedAt: new Date(endedAt).toISOString(),
         winnerTeam: frame.winnerTeam,
-        abandoned: false,
+        abandoned: options.abandoned ?? false,
         players,
       }),
     });
@@ -648,7 +652,14 @@ export class Room implements DurableObject {
             })),
           players: players.map((player) => ({
             slot: player.slot,
-            result: frame.winnerTeam === null ? "loss" : player.team === frame.winnerTeam ? "win" : "loss",
+            result:
+              frame.winnerTeam === null
+                ? "loss"
+                : player.team === frame.winnerTeam
+                  ? "win"
+                  : options.abandoned === true
+                    ? "abandon"
+                    : "loss",
           })),
         },
       };
@@ -694,7 +705,12 @@ export class Room implements DurableObject {
         (subject.guestId !== null && candidate.guestId === subject.guestId),
     );
     if (!member) {
-      ws.close(CLOSE_ROOM_NOT_FOUND, "unknown player");
+      // A socket with no seat in a room that is full is the ninth player of an eight-slot room
+      // (`US-ROOM-002` AC3): `4409`, and the roster does not change.
+      ws.close(
+        this.room.members.length >= this.room.settings.maxPlayers ? CLOSE_ROOM_FULL : CLOSE_ROOM_NOT_FOUND,
+        this.room.members.length >= this.room.settings.maxPlayers ? "room full" : "unknown player",
+      );
       return;
     }
     const playerId = member.playerId;
@@ -863,7 +879,6 @@ export class Room implements DurableObject {
   /** Alarms do the lifecycle work: grace expiry, forfeit, idle expiry. */
   async alarm(): Promise<void> {
     const now = Date.now();
-    await this.sweepSilentSockets(now);
 
     // `US-ROOM-005` AC3: a migration that did not produce a live host inside 5 s retries once with the next
     // candidate and then gives the room up. This runs before the grace sweep so a dead host cannot be
@@ -894,6 +909,8 @@ export class Room implements DurableObject {
     }
 
     // A grace that ran out becomes `disconnected`, and every peer hears about it (`US-ROOM-004` AC3).
+    // The sweep that *creates* a grace runs after this block: a seat marked `grace` in this pass must be
+    // visible as `grace` to the peers before the next alarm can expire it (`US-ROOM-002` AC6).
     const expired = this.room.members.filter((member) => member.connectionState === "grace");
     this.room = {
       ...this.room,
@@ -908,11 +925,27 @@ export class Room implements DurableObject {
     }
     if (expired.length > 0) this.broadcast({ t: "room_state", room: this.publicState() });
 
+    // A team that lost every member forfeits, and the match is recorded as abandoned (`US-ROOM-004` AC5/AC6)
+    // before the "nobody is connected any more" rule below gets a chance to hide the winner.
+    if (this.room.status === "playing") {
+      const forfeited = isForfeited(this.room);
+      if (forfeited !== null) {
+        this.room = { ...this.room, status: "abandoned" };
+        await this.persist();
+        this.broadcast({ t: "room_state", room: this.publicState() });
+        await this.recordAbandoned(forfeited);
+      }
+    }
+
     // Nobody connected and nobody left in the roster: the room is over, not merely quiet (`US-ROOM-005`).
     const anyConnected = this.room.members.some((member) => member.connectionState === "connected");
     if (!anyConnected && this.room.status === "playing") {
       this.room = { ...this.room, status: "abandoned" };
     }
+
+    // Silence is noticed last, so a socket that stops answering is announced as `grace` (not as gone) and the
+    // expiry pass above can only retire it on a later alarm.
+    await this.sweepSilentSockets(now);
 
     // The host role moves only once the grace window it was given has run out (`US-ROOM-005`: a host that is
     // merely `grace` is not replaced) — and only to a peer that is actually connected.
@@ -949,23 +982,66 @@ export class Room implements DurableObject {
    * A `ping` every `PING_INTERVAL_MS` with three missed ones allowed (`US-ROOM-002` AC6). The client
    * cannot lie about this: silence is what is measured, not a claimed timestamp.
    */
+  /**
+   * Record a forfeited match (`US-ROOM-004` AC6). The abandoning team's seats are reported as `abandon`, the
+   * survivors as `win`, and the numbers are zeros because nobody was there to report them. Any connected
+   * participant's token will do: `POST /matches` authorises the submitter as a player, not as the host.
+   */
+  private async recordAbandoned(winnerTeam: Team): Promise<void> {
+    const token = this.participantToken();
+    if (!token || !this.origin) return;
+    const stats = this.room.members.map((member) => ({
+      slot: member.slot,
+      damageDealt: 0,
+      shotsFired: 0,
+      hits: 0,
+    }));
+    const frame: MatchEndFrame = { t: "match_end", winnerTeam, stats };
+    const endedAt = Date.now();
+    const recorded = await this.recordMatch(token, frame, endedAt, { abandoned: true }).catch(() => null);
+    if (recorded?.ok) {
+      this.recorded = recorded.value;
+      this.broadcast({ t: "match_recorded", ...recorded.value });
+    }
+  }
+
+  /** The first socket that still has a session token, host first (`POST /matches` accepts any player). */
+  private participantToken(): string | null {
+    const hostSocket = this.room.hostPlayerId === null ? undefined : this.sockets.get(this.room.hostPlayerId);
+    const ordered = hostSocket === undefined ? [...this.sockets.values()] : [hostSocket, ...this.sockets.values()];
+    for (const socket of ordered) {
+      const token = this.meta.get(socket)?.token;
+      if (token) return token;
+    }
+    return null;
+  }
+
+  /**
+   * Silence is noticed per socket, but the announcement is made *before* the socket is dropped: a peer that
+   * is still listening must hear `peer_left` even when every silent socket is swept in the same pass
+   * (`US-ROOM-002` AC4 — the roster has to show `grace` at least once).
+   */
   private async sweepSilentSockets(now: number): Promise<void> {
     const deadline = PING_INTERVAL_MS * PING_MISSES_BEFORE_GRACE;
-    let silent: string | null = null;
-    for (const socket of this.sockets.values()) {
+    const silent = [...this.sockets.entries()].filter(([, socket]) => {
       const meta = this.meta.get(socket);
-      if (!meta?.playerId || !meta.authed) continue;
-      if (now - meta.lastPingAt <= deadline) continue;
-      silent = meta.playerId;
-      this.sockets.delete(meta.playerId);
+      if (!meta?.playerId || !meta.authed) return false;
+      return now - meta.lastPingAt > deadline;
+    });
+    if (silent.length === 0) return;
+    for (const [playerId] of silent) {
+      const outcome = markDisconnected(this.room, playerId, now);
+      this.room = this.withActivity(outcome.room);
+      this.broadcast({ t: "peer_left", playerId, reason: "grace" });
+    }
+    this.broadcast({ t: "room_state", room: this.publicState() });
+    for (const [playerId, socket] of silent) {
+      this.sockets.delete(playerId);
       this.meta.delete(socket);
       if (socket.readyState === 1) socket.close(4408, "heartbeat timeout");
-      const outcome = markDisconnected(this.room, meta.playerId, now);
-      this.room = this.withActivity(outcome.room);
-      this.broadcast({ t: "peer_left", playerId: meta.playerId, reason: "grace" });
-      await this.scheduleHeartbeatSweep();
     }
-    if (silent) await this.persist();
+    await this.scheduleHeartbeatSweep();
+    await this.persist();
   }
 
   private async scheduleHeartbeatSweep(): Promise<void> {

@@ -156,5 +156,6 @@
   "errors.rate-limited": "Bạn thao tác quá nhanh, thử lại sau.",
   "errors.snapshot-too-large": "Dữ liệu trận quá lớn.",
   "errors.internal": "Máy chủ gặp sự cố.",
-  "errors.network": "Không kết nối được máy chủ."
+  "errors.network": "Không kết nối được máy chủ.",
+  "match.disconnected": "Mất kết nối với phòng."
 }

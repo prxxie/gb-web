@@ -156,5 +156,6 @@
   "errors.rate-limited": "Too many actions — try again shortly.",
   "errors.snapshot-too-large": "The match data is too large.",
   "errors.internal": "The server hit a problem.",
-  "errors.network": "Could not reach the server."
+  "errors.network": "Could not reach the server.",
+  "match.disconnected": "Lost the room connection."
 }

@@ -37,7 +37,8 @@ import { useLocale } from "../app/providers";
 import { translate, type Locale } from "../i18n";
 import { createMesh, type Mesh } from "../net/mesh";
 import { itemFrame } from "../net/frames";
-import { connectRoom, type RoomSocket, type ServerMessage } from "../net/signaling";
+import { connectWithReconnect, type ReconnectingSocket } from "../net/reconnect";
+import type { ServerMessage } from "../net/signaling";
 import { api } from "../lib/api";
 import { currentSession } from "../lib/session";
 import type { JSX } from "react";
@@ -122,7 +123,7 @@ export function MatchPage(): JSX.Element {
   const container = useRef<HTMLDivElement | null>(null);
   const battle = useRef<BattleHandle | null>(null);
   const mesh = useRef<Mesh | null>(null);
-  const socket = useRef<RoomSocket | null>(null);
+  const socket = useRef<ReconnectingSocket | null>(null);
   const seq = useRef(1);
   const stateRef = useRef<MatchState | null>(null);
   const ended = useRef(false);
@@ -333,7 +334,7 @@ export function MatchPage(): JSX.Element {
       });
     });
 
-    socket.current = connectRoom({
+    socket.current = connectWithReconnect({
       wsUrl: `${base}/api/v1/rooms/${plan.roomCode}/ws`,
       token: session.token,
       displayName: session.subject.displayName,
@@ -362,8 +363,13 @@ export function MatchPage(): JSX.Element {
           }
         }
       },
-      onClose: (closeCode) => {
+      // A transient drop reconnects inside the grace window (`US-ROOM-004` AC7); a code the server chose
+      // means retrying would only repeat the answer.
+      onReconnecting: () => setBanner(t("match.reconnecting")),
+      onReconnected: () => setBanner(null),
+      onFatal: (closeCode) => {
         if (closeCode === 4401) setBanner(t("signIn.title"));
+        else setBanner(t("match.disconnected"));
       },
     });
 

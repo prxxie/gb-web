@@ -9,7 +9,9 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { ALLOWED_CAPACITIES, ROOM_CODE_ALPHABET, isValidRoomCode } from "@gbw/core";
 import { resetLimits } from "../src/lib/ratelimit";
-import { accountSubject, createRig, seedProfile, type TestRig } from "./support/fake-env";
+import { createRoom } from "../src/routes/rooms";
+import { verifySession } from "../src/lib/session";
+import { TEST_SECRET, accountSubject, createRig, seedProfile, type TestRig } from "./support/fake-env";
 
 const HOST = "acct-host";
 const GUEST = "acct-guest";
@@ -124,6 +126,32 @@ describe("POST /rooms", () => {
     // Assert — NFR-05 / api README: a 429 says when to come back
     expect(last?.status).toBe(429);
     expect(last?.headers.get("retry-after")).not.toBeNull();
+  });
+
+  it("TC-ROOM-170: five code collisions in a row answer 503 with a retry hint", async () => {
+    // Arrange — the generator is pinned to a code that is already taken, which is what a collision looks like
+    // (`US-ROOM-001` AC2: five attempts, then ask the client to come back).
+    const rig = createRig();
+    const existing = await newRoom(rig, 2);
+    const token = await rig.token(accountSubject(HOST));
+    const session = await verifySession(token, TEST_SECRET);
+    const request = new Request("https://gbw.example/api/v1/rooms", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ maxPlayers: 2 }),
+    });
+    let calls = 0;
+
+    // Act — the router turns this into the `unavailable` 503 problem document (asserted in
+    // `apps/worker/tests/api-contract.test.ts`); here the point is the attempt count and the hint.
+    const attempt = createRoom(request, rig.env, session, "https://gbw.example", () => {
+      calls += 1;
+      return existing.roomCode;
+    });
+
+    // Assert
+    await expect(attempt).rejects.toMatchObject({ type: "unavailable", retryAfterSeconds: 5 });
+    expect(calls).toBe(5);
   });
 
   it("POST /rooms without a bearer is a 401 problem document", async () => {

@@ -11,7 +11,8 @@ import { useLocale, useSession } from "../app/providers";
 import { LoadoutPicker } from "../components/LoadoutPicker";
 import { SettingsPanel } from "../components/SettingsPanel";
 import { api } from "../lib/api";
-import { connectRoom, type RoomSocket, type ServerMessage } from "../net/signaling";
+import { connectWithReconnect, type ReconnectingSocket } from "../net/reconnect";
+import type { ServerMessage } from "../net/signaling";
 import type { PlannedMatch } from "./MatchPage";
 import type { JSX } from "react";
 
@@ -23,10 +24,10 @@ export function LobbyPage(): JSX.Element {
   const [room, setRoom] = useState<RoomState | null>(null);
   const [playerId, setPlayerId] = useState<string | null>(null);
   const [mobileId, setMobileId] = useState<string>(MOBILES[0]?.mobileId ?? "mbl-01");
-  const [status, setStatus] = useState<"connecting" | "live" | "closed">("connecting");
+  const [status, setStatus] = useState<"connecting" | "live" | "reconnecting" | "closed">("connecting");
   const [grace, setGrace] = useState(0);
   const [loadout, setLoadout] = useState<readonly LoadoutEntry[]>([]);
-  const socket = useRef<RoomSocket | null>(null);
+  const socket = useRef<ReconnectingSocket | null>(null);
   const joined = useRef(false);
 
   const self = useMemo(() => room?.members.find((member) => member.playerId === playerId) ?? null, [room, playerId]);
@@ -64,7 +65,7 @@ export function LobbyPage(): JSX.Element {
         return;
       }
       setPlayerId(selfId);
-      socket.current = connectRoom({
+      socket.current = connectWithReconnect({
         wsUrl: `${base}/api/v1/rooms/${code}/ws`,
         token: session.token,
         displayName: session.subject.displayName,
@@ -114,7 +115,8 @@ export function LobbyPage(): JSX.Element {
             navigate(`/match/${code}`);
           }
         },
-        onClose: () => setStatus("closed"),
+        onReconnecting: () => setStatus("reconnecting"),
+        onFatal: () => setStatus("closed"),
       });
     });
 
@@ -202,7 +204,7 @@ export function LobbyPage(): JSX.Element {
     <div className="screen">
       <header className="row">
         <h1 data-testid="room-code">{code}</h1>
-        <button type="button" className="ghost" onClick={() => void copyCode()}>
+        <button type="button" className="ghost" data-testid="copy-code" onClick={() => void copyCode()}>
           {t("lobby.copy")}
         </button>
         <span className="badge">
@@ -263,7 +265,8 @@ export function LobbyPage(): JSX.Element {
       </div>
 
       {status === "connecting" ? <div className="overlay">{t("common.loading")}</div> : null}
-      {status === "closed" && grace === 0 ? <div className="overlay">{t("match.reconnecting")}</div> : null}
+      {status === "reconnecting" ? <div className="overlay" data-testid="lobby-reconnecting">{t("match.reconnecting")}</div> : null}
+      {status === "closed" ? <div className="overlay">{t("match.disconnected")}</div> : null}
       {grace > 0 ? (
         <div className="banner" data-testid="grace-countdown">
           {t("match.reconnecting")} — {grace}s
