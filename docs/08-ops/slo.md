@@ -39,7 +39,7 @@ frequency is too low to compute a ratio in a 30-day window: TC-ROOM-049 measures
 ## 4. Measurement notes
 
 - Source of truth is the Cloudflare dashboard (Workers metrics, D1 metrics). Free-tier analytics has short retention, so
-  a daily cron writes the previous day's numbers into `docs/06-reports/slo-snapshots/YYYY-MM.md` (story in the `OPS` epic).
+  a daily cron (`scripts/slo-snapshot.mjs`, `.github/workflows/slo-snapshot.yml`) writes the previous day's numbers into `docs/06-reports/slo-snapshots/YYYY-MM-DD.md` (US-OPS-002). The script reads § 1 of this file, so a new SLO appears in the snapshot without a code change.
 - Latency measured at the Worker excludes client network time; the client-side experience (touch → shot) is `NFR-02`
   and is measured by TC-OPS-180/TC-OPS-181 on real phones, not here.
 - SLO-3 is a product objective, not an availability one: it fails when players give up, which no uptime chart shows.

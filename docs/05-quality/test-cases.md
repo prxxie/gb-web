@@ -233,7 +233,10 @@ The `covers` column names the requirement ([nonfunctional-requirements.md](../01
 |----|-------|------|----------|-------|--------|
 | TC-OPS-118 | US-OPS-001 | Log line for a completed request | JSON with `request_id`, `route`, `status`, `duration_ms`, no token or name | worker | NFR-24 |
 | TC-OPS-173 | US-OPS-001 | Failing request log, searched for secrets | No token, cookie, display name or email present | worker | NFR-12 |
-| TC-OPS-901 | US-OPS-002 | Daily SLO snapshot job | Four SLI rows with budget and verdict; a breach is flagged and exits non-zero | manual | `08-ops/slo.md` |
+| TC-OPS-901 | US-OPS-002 | Every SLO in `slo.md` becomes a snapshot row | Four rows, each naming its `NFR-nn` | unit | `scripts/slo-snapshot.mjs` |
+| TC-OPS-903 | US-OPS-002 | A metric the source cannot answer | The row reads `no data` and the file is a breach | unit | `08-ops/slo.md` § 2 |
+| TC-OPS-904 | US-OPS-002 | A clean day and a breaching day | Clean exits 0; a breach marks only its own row and exits non-zero | unit | `08-ops/slo.md` |
+| TC-OPS-905 | US-OPS-002 | A target that cannot be read | Counted as a breach, never as an assumed pass | unit | `08-ops/slo.md` |
 | TC-OPS-185 | US-OPS-003 | 50 concurrent rooms load run | No 5xx, p95 API < 400 ms, report written | manual | OQ-33 |
 | TC-OPS-902 | US-OPS-004 | Release record completeness | Scope, evidence links, rollback plan and deployed versions present | manual | `07-release/README.md` |
 
