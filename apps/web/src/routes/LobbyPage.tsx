@@ -56,8 +56,11 @@ export function LobbyPage(): JSX.Element {
     };
 
     void enter().then((selfId) => {
-      if (cancelled || !selfId) {
-        setStatus("closed");
+      if (cancelled) return;
+      if (!selfId) {
+        // A code nobody minted is a menu-level problem (`US-ROOM-002` AC4): the lobby cannot show a roster
+        // that does not exist, so it hands the reason back to the menu instead of spinning forever.
+        navigate("/", { state: { error: "errors.room-not-found" } });
         return;
       }
       setPlayerId(selfId);
@@ -75,6 +78,12 @@ export function LobbyPage(): JSX.Element {
             // The server echoes the stored loadout, so a reconnecting member sees what it saved.
             const mine = message.room.members.find((member) => member.playerId === (message.you?.playerId ?? selfId));
             if (mine?.loadout) setLoadout(mine.loadout);
+            return;
+          }
+          // `peer_joined` carries the whole roster too (`signaling.md` §3), so the seated players see each
+          // other without waiting for the next `room_state`.
+          if (message.t === "peer_joined") {
+            setRoom(message.room);
             return;
           }
           if (message.t === "peer_left") {

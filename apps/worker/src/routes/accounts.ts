@@ -19,7 +19,7 @@ import {
 } from "../lib/db.js";
 import { verifyClerkJwt } from "../lib/jwt.js";
 import { ProblemError } from "../lib/problem.js";
-import { checkLimit, RULES } from "../lib/ratelimit.js";
+import { ipLimit, RULES } from "../lib/ratelimit.js";
 import { bearerOf, mintSession, type SessionToken } from "../lib/session.js";
 import { Field, readJson } from "../lib/validation.js";
 
@@ -43,8 +43,8 @@ export function isValidDisplayName(value: string): boolean {
 const AVATAR_PATTERN = /^avatar-(0[1-9]|1[0-2])$/;
 
 export async function createSession(request: Request, env: Env): Promise<Response> {
-  const limit = checkLimit(`sessions:${request.headers.get("cf-connecting-ip") ?? "local"}`, RULES.sessionsPerIp);
-  if (!limit.allowed) {
+  const limit = ipLimit(request, env, "sessions", RULES.sessionsPerIp);
+  if (limit && !limit.allowed) {
     throw new ProblemError("rate-limited", "Too many sessions from this address", [], limit.retryAfterSeconds, "ip_sessions");
   }
 

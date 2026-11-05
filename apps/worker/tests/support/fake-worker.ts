@@ -496,7 +496,9 @@ export function fakeRooms(options: FakeRoomsOptions = {}): FakeRooms {
   };
   const stub = {
     async fetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
-      const url = new URL(String(input));
+      // The socket route forwards a *Request* (it copies the browser's upgrade headers into it), every
+      // other route forwards a URL string — both shapes reach this stub, so normalise the same way.
+      const url = new URL(typeof input === "string" ? input : input instanceof URL ? input.href : input.url);
       const method = init?.method ?? "GET";
       const body = typeof init?.body === "string" ? (JSON.parse(init.body) as Record<string, unknown>) : null;
       calls.push({ path: url.pathname, method, body });

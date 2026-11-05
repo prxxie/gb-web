@@ -107,7 +107,9 @@ export function joinRoom(room: RoomState, request: JoinRequest): JoinOutcome {
     avatarId: request.avatarId,
     mobileId: request.mobileId,
     slot,
-    team: null,
+    // A joiner is seated in the emptier team, host first on A: a two-player room can start without the host
+    // shuffling anybody, and `team_assign` remains the override (`US-ROOM-003`, `screens/lobby.md`).
+    team: lessPopulatedTeam(room),
     role: room.members.length === 0 ? "host" : "player",
     connectionState: "connected",
     joinedAt: request.now,
@@ -166,6 +168,13 @@ export function leaveRoom(room: RoomState, playerId: string, now: number): Leave
     member,
     reason: "left",
   };
+}
+
+/** The team with fewer members; a tie seats on A. */
+function lessPopulatedTeam(room: RoomState): Team {
+  const a = room.members.filter((member) => member.team === "A").length;
+  const b = room.members.filter((member) => member.team === "B").length;
+  return a <= b ? "A" : "B";
 }
 
 export function setTeam(room: RoomState, playerId: string, team: Team, now: number): RoomState {

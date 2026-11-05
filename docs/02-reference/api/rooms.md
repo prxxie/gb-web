@@ -46,6 +46,11 @@ Response `200`: `{ roomCode, playerId, wsUrl, maxPlayers }`.
 Errors: `404 room-not-found` (unknown or swept code), `409 room-full`, `410 room-closed` (match already started),
 `422 validation`, `401 unauthenticated`. A guest joins with its guest session (`OQ-05`) and is unranked.
 
+The call is **idempotent for one session**: a seat is identified by the account or guest the token names, so a page
+that mounts twice (React's StrictMode) or a lobby that reloads answers `200` with the seat it already owns instead of
+taking a second one. A code nobody minted is `404 room-not-found`: the Durable Object is created before it is named, and the
+first join is what names it.
+
 ## GET /rooms/{code}
 
 Public joinability preview so the join screen can show a good error before opening a socket.

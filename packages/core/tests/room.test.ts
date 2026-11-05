@@ -113,9 +113,13 @@ describe("TC-ROOM-148: start conditions", () => {
     room = join(room, 1, "B");
     expect(canStart(room, "p-0")).toBe("not-full");
     room = join(room, 2, "A");
-    room = join(room, 3, null);
+    // A joiner is seated in the emptier team (`lobby.md` § Late joiner), so the lobby is balanced on arrival
+    // and only a manual move can unbalance it — that is the state this case is about.
+    room = join(room, 3);
+    expect(isBalanced(room)).toBe(true);
+    room = setTeam(room, "p-2", "B", NOW + 350);
     expect(canStart(room, "p-0")).toBe("teams-unbalanced");
-    room = setTeam(room, "p-3", "B", NOW + 400);
+    room = setTeam(room, "p-2", "A", NOW + 400);
     expect(isBalanced(room)).toBe(true);
     expect(canStart(room, "p-1")).toBe("not-host");
     expect(canStart(room, "p-0")).toBeNull();

@@ -5,7 +5,7 @@
  * component. Skip is disabled outside the player's own turn (AC2). Six taps inside a second lose the
  * third onward locally (AC4); the host still enforces its own limit.
  */
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import type { JSX } from "react";
 
 export type ChatKind = "quick_phrase" | "emote";
@@ -42,6 +42,7 @@ export function PhrasePicker({
   onChat,
 }: PhrasePickerProps): JSX.Element {
   const sent = useRef<number[]>([]);
+  const [open, setOpen] = useState(false);
 
   const chat = (kind: ChatKind, id: string): void => {
     const now = Date.now();
@@ -62,20 +63,37 @@ export function PhrasePicker({
       >
         {labels.skip}
       </button>
-      <div className="match__phrases" role="group" aria-label={labels.phrases}>
-        {phraseIds.map((id) => (
-          <button key={id} type="button" data-testid={`phrase-${id}`} onClick={() => chat("quick_phrase", id)}>
-            {phraseText(id)}
-          </button>
-        ))}
-      </div>
-      <div className="match__phrases" role="group" aria-label={labels.emotes}>
-        {emoteIds.map((id) => (
-          <button key={id} type="button" data-testid={`emote-${id}`} onClick={() => chat("emote", id)}>
-            {emoteText(id)}
-          </button>
-        ))}
-      </div>
+      <button
+        type="button"
+        className="match__skip"
+        data-testid="chat-toggle"
+        aria-expanded={open}
+        onClick={() => setOpen((was) => !was)}
+      >
+        {labels.phrases}
+      </button>
+      {/*
+        The grid opens on demand: twenty-four 60 px targets cannot sit over a battlefield that a one-finger
+        pull has to start on (`screens/match.md` § Controls), so the closed state is one 60 × 60 button.
+      */}
+      {open ? (
+        <div className="match__chat" data-testid="chat-grid">
+          <div className="match__phrases" role="group" aria-label={labels.phrases}>
+            {phraseIds.map((id) => (
+              <button key={id} type="button" data-testid={`phrase-${id}`} onClick={() => chat("quick_phrase", id)}>
+                {phraseText(id)}
+              </button>
+            ))}
+          </div>
+          <div className="match__phrases" role="group" aria-label={labels.emotes}>
+            {emoteIds.map((id) => (
+              <button key={id} type="button" data-testid={`emote-${id}`} onClick={() => chat("emote", id)}>
+                {emoteText(id)}
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

@@ -24,8 +24,11 @@ export function Shell({ children }: ShellProps): JSX.Element {
           className="ghost shell__locale"
           data-testid="locale-toggle"
           onClick={() => setLocale(locale === "vi" ? "en" : "vi")}
+          // The label names the language the tap switches to, so the button is "EN" while the page is in
+          // Vietnamese — naming the current language instead makes the control read as a status badge.
+          title={locale === "vi" ? "Chuyển sang tiếng Anh" : "Switch to Vietnamese"}
         >
-          {locale.toUpperCase()}
+          {locale === "vi" ? "EN" : "VI"}
         </button>
       </header>
       <div className="shell__body">{children}</div>

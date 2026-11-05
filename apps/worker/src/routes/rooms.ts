@@ -13,7 +13,7 @@ import {
 } from "@gbw/core";
 import type { Env } from "../lib/db.js";
 import { ProblemError } from "../lib/problem.js";
-import { checkLimit, RULES } from "../lib/ratelimit.js";
+import { ipLimit, RULES } from "../lib/ratelimit.js";
 import type { SessionToken } from "../lib/session.js";
 import { Field, readJson } from "../lib/validation.js";
 
@@ -75,8 +75,8 @@ export async function createRoom(
   session: SessionToken,
   originBase: string,
 ): Promise<Response> {
-  const limit = checkLimit(`rooms:${request.headers.get("cf-connecting-ip") ?? "local"}`, RULES.roomsPerIp);
-  if (!limit.allowed) {
+  const limit = ipLimit(request, env, "rooms", RULES.roomsPerIp);
+  if (limit && !limit.allowed) {
     throw new ProblemError("rate-limited", "Too many rooms created from this address", [], limit.retryAfterSeconds, "ip_rooms");
   }
 
@@ -143,11 +143,10 @@ export async function joinRoomByCode(
   if (existing.status === "ended" || existing.status === "abandoned") {
     throw new ProblemError("room-closed", "That match is already over");
   }
-  // A room object always exists once its stub is created, so "the code names nothing" is told apart from
-  // "the room is empty" by an empty roster: only the host's first join seats somebody.
-  if (!existing.roomCode || existing.members.length === 0) {
-    throw new ProblemError("room-not-found", "No room answers to that code");
-  }
+  // A room object exists as soon as its stub is created, so the code it was *named* with is what tells a real
+  // room from a ghost: `POST /rooms` names the room and seats its host in the same call, and a code nobody
+  // minted leaves `roomCode` empty.
+  if (!existing.roomCode) throw new ProblemError("room-not-found", "No room answers to that code");
   const body = await readJson(request);
   const field = new Field([]);
   const displayName = field.string(body["displayName"] ?? "Player", "displayName", { min: 2, max: 16 });
@@ -225,12 +224,13 @@ export async function roomSocket(env: Env, roomCode: string, request: Request): 
   if (!isValidRoomCode(roomCode)) throw new ProblemError("room-not-found", "Room codes are six characters");
   // The DO is reached through a reserved host, so its own `request.url` can never tell it the public
   // origin. The proxy passes it explicitly: `match_end` needs it to call back into `POST /matches`.
-  return await stubFor(env, roomCode).fetch(`https://room.internal/ws`, {
-    headers: {
-      upgrade: request.headers.get("upgrade") ?? "websocket",
-      "x-room-origin": new URL(request.url).origin,
-    },
-  });
+  //
+  // The upgrade is forwarded as a *copy of the incoming request*, not as a fresh `fetch` with a hand-made
+  // header set: the WebSocket handshake needs the browser's `sec-websocket-key`, `sec-websocket-version`
+  // and `connection` headers, and a rebuilt request without them is answered 500 by the runtime.
+  const forwarded = new Request("https://room.internal/ws", request);
+  forwarded.headers.set("x-room-origin", new URL(request.url).origin);
+  return await stubFor(env, roomCode).fetch(forwarded);
 }
 
 export interface IceServer {

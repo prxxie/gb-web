@@ -385,6 +385,23 @@ td {
   background: rgba(22, 33, 58, 0.92);
 }
 
+/* The grid is an overlay that only exists while it is open (`screens/match.md` § Controls): twenty-four
+   60 px targets laid over the battlefield would sit exactly where the pull gesture starts. */
+.match__chat {
+  position: absolute;
+  bottom: calc(108px + var(--safe-bottom));
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px;
+  border-radius: 14px;
+  background: rgba(9, 14, 26, 0.96);
+  max-height: calc(100% - 120px);
+  overflow-y: auto;
+}
+
 .match__phrases {
   display: grid;
   grid-template-columns: repeat(6, minmax(60px, 1fr));

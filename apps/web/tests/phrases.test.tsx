@@ -36,6 +36,12 @@ function picker(overrides: Partial<Parameters<typeof PhrasePicker>[0]> = {}) {
   return { onSkip, onChat };
 }
 
+/** The grid is one button until it is opened (`screens/match.md` § Controls — a 24-cell grid over the canvas
+ *  would swallow the pull gesture), so every case below opens it first, exactly as a player does. */
+async function openGrid(): Promise<void> {
+  await userEvent.click(screen.getByTestId("chat-toggle"));
+}
+
 describe("TC-MATCH-905: skip", () => {
   it("sends skip once and nothing else (AC1)", async () => {
     const { onSkip, onChat } = picker();
@@ -56,6 +62,7 @@ describe("TC-MATCH-905: skip", () => {
 describe("TC-MATCH-905: a chosen phrase", () => {
   it("sends the chosen id once, as a quick_phrase (AC3)", async () => {
     const { onChat, onSkip } = picker();
+    await openGrid();
     await userEvent.click(screen.getByTestId("phrase-phrase-03"));
     expect(onSkip).not.toHaveBeenCalled();
     expect(onChat).toHaveBeenCalledTimes(1);
@@ -64,6 +71,7 @@ describe("TC-MATCH-905: a chosen phrase", () => {
 
   it("sends no text at all — only the id crosses the wire (AC7)", async () => {
     const { onChat } = picker();
+    await openGrid();
     await userEvent.click(screen.getByTestId("phrase-phrase-07"));
     const [kind, id] = onChat.mock.calls[0] as [string, string];
     expect(kind).toBe("quick_phrase");
@@ -73,14 +81,16 @@ describe("TC-MATCH-905: a chosen phrase", () => {
 
   it("an emote uses its own kind", async () => {
     const { onChat } = picker();
+    await openGrid();
     await userEvent.click(screen.getByTestId("emote-emote-04"));
     expect(onChat).toHaveBeenCalledWith("emote", "emote-04");
   });
 });
 
 describe("TC-MATCH-905: the picker's surface", () => {
-  it("shows the fixed 12-phrase grid and the 8 emotes in labelled groups", () => {
+  it("shows the fixed 12-phrase grid and the 8 emotes in labelled groups once opened", async () => {
     picker();
+    await openGrid();
     const phrases = screen.getByRole("group", { name: LABELS.phrases });
     const emotes = screen.getByRole("group", { name: LABELS.emotes });
     expect(within(phrases).getAllByRole("button")).toHaveLength(12);

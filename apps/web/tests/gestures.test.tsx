@@ -8,7 +8,7 @@
  * reads the real stylesheet because jsdom has no layout — the numbers are the ones the browser gets.
  */
 import { afterEach, describe, expect, it } from "vitest";
-import { cleanup, render } from "@testing-library/react";
+import { cleanup, fireEvent, render } from "@testing-library/react";
 import { readFileSync } from "node:fs";
 import { TUNABLES, defaultWindow, panBy, pinchTo } from "@gbw/core";
 import { addPointer, classify, clearPointers, movePointer } from "../src/game/viewport";
@@ -147,7 +147,13 @@ describe("TC-MATCH-916 / NFR-17: what a thumb taps is at least 60 × 60", () => 
       </>,
     );
 
-    const targets = [".match__pad button", ".match__skip", ".match__phrases button"];
+    // The chat grid is closed by default, so its buttons are measured after opening it: `NFR-17` applies to
+    // every target a thumb can reach, closed or open.
+    const toggle = document.querySelector('[data-testid="chat-toggle"]');
+    expect(toggle, "the chat toggle is rendered").not.toBeNull();
+    fireEvent.click(toggle as Element);
+    const targets = [".match__pad button", ".match__skip"];
+    targets.push(".match__phrases button");
     for (const selector of targets) {
       const { width, height } = size(selector);
       expect(width, `${selector} width`).toBeGreaterThanOrEqual(60);

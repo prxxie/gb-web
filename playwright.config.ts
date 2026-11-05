@@ -28,6 +28,9 @@ export default defineConfig({
     screenshot: "only-on-failure",
     // The game is landscape-only (`NFR-19`), so every run uses a landscape phone profile.
     ...devices["Pixel 7 landscape"],
+    // Every request the run makes claims its own address: `NFR-25` allows ten rooms a minute per address,
+    // and a spec file that creates rooms would otherwise spend one shared local budget across the run.
+    extraHTTPHeaders: { "cf-connecting-ip": `198.51.100.${1 + (Date.now() % 200)}` },
   },
   webServer: EXTERNAL_SERVERS
     ? undefined
@@ -40,6 +43,9 @@ export default defineConfig({
         },
         {
           command: `pnpm dev --port ${WEB_PORT} --strictPort`,
+          // The flows below are the guest/game paths: a real Clerk key in `.env.local` would load the identity
+          // SDK and hide the "no key" screen the sign-in cases assert (`TC-PWA-139`), so e2e pins it empty.
+          env: { ...process.env, VITE_CLERK_PUBLISHABLE_KEY: "" } as Record<string, string>,
           url: BASE_URL,
           reuseExistingServer: !process.env.CI,
           timeout: 60_000,

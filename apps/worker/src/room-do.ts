@@ -90,7 +90,9 @@ export class Room implements DurableObject {
     private readonly ctx: DurableObjectState,
     private readonly env: Env,
   ) {
-    this.room = createRoom({ roomCode: "AAAAAA", now: Date.now() });
+    // An unnamed room: the Worker mints the code and hands it over with the host's first join, so a code
+    // that was never minted leaves this empty — that is what tells a real room from a ghost (`rooms.md` § 404).
+    this.room = createRoom({ roomCode: "", now: Date.now() });
     void this.ctx.blockConcurrencyWhile(async () => {
       const stored = await this.ctx.storage.get<RoomState>("room");
       const storedSnapshot = await this.ctx.storage.get<Snapshot>("snapshot");
@@ -151,6 +153,19 @@ export class Room implements DurableObject {
     const wasGraceHost =
       this.room.hostPlayerId === body.playerId &&
       this.room.members.find((member) => member.playerId === body.playerId)?.connectionState === "grace";
+    // A join is idempotent for the same session: a page that mounts twice (React's StrictMode does) must not
+    // take two seats, and a reloaded lobby must land back on the seat it already owns rather than on a new
+    // one (`US-ROOM-001` AC3). The identity is the one the session token carries, not the client's word.
+    const existing = this.room.members.find(
+      (member) =>
+        (body.accountId !== null && member.accountId === body.accountId) ||
+        (body.guestId !== null && member.guestId === body.guestId),
+    );
+    if (existing) {
+      this.room = this.withActivity({ ...this.room, members: this.room.members.map((member) => member.playerId === existing.playerId ? { ...member, seenConnected: true } : member) });
+      await this.persist();
+      return Response.json({ room: this.publicState(), member: existing });
+    }
     const outcome = joinRoom(this.room, { ...body, now: Date.now() });
     if (outcome.rejection) {
       const status = outcome.rejection === "room-full" ? 409 : outcome.rejection === "room-closed" ? 410 : 400;

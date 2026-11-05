@@ -88,7 +88,8 @@ describe("room host-only commands", () => {
     ]);
 
     expect(harness.state().status).toBe("lobby");
-    expect(harness.state().members.map((member) => member.team)).toEqual([null, null, null, null]);
+    // Seats alternate as players join (`US-ROOM-003`), and a refused command leaves them exactly where they were.
+    expect(harness.state().members.map((member) => member.team)).toEqual(["A", "B", "A", "B"]);
     for (const socket of sockets.values()) expect(socket.framesOf("match_started")).toEqual([]);
   });
 

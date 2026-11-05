@@ -81,7 +81,7 @@ your mobile on your turn (`OQ-40` — this supersedes the optional joystick in s
 | Angle up / down | tap or hold the ▲ / ▼ of the four-way pad (**±1° per tap, 10°/s held**) | Rotates the barrel, clamped to the mobile's own `angleMin…angleMax`; the chip shows the value | — (folded into the next `fire`) | active slot |
 | Move left / right | tap or hold the ◀ / ▶ of the four-way pad | Walks/ runs the mobile within `moveDistance`, debits `moveEnergy` and `moveDelay` as it moves | `input{kind:'move', direction, distance, seq}` on `control` | active slot |
 | Skip turn | `Bỏ lượt` button, 60×60 | Forfeits the turn | `input{kind:'skip'}` | active slot |
-| Chat | preset phrase grid / emote buttons | Bubble for 3 s | `chat{kind, id}` | any member, rate-limited 2/s |
+| Chat | the `Trò chuyện` button opens a preset phrase grid and emote buttons (closed by default, so the pull gesture keeps the canvas) | Bubble for 3 s | `chat{kind, id}` | any member, rate-limited 2/s |
 | Rotate notice | — | Portrait blocks play with a rotate prompt | — | — |
 
 Gesture arbitration: a two-finger gesture cancels any power pull in progress **without firing**; the pad, the weapon
