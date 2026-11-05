@@ -1,0 +1,1240 @@
+openapi: 3.1.0
+info:
+  title: GBW API
+  version: 1.0.0
+  description: |
+    HTTP contract for the Game Bắn Súng Đạn Đạo Theo Lượt worker, mounted under `/api/v1`.
+    Paths and methods mirror the dispatcher in `apps/worker/src/index.ts`; every failure is an RFC 9457
+    `Problem` body. Every path also answers a CORS preflight (`OPTIONS`) with `204`, and a disallowed
+    `Origin` is refused with `403` before routing. The WebSocket protocol behind `GET /rooms/{code}/ws` is
+    documented in `docs/02-reference/api/signaling.md` and is out of scope here.
+servers:
+  - url: /api/v1
+tags:
+  - name: Health
+    description: Liveness and build identity.
+  - name: Sessions
+    description: Session-token minting.
+  - name: Profile
+    description: The signed-in player's own profile.
+  - name: Rooms
+    description: Room creation, preview, join and the signaling socket.
+  - name: Matches
+    description: Match recording and personal history.
+  - name: Leaderboard
+    description: Public rating leaderboard.
+security:
+  - bearerAuth: []
+paths:
+  /health:
+    get:
+      tags:
+        - Health
+      summary: Liveness and build identity
+      operationId: getHealth
+      security: []
+      description: |
+        Dependency-free liveness probe (`US-FND-002` AC1). The implementation also returns `environment`
+        and `ruleset`, which AC1's "no other keys" omits (`apps/worker/src/routes/health.ts:14-15`).
+      responses:
+        '200':
+          description: Service is up.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Health'
+        '403':
+          description: The request Origin is not allowed; CORS is checked before routing.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+
+  /sessions:
+    post:
+      tags:
+        - Sessions
+      summary: Mint a session token
+      operationId: createSession
+      security:
+        - {}
+        - bearerAuth: []
+      description: |
+        Mints a 60-minute session token for a guest or a signed-in account; account mode accepts the Clerk
+        JWT in `Authorization` or in `clerkToken`. The endpoint index omits the 400 (malformed JSON) and 503
+        (Clerk JWKS unreachable) responses that the code emits (`apps/worker/src/routes/accounts.ts:59-89`).
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SessionRequest'
+      responses:
+        '201':
+          description: Session token and its subject.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Session'
+        '400':
+          description: Body is not valid JSON or not a JSON object.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '401':
+          description: Missing, expired or invalid credential; account mode without a Clerk token.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '422':
+          description: A field failed its documented rule, or an undocumented field was sent.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '429':
+          description: Too many session requests from this address.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '503':
+          description: Clerk's key set is unreachable and nothing is cached.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+
+  /turn-credentials:
+    get:
+      tags:
+        - Rooms
+      summary: Mint short-lived TURN credentials
+      operationId: getTurnCredentials
+      description: |
+        Returns Cloudflare `iceServers` entries, always prefixed with the project STUN server. `429` is
+        documented in `rooms.md` but the route applies no limiter (`apps/worker/src/routes/rooms.ts:246-273`).
+      responses:
+        '200':
+          description: ICE servers for one peer connection.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TurnCredentials'
+        '401':
+          description: Missing, expired or invalid session token.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '429':
+          description: Documented rate limit; not enforced by the current route.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '500':
+          description: The TURN credential service refused the request.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+
+  /rooms:
+    post:
+      tags:
+        - Rooms
+      summary: Create a room
+      operationId: createRoom
+      description: |
+        Reserves a six-character code and seats the host; the code is swept after 10 minutes if nobody
+        joins. `rooms.md` lists only `maxPlayers` and `isPrivate`, while the code also accepts
+        `displayName`, `mobileId`, `avatarId` and `mode` with defaults (`apps/worker/src/routes/rooms.ts:85-92`).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateRoomRequest'
+      responses:
+        '201':
+          description: The created room and the host's seat.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RoomCreated'
+        '400':
+          description: Body is not valid JSON or not a JSON object.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '401':
+          description: Missing, expired or invalid session token.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '422':
+          description: A field failed its documented rule; `maxPlayers` is required.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '429':
+          description: Too many rooms created from this address.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '500':
+          description: No room code could be allocated after five attempts.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+
+  /rooms/{code}:
+    get:
+      tags:
+        - Rooms
+      summary: Preview a room's joinability
+      operationId: getRoomPreview
+      security: []
+      description: |
+        Public, identity-free preview. Unlike `rooms.md`'s 404 row, an unused but well-formed code answers
+        `200` with `joined: 0`; only a malformed code is `404` (`apps/worker/src/routes/rooms.ts:187-213`).
+      parameters:
+        - $ref: '#/components/parameters/RoomCode'
+      responses:
+        '200':
+          description: Room state safe for a stranger to see.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RoomState'
+        '404':
+          description: The code is not six characters from the room alphabet.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '410':
+          description: The room is ended or abandoned.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+
+  /rooms/{code}/join:
+    post:
+      tags:
+        - Rooms
+      summary: Join a lobby
+      operationId: joinRoom
+      description: |
+        Seats the caller if the lobby has a free slot; a repeated call from the same session returns its
+        existing seat. The implementation defaults `displayName`, `mobileId` and `avatarId`, which
+        `rooms.md` marks required (`apps/worker/src/routes/rooms.ts:150-155`), and can answer `422`, which
+        the endpoint index omits (`rooms.md:47` documents it).
+      parameters:
+        - $ref: '#/components/parameters/RoomCode'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/JoinRoomRequest'
+      responses:
+        '200':
+          description: The caller's seat and the room settings.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RoomJoined'
+        '400':
+          description: Body is not valid JSON or not a JSON object.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '401':
+          description: Missing, expired or invalid session token.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '404':
+          description: No room answers to that code.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '409':
+          description: The room is at `maxPlayers`.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '410':
+          description: The room is ended or abandoned.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '422':
+          description: A supplied field failed its documented rule.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+
+  /rooms/{code}/ws:
+    get:
+      tags:
+        - Rooms
+      summary: Open the signaling WebSocket
+      operationId: openRoomSocket
+      security: []
+      description: |
+        WebSocket upgrade; the session token travels in the first `auth` frame, never in the URL
+        (`signaling.md`). The index's 401/409/429 rows are socket close codes or frames, not handshake
+        responses, and an unused well-formed code upgrades into a fresh Durable Object.
+      parameters:
+        - $ref: '#/components/parameters/RoomCode'
+      responses:
+        '101':
+          description: Switching protocols; frames are documented in `signaling.md`.
+        '404':
+          description: The code is not six characters from the room alphabet.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '410':
+          description: The room is ended or abandoned.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+
+  /me:
+    get:
+      tags:
+        - Profile
+      summary: Read own profile
+      operationId: getMe
+      description: The caller's profile, rating and aggregate stats; needs an account session.
+      responses:
+        '200':
+          description: Own profile.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Me'
+        '401':
+          description: Missing, expired or invalid credential, or a guest token.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+    patch:
+      tags:
+        - Profile
+      summary: Update own display name or avatar
+      operationId: patchMe
+      description: |
+        Writes at least one of `displayName` and `avatarId`; echoed read-model fields are ignored
+        (`apps/worker/src/routes/accounts.ts:219-241`).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchMeRequest'
+      responses:
+        '200':
+          description: The updated profile.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Me'
+        '400':
+          description: Body is not valid JSON or not a JSON object.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '401':
+          description: Missing, expired or invalid credential, or a guest token.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '409':
+          description: That display name is already taken.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '422':
+          description: A field failed its documented rule, or nothing writable was sent.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+    delete:
+      tags:
+        - Profile
+      summary: Delete own account
+      operationId: deleteMe
+      description: Deletes the Clerk user and schedules the D1 purge for 30 days later.
+      responses:
+        '204':
+          description: Deletion scheduled; no body.
+        '401':
+          description: Missing, expired or invalid credential, or a guest token.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '409':
+          description: A match is still in progress for this account.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+
+  /me/matches:
+    get:
+      tags:
+        - Matches
+      summary: List own match history
+      operationId: getMyMatches
+      description: |
+        Newest first, ordered by `ended_at DESC, match_id DESC`. An unreadable `cursor` is `422
+        validation`, not the `400` that `api/README.md`'s pagination row promises (`apps/worker/src/lib/db.ts:309-316`).
+      parameters:
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: One page of the caller's matches.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MatchHistoryPage'
+        '401':
+          description: Missing, expired or invalid credential, or a guest token.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '422':
+          description: The cursor is not readable.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+
+  /matches:
+    post:
+      tags:
+        - Matches
+      summary: Record a finished match
+      operationId: submitMatch
+      description: |
+        Records the result, computes ratings server-side and replays a stored `Idempotency-Key` for 24 h.
+        The implementation requires the caller to be a participant, not necessarily the host
+        (`apps/worker/src/routes/matches.ts:207-209`); the endpoint index omits the `429` and `400`
+        responses the code emits.
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: false
+          description: 8–128 characters; a replay within 24 h returns the stored 201 body.
+          schema:
+            type: string
+            minLength: 8
+            maxLength: 128
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MatchSubmission'
+      responses:
+        '201':
+          description: The recorded match and the rating changes.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MatchCreated'
+        '400':
+          description: Body is not valid JSON or not a JSON object.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '401':
+          description: Missing, expired or invalid credential, or a guest token.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '403':
+          description: The caller is not a participant in the submitted match.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '409':
+          description: This room occurrence is already recorded.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '422':
+          description: A field failed its documented rule; `errors[]` names it.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '429':
+          description: Too many match submissions from this account.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+
+  /leaderboard:
+    get:
+      tags:
+        - Leaderboard
+      summary: List top players by rating
+      operationId: getLeaderboard
+      security: []
+      description: |
+        Public and cached for 30 s; only active accounts with a rated match are listed. An unreadable
+        `cursor` is `422 validation`, not the `400` in `api/README.md`'s pagination row
+        (`apps/worker/src/lib/db.ts:322-330`).
+      parameters:
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: One page of the leaderboard.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LeaderboardPage'
+        '422':
+          description: The cursor is not readable.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Session token from `POST /sessions`, or a Clerk session JWT where an endpoint says so.
+  parameters:
+    RoomCode:
+      name: code
+      in: path
+      required: true
+      description: Six-character room code.
+      schema:
+        type: string
+        pattern: '^[A-HJ-NP-Z2-9]{6}$'
+    Limit:
+      name: limit
+      in: query
+      required: false
+      description: Page size; defaults to 20, capped at 100.
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+    Cursor:
+      name: cursor
+      in: query
+      required: false
+      description: Opaque cursor from the previous page.
+      schema:
+        type: string
+  schemas:
+    Problem:
+      type: object
+      description: RFC 9457 problem body; `type` is `https://gbw.example/problems/<type>` in the code, while `api/README.md` writes `https://gbw.app/problems/`.
+      required:
+        - type
+        - title
+        - status
+        - request_id
+      properties:
+        type:
+          type: string
+          format: uri
+          description: Stable problem type URI; clients branch on it.
+        title:
+          type: string
+          description: Fixed per problem type.
+        status:
+          type: integer
+          description: HTTP status, repeated in the body.
+        detail:
+          type: string
+          description: Human-readable detail that may change between releases.
+        instance:
+          type: string
+          description: The request path the problem happened on.
+        request_id:
+          type: string
+          description: Request id, also echoed in the `x-request-id` header.
+        errors:
+          type: array
+          description: Field-level failures, present on `validation` problems.
+          items:
+            $ref: '#/components/schemas/FieldError'
+        retryAfterSeconds:
+          type: integer
+          minimum: 0
+          description: Seconds to wait; also sent as `Retry-After`.
+    FieldError:
+      type: object
+      required:
+        - field
+        - detail
+      properties:
+        field:
+          type: string
+          description: Dot path of the offending field.
+        detail:
+          type: string
+          description: What about the field was rejected.
+    Health:
+      type: object
+      required:
+        - status
+        - version
+        - environment
+        - ruleset
+        - request_id
+      properties:
+        status:
+          type: string
+          enum:
+            - ok
+        version:
+          type: string
+          description: Build short sha, or `dev` under `wrangler dev`.
+        environment:
+          type: string
+          description: The Worker's `ENVIRONMENT` binding.
+        ruleset:
+          type: string
+          description: Current tunables ruleset date (`2026-11-05`).
+        request_id:
+          type: string
+    SessionRequest:
+      type: object
+      description: One endpoint, two modes; identity fields such as `accountId` are ignored.
+      properties:
+        kind:
+          type: string
+          enum:
+            - guest
+            - account
+          default: guest
+        displayName:
+          type: string
+          description: Guest default `Guest <first 4 of guestId>`; `accounts.md` documents 2–16 chars, which the guest path does not enforce.
+        clerkToken:
+          type: string
+          description: Alternative to the Authorization header in account mode.
+    Session:
+      type: object
+      required:
+        - sessionToken
+        - expiresAt
+        - subject
+        - request_id
+      properties:
+        sessionToken:
+          type: string
+          description: HMAC-signed session JWT, valid for 60 minutes.
+        expiresAt:
+          type: string
+          format: date-time
+        subject:
+          type: object
+          required:
+            - kind
+            - displayName
+          properties:
+            kind:
+              type: string
+              enum:
+                - guest
+                - account
+            guestId:
+              type: string
+              description: Guest sessions only.
+            accountId:
+              type: string
+              description: Account sessions only; never the Clerk subject.
+            displayName:
+              type: string
+            avatarId:
+              type: string
+              description: Account sessions only.
+            rating:
+              type: integer
+              description: Account sessions only.
+            ratedMatches:
+              type: integer
+              description: Account sessions only.
+        request_id:
+          type: string
+    Me:
+      type: object
+      required:
+        - accountId
+        - displayName
+        - avatarId
+        - rating
+        - ratedMatches
+        - stats
+        - createdAt
+        - deletionScheduledFor
+        - request_id
+      properties:
+        accountId:
+          type: string
+        displayName:
+          type: string
+        avatarId:
+          type: string
+        rating:
+          type: integer
+        ratedMatches:
+          type: integer
+        stats:
+          type: object
+          required:
+            - matches
+            - wins
+            - losses
+            - abandons
+          properties:
+            matches:
+              type: integer
+            wins:
+              type: integer
+            losses:
+              type: integer
+            abandons:
+              type: integer
+        createdAt:
+          type: string
+          format: date-time
+        deletionScheduledFor:
+          type:
+            - string
+            - 'null'
+          format: date-time
+          description: Purge date while deletion is pending, otherwise null.
+        request_id:
+          type: string
+    PatchMeRequest:
+      type: object
+      description: At least one writable field; `rating`, `ratedMatches` and `stats` are ignored when sent alongside one.
+      properties:
+        displayName:
+          type: string
+          minLength: 2
+          maxLength: 16
+        avatarId:
+          type: string
+          pattern: '^avatar-(0[1-9]|1[0-2])$'
+        rating:
+          type: integer
+          description: Read-model echo; ignored, never written.
+        ratedMatches:
+          type: integer
+          description: Read-model echo; ignored, never written.
+        stats:
+          type: object
+          description: Read-model echo; ignored, never written.
+    RoomSettings:
+      type: object
+      required:
+        - maxPlayers
+        - mode
+        - mapId
+        - isPrivate
+      properties:
+        maxPlayers:
+          type: integer
+          enum:
+            - 2
+            - 4
+            - 6
+            - 8
+        mode:
+          type: string
+          enum:
+            - solo
+            - score
+            - tag
+            - jewel
+        mapId:
+          type: string
+        isPrivate:
+          type: boolean
+    CreateRoomRequest:
+      type: object
+      required:
+        - maxPlayers
+      properties:
+        maxPlayers:
+          type: integer
+          enum:
+            - 2
+            - 4
+            - 6
+            - 8
+        isPrivate:
+          type: boolean
+          default: false
+        displayName:
+          type: string
+          minLength: 2
+          maxLength: 16
+          default: Player
+          description: Accepted by the code but absent from `rooms.md`.
+        mobileId:
+          type: string
+          default: mbl-01
+          description: Accepted by the code but absent from `rooms.md`.
+        avatarId:
+          type: string
+          default: avatar-01
+          description: Accepted by the code but absent from `rooms.md`.
+        mode:
+          type: string
+          enum:
+            - solo
+            - score
+            - tag
+            - jewel
+          default: solo
+          description: Accepted by the code but absent from `rooms.md`.
+        mapId:
+          type: string
+          default: map-01
+          description: Accepted by the code but absent from `rooms.md`.
+    RoomCreated:
+      type: object
+      required:
+        - roomCode
+        - playerId
+        - wsUrl
+        - joinUrl
+        - maxPlayers
+        - settings
+        - expiresAt
+        - request_id
+      properties:
+        roomCode:
+          type: string
+          pattern: '^[A-HJ-NP-Z2-9]{6}$'
+        playerId:
+          type: string
+          description: The host's seat id inside this room.
+        wsUrl:
+          type: string
+          format: uri
+          description: Built from the request origin (`http`/`https`), although `rooms.md` calls it absolute `wss://`.
+        joinUrl:
+          type: string
+          format: uri
+          description: Returned by the code but absent from `rooms.md`.
+        maxPlayers:
+          type: integer
+          enum:
+            - 2
+            - 4
+            - 6
+            - 8
+        settings:
+          $ref: '#/components/schemas/RoomSettings'
+        expiresAt:
+          type: string
+          format: date-time
+          description: Sweep time when nobody joins (`now + 10 min`).
+        request_id:
+          type: string
+    JoinRoomRequest:
+      type: object
+      description: Every field is optional in the code; `rooms.md` marks all three required.
+      properties:
+        displayName:
+          type: string
+          minLength: 2
+          maxLength: 16
+          default: Player
+        mobileId:
+          type: string
+          default: mbl-01
+        avatarId:
+          type: string
+          default: avatar-01
+    RoomJoined:
+      type: object
+      required:
+        - roomCode
+        - playerId
+        - wsUrl
+        - maxPlayers
+        - settings
+        - request_id
+      properties:
+        roomCode:
+          type: string
+          pattern: '^[A-HJ-NP-Z2-9]{6}$'
+        playerId:
+          type: string
+        wsUrl:
+          type: string
+          format: uri
+        maxPlayers:
+          type: integer
+        settings:
+          $ref: '#/components/schemas/RoomSettings'
+        request_id:
+          type: string
+    RoomState:
+      type: object
+      required:
+        - roomCode
+        - status
+        - settings
+        - joined
+        - playerCount
+        - maxPlayers
+        - joinable
+        - hostDisplayName
+        - host
+        - request_id
+      properties:
+        roomCode:
+          type: string
+        status:
+          type: string
+          enum:
+            - lobby
+            - playing
+            - ended
+            - abandoned
+        settings:
+          $ref: '#/components/schemas/RoomSettings'
+        joined:
+          type: integer
+          description: Alias of `playerCount`, kept for the lobby HUD.
+        playerCount:
+          type: integer
+        maxPlayers:
+          type: integer
+        joinable:
+          type: boolean
+          description: Lobby with at least one free seat.
+        hostDisplayName:
+          type:
+            - string
+            - 'null'
+          description: Null before the host's socket joins.
+        host:
+          type: boolean
+          description: Returned by the code but absent from `rooms.md`.
+        request_id:
+          type: string
+    TurnCredentials:
+      type: object
+      required:
+        - iceServers
+        - ttlSeconds
+        - turn
+        - request_id
+      properties:
+        iceServers:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/IceServer'
+        ttlSeconds:
+          type: integer
+          description: Credential lifetime in seconds (`3600`).
+        turn:
+          type: boolean
+          description: False when no TURN key is configured; the response is then STUN-only.
+        request_id:
+          type: string
+    IceServer:
+      type: object
+      required:
+        - urls
+      properties:
+        urls:
+          oneOf:
+            - type: string
+            - type: array
+              items:
+                type: string
+        username:
+          type: string
+        credential:
+          type: string
+    MatchSubmission:
+      type: object
+      required:
+        - roomCode
+        - rulesetVersion
+        - startedAt
+        - endedAt
+        - winnerTeam
+        - players
+      properties:
+        matchId:
+          type: string
+          minLength: 8
+          maxLength: 64
+          description: Optional client-proposed id; the server mints one when absent.
+        roomCode:
+          type: string
+          pattern: '^[A-HJ-NP-Z2-9]{6}$'
+        rulesetVersion:
+          type: string
+          description: A stale version records the match unranked.
+        startedAt:
+          type: string
+          format: date-time
+        endedAt:
+          type: string
+          format: date-time
+        winnerTeam:
+          type: string
+          enum:
+            - A
+            - B
+        abandoned:
+          type: boolean
+          default: false
+        players:
+          type: array
+          minItems: 2
+          maxItems: 8
+          items:
+            $ref: '#/components/schemas/SubmittedPlayer'
+    SubmittedPlayer:
+      type: object
+      required:
+        - slot
+        - team
+      properties:
+        slot:
+          type: integer
+          minimum: 0
+          maximum: 7
+        team:
+          type: string
+          enum:
+            - A
+            - B
+        accountId:
+          type:
+            - string
+            - 'null'
+          description: Null for a guest or a bot.
+        displayName:
+          type: string
+          maxLength: 64
+        damageDealt:
+          type: integer
+          minimum: 0
+          maximum: 100000
+          default: 0
+          description: Optional in the code (default 0); `matches.md` marks it required.
+        shotsFired:
+          type: integer
+          minimum: 0
+          maximum: 1000
+          default: 0
+          description: Optional in the code (default 0); `matches.md` marks it required.
+        hits:
+          type: integer
+          minimum: 0
+          maximum: 1000
+          default: 0
+          description: Must not exceed `shotsFired`.
+        forfeited:
+          type: boolean
+          default: false
+    MatchCreated:
+      type: object
+      required:
+        - matchId
+        - ranked
+        - ratings
+        - request_id
+      properties:
+        matchId:
+          type: string
+        ranked:
+          type: boolean
+          description: False for an abandoned match, a guest/bot participant or a stale ruleset.
+        ratings:
+          type: array
+          description: One entry per registered participant; empty when unranked.
+          items:
+            $ref: '#/components/schemas/RatingChange'
+        request_id:
+          type: string
+    RatingChange:
+      type: object
+      required:
+        - accountId
+        - before
+        - after
+        - delta
+      properties:
+        accountId:
+          type: string
+        before:
+          type: integer
+        after:
+          type: integer
+        delta:
+          type: integer
+    MatchHistoryPage:
+      type: object
+      required:
+        - items
+        - next_cursor
+        - has_more
+        - request_id
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/MatchHistoryItem'
+        next_cursor:
+          type:
+            - string
+            - 'null'
+        has_more:
+          type: boolean
+        request_id:
+          type: string
+    MatchHistoryItem:
+      type: object
+      required:
+        - matchId
+        - playedAt
+        - team
+        - result
+        - opponents
+        - damageDealt
+        - shotsFired
+        - hits
+        - ratingDelta
+        - rulesetVersion
+      properties:
+        matchId:
+          type: string
+        playedAt:
+          type: string
+          format: date-time
+        team:
+          type: string
+          enum:
+            - A
+            - B
+        result:
+          type: string
+          enum:
+            - win
+            - loss
+            - abandon
+        opponents:
+          type: array
+          items:
+            type: object
+            required:
+              - displayName
+              - team
+            properties:
+              displayName:
+                type: string
+              team:
+                type: string
+        damageDealt:
+          type: integer
+        shotsFired:
+          type: integer
+        hits:
+          type: integer
+        ratingDelta:
+          type:
+            - integer
+            - 'null'
+        rulesetVersion:
+          type: string
+    LeaderboardPage:
+      type: object
+      required:
+        - items
+        - next_cursor
+        - has_more
+        - request_id
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/LeaderboardEntry'
+        next_cursor:
+          type:
+            - string
+            - 'null'
+        has_more:
+          type: boolean
+        request_id:
+          type: string
+    LeaderboardEntry:
+      type: object
+      required:
+        - rank
+        - displayName
+        - avatarId
+        - rating
+        - ratedMatches
+      properties:
+        rank:
+          type: integer
+          minimum: 1
+        displayName:
+          type: string
+        avatarId:
+          type: string
+        rating:
+          type: integer
+        ratedMatches:
+          type: integer

@@ -6,10 +6,13 @@
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { MOBILES, canStart, defaultSettings, type RoomState } from "@gbw/core";
+import { MOBILES, canStart, defaultSettings, type ClientFrame, type LoadoutEntry, type RoomSettings, type RoomState } from "@gbw/core";
 import { useLocale, useSession } from "../app/providers";
+import { LoadoutPicker } from "../components/LoadoutPicker";
+import { SettingsPanel } from "../components/SettingsPanel";
 import { api } from "../lib/api";
-import { connectRoom, type RoomSocket, type ServerMessage } from "../net/signaling";
+import { connectWithReconnect, type ReconnectingSocket } from "../net/reconnect";
+import type { ServerMessage } from "../net/signaling";
 import type { PlannedMatch } from "./MatchPage";
 import type { JSX } from "react";
 
@@ -21,9 +24,10 @@ export function LobbyPage(): JSX.Element {
   const [room, setRoom] = useState<RoomState | null>(null);
   const [playerId, setPlayerId] = useState<string | null>(null);
   const [mobileId, setMobileId] = useState<string>(MOBILES[0]?.mobileId ?? "mbl-01");
-  const [status, setStatus] = useState<"connecting" | "live" | "closed">("connecting");
+  const [status, setStatus] = useState<"connecting" | "live" | "reconnecting" | "closed">("connecting");
   const [grace, setGrace] = useState(0);
-  const socket = useRef<RoomSocket | null>(null);
+  const [loadout, setLoadout] = useState<readonly LoadoutEntry[]>([]);
+  const socket = useRef<ReconnectingSocket | null>(null);
   const joined = useRef(false);
 
   const self = useMemo(() => room?.members.find((member) => member.playerId === playerId) ?? null, [room, playerId]);
@@ -53,12 +57,15 @@ export function LobbyPage(): JSX.Element {
     };
 
     void enter().then((selfId) => {
-      if (cancelled || !selfId) {
-        setStatus("closed");
+      if (cancelled) return;
+      if (!selfId) {
+        // A code nobody minted is a menu-level problem (`US-ROOM-002` AC4): the lobby cannot show a roster
+        // that does not exist, so it hands the reason back to the menu instead of spinning forever.
+        navigate("/", { state: { error: "errors.room-not-found" } });
         return;
       }
       setPlayerId(selfId);
-      socket.current = connectRoom({
+      socket.current = connectWithReconnect({
         wsUrl: `${base}/api/v1/rooms/${code}/ws`,
         token: session.token,
         displayName: session.subject.displayName,
@@ -69,6 +76,15 @@ export function LobbyPage(): JSX.Element {
             setRoom(message.room);
             setStatus("live");
             if (message.you) setPlayerId(message.you.playerId);
+            // The server echoes the stored loadout, so a reconnecting member sees what it saved.
+            const mine = message.room.members.find((member) => member.playerId === (message.you?.playerId ?? selfId));
+            if (mine?.loadout) setLoadout(mine.loadout);
+            return;
+          }
+          // `peer_joined` carries the whole roster too (`signaling.md` §3), so the seated players see each
+          // other without waiting for the next `room_state`.
+          if (message.t === "peer_joined") {
+            setRoom(message.room);
             return;
           }
           if (message.t === "peer_left") {
@@ -99,7 +115,8 @@ export function LobbyPage(): JSX.Element {
             navigate(`/match/${code}`);
           }
         },
-        onClose: () => setStatus("closed"),
+        onReconnecting: () => setStatus("reconnecting"),
+        onFatal: () => setStatus("closed"),
       });
     });
 
@@ -126,12 +143,44 @@ export function LobbyPage(): JSX.Element {
     }
   };
 
+  /**
+   * One frame carries the whole roster (`US-ROOM-003`): the host sends the desired end state, so a
+   * dropped or re-ordered frame can never leave half the room reassigned.
+   */
   const assign = (playerIdToMove: string, team: "A" | "B"): void => {
-    socket.current?.send({ t: "team_assign", playerId: playerIdToMove, team });
+    if (!room) return;
+    const assignments = room.members.map((member) => ({
+      playerId: member.playerId,
+      team: member.playerId === playerIdToMove ? team : member.team,
+    }));
+    socket.current?.send({ t: "team_assign", assignments });
   };
 
   const start = (): void => {
     socket.current?.send({ t: "start_match" });
+  };
+
+  /**
+   * Room settings are host-only (`US-ROOM-007`). The frame carries `mode` and `mapId`; `maxPlayers` is
+   * part of `RoomSettings` so it rides along, and `@gbw/core`'s parser still has to grow the field before
+   * the server can honour it — the cast is confined to this one call site until it does.
+   */
+  const changeSettings = (patch: Partial<RoomSettings>): void => {
+    if (!room || !isHost) return;
+    const next = { ...room.settings, ...patch };
+    const frame = {
+      t: "room_settings",
+      mode: next.mode,
+      mapId: next.mapId,
+      maxPlayers: next.maxPlayers,
+    } as ClientFrame;
+    socket.current?.send(frame);
+  };
+
+  /** Every member picks its own loadout (`US-ROOM-007` AC4); the server enforces the eleven-item budget. */
+  const changeLoadout = (items: readonly LoadoutEntry[]): void => {
+    setLoadout(items);
+    socket.current?.send({ t: "loadout", items });
   };
 
   if (!session) {
@@ -155,7 +204,7 @@ export function LobbyPage(): JSX.Element {
     <div className="screen">
       <header className="row">
         <h1 data-testid="room-code">{code}</h1>
-        <button type="button" className="ghost" onClick={() => void copyCode()}>
+        <button type="button" className="ghost" data-testid="copy-code" onClick={() => void copyCode()}>
           {t("lobby.copy")}
         </button>
         <span className="badge">
@@ -191,6 +240,9 @@ export function LobbyPage(): JSX.Element {
         )}
       </section>
 
+      <SettingsPanel settings={settings} isHost={isHost} onChange={changeSettings} />
+      <LoadoutPicker items={loadout} onChange={changeLoadout} />
+
       <div className="row" style={{ alignItems: "flex-start" }}>
         {(["A", "B"] as const).map((team) => (
           <section key={team} className="card grow" data-testid={`team-${team}`}>
@@ -213,7 +265,8 @@ export function LobbyPage(): JSX.Element {
       </div>
 
       {status === "connecting" ? <div className="overlay">{t("common.loading")}</div> : null}
-      {status === "closed" && grace === 0 ? <div className="overlay">{t("match.reconnecting")}</div> : null}
+      {status === "reconnecting" ? <div className="overlay" data-testid="lobby-reconnecting">{t("match.reconnecting")}</div> : null}
+      {status === "closed" ? <div className="overlay">{t("match.disconnected")}</div> : null}
       {grace > 0 ? (
         <div className="banner" data-testid="grace-countdown">
           {t("match.reconnecting")} — {grace}s

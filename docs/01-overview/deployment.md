@@ -68,7 +68,7 @@ for the deploy step. A PR from a fork does not get secrets and therefore does no
 
 | Check | Command | Pass |
 |-------|---------|------|
-| API alive | `curl -fsS https://api.gbw.<domain>/api/v1/health` | `200`, `{"status":"ok","version":"<git sha>"}` |
+| API alive | `curl -fsS https://api.gbw.<domain>/api/v1/health` | `200`, `{"status":"ok","version":"<git sha, or the deploy tag>"}` |
 | Static app | `curl -fsSI https://gbw.<domain>/` | `200`, `content-type: text/html`, service worker reachable |
 | Sign-in route loads Clerk | Playwright `tests/e2e/prod-smoke.spec.ts` against production | Sign-in card renders for both locales |
 | Room round trip | Same spec: two contexts create/join a room | Roster shows 2 members within 5 s |
@@ -108,4 +108,4 @@ release.
 | Pipeline order (migrate → worker → pages) | `.github/workflows/deploy-production.yml` review + `tests/e2e/prod-smoke.spec.ts` (TC-FND-901) |
 | Smoke checks all pass on production | Release record `docs/07-release/REL-…` evidence line |
 | Rollback returns the previous version serving 200 | `tests/e2e/prod-smoke.spec.ts` re-run after `wrangler rollback` (TC-FND-902) |
-| No secret in `wrangler.jsonc` or the web build | `apps/web/tests/bundle-secrets.test.ts` greps the built assets for the secret names (TC-FND-012) |
+| No secret in `wrangler.jsonc` or the web build | `tests/meta/bundle-secrets.test.ts` builds the SPA into a temp dir and greps every asset for the secret names and for the values in an untracked `apps/worker/.dev.vars` (TC-FND-012) |

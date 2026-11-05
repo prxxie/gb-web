@@ -1,0 +1,137 @@
+/**
+ * `docs/02-reference/screens/main.md` — the main menu is the entry point of every flow: it offers a
+ * bot match, room creation and joining, and the two account routes.
+ */
+import { expect, test } from "@playwright/test";
+import { createRoom, joinRoom, newPlayer, sessionOf } from "./support";
+
+test.describe("main menu", () => {
+  test("TC-ROOM-133: the menu offers the bot match, room creation and the account routes", async ({ page }) => {
+    await page.goto("/");
+
+    await expect(page.getByRole("heading", { level: 1, name: "Bắn Súng Đạn Đạo" })).toBeVisible();
+    await expect(page.getByTestId("play-bot")).toBeVisible();
+    await expect(page.getByTestId("room-code-input")).toBeVisible();
+    await expect(page.getByRole("link", { name: "Bảng xếp hạng" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Hồ sơ" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Đăng nhập" })).toBeVisible();
+  });
+
+  test("TC-ROOM-133: create a room from the menu lands on its lobby with the host seated", async ({ page }) => {
+    await page.goto("/");
+    const name = (await sessionOf(page)).subject.displayName;
+
+    const code = await createRoom(page);
+    await expect(page).toHaveURL(new RegExp(`/lobby/${code}$`));
+    await expect(page.getByTestId("team-A")).toContainText(name);
+    await expect(page.getByTestId("start-match")).toBeVisible();
+  });
+
+  test("TC-ROOM-134: a second player joins by code and both see each other", async ({ browser }) => {
+    const host = await newPlayer(browser);
+    const guest = await newPlayer(browser);
+    const code = await createRoom(host.page);
+    const hostName = (await sessionOf(host.page)).subject.displayName;
+
+    await joinRoom(guest.page, code);
+    const guestName = (await sessionOf(guest.page)).subject.displayName;
+
+    await expect(host.page.getByTestId("team-B")).toContainText(guestName);
+    await expect(guest.page.getByTestId("team-A")).toContainText(hostName);
+    await expect(guest.page.getByTestId("start-match")).toHaveCount(0);
+
+    await host.context.close();
+    await guest.context.close();
+  });
+
+  test("TC-ROOM-136: joining a room that does not exist keeps the player on the menu with a banner", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    await page.getByTestId("room-code-input").fill("ZZZZZZ");
+    await page.getByTestId("join-room").click();
+
+    await expect(page.getByText("Không tìm thấy phòng.")).toBeVisible();
+    await expect(page).toHaveURL("/");
+  });
+
+  test("TC-ROOM-133: the code box keeps only six legal characters", async ({ page }) => {
+    await page.goto("/");
+    const input = page.getByTestId("room-code-input");
+
+    // Lower case is raised, the separator is dropped, and the letters the alphabet excludes (I, O, 0, 1) never
+    // reach the box — `US-ROOM-001` §4 uses 24 letters plus 8 digits.
+    await input.fill("ab-cd 2x3");
+    await expect(input).toHaveValue("ABCD2X");
+    await expect(page.getByTestId("join-room")).toBeEnabled();
+
+    await input.fill("io01");
+    await expect(input).toHaveValue("");
+    await expect(page.getByTestId("join-room")).toBeDisabled();
+
+    await input.fill("ABC");
+    await expect(page.getByTestId("join-room")).toBeDisabled();
+  });
+
+  test("TC-ROOM-150: the lobby copies its code to the clipboard", async ({ page, context }) => {
+    await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+    await page.goto("/");
+    const code = await createRoom(page);
+
+    await page.getByTestId("copy-code").click();
+
+    expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(code);
+  });
+
+  test("TC-ROOM-136: joining a room that has closed says so instead of retrying", async ({ page }) => {
+    // The room really closing takes sixty idle seconds, so the answer is stubbed: what this asserts is the
+    // banner the menu picks for a 410 (`US-ROOM-001` AC5).
+    await page.route("**/api/v1/rooms/*", async (route) => {
+      if (route.request().method() !== "GET") return route.continue();
+      await route.fulfill({
+        status: 410,
+        contentType: "application/problem+json",
+        body: JSON.stringify({ type: "https://gbw.example/problems/room-closed", title: "Room closed", status: 410 }),
+      });
+    });
+    await page.goto("/");
+    await page.getByTestId("room-code-input").fill("ABC234");
+    await page.getByTestId("join-room").click();
+
+    await expect(page.getByText("Phòng đã đóng.")).toBeVisible();
+    await expect(page).toHaveURL("/");
+  });
+
+  test("the offline hint is not shown while the player is online", async ({ page, context }) => {
+    await page.goto("/");
+    const hint = page.getByText("Bạn đang ngoại tuyến — chỉ chơi được với máy.");
+
+    await expect(hint).toHaveCount(0);
+
+    await context.setOffline(true);
+    await expect(hint).toBeVisible();
+    await context.setOffline(false);
+    await expect(hint).toHaveCount(0);
+  });
+
+  test("the top bar exposes the VI/EN switch and the choice survives a reload", async ({ page }) => {
+    await page.goto("/");
+
+    const english = page.getByRole("button", { name: "EN" });
+    await expect(english).toBeVisible();
+    await english.click();
+    await expect(page.getByRole("heading", { level: 1, name: "Turn-Based Artillery" })).toBeVisible();
+
+    await page.reload();
+    await expect(page.getByRole("heading", { level: 1, name: "Turn-Based Artillery" })).toBeVisible();
+  });
+
+  test("a stored locale is honoured on load", async ({ page }) => {
+    await page.addInitScript(() => localStorage.setItem("gbw.locale", "en"));
+    await page.goto("/");
+
+    await expect(page.getByRole("heading", { level: 1, name: "Turn-Based Artillery" })).toBeVisible();
+    await expect(page.getByTestId("play-bot")).toHaveText("Play the bot");
+    expect(await page.evaluate(() => document.documentElement.lang)).toBe("en");
+  });
+});

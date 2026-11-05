@@ -54,3 +54,35 @@ export const RULES = {
 export function resetLimits(): void {
   buckets.clear();
 }
+
+/**
+ * The address to charge, or `null` when the request carries none.
+ *
+ * Cloudflare sets `cf-connecting-ip` for a request that reached the edge from a real client; everything
+ * else (a service binding, a test harness, a `fetch` without the header) falls back to one `"local"`
+ * bucket. The browser flows send a per-run address of their own (`playwright.config.ts`), because a whole
+ * e2e run from one loopback address would otherwise exhaust the ten-rooms-a-minute budget of `NFR-25`.
+ */
+export function clientIp(request: Request): string | null {
+  return request.headers.get("cf-connecting-ip");
+}
+
+/**
+ * The per-address budget for one call, or `null` when there is no address to charge.
+ *
+ * A local `wrangler dev` (`ENVIRONMENT=development`) sends no `cf-connecting-ip`, so every tab, probe and
+ * browser run would spend one `"local"` bucket — the brake then fires on a developer rather than on an
+ * abuser. Development therefore charges nothing for a request without an address. Every other environment
+ * keeps the documented `NFR-25` behaviour: with an address it charges that address, without one the
+ * `"local"` bucket stands in.
+ */
+export function ipLimit(
+  request: Request,
+  env: { readonly ENVIRONMENT?: string },
+  key: string,
+  rule: LimitRule,
+): LimitResult | null {
+  const ip = clientIp(request);
+  if (ip === null && env.ENVIRONMENT === "development") return null;
+  return checkLimit(`${key}:${ip ?? "local"}`, rule);
+}

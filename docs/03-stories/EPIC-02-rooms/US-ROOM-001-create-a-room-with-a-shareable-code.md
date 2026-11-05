@@ -61,7 +61,7 @@ code ([ADR-0001](../../04-decisions/adr/ADR-0001-stack-phaser-react-cloudflare.m
 `GET /api/v1/rooms/{code}` (no auth) → `200` with `{code, status, joined, maxPlayers, joinable}` and deliberately no
 player ids. Rate limit: 10 rooms/minute per IP, 30/hour per account (`NFR-25`).
 
-Code alphabet: `ABCDEFGHJKLMNPQRSTUVWXYZ23456789` (31 symbols, no `I`, `O`, `0`, `1`); 31^6 ≈ 887 million.
+Code alphabet: `ABCDEFGHJKLMNPQRSTUVWXYZ23456789` (32 symbols, no `I`, `O`, `0`, `1`); 32^6 ≈ 887 million.
 
 ## 5. Rules and edge cases
 

@@ -85,13 +85,22 @@ export function groundY(terrain: Terrain, x: number): number {
   return heightAt(terrain, x);
 }
 
-/** Compact RLE over rounded heights, used for the Durable Object snapshot and the tests. */
+/**
+ * Heights travel as tenths of a unit, the same quantum positions use (`tunables.json` `roundTo`).
+ *
+ * Whole units were not enough: a carve leaves the host with fractional depths
+ * (`y + sqrt(r²-dx²)·0.5`), so a peer that rounded to integers resolved a hit up to 0.5 px away from the
+ * host — exactly the divergence the shared mask exists to prevent (`US-CORE-006` AC4).
+ */
+const TERRAIN_QUANTUM = 10;
+
+/** Compact RLE over heights quantised to a tenth of a unit, used for the Durable Object snapshot. */
 export function serializeTerrain(terrain: Terrain): string {
   const parts: string[] = [];
-  let previous = Math.round(terrain.heights[0] ?? 0);
+  let previous = Math.round((terrain.heights[0] ?? 0) * TERRAIN_QUANTUM);
   let run = 1;
   for (let i = 1; i < terrain.heights.length; i += 1) {
-    const value = Math.round(terrain.heights[i] ?? 0);
+    const value = Math.round((terrain.heights[i] ?? 0) * TERRAIN_QUANTUM);
     if (value === previous) {
       run += 1;
     } else {
@@ -111,10 +120,10 @@ export function deserializeTerrain(mapId: string, encoded: string): Terrain {
     const [valueRaw, runRaw] = part.split("x");
     const value = Number(valueRaw);
     const run = Number(runRaw);
-    if (!Number.isFinite(value) || !Number.isFinite(run) || run <= 0) {
+    if (!Number.isFinite(value) || !Number.isFinite(run) || run <= 0 || !Number.isInteger(run)) {
       throw new Error(`corrupt terrain RLE: ${part}`);
     }
-    for (let i = 0; i < run; i += 1) heights.push(value);
+    for (let i = 0; i < run; i += 1) heights.push(value / TERRAIN_QUANTUM);
   }
   if (heights.length !== base.heights.length) {
     throw new Error(`terrain length mismatch: ${heights.length} vs ${base.heights.length}`);

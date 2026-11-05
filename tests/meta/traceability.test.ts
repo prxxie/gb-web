@@ -74,6 +74,45 @@ describe("test-case traceability", () => {
     expect(rows.filter((story) => !stories.has(story))).toEqual([]);
   });
 
+  it("a case is cited in the scope its table row declares", () => {
+    // Scope is how a case is executed, not a preference: a `worker` case needs miniflare, so a core unit
+    // test citing it is really testing something else under a borrowed id. This is how `TC-CORE-914`
+    // ("blast radius 80 on the mask") ended up on three unrelated behaviours in two files.
+    const table = readFileSync(join(ROOT, "docs/05-quality/test-cases.md"), "utf8");
+    const scope = new Map(
+      [...table.matchAll(/^\|\s*(TC-[A-Z]{2,6}-\d{3})\s*\|[^|]*\|[^|]*\|[^|]*\|\s*(\w+)\s*\|/gm)].map(
+        (match) => [match[1] ?? "", match[2] ?? ""] as const,
+      ),
+    );
+    const directories: readonly (readonly [string, string])[] = [
+      ["packages/core/tests", "unit"],
+      ["apps/worker/tests", "worker"],
+      ["apps/web/tests", "web"],
+      ["tests/e2e", "e2e"],
+    ];
+    const violations = new Set<string>();
+    for (const [directory, declared] of directories) {
+      for (const file of walk(join(ROOT, directory), [".ts", ".tsx"])) {
+        if (file.endsWith("setup.ts")) continue;
+        for (const match of readFileSync(file, "utf8").matchAll(ID_PATTERN)) {
+          const row = scope.get(match[0]);
+          if (row !== undefined && row !== declared) {
+            violations.add(`${match[0]} ${file.slice(ROOT.length).replace(/^\/+/, "")}`);
+          }
+        }
+      }
+    }
+    const registered = new Set(
+      readFileSync(join(ROOT, "tests/meta/traceability-scope-exceptions.txt"), "utf8")
+        .split("\n")
+        .map((line) => line.trim())
+        .filter((line) => line.length > 0 && !line.startsWith("#")),
+    );
+    expect([...violations].filter((line) => !registered.has(line)).sort()).toEqual([]);
+    // A registered debt that stopped violating means the list was not kept honest.
+    expect([...registered].filter((line) => !violations.has(line)).sort()).toEqual([]);
+  });
+
   it("documented coverage does not fall below the recorded baseline", () => {
     const covered = [...tested()].filter((id) => documented().has(id)).length;
     console.info(`traceability: ${covered} of ${documented().size} documented cases have an automated test (baseline ${BASELINE})`);

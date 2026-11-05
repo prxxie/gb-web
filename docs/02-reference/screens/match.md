@@ -81,7 +81,7 @@ your mobile on your turn (`OQ-40` — this supersedes the optional joystick in s
 | Angle up / down | tap or hold the ▲ / ▼ of the four-way pad (**±1° per tap, 10°/s held**) | Rotates the barrel, clamped to the mobile's own `angleMin…angleMax`; the chip shows the value | — (folded into the next `fire`) | active slot |
 | Move left / right | tap or hold the ◀ / ▶ of the four-way pad | Walks/ runs the mobile within `moveDistance`, debits `moveEnergy` and `moveDelay` as it moves | `input{kind:'move', direction, distance, seq}` on `control` | active slot |
 | Skip turn | `Bỏ lượt` button, 60×60 | Forfeits the turn | `input{kind:'skip'}` | active slot |
-| Chat | preset phrase grid / emote buttons | Bubble for 3 s | `chat{kind, id}` | any member, rate-limited 2/s |
+| Chat | the `Trò chuyện` button opens a preset phrase grid and emote buttons (closed by default, so the pull gesture keeps the canvas) | Bubble for 3 s | `chat{kind, id}` | any member, rate-limited 2/s |
 | Rotate notice | — | Portrait blocks play with a rotate prompt | — | — |
 
 Gesture arbitration: a two-finger gesture cancels any power pull in progress **without firing**; the pad, the weapon
@@ -130,7 +130,7 @@ a drag. All pad and button targets are ≥ 60 × 60 logical px (`NFR-17`).
 | Fullscreen requested on first tap; safe-area insets respected | `tests/e2e/fullscreen.spec.ts` (TC-MATCH-921) |
 | Turn clock starts at 20 s, skips on timeout, does not drift > 1 s | `packages/core/tests/turn.test.ts` (TC-CORE-152) |
 | Wind re-rolled once per round, dial shows 12 sectors and 0–26 | `packages/core/tests/weather.test.ts` (TC-CORE-926), `apps/web/tests/wind-dial.test.ts` (TC-MATCH-923) |
-| Blast damage, friendly fire, elimination, team-loss detection | `packages/core/tests/physics.test.ts` (TC-CORE-020…TC-CORE-028) |
+| Blast damage, friendly fire, elimination, team-loss detection | `packages/core/tests/combat.test.ts`, `packages/core/tests/match.test.ts` (TC-CORE-020…TC-CORE-028) |
 | Snapshot apply is idempotent and duck-types by `seq` | `packages/core/tests/snapshot.test.ts` (TC-CORE-040) |
 | Reconnect overlay countdown matches the 20 s grace | `tests/e2e/reconnect.spec.ts` (TC-ROOM-047) |
 | Host migration overlay ≤ 5 s end-to-end | `tests/e2e/migration.spec.ts` (TC-ROOM-049) |

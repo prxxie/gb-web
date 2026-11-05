@@ -1,0 +1,88 @@
+name: Deploy preview
+
+# `US-FND-004` AC1/AC2/AC6: a pull request deploys a Pages preview and a `-preview` worker, and nothing
+# deploys when CI is red — the job reuses `ci.yml` as its gate instead of repeating the checks, so a
+# failing typecheck stops the pipeline before the first migration runs.
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches-ignore: [main]
+
+permissions:
+  contents: read
+  pull-requests: write
+  deployments: write
+
+concurrency:
+  group: deploy-preview-${{ github.event.workflow_run.head_branch }}
+  cancel-in-progress: true
+
+env:
+  VITE_API_BASE: /api/v1
+  CF_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+  CF_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+jobs:
+  deploy:
+    name: migrations → worker → pages
+    runs-on: ubuntu-latest
+    if: github.event.workflow_run.conclusion == 'success'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      # Forward-only (`docs/01-overview/deployment.md` § Migrations): apply first, deploy second, so a
+      # migration that fails stops before a worker that would need it exists.
+      - name: Apply preview migrations
+        working-directory: apps/worker
+        run: pnpm exec wrangler d1 migrations apply gbw-preview --remote --env preview
+
+      - name: Deploy the preview worker
+        id: worker
+        working-directory: apps/worker
+        run: |
+          set -euo pipefail
+          pnpm exec wrangler deploy --env preview | tee "$RUNNER_TEMP/deploy.log"
+          url=$(grep -Eo 'https://[a-z0-9.-]+\.workers\.dev' "$RUNNER_TEMP/deploy.log" | tail -1)
+          test -n "$url" || { echo "::error::wrangler printed no worker URL"; exit 1; }
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+
+      - name: Build the web app
+        env:
+          VITE_CLERK_PUBLISHABLE_KEY: ${{ secrets.VITE_CLERK_PUBLISHABLE_KEY }}
+        run: pnpm build
+
+      - name: Deploy the Pages preview
+        id: pages
+        run: |
+          set -euo pipefail
+          pnpm exec wrangler pages deploy apps/web/dist \
+            --project-name "${{ vars.CLOUDFLARE_PAGES_PROJECT }}" \
+            --branch "pr-${{ github.event.workflow_run.pull_requests[0].number }}" \
+            | tee "$RUNNER_TEMP/pages.log"
+          url=$(grep -Eo 'https://[a-z0-9.-]+\.pages\.dev' "$RUNNER_TEMP/pages.log" | tail -1)
+          test -n "$url" || { echo "::error::wrangler printed no Pages URL"; exit 1; }
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+
+      # AC1 wants both URLs and the sha in the comment, so a tester can say exactly what they opened.
+      - name: Comment the URLs on the pull request
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR: ${{ github.event.workflow_run.pull_requests[0].number }}
+          SHA: ${{ github.event.workflow_run.head_sha }}
+          WEB: ${{ steps.pages.outputs.url }}
+          API: ${{ steps.worker.outputs.url }}
+        run: |
+          set -euo pipefail
+          test -n "$PR" || { echo "::warning::no pull request attached to this run"; exit 0; }
+          body=$(printf 'Preview for `%s`\n\n- Web: %s\n- API: %s/api/v1/health\n' "$SHA" "$WEB" "$API")
+          gh pr comment "$PR" --body "$body"

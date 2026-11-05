@@ -13,7 +13,7 @@ Targets inherited from the source spec carry `[spec: gbw-spec.md#…]`; targets 
 | NFR-01 | The match scene holds **60 FPS** on iPhone 12 (Safari) and Galaxy A52 (Chrome) in a 2v2 match, defined as average frame time ≤ 16.7 ms over a 60 s sample. | Chrome DevTools performance trace on the device matrix, `05-quality/test-cases.md` TC-OPS-180; frame-time log in the debug overlay (`?debug=1`). | `[spec: gbw-spec.md#NFR-01]` |
 | NFR-02 | A touch on an aim/fire control produces visible feedback in **< 100 ms** (touchstart → first painted frame showing the change). | Trace timeline with the `input` and `paint` markers, TC-OPS-180. | `[spec: gbw-spec.md#NFR-01]` |
 | NFR-03 | Peak JS heap during a 4v4 match stays **< 200 MB**; first load transfers **< 5 MB** compressed (JS + assets for the shell and the match scene). | Heap snapshot after 3 matches (TC-PWA-043); Playwright network sum on a cold load (TC-PWA-043); `pnpm build` chunk report. | `[spec: gbw-spec.md#NFR-01]` |
-| NFR-04 | A snapshot on the `state` channel stays **≤ 800 B** in an 8-player room at 10–20 Hz. | Protocol unit test that encodes a worst-case 8-player snapshot and asserts byte length, TC-CORE-041. | `[brief §9 / OQ-24]` |
+| NFR-04 | A snapshot on the `state` channel stays **≤ 800 B** in an 8-player room at 10–20 Hz. The one frame that carries the terrain mask — sent once per carve — is instead bounded by the 8 KB per-frame cap, because the mask alone is 2.3–5.5 KB at 1 001 samples. | Protocol unit test that encodes a worst-case 8-player snapshot and asserts byte length by default and without the mask, plus the masked frame against the 8 KB cap, TC-CORE-041. | `[brief §9 / OQ-24]` |
 
 ## Cost and quota
 

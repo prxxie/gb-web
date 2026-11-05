@@ -37,7 +37,9 @@ over the WebSocket ([signaling.md](../api/signaling.md)).
   empty, but both sides must hold the same number of players.
 - The host may be on either team; the host role is orthogonal to `team`.
 - `Chuyển đội` is refused when the destination team is full (client-side disabled + server-side `409`).
-- Late joiner: gets `team = null` until the host assigns; `Bắt đầu` is disabled while any member is unassigned.
+- Late joiner: is seated in the emptier team (a tie seats on A), so a full room can start without shuffling;
+  `team_assign` moves anybody afterwards. `Bắt đầu` is disabled while any member is unassigned (legacy rooms
+  that predate this rule) or the teams differ in size.
 
 ## States
 

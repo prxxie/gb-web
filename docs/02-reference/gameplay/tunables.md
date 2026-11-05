@@ -259,9 +259,9 @@ Eleven maps in `packages/core/src/data/maps.ts`, each with a `gravityModifier` o
 | `force` | pushes projectiles sideways with a constant field | `TC-CORE-918` |
 | `gust` | periodic 4× wind spikes, announced in the HUD | `TC-CORE-918` |
 | `electric` | every 3rd turn a random cell is struck for 150 damage | `TC-CORE-919` |
-| `wind` | wind re-rolls twice per turn instead of once | `TC-CORE-023` |
+| `wind` | the round re-rolls twice and plays the second roll (`rollWeather(seed, round × 2)`) | `TC-CORE-023` |
 | `return` | shots that leave the map return once with reduced power | `TC-CORE-913` |
-| `heal` | standing in the marked zone heals 100 HP at turn start | `TC-CORE-919` |
+| `heal` | standing within 200 units of the map centre (`HEAL_ZONE_X` 1000, `HEAL_ZONE_RADIUS` 200) heals 100 HP at turn start, capped at `maxHp` | `TC-CORE-919` |
 | `fog` | blast markers hidden; aim arc shortened | `TC-MATCH-901` |
 | tornado | fixed spawn point moves units 60 px per turn | `TC-CORE-919` |
 
@@ -269,6 +269,15 @@ Eleven maps in `packages/core/src/data/maps.ts`, each with a `gravityModifier` o
 
 Worn avatars grant `+2…+8` to one stat (`attack` = damage multiplier, `defense`, `energy`, `delay` reduction), stacked
 from the account's equipped parts and validated server-side at loadout time — `TC-AUTH-104`, `data/accounts.md`.
+
+| Stat | Unit | Cap | Applied as |
+|---|---|---|---|
+| `attack` | percent | `+10` | damage `× (1 + attack/100)` |
+| `defense` | percent | `+10` | incoming damage `÷ (1 + defense/100)` |
+| `energy` | points | `+12` | added to the pool (`base + energy`), not a multiplier |
+| `delay` | percent | `−8` | delay `× (1 − delay/100)` |
+
+`AVATAR_CAPS` in `packages/core/src/data/avatars.ts` is the single source of these numbers (`TC-CORE-921`).
 
 ## 8. Room
 

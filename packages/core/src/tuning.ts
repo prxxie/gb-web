@@ -28,6 +28,9 @@ export const TUNABLES = {
   /** Crater radius as a fraction of the blast radius. */
   terrainCarveRatio: 0.6,
   maxFlightMs: 10_000,
+  /** `itm-bunge`: ms before the shell turns around, and the sideways pull that brings it home. */
+  bungeTurnMs: 350,
+  bungePull: 900,
   mapWidth: 2000,
   mapHeight: 1200,
   /** Positions are rounded to this before they enter a snapshot (`NFR-04`). */

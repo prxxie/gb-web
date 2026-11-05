@@ -23,6 +23,17 @@ export interface SessionToken {
 
 export const SESSION_TTL_MS = 60 * 60 * 1000;
 
+const HEADER = { alg: "HS256", typ: "JWT" } as const;
+
+interface Claims {
+  readonly sub: string;
+  readonly kind: "guest" | "account";
+  readonly guestId: string | null;
+  readonly accountId: string | null;
+  readonly iat: number;
+  readonly exp: number;
+}
+
 function b64url(bytes: Uint8Array): string {
   let binary = "";
   for (const byte of bytes) binary += String.fromCharCode(byte);
@@ -54,30 +65,50 @@ export async function mintSession(
   secret: string,
   now: number = Date.now(),
 ): Promise<{ token: string; expiresAt: number }> {
-  const payload: SessionToken = { sub: subject, iat: now, exp: now + SESSION_TTL_MS };
-  const encoded = b64url(new TextEncoder().encode(JSON.stringify(payload)));
-  const signature = await crypto.subtle.sign("HMAC", await key(secret), new TextEncoder().encode(encoded));
-  return { token: `${encoded}.${b64url(new Uint8Array(signature))}`, expiresAt: payload.exp };
+  const issuedAt = Math.floor(now / 1000);
+  const claims: Claims = {
+    sub: subject.accountId ?? subject.guestId ?? "",
+    kind: subject.kind,
+    guestId: subject.guestId,
+    accountId: subject.accountId,
+    iat: issuedAt,
+    exp: issuedAt + SESSION_TTL_MS / 1000,
+  };
+  const header = b64url(new TextEncoder().encode(JSON.stringify(HEADER)));
+  const encoded = b64url(new TextEncoder().encode(JSON.stringify(claims)));
+  const signingInput = `${header}.${encoded}`;
+  const signature = await crypto.subtle.sign("HMAC", await key(secret), new TextEncoder().encode(signingInput));
+  return { token: `${signingInput}.${b64url(new Uint8Array(signature))}`, expiresAt: claims.exp * 1000 };
 }
 
 export async function verifySession(token: string, secret: string, now: number = Date.now()): Promise<SessionToken> {
-  const [encoded, signature] = token.split(".");
-  if (!encoded || !signature) throw new ProblemError("unauthenticated", "Malformed session token");
+  const parts = token.split(".");
+  if (parts.length !== 3) throw new ProblemError("unauthenticated", "Malformed session token");
+  const [header, encoded, signature] = parts as [string, string, string];
   const valid = await crypto.subtle.verify(
     "HMAC",
     await key(secret),
     fromB64url(signature),
-    new TextEncoder().encode(encoded),
+    new TextEncoder().encode(`${header}.${encoded}`),
   );
   if (!valid) throw new ProblemError("unauthenticated", "Session token does not verify");
-  let payload: SessionToken;
+  let claims: Claims;
   try {
-    payload = JSON.parse(new TextDecoder().decode(fromB64url(encoded))) as SessionToken;
+    claims = JSON.parse(new TextDecoder().decode(fromB64url(encoded))) as Claims;
   } catch {
     throw new ProblemError("unauthenticated", "Session token is not readable");
   }
-  if (payload.exp <= now) throw new ProblemError("unauthenticated", "Session token expired");
-  return payload;
+  if (typeof claims.exp !== "number" || claims.exp * 1000 <= now) {
+    throw new ProblemError("unauthenticated", "Session token expired");
+  }
+  if (claims.kind !== "guest" && claims.kind !== "account") {
+    throw new ProblemError("unauthenticated", "Session token has no subject kind");
+  }
+  return {
+    sub: { kind: claims.kind, guestId: claims.guestId ?? null, accountId: claims.accountId ?? null },
+    iat: Number(claims.iat) * 1000,
+    exp: Number(claims.exp) * 1000,
+  };
 }
 
 /** Read `Authorization: Bearer <token>` or `X-Session-Token`. */

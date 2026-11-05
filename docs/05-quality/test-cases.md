@@ -56,6 +56,18 @@ The `covers` column names the requirement ([nonfunctional-requirements.md](../01
 | TC-ROOM-134 | US-ROOM-001 | Create vs join from the main menu | Host lands in the lobby with a copy control, peer joins the same room | e2e | FR-01 |
 | TC-ROOM-136 | US-ROOM-001 | Join a 404/410 code | Banner shown, stays on `/` | e2e | FR-01 |
 | TC-ROOM-150 | US-ROOM-001 | Copy-code control | Clipboard equals the code | e2e | `screens/lobby.md` |
+| TC-ROOM-168 | US-CORE-012 | `setRoomSettings` with a new map and mode, then a capacity below the seated members | The settings patch lands and keeps the other fields; the shrink is refused `below-seated` | unit | FR-05 |
+| TC-ROOM-169 | US-ROOM-005 | Election exhausts its candidates | Every socket gone: the room is `abandoned`, never hostless | worker | `apps/worker/src/room-do.ts` |
+| TC-ROOM-170 | US-ROOM-001 | Code generator keeps returning a taken code | Five attempts, then `503 unavailable` with `Retry-After: 5` | worker | FR-01 |
+| TC-ROOM-174 | US-ROOM-004 | A socket dies with a transient close code | Reopened after 500 ms, `onReconnected` fires once | web | NFR-07 |
+| TC-ROOM-175 | US-ROOM-004 | A socket is closed with `4401` | No retry; `onFatal(4401)` | web | NFR-07 |
+| TC-ROOM-176 | US-ROOM-004 | Transient drops keep failing for 21 s | Retries stop at the end of the grace window | web | NFR-07 |
+| TC-ROOM-177 | US-ROOM-004 | The page unmounts while the socket is dead | The retry loop stops with it | web | NFR-07 |
+| TC-ROOM-186 | US-ROOM-004 | Both seats of one team leave mid-match | The room ends `abandoned` and `POST /matches` records `abandoned: true`, winner A, `abandon` for the B seats | worker | `US-ROOM-004` AC6 |
+| TC-ROOM-183 | US-ROOM-003 | `team_assign` fan-out | Every socket, host included, receives exactly one `room_state` carrying A/A/B/B | worker | `api/signaling.md` |
+| TC-ROOM-184 | US-ROOM-004 | Reconnect 19 s into the grace window | The returning socket keeps slot 3 and team B and is re-sent `snapshot_state` with its 70 HP | worker | NFR-07 |
+| TC-ROOM-185 | US-ROOM-004 | Grace window runs out | The seat flips to `disconnected`, peers hear `peer_left {reason:"disconnected"}`, the next `room_state` shows it | worker | NFR-07 |
+| TC-ROOM-182 | US-ROOM-005 | Migration end to end on two sockets | Host socket killed mid-match: the survivor is promoted within 5 s with `hostGeneration` 2 and still pings | e2e | NFR-06 |
 | TC-ROOM-151 | US-ROOM-007 | Host selects mode, map and capacity; a non-host tries | Host writes, member is rejected, loadout caps at 11 items across two pages | e2e | `screens/lobby.md` |
 | TC-ROOM-153 | US-ROOM-007 | Two players pick the same mobile, then a guest picks one | Both are accepted in the same match, every mobile appears once in the grid, the choice survives reconnect | e2e | `data/mobiles.md` |
 | TC-ROOM-123 | US-ROOM-001 | Idle room for 10 minutes | Storage deleted, code reusable after 60 s | worker | `data/room-state.md` |
@@ -69,6 +81,11 @@ The `covers` column names the requirement ([nonfunctional-requirements.md](../01
 | TC-ROOM-066 | US-ROOM-003 | Non-host sends `start_match` or `team_assign` | `error not-host`, roster unchanged | worker | NFR-11 |
 | TC-ROOM-148 | US-ROOM-003 | Start gating | Disabled until every slot is filled, teams equal and non-empty | e2e | `workflow-state-machine.md` |
 | TC-ROOM-162 | US-ROOM-003 | Illegal state transitions in `playing`/`ended` | Rejected with no side effects | worker | `workflow-state-machine.md` |
+| TC-ROOM-164 | US-ROOM-003 | `start_match` in a lobby that is not full | `room-not-full` | worker | `workflow-state-machine.md` |
+| TC-ROOM-165 | US-ROOM-003 | `start_match` with unbalanced teams | `teams-not-balanced` | worker | `workflow-state-machine.md` |
+| TC-ROOM-166 | US-ROOM-003 | `match_started` after a host start | Carries the chosen mode, map and each assignment's loadout | worker | `api/signaling.md` § 3 |
+| TC-ROOM-163 | US-NET-004 | Every documented client frame, and one field the frame does not document | Each documented frame parses; an unknown `t` is `unsupported-message`; an undocumented field is `bad-request` naming it; an 8 KB sdp is `payload-too-large` | unit | `api/signaling.md` § 2 |
+| TC-ROOM-167 | US-ROOM-007 | A lobby loadout of eleven items, then a twelfth | Eleven are kept and the twelfth is refused | worker | `data/items.md` |
 | TC-ROOM-046 | US-ROOM-004 | Reconnect within the 20 s grace | Slot, team and HP restored from `lastSnapshot` | e2e | NFR-07 |
 | TC-ROOM-047 | US-ROOM-004 | Grace countdown on the match screen | Overlay counts 20 → 0, then `disconnected` | e2e | NFR-07 |
 | TC-ROOM-055 | US-ROOM-004 | Kill one peer during a 2v2 | The other three keep playing; the match completes | e2e | NFR-08 |
@@ -91,7 +108,7 @@ The `covers` column names the requirement ([nonfunctional-requirements.md](../01
 | TC-CORE-020 | US-CORE-001 | `mbl-01` shot 1 at 45°, force 98, no wind | Lands at 1,988 units after 6.3 s, each position inside the golden-sample ±0.5 units band; gravity 100 u/s² adds exactly 5 u/s per step | unit | FR-04 |
 | TC-CORE-021 | US-CORE-001 | Wind +max pushes the projectile downwind | Δx increases monotonically with wind | unit | FR-04 |
 | TC-CORE-022 | US-CORE-001 | Force and angle out of the mobile's own window (`mbl-05` 25°, `mbl-15` 50°, `mbl-13` −18°) | Clamped to that mobile's `angleMin…angleMax` and `0…maxPower`, never `NaN`, and two mobiles with the same profile clamp differently | unit | FR-03 |
-| TC-CORE-023 | US-CORE-001 | Same shot, wind +10, on `mbl-01` (`mass 168`), `mbl-19` (`mass 120`) and `mbl-03` (`mass 169` at `g 118`) | Drift follows `½ · (110 × 10 / mass) · t²` — 130, 191 and 62 units — and a vertical wind component changes effective gravity (`a_y = −g + 110 × wind.y / mass`) | unit | FR-04 |
+| TC-CORE-023 | US-CORE-001 | Same shot in calm, in wind +26 and in wind −26, on `mbl-01` (`mass 168`) | Landing drift equals `½ · (windCoefficient × magnitude / mass) · t²` with `windCoefficient = 42` (`tunables.md` § 1.3) within 5 % (the bound the 0.1 position quantum puts on a 6.3 s flight), is linear in `magnitude`, reverses sign with the wind, and a vertical component changes effective gravity (`a_y = −g + 42 × wind.y / mass`) | unit | FR-04 |
 | TC-CORE-024 | US-CORE-003 | Blast at Inner, Mid and Outer radii | Three distinct damage tiers, 0 beyond the radius | unit | FR-06 |
 | TC-CORE-025 | US-CORE-003 | HP would go below zero | HP floored at 0, player marked `eliminated` | unit | FR-06 |
 | TC-CORE-026 | US-CORE-003 | Target with `defense 1.15` takes an Inner hit of 500 | Damage is divided by `defense` and rounded: 435 | unit | FR-06 |
@@ -99,7 +116,7 @@ The `covers` column names the requirement ([nonfunctional-requirements.md](../01
 | TC-CORE-028 | US-CORE-001 | Same seed and inputs twice | Identical state hash after 200 steps | unit | NFR-22 |
 | TC-CORE-029 | US-CORE-001 | Projectile leaves `mapBounds` and never lands | Turn resolves as a miss after `maxFlightMs`, no error | unit | FR-04 |
 | TC-CORE-040 | US-CORE-004 | Apply the same snapshot twice | Second apply is a no-op; key order and rounding stable | unit | FR-05 |
-| TC-CORE-041 | US-CORE-004 | Encode 8 players in Jewel mode with 6 jewels | ≤ 800 bytes, decodes identically | unit | NFR-04 |
+| TC-CORE-041 | US-CORE-004 | Encode 8 players in Jewel mode with 6 jewels; then the same match with `includeTerrain` | ≤ 800 bytes and no mask by default, decodes identically; the mask-bearing frame is larger but ≤ 8 KB and its heights decode to a tenth of a unit | unit | NFR-04 |
 | TC-CORE-042 | US-CORE-004 | Snapshot with an older `seq` or a stale `hostGeneration` | Ignored, state unchanged | unit | FR-05 |
 | TC-CORE-045 | US-CORE-002 | Two fire inputs for one turn with different `seq` | Last `seq` wins, one shot simulated | unit | FR-05 |
 | TC-CORE-152 | US-CORE-002 | Turn clock | 20 s, skips on timeout, drift ≤ 1 s | unit | OQ-03 |
@@ -121,14 +138,20 @@ The `covers` column names the requirement ([nonfunctional-requirements.md](../01
 | TC-CORE-916 | US-CORE-010 | Tag mode, a team finishes its whole turn | `activeTeam` flips and the opposing team acts | unit | FR-02 |
 | TC-CORE-917 | US-CORE-010 | Jewel mode: walk over a jewel, then kill a carrier | Jewel carried, then transferred to the killer's team; all jewels ends the match | unit | FR-06 |
 | TC-CORE-918 | US-CORE-011 | Map with `force`, map with `gust` | Constant sideways push; 4× wind spike for one turn, announced and reverted | unit | FR-04 |
-| TC-CORE-919 | US-CORE-011 | Map with `electric`, `heal` and a tornado | Strike on every third turn for 15; heal zone +10 capped; tornado displaces 60 px without burying | unit | NFR-21 |
+| TC-CORE-919 | US-CORE-011 | Map with `electric`, `heal` and a tornado | Strike on every third turn for 150; heal zone (200 units around x 1000) restores 100 capped at `maxHp`, a unit outside it gains nothing; tornado displaces 60 px without burying | unit | NFR-21 |
 | TC-CORE-920 | US-CORE-012 | Load the eleven maps | Schema valid, spawns valid for 8 slots, terrain RLE expands | unit | FR-04 |
 | TC-CORE-921 | US-CORE-013 | Profile with +4 attack, another with +20 | First is ×1.04, second clamps at ×1.10; energy and delay caps hold | unit | FR-06 |
 | TC-CORE-922 | US-CORE-007 | Super shot used once | Slot 2 reports empty afterwards and cannot be selected | unit | FR-04 |
 | TC-CORE-923 | US-CORE-007 | Balance report over all twenty mobiles | Every archetype has exactly two mobiles, the two sit within ±10 % of each other on damage per delay, the roster spread is printed, report regenerates from the CSV | unit | `data/mobiles.md` § 5 |
-| TC-CORE-924 | US-CORE-007 | Every mobile fires at its `maxPower` on a flat probe map | Landing distance and hang time match `data/mobiles.md` § 4 within ±1 unit (`mbl-14` 2,162 vs `mbl-03` 1,441), each mobile keeps its own arc at identical power, and a heavier mobile drifts less under wind | unit | FR-04 |
+| TC-CORE-924 | US-CORE-007 | Every mobile fires at its `maxPower` on a flat probe map | Landing distance and hang time match `data/mobiles.md` § 4 within ±1 unit (`mbl-14` 2,058 vs `mbl-03` 1,433, first ground contact), each mobile keeps its own arc at identical power, and a heavier mobile drifts less under wind | unit | FR-04 |
 | TC-CORE-925 | US-CORE-007 | `mbl-13` (`mass 118`, `g 84`) and `mbl-03` (`mass 169`, `g 118`) fire the same angle and force | The light/weak-gravity mobile lands further and drifts more under identical wind; swapping their `mass` values swaps the behaviour, proving `mass` is the only wind term | unit | FR-04 |
 | TC-CORE-926 | US-CORE-015 | Roll the weather across four rounds with a fixed seed | `turn.round` increments on queue wrap; `magnitude` 0–26 and `sector` 0–11 each roll; wind constant inside a round; same seed replays the same sequence | unit | FR-04 |
+| TC-CORE-927 | US-CORE-005 | A bot holding Power up, its best raw shot landing more than the item can fix | It sends the `item` input before the shot, one item only, and pays the item's `delayCost` | unit | NFR-21 |
+| TC-CORE-928 | US-CORE-015 | An eight-player mid-round snapshot after a wind roll | The weather rides in the snapshot (`magnitude`, `sector`, `rolledAtRound`), decodes identically, and the state snapshot stays ≤ 800 bytes | unit | FR-04 |
+| TC-CORE-929 | US-CORE-013 | A guest with no avatar equipped | No bonus is applied and the match is still playable | unit | FR-06 |
+| TC-CORE-930 | US-CORE-013 | An avatar part the profile does not own, or a retired one | It contributes no bonus, and the rest of the profile still applies | unit | NFR-11 |
+| TC-CORE-931 | US-CORE-011 | The fog gimmick on a flat map | The visible window halves and the battle state is untouched | unit | `tunables.md` § 6 |
+| TC-CORE-932 | US-CORE-009 | An item the player does not own | Rejected without charging the item's delay | unit | `data/items.md` |
 
 ## Netplay (NET)
 
@@ -144,6 +167,7 @@ The `covers` column names the requirement ([nonfunctional-requirements.md](../01
 
 | ID | Story | Case | Expected | Level | Covers |
 |----|-------|------|----------|-------|--------|
+| TC-CORE-016 | US-CORE-010 | `room_settings` with mode `royale`, then with `mapId` `map-99` | Both refused `bad-request` naming the field, so an unknown mode never reaches `createMatch` | unit | FR-05 |
 | TC-MATCH-901 | US-MATCH-001 | Mount the scene with a state | Map, units and turn indicator drawn; no unit jumps backwards between snapshots | e2e | NFR-01 |
 | TC-MATCH-151 | US-MATCH-002 | Drag aim and release | One `fire`, angle/force within ±2° / ±3 of the drawn values | e2e | FR-03 |
 | TC-MATCH-902 | US-MATCH-002 | A second finger lands mid-pull | The pull is cancelled without firing and the camera gesture takes over | web | FR-03 |
@@ -232,3 +256,38 @@ The `covers` column names the requirement ([nonfunctional-requirements.md](../01
 - A case that cannot run yet (missing environment, for example `TC-OPS-185` before M3) is marked in the release record,
   never deleted.
 - A test id must match `TC-[A-Z]{2,6}-\d{3}`; numbers are unique within an epic and are never reused.
+
+## Socket contract and lifecycle (hardening pass 2026-11-05)
+
+Cases added when the socket contract was written down once and the Durable Object was rebuilt against it. They
+exist because the same behaviour used to be cited under borrowed ids from other epics (`TC-CORE-914` carried three
+unrelated meanings), so every row below names the one thing it proves.
+
+| ID | Story | Case | Expected | Level | Covers |
+|----|-------|------|----------|-------|--------|
+| TC-FND-131 | US-FND-003 | A direct URL (`/lobby/ABC234`, `/match/ABC234`) renders the shell and the locale toggle | Shell renders without a 404 and the toggle switches VI↔EN | web | `US-FND-003` AC1, AC2, AC5 |
+| TC-MATCH-914 | US-MATCH-002 | Drag distance maps to the power ring radius | Radius grows with the pull and stops at the maximum | web | `US-MATCH-002` §4 |
+| TC-NET-045 | US-NET-004 | A peer sends `team_assign`; the host sends it after the start | `not-host` while a peer, `invalid-state` once playing; the roster is unchanged | worker | `US-NET-004` §2 roster |
+| TC-NET-066 | US-NET-004 | A socket signals itself, then signals a seated member with no socket | `bad-request`, then `peer-not-connected`; no frame is relayed | worker | `US-NET-004` §3 `signal` |
+| TC-PWA-152 | US-PWA-003 | The page is squeezed into portrait, then rotated to landscape | Portrait shows the rotate gate with the hint, landscape shows the match | web | `US-PWA-003` AC1, AC2 |
+| TC-ROOM-025 | US-MATCH-004 | A preset phrase and a free text are sent, then an empty, unknown-kind or 121-char frame | The two valid frames parse; the three invalid ones are refused with the limit in `detail` | unit | `US-MATCH-004` §4 `chat` |
+| TC-ROOM-053 | US-ROOM-001 | A room runs past 24 h from its creation but not from its match start | The cap is measured from the match start; the room survives until then | worker | `room-state.md` expiry |
+| TC-ROOM-054 | US-ROOM-002 | Two snapshots are pushed in a row | Only the newest is stored, under its own key, and the older `seq` is dropped | worker | `room-state.md` snapshot |
+| TC-ROOM-057 | US-ROOM-004 | Every member of one team loses its socket, then all but one | The team forfeits only when every member is disconnected | worker | `US-ROOM-004` AC3 |
+| TC-ROOM-058 | US-NET-002 | The host pushes a snapshot, then replays an older `seq` | Each other member receives it once; the stale push is dropped without an error | worker | `US-NET-002` AC1 |
+| TC-ROOM-061 | US-ROOM-005 | The host leaves and the election promotes a peer | `host_changed` hands over the newest snapshot and the bumped generation | worker | `US-ROOM-005` AC2 |
+| TC-ROOM-062 | US-ROOM-002 | A member sends `leave` | `peer_left` is announced and the roster shrinks | worker | `US-ROOM-002` §3 |
+| TC-ROOM-063 | US-ROOM-002 | A new socket authenticates into a lobby | The others get `peer_joined`; the newcomer gets `room_state` with its own slot | worker | `US-ROOM-002` AC2 |
+| TC-ROOM-064 | US-NET-001 | A client sends `ping {at}` | `pong` carries the client's `at` and the host's `now` | worker | `signaling.md` §2 heartbeat |
+| TC-ROOM-065 | US-NET-001 | Eleven pings, then twenty-one signals, in one second | The frame past the budget is refused once and the socket closes `4429` | worker | `signaling.md` § Budgets |
+| TC-ROOM-070 | US-ROOM-006 | TURN credentials are requested from a Worker with no TURN key | `200` with the public STUN entry and `turn: false` | worker | `US-ROOM-006` AC2 |
+| TC-ROOM-129 | US-ROOM-004 | A member reconnects, and a lobby slot is freed | The reconnecting member keeps its slot; the freed slot goes to the next joiner | worker | `US-ROOM-004` AC1 |
+| TC-ROOM-146 | US-ROOM-003 | A team is assigned more members than `maxPlayers / 2` | `bad-request`; the roster is unchanged | worker | `US-ROOM-003` §4 capacity |
+| TC-ROOM-155 | US-ROOM-001 | A room is created | It starts in the lobby and arms the ten-minute idle alarm | worker | `room-state.md` § Started |
+| TC-ROOM-156 | US-ROOM-003 | `team_assign` and `peer_joined` arrive in the lobby | The status stays `lobby` | worker | `workflow-state-machine.md` guard |
+| TC-ROOM-157 | US-ROOM-003 | `start_match` succeeds | Slots, teams and status satisfy the playing invariant | worker | `US-ROOM-003` AC4 |
+| TC-ROOM-158 | US-NET-002 | A snapshot arrives while playing | The room stays `playing` and exactly one snapshot is stored | worker | `US-NET-002` AC1 |
+| TC-ROOM-159 | US-ROOM-004 | Every member's grace window expires | The room becomes `abandoned` | worker | `workflow-state-machine.md` playing→abandoned |
+| TC-ROOM-160 | US-ROOM-004 | An abandoned room is left idle, and a second start is attempted | The room is deleted, refuses joins, and cannot be restarted | worker | `workflow-state-machine.md` abandoned |
+| TC-ROOM-161 | US-ROOM-003 | The lobby is re-entered once the match is playing | Refused; the room stays `playing` | worker | `workflow-state-machine.md` guards |
+| TC-ROOM-707 | US-ROOM-007 | The host picks mode, map, capacity and a loadout; a peer changes one | The host's choice reaches every member; the peer's frame is refused | web | `US-ROOM-007` AC1–AC4 |

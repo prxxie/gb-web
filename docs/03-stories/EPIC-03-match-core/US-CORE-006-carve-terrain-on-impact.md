@@ -36,7 +36,7 @@ units walk on it, and the mask must be part of the replicated state.
 | AC1 | a projectile reaches the terrain mask | it is stepped | it detonates at the first contact point, not inside the terrain (`TC-CORE-914`) |
 | AC2 | a blast of radius 80 lands | it resolves | a crater of `0.6 × 80` is removed from the mask and the units standing on it fall to the new surface (`TC-CORE-914`) |
 | AC3 | a crater is carved under a unit | its turn ends | the unit's `y` is re-grounded and it cannot float (`TC-CORE-914`) |
-| AC4 | the same crater | it is carved on host and peer | both masks are byte-identical after `applySnapshot` (`TC-CORE-040`) |
+| AC4 | the same crater | it is carved on host and peer | both masks are byte-identical after `applySnapshot`: the host attaches the RLE mask to the snapshot that follows a carve (`snapshot.terrain`, ~1.9 KB) and the peer decodes it (`TC-CORE-040`) |
 | AC5 | a unit is fully buried by terrain | movement is resolved | it can still fire but cannot move until the terrain is opened (`TC-CORE-904`) |
 | AC6 | a `piercing` shot | it crosses the mask | it ignores terrain until it hits a unit (`TC-CORE-913`) |
 

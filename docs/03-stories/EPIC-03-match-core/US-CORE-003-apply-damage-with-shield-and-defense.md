@@ -74,7 +74,7 @@ Modes with their own scoring ([`US-CORE-010`](US-CORE-010-score-the-four-modes.m
 ## 8. Test notes
 
 `TC-CORE-024`, `TC-CORE-025`, `TC-CORE-026`, `TC-CORE-027`, `TC-CORE-903`, `TC-CORE-905`, `TC-CORE-912`.
-`Red first: packages/core/tests/blast.test.ts::inner_tier_hurts_more_than_outer`.
+`Red first: packages/core/tests/combat.test.ts::inner_tier_hurts_more_than_outer`.
 
 <!-- delivery:2026-11-05 -->
 

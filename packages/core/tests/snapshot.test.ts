@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { acceptSnapshot, applySnapshot, encodeBytes, encodeSnapshot, decodeSnapshot, snapshotBytes, toSnapshot } from "../src/snapshot.js";
 import { createMatch, type Seat } from "../src/match.js";
+import type { MatchState } from "../src/types.js";
 import { TUNABLES } from "../src/tuning.js";
 
 const NOW = 1_700_000_000_000;
@@ -16,6 +17,34 @@ function fullMatch() {
 }
 
 describe("TC-CORE-040: snapshot round trip", () => {
+  it("AC5: the scores, the jewels and the ruleset version survive the wire", () => {
+    const state = createMatch({
+      matchId: "m-2",
+      roomCode: "ABC235",
+      seed: 12,
+      mode: "jewel",
+      mapId: "map-01",
+      seats: [seat(0, "A"), seat(1, "B")],
+      now: NOW,
+    });
+    const scored: MatchState = {
+      ...state,
+      rulesetVersion: "2026-11-06",
+      scores: {
+        score: { A: 3, B: 1 },
+        activeTeam: "B",
+        jewels: state.scores.jewels.map((jewel, index) => ({ ...jewel, carriedBy: index === 0 ? 1 : null })),
+      },
+    };
+    const applied = applySnapshot(scored, decodeSnapshot(encodeSnapshot(toSnapshot(scored, 1))));
+
+    expect(applied.scores.score).toEqual({ A: 3, B: 1 });
+    expect(applied.scores.activeTeam).toBe("B");
+    expect(applied.scores.jewels.filter((jewel) => jewel.carriedBy === 1)).toHaveLength(1);
+    // A peer needs the version to know whether its own ruleset may rank this match (`US-CORE-007` AC5).
+    expect(applied.rulesetVersion).toBe("2026-11-06");
+  });
+
   it("encodes and decodes back to the same state", () => {
     const state = fullMatch();
     const snapshot = toSnapshot(state, 3);
@@ -38,6 +67,26 @@ describe("TC-CORE-041: the size budget", () => {
     const bytes = snapshotBytes(state, 1);
     expect(bytes).toBeLessThanOrEqual(TUNABLES.snapshotMaxBytes);
     expect(encodeBytes(encodeSnapshot(toSnapshot(state, 1)))).toBe(bytes);
+    // The mask is deliberately absent: a state snapshot is the 10 Hz channel, a carve is not.
+    expect(toSnapshot(state, 1).terrain).toBeUndefined();
+  });
+
+  it("carries the mask only on a carve, and only up to the socket cap", () => {
+    const state = fullMatch();
+    const withMask = snapshotBytes(state, 1, { includeTerrain: true });
+    // The mask is the whole cost: it adds bytes to every snapshot that carries it, and the hard cap is
+    // the only per-frame limit that applies (`signaling.md` §3).
+    expect(withMask).toBeGreaterThan(snapshotBytes(state, 1));
+    expect(withMask).toBeLessThanOrEqual(TUNABLES.snapshotHardLimitBytes);
+    const decoded = decodeSnapshot(encodeSnapshot(toSnapshot(state, 1, { includeTerrain: true })));
+    expect(decoded.terrain).toBeTypeOf("string");
+    // The mask decodes to the host's own heights, to a tenth of a unit, not to whole units.
+    const applied = applySnapshot(state, decoded);
+    expect(applied.terrain).toBeDefined();
+    const shared = applied.terrain ?? [];
+    for (let index = 0; index < shared.length; index += 97) {
+      expect(shared[index]).toBeCloseTo(state.terrain[index] ?? 0, 1);
+    }
   });
 });
 

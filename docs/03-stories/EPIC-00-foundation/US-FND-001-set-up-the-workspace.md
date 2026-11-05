@@ -2,7 +2,7 @@
 id: US-FND-001
 title: Set up the pnpm workspace so the documented commands run
 epic: EPIC-00-foundation
-status: ready
+status: in-progress
 priority: P0
 size: M
 depends_on: []
@@ -39,7 +39,7 @@ come from the architecture and conventions files.
 | AC2 | A clean checkout | `pnpm typecheck`, `pnpm lint` and `pnpm test` run in that order | All three exit 0; `pnpm test` reports at least one passing test per project (core, worker, web) |
 | AC3 | `packages/core` as written | A static scan of its imports runs | It contains no `phaser`, no DOM global reference and no network module (`TC-FND-018`) |
 | AC4 | A production build | The emitted web bundle is searched for `SESSION_TOKEN_SECRET` and `TURN_KEY_API_TOKEN` values | No match (`TC-FND-012`) |
-| AC5 | `apps/worker/.dev.vars.example` and `apps/web/.env.example` | Both are read | Every key the code reads is collected in one of them, and the two sets are identical — names only, no values (`TC-FND-002`) |
+| AC5 | `apps/worker/.dev.vars.example` and `apps/web/.env.example` | Both are read | Every name the code reads appears in one of them, neither file lists a name the code does not read, and no row carries a value — only public defaults (`VITE_API_BASE=/api/v1`, an empty `VITE_CLERK_PUBLISHABLE_KEY`, and the worker's local placeholder `SESSION_TOKEN_SECRET=dev-only-change-me`) (`TC-FND-002`) |
 | AC6 | The repository with CI configured | A pull request with a failing unit test is opened | CI fails on the test job and the merge is blocked |
 | AC7 | `AGENTS.md` and `docs/01-overview/environment-setup.md` | This story is `done` | No `(planned — …)` marker remains in either file and every documented command has been executed successfully |
 
@@ -67,15 +67,13 @@ and `types: ["vite/client"]`; `packages/core` uses `lib: ["ES2023"]` only — th
 
 - No secret value enters the repository: `.env.example` carries names only, and CI builds with dummy values (`NFR-12`).
 - No new dependency without explicit approval naming version and licence (rule 06); the packs already approved cover everything here.
-- `engines.node: ">=24"` in the root `package.json`; `pnpm install` on Node 22 must fail loudly rather than half-work.
-- `packages/core` must not import from `apps/*` in either direction; the scan in AC3 fails the build if it does.
-- `engines.node` is `>=22.12` and CI runs Node 24: a newer runtime is allowed, an older one fails at install time rather than halfway through a build. Verified on 22.22.2.
+- `engines.node` is `>=22.12` and CI runs Node 22 LTS: a newer runtime is allowed, an older one fails at install time rather than halfway through a build. Verified on 22.22.2.
 - E2E tests may not require network access to Cloudflare — they run against `wrangler dev`.
 
 ## 6. Implementation notes
 
-- Three Vitest projects via `vitest.workspace.ts` (`core`, `worker` with miniflare, `web` with jsdom + RTL).
-- Playwright fixture `tests/e2e/fixtures/twoPlayers.ts` opens two browser contexts — every later e2e story reuses it.
+- One Vitest run with four globs: `vitest.config.ts` at the root includes `packages/core/tests/**/*.test.ts`, `apps/worker/tests/**/*.test.ts`, `apps/web/tests/**/*.test.tsx` and `tests/meta/**/*.test.ts` — one file per package instead of a workspace file, so `pnpm test` stays a single command.
+- Playwright starts both servers itself (`playwright.config.ts` `webServer`), so a spec run needs no manual terminals; every spec opens its own browser context.
 - The import scan is a test, not an ESLint rule, so it also catches transitive imports through `packages/core/src/index.ts`.
 - Keep `tsc -b` project references; the build order is `core → worker → web`.
 
@@ -99,4 +97,10 @@ None. The toolchain question (`OQ-11`) was answered when the stack ADR was accep
 
 ## Delivery status — 2026-11-05
 
-**done.** the workspace is real: `pnpm install`, `pnpm build` (web + `wrangler deploy --dry-run`), `pnpm typecheck`, `pnpm lint` and `pnpm test` all run; `AGENTS.md` carries no `(planned — …)` marker any more
+**shipped 2026-11-05, awaiting the CI evidence for AC6.** What exists and was run on Node 22.22.2:
+
+- AC1–AC5, AC7: `pnpm install`, `pnpm build` (115.97 KiB bundle + `wrangler deploy --dry-run`), `pnpm typecheck`, `pnpm lint`, `pnpm test` (15 files / 110 cases) and `pnpm e2e` (6 specs) all pass. `AGENTS.md` and
+  `docs/01-overview/environment-setup.md` carry no `(planned — …)` marker. `TC-FND-002` (`apps/worker/tests/env.test.ts`),
+  `TC-FND-012` (`tests/meta/bundle-secrets.test.ts`) and `TC-FND-018` (`packages/core/tests/imports.test.ts`) exist and are green.
+- AC6: `.github/workflows/ci.yml` runs the same five commands plus Playwright; evidence is the workflow run recorded in
+  `docs/05-quality/evidence/US-FND-001/`.
