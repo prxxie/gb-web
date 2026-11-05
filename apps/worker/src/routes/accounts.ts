@@ -108,7 +108,7 @@ export async function createSession(request: Request, env: Env): Promise<Respons
         ratedMatches: profile?.rated_matches ?? 0,
       },
     },
-    { status: 200, headers: { "cache-control": "no-store" } },
+    { status: 201, headers: { "cache-control": "no-store" } },
   );
 }
 

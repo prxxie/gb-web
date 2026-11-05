@@ -35,8 +35,8 @@ makes them gameplay-affecting, capped so a cosmetic gap never decides a ranked m
 |---|---|---|---|
 | AC1 | a profile with a +4 attack part | a match starts | the damage multiplier is `×1.04`, capped at `×1.10` total (`TC-CORE-921`) |
 | AC2 | a profile with +8 energy | the match starts | the energy pool is `base + 8` and never above the cap (`TC-CORE-921`) |
-| AC3 | a guest | a match starts | bonuses are all zero and the match is still playable (`TC-AUTH-074`) |
-| AC4 | an equipped part the account no longer owns | the loadout is validated | it is stripped server-side and the bonus is not applied (`TC-AUTH-104`) |
+| AC3 | a guest | a match starts | bonuses are all zero and the match is still playable (`TC-CORE-929`) |
+| AC4 | an equipped part the account no longer owns | the loadout is validated | it is stripped server-side and the bonus is not applied (`TC-CORE-930`) |
 | AC5 | the bonus table | it is applied | totals are clamped to the caps and listed in the match record (`TC-RANK-110`) |
 
 ## 4. Contract

@@ -32,21 +32,26 @@ location ``. They run on top of map gravity and wind range.
 |---|---|---|---|
 | AC1 | a map with `force` | a projectile flies | it is pushed sideways by the constant field and the HUD announces it (`TC-CORE-918`) |
 | AC2 | a map with `gust` | a 4× wind spike is scheduled | the spike is applied for one turn, announced, then reverted (`TC-CORE-918`) |
-| AC3 | a map with `electric` | every third turn starts | a random cell is struck for 15 damage with a visible marker (`TC-CORE-919`) |
+| AC3 | a map with `electric` | every third turn starts | a random cell is struck for 150 damage with a visible marker (`TC-CORE-919`) |
 | AC4 | a map with `wind` | a turn starts | wind re-rolls twice and the second value is the one used (`TC-CORE-023`) |
 | AC5 | a map with `return` | a shot leaves the map | it returns once with reduced power instead of despawning (`TC-CORE-913`) |
-| AC6 | a map with `heal` | a unit stands in the heal zone at turn start | it regains 10 HP, capped at `maxHp` (`TC-CORE-919`) |
-| AC7 | a map with `fog` | the match renders | aim arc is shortened and blast markers hidden, unit positions still visible (`TC-MATCH-901`) |
+| AC6 | a map with `heal` | a unit stands in the heal zone at turn start | it regains 100 HP, capped at `maxHp` (`TC-CORE-919`) |
+| AC7 | a map with `fog` | the match renders | aim arc is shortened and blast markers hidden, unit positions still visible (`TC-CORE-931`) |
 | AC8 | a map with a tornado spawn | a turn starts | units within its radius move 60 px, never into terrain (`TC-CORE-919`) |
 
 ## 4. Contract
 
 ```ts
-export type Gimmick = 'force'|'gust'|'electric'|'wind'|'return'|'heal'|'fog';
-export interface Stage { mapId: string; gravity: number; windRange: number; gimmicks: Gimmick[];
-  healZones?: Array<{ x: number; y: number; r: number }>; tornado?: { x: number; y: number; r: number } }
-export function applyTurnGimmicks(state: MatchState, stage: Stage, rng: Rng): MatchState;
+export type Gimmick = "force" | "gust" | "electric" | "wind" | "return" | "heal" | "fog" | "tornado";
+export interface GimmickEvent { round: number; kind: Gimmick | "tornado"; amount: number; magnitude?: number }
+export interface GimmickEffect { state: MatchState; events: readonly GimmickEvent[] }
+export function applyGimmicks(state: MatchState, round: number, map: MapDef): GimmickEffect;
+export function visibilityMultiplier(map: MapDef): number;   // `fog` — 0.5, otherwise 1
+export function returnsOffMapShots(map: MapDef): boolean;    // `return`
 ```
+
+The magnitudes are exported constants (`FORCE_FIELD`, `GUST_FACTOR`, `ELECTRIC_EVERY`, `ELECTRIC_DAMAGE`,
+`HEAL_AMOUNT`, `TORNADO_PUSH`) so `tunables.md` § 6 and the code cannot drift.
 
 ## 5. Rules and edge cases
 
@@ -56,7 +61,8 @@ export function applyTurnGimmicks(state: MatchState, stage: Stage, rng: Rng): Ma
 
 ## 6. Implementation notes
 
-- `packages/core/src/stages/{gimmicks.ts,apply.ts}`; each gimmick is a pure `(state) => state` function.
+- `packages/core/src/gimmicks.ts`; one `applyGimmicks` pass per round, each branch a pure edit of the state it is
+  given, and `packages/core/src/match.ts` only reacts to the events it returns.
 
 ## 7. Out of scope
 

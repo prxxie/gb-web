@@ -193,7 +193,7 @@ describe("weather (US-CORE-015)", () => {
     // mobile's trajectory depends on its own weapon as well, so it is not a cleaner oracle here.
   });
 
-  it("TC-CORE-041: an eight-player mid-round snapshot carries the weather under 800 bytes", () => {
+  it("TC-CORE-928: an eight-player mid-round snapshot carries the weather under 800 bytes", () => {
     const state = match(8);
     const snapshot = toSnapshot(state, 1);
     expect(snapshotBytes(state, 1)).toBeLessThanOrEqual(TUNABLES.snapshotMaxBytes);

@@ -31,7 +31,7 @@ GunBound ships up to eleven maps per mode and the room card's icon is `((mode) *
 
 | # | Given | When | Then |
 |---|---|---|---|
-| AC1 | the map bundle | it is loaded | eleven records validate: `mapId`, `gravity`, `windRange`, `gimmicks`, terrain RLE (`TC-CORE-920`) |
+| AC1 | the map bundle | it is loaded | eleven records validate: `mapId`, `gravityModifier`, `windRange`, `gimmicks`, terrain RLE (`TC-CORE-920`) |
 | AC2 | any map | a match starts | spawn points are valid ground positions for up to eight slots (`TC-CORE-920`) |
 | AC3 | a map with gimmicks | the match starts | its gimmicks are active and listed in the lobby preview (`TC-CORE-918`) |
 | AC4 | the host changes the map in the lobby | start is pressed | every peer receives the new `mapId` before the first snapshot (`TC-ROOM-151`) |
@@ -41,10 +41,23 @@ GunBound ships up to eleven maps per mode and the room card's icon is `((mode) *
 ## 4. Contract
 
 ```ts
-export interface MapRecord extends Stage { name: { vi: string; en: string }; terrain: Uint8Array;
-  spawns: Array<{ x: number; y: number }> }
-export function loadMaps(raw: unknown): MapRecord[];
+export interface MapDef {
+  mapId: string;
+  name: { vi: string; en: string };         // one authored label per locale, never a translated literal
+  gravityModifier: number;                  // per-map knob on top of each mobile's own gravity
+  seed: number;
+  gimmicks: readonly Gimmick[];
+  spawns: readonly (readonly [number, number] | null)[];  // slot-indexed; `null` = illegal slot
+  jewels: readonly (readonly [number, number])[];
+  windRange: { min: number; max: number };  // the magnitude window this map rolls into
+  terrain: string;                          // authored mask, RLE over tenths (serializeTerrain)
+}
+export const MAPS: readonly MapDef[];
+export function getMap(mapId: string): MapDef;   // throws RangeError for an unknown id
 ```
+
+`terrain` is produced on first read and cached, because the generator needs `terrain.ts`, which reads back the
+map profiles — an eager build would run against a half-initialised import.
 
 ## 5. Rules and edge cases
 

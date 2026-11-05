@@ -122,6 +122,7 @@ export function encodeSnapshot(snapshot: Snapshot | WireSnapshot): string {
       player.eliminated ? 1 : 0,
       0,
     ]),
+    ...(state.terrain === undefined ? {} : { m: state.terrain }),
     j: state.scores.jewels.flatMap((jewel) => [jewel.x, jewel.y, jewel.carriedBy ?? -1]),
     sc: [state.scores.score.A, state.scores.score.B],
     st: state.status,
@@ -261,6 +262,6 @@ function heightsAsTerrain(state: MatchState): Terrain {
   return { step: state.terrainStep, heights: Float64Array.from(state.terrain), width: TUNABLES.mapWidth };
 }
 
-export function snapshotBytes(state: MatchState, hostGeneration: number): number {
-  return encodeBytes(encodeSnapshot(toSnapshot(state, hostGeneration)));
+export function snapshotBytes(state: MatchState, hostGeneration: number, options: SnapshotOptions = {}): number {
+  return encodeBytes(encodeSnapshot(toSnapshot(state, hostGeneration, options)));
 }

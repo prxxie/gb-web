@@ -65,6 +65,9 @@ export function launch(options: LaunchOptions): Projectile {
     piercing: options.weapon.shotClass === "piercing",
     parentId: null,
     bunge: options.bunge ?? false,
+    homeX: roundTo(options.from.x),
+    homeY: roundTo(options.from.y),
+    returned: false,
     blooded: (options.powerMultiplier ?? 1) > 1,
   };
 }
@@ -74,6 +77,8 @@ export interface StepContext {
   readonly gravity: number;
   readonly mass: number;
   readonly stepMs?: number;
+  /** Constant sideways acceleration a `force` map adds, in units/s² (`TC-CORE-918`). */
+  readonly forceX?: number;
 }
 
 /**
@@ -83,8 +88,14 @@ export interface StepContext {
 export function stepProjectile(projectile: Projectile, context: StepContext): Projectile {
   const dt = (context.stepMs ?? TUNABLES.stepMs) / 1000;
   const wind = windAcceleration(context.wind, context.mass);
-  const vx = projectile.vx + wind.ax * dt;
-  const vy = projectile.vy + (context.gravity + wind.ay) * dt;
+  // A bunge shell turns around a third of a second into the flight and is pulled back to its muzzle, so it
+  // lands on the side it was fired from (`itm-bunge`, US-CORE-009). The pull is a force, not a teleport, so
+  // it still collides with anything in the way home.
+  const turnHome = projectile.bunge && projectile.ageMs >= TUNABLES.bungeTurnMs;
+  const pullX = turnHome ? Math.sign(projectile.homeX - projectile.x) * TUNABLES.bungePull : 0;
+  const vx =
+    (turnHome ? projectile.vx * 0.5 : projectile.vx) + pullX * dt + wind.ax * dt + (context.forceX ?? 0) * dt;
+  const vy = (turnHome ? projectile.vy * 0.5 : projectile.vy) + (context.gravity + wind.ay) * dt;
   return {
     ...projectile,
     // Velocity is NOT rounded: `roundTo` is the 0.1 position quantum it takes to make a snapshot compact,
@@ -181,6 +192,7 @@ export function simulateFlight(
   context: StepContext,
   terrain: { step: number; heights: Float64Array; width: number },
   mapBounds: { width: number; height: number } = { width: TUNABLES.mapWidth, height: TUNABLES.mapHeight },
+  options: { readonly returnOffMap?: boolean; readonly firstGroundImpact?: boolean } = {},
 ): FlightResult {
   let current = projectile;
   let steps = 0;
@@ -189,10 +201,42 @@ export function simulateFlight(
     current = stepProjectile(current, context);
     steps += 1;
     if (current.x < -mapBounds.width || current.x > mapBounds.width * 2 || current.y > mapBounds.height * 2) {
+      // A `return` map sends the shell back once with reduced power before it despawns (`TC-CORE-913`).
+      if (options.returnOffMap && !current.returned) {
+        current = {
+          ...current,
+          returned: true,
+          x: roundTo(Math.min(Math.max(current.x, 0), mapBounds.width)),
+          vx: -current.vx * 0.6,
+          vy: current.vy * 0.6,
+        };
+        continue;
+      }
       return { impact: null, landingX: current.x, landingY: current.y, flightMs: current.ageMs, steps, offMap: true };
+    }
+    // A bunge shell that made it home explodes there instead of orbiting its muzzle forever (`itm-bunge`).
+    if (
+      current.bunge &&
+      current.ageMs >= TUNABLES.bungeTurnMs &&
+      Math.abs(current.x - current.homeX) <= 60 &&
+      current.y >= heightAt(terrain, current.x) - 40
+    ) {
+      return {
+        impact: { x: roundTo(current.x), y: roundTo(current.y), normalSlope: slopeAt(terrain, current.x) },
+        landingX: current.x,
+        landingY: current.y,
+        flightMs: current.ageMs,
+        steps,
+        offMap: false,
+      };
     }
     const hit = segmentImpact(terrain, previous, { x: current.x, y: current.y });
     if (hit) {
+      // A `piercing` shell flies on and a `bounce` shell rebounds in play; the balance table wants the first
+      // crossing, so it asks for it explicitly (`mobiles.md` § 4).
+      if (options.firstGroundImpact) {
+        return { impact: hit, landingX: hit.x, landingY: hit.y, flightMs: current.ageMs, steps, offMap: false };
+      }
       if (current.piercing) continue;
       if (current.bouncesLeft > 0) {
         current = bounce(current, hit);

@@ -69,7 +69,11 @@ The `covers` column names the requirement ([nonfunctional-requirements.md](../01
 | TC-ROOM-066 | US-ROOM-003 | Non-host sends `start_match` or `team_assign` | `error not-host`, roster unchanged | worker | NFR-11 |
 | TC-ROOM-148 | US-ROOM-003 | Start gating | Disabled until every slot is filled, teams equal and non-empty | e2e | `workflow-state-machine.md` |
 | TC-ROOM-162 | US-ROOM-003 | Illegal state transitions in `playing`/`ended` | Rejected with no side effects | worker | `workflow-state-machine.md` |
+| TC-ROOM-164 | US-ROOM-003 | `start_match` in a lobby that is not full | `room-not-full` | worker | `workflow-state-machine.md` |
+| TC-ROOM-165 | US-ROOM-003 | `start_match` with unbalanced teams | `teams-not-balanced` | worker | `workflow-state-machine.md` |
+| TC-ROOM-166 | US-ROOM-003 | `match_started` after a host start | Carries the chosen mode, map and each assignment's loadout | worker | `api/signaling.md` § 3 |
 | TC-ROOM-163 | US-NET-004 | Every documented client frame, and one field the frame does not document | Each documented frame parses; an unknown `t` is `unsupported-message`; an undocumented field is `bad-request` naming it; an 8 KB sdp is `payload-too-large` | unit | `api/signaling.md` § 2 |
+| TC-ROOM-167 | US-ROOM-007 | A lobby loadout of eleven items, then a twelfth | Eleven are kept and the twelfth is refused | worker | `data/items.md` |
 | TC-ROOM-046 | US-ROOM-004 | Reconnect within the 20 s grace | Slot, team and HP restored from `lastSnapshot` | e2e | NFR-07 |
 | TC-ROOM-047 | US-ROOM-004 | Grace countdown on the match screen | Overlay counts 20 → 0, then `disconnected` | e2e | NFR-07 |
 | TC-ROOM-055 | US-ROOM-004 | Kill one peer during a 2v2 | The other three keep playing; the match completes | e2e | NFR-08 |
@@ -100,7 +104,7 @@ The `covers` column names the requirement ([nonfunctional-requirements.md](../01
 | TC-CORE-028 | US-CORE-001 | Same seed and inputs twice | Identical state hash after 200 steps | unit | NFR-22 |
 | TC-CORE-029 | US-CORE-001 | Projectile leaves `mapBounds` and never lands | Turn resolves as a miss after `maxFlightMs`, no error | unit | FR-04 |
 | TC-CORE-040 | US-CORE-004 | Apply the same snapshot twice | Second apply is a no-op; key order and rounding stable | unit | FR-05 |
-| TC-CORE-041 | US-CORE-004 | Encode 8 players in Jewel mode with 6 jewels | ≤ 800 bytes, decodes identically | unit | NFR-04 |
+| TC-CORE-041 | US-CORE-004 | Encode 8 players in Jewel mode with 6 jewels; then the same match with `includeTerrain` | ≤ 800 bytes and no mask by default, decodes identically; the mask-bearing frame is larger but ≤ 8 KB and its heights decode to a tenth of a unit | unit | NFR-04 |
 | TC-CORE-042 | US-CORE-004 | Snapshot with an older `seq` or a stale `hostGeneration` | Ignored, state unchanged | unit | FR-05 |
 | TC-CORE-045 | US-CORE-002 | Two fire inputs for one turn with different `seq` | Last `seq` wins, one shot simulated | unit | FR-05 |
 | TC-CORE-152 | US-CORE-002 | Turn clock | 20 s, skips on timeout, drift ≤ 1 s | unit | OQ-03 |
@@ -127,9 +131,15 @@ The `covers` column names the requirement ([nonfunctional-requirements.md](../01
 | TC-CORE-921 | US-CORE-013 | Profile with +4 attack, another with +20 | First is ×1.04, second clamps at ×1.10; energy and delay caps hold | unit | FR-06 |
 | TC-CORE-922 | US-CORE-007 | Super shot used once | Slot 2 reports empty afterwards and cannot be selected | unit | FR-04 |
 | TC-CORE-923 | US-CORE-007 | Balance report over all twenty mobiles | Every archetype has exactly two mobiles, the two sit within ±10 % of each other on damage per delay, the roster spread is printed, report regenerates from the CSV | unit | `data/mobiles.md` § 5 |
-| TC-CORE-924 | US-CORE-007 | Every mobile fires at its `maxPower` on a flat probe map | Landing distance and hang time match `data/mobiles.md` § 4 within ±1 unit (`mbl-14` 2,162 vs `mbl-03` 1,441), each mobile keeps its own arc at identical power, and a heavier mobile drifts less under wind | unit | FR-04 |
+| TC-CORE-924 | US-CORE-007 | Every mobile fires at its `maxPower` on a flat probe map | Landing distance and hang time match `data/mobiles.md` § 4 within ±1 unit (`mbl-14` 2,058 vs `mbl-03` 1,433, first ground contact), each mobile keeps its own arc at identical power, and a heavier mobile drifts less under wind | unit | FR-04 |
 | TC-CORE-925 | US-CORE-007 | `mbl-13` (`mass 118`, `g 84`) and `mbl-03` (`mass 169`, `g 118`) fire the same angle and force | The light/weak-gravity mobile lands further and drifts more under identical wind; swapping their `mass` values swaps the behaviour, proving `mass` is the only wind term | unit | FR-04 |
 | TC-CORE-926 | US-CORE-015 | Roll the weather across four rounds with a fixed seed | `turn.round` increments on queue wrap; `magnitude` 0–26 and `sector` 0–11 each roll; wind constant inside a round; same seed replays the same sequence | unit | FR-04 |
+| TC-CORE-927 | US-CORE-005 | A bot holding Power up, its best raw shot landing more than the item can fix | It sends the `item` input before the shot, one item only, and pays the item's `delayCost` | unit | NFR-21 |
+| TC-CORE-928 | US-CORE-015 | An eight-player mid-round snapshot after a wind roll | The weather rides in the snapshot (`magnitude`, `sector`, `rolledAtRound`), decodes identically, and the state snapshot stays ≤ 800 bytes | unit | FR-04 |
+| TC-CORE-929 | US-CORE-013 | A guest with no avatar equipped | No bonus is applied and the match is still playable | unit | FR-06 |
+| TC-CORE-930 | US-CORE-013 | An avatar part the profile does not own, or a retired one | It contributes no bonus, and the rest of the profile still applies | unit | NFR-11 |
+| TC-CORE-931 | US-CORE-011 | The fog gimmick on a flat map | The visible window halves and the battle state is untouched | unit | `tunables.md` § 6 |
+| TC-CORE-932 | US-CORE-009 | An item the player does not own | Rejected without charging the item's delay | unit | `data/items.md` |
 
 ## Netplay (NET)
 

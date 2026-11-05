@@ -220,12 +220,43 @@ function parseLoadout(value: unknown): ParseResult<readonly LoadoutEntry[]> {
   return ok(items);
 }
 
+/**
+ * A snapshot is the one frame a peer trusts without looking, so every field the peer dereferences is
+ * checked here: an empty `players: []` used to be accepted and then threw inside the peer's React tree.
+ */
 function parseSnapshot(value: unknown): ParseResult<Snapshot> {
   if (!isRecord(value)) return fail("bad-request", "snapshot_push needs a snapshot");
   if (!isInteger(value["seq"]) || (value["seq"] as number) < 0) return fail("bad-request", "snapshot.seq must be a whole number");
   if (!isInteger(value["hostGeneration"])) return fail("bad-request", "snapshot.hostGeneration is required");
   if (!Array.isArray(value["players"])) return fail("bad-request", "snapshot.players must be an array");
-  if (utf8Bytes(JSON.stringify(value)) > MAX_SNAPSHOT_BYTES) {
+  const players = value["players"];
+  if (players.length === 0) return fail("bad-request", "snapshot.players cannot be empty");
+  if (players.length > 8) return fail("bad-request", "snapshot.players cannot exceed eight slots");
+  for (const entry of players) {
+    if (!isRecord(entry)) return fail("bad-request", "each snapshot player must be an object");
+    if (!isInteger(entry["slot"]) || (entry["slot"] as number) < 0 || (entry["slot"] as number) > 7) {
+      return fail("bad-request", "snapshot player.slot must be 0–7");
+    }
+    for (const field of ["hp", "shield", "energy", "x", "y", "facing", "delay"]) {
+      if (typeof entry[field] !== "number" || !Number.isFinite(entry[field] as number)) {
+        return fail("bad-request", `snapshot player.${field} must be a finite number`);
+      }
+    }
+  }
+  const turn = value["turn"];
+  if (!isRecord(turn)) return fail("bad-request", "snapshot.turn is required");
+  if (!isInteger(turn["activeSlot"]) || (turn["activeSlot"] as number) < 0 || (turn["activeSlot"] as number) > 7) {
+    return fail("bad-request", "snapshot.turn.activeSlot is required");
+  }
+  if (!isInteger(turn["round"]) || (turn["round"] as number) < 1) return fail("bad-request", "snapshot.turn.round is required");
+  if (value["status"] !== "playing" && value["status"] !== "ended") {
+    return fail("bad-request", "snapshot.status must be playing or ended");
+  }
+  if (value["terrain"] !== undefined && typeof value["terrain"] !== "string") {
+    return fail("bad-request", "snapshot.terrain must be an RLE string");
+  }
+  const bytes = utf8Bytes(JSON.stringify(value));
+  if (bytes > MAX_SNAPSHOT_BYTES) {
     return fail("snapshot-too-large", `a snapshot over ${MAX_SNAPSHOT_BYTES} bytes is refused`);
   }
   return ok(value as unknown as Snapshot);
@@ -233,7 +264,8 @@ function parseSnapshot(value: unknown): ParseResult<Snapshot> {
 
 function parseMatchEnd(frame: Record<string, unknown>): ParseResult<MatchEndFrame> {
   const winner = frame["winnerTeam"];
-  if (winner !== null && winner !== undefined && !isTeam(winner)) {
+  // `winnerTeam` is not optional: an absent value silently means a draw, which is a result, not a default.
+  if (winner !== null && !isTeam(winner)) {
     return fail("bad-request", "match_end.winnerTeam must be A, B or null");
   }
   const rawStats = frame["stats"];
@@ -333,7 +365,8 @@ export function parseClientFrame(raw: string): ParseResult<ClientFrame> {
       if (extra) return fail("bad-request", extra);
       const direction = parsed["direction"];
       if (direction !== 0 && direction !== 1) return fail("bad-request", "move.direction must be 0 or 1");
-      return ok({ t: "move", direction, run: parsed["run"] === true });
+      if (typeof parsed["run"] !== "boolean") return fail("bad-request", "move.run must be a boolean");
+      return ok({ t: "move", direction, run: parsed["run"] });
     }
     case "item": {
       const extra = onlyKeys(parsed, ["t", "id"], t);
@@ -341,12 +374,16 @@ export function parseClientFrame(raw: string): ParseResult<ClientFrame> {
       if (typeof parsed["id"] !== "string" || parsed["id"].length === 0) return fail("bad-request", "item needs an id");
       return ok({ t: "item", id: parsed["id"] });
     }
-    case "leave":
+    case "leave": {
+      const extra = onlyKeys(parsed, ["t"], t);
+      if (extra) return fail("bad-request", extra);
       return ok({ t: "leave" });
+    }
     case "ping": {
       const extra = onlyKeys(parsed, ["t", "at"], t);
       if (extra) return fail("bad-request", extra);
-      return ok({ t: "ping", at: isInteger(parsed["at"]) ? (parsed["at"] as number) : 0 });
+      if (!isInteger(parsed["at"])) return fail("bad-request", "ping.at must be a whole-millisecond timestamp");
+      return ok({ t: "ping", at: parsed["at"] as number });
     }
     default:
       return fail("unsupported-message", `${t} is not a client frame`);
@@ -378,6 +415,7 @@ export function parseServerFrame(raw: string): ParseResult<ServerFrame> {
     case "move":
     case "item":
     case "pong":
+    case "room_closed":
     case "error":
       return ok(parsed as unknown as ServerFrame);
     default:

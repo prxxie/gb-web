@@ -126,5 +126,6 @@ export const DEFAULT_MOBILE_ID = "mbl-01";
 
 /** Balance band used by `TC-CORE-923`: damage-per-delay spread across the roster. */
 export function damagePerDelay(mobile: Mobile): number {
-  return mobile.weapons[0].power / (mobile.baseDelay + mobile.weapons[0].delay);
+  // `mobiles.md` § 7: shot 1 power ÷ its own delay, so two mobiles compare on the same axis.
+  return mobile.weapons[0].power / mobile.weapons[0].delay;
 }

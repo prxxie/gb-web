@@ -73,7 +73,10 @@ export function electHost(room: RoomState): string | null {
   const candidates = room.members
     .filter((member) => member.playerId !== room.hostPlayerId)
     .sort((a, b) => a.joinedAt - b.joinedAt || a.slot - b.slot);
-  return candidates[0]?.playerId ?? null;
+  // A peer already inside its grace window cannot take the host role: promoting it would hand the room to a
+  // socket that is gone, so the oldest *connected* peer wins and a disconnected one is only the last resort.
+  const connected = candidates.filter((member) => member.connectionState === "connected");
+  return (connected[0] ?? candidates[0])?.playerId ?? null;
 }
 
 export function joinRoom(room: RoomState, request: JoinRequest): JoinOutcome {

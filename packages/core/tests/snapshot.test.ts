@@ -38,6 +38,26 @@ describe("TC-CORE-041: the size budget", () => {
     const bytes = snapshotBytes(state, 1);
     expect(bytes).toBeLessThanOrEqual(TUNABLES.snapshotMaxBytes);
     expect(encodeBytes(encodeSnapshot(toSnapshot(state, 1)))).toBe(bytes);
+    // The mask is deliberately absent: a state snapshot is the 10 Hz channel, a carve is not.
+    expect(toSnapshot(state, 1).terrain).toBeUndefined();
+  });
+
+  it("carries the mask only on a carve, and only up to the socket cap", () => {
+    const state = fullMatch();
+    const withMask = snapshotBytes(state, 1, { includeTerrain: true });
+    // The mask is the whole cost: it adds bytes to every snapshot that carries it, and the hard cap is
+    // the only per-frame limit that applies (`signaling.md` §3).
+    expect(withMask).toBeGreaterThan(snapshotBytes(state, 1));
+    expect(withMask).toBeLessThanOrEqual(TUNABLES.snapshotHardLimitBytes);
+    const decoded = decodeSnapshot(encodeSnapshot(toSnapshot(state, 1, { includeTerrain: true })));
+    expect(decoded.terrain).toBeTypeOf("string");
+    // The mask decodes to the host's own heights, to a tenth of a unit, not to whole units.
+    const applied = applySnapshot(state, decoded);
+    expect(applied.terrain).toBeDefined();
+    const shared = applied.terrain ?? [];
+    for (let index = 0; index < shared.length; index += 97) {
+      expect(shared[index]).toBeCloseTo(state.terrain[index] ?? 0, 1);
+    }
   });
 });
 

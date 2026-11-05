@@ -18,6 +18,22 @@ import {
 
 const auth = { t: "auth", token: "jwt.token.value", displayName: "An", mobileId: "mbl-01" };
 
+/** A minimal but complete snapshot: every field a peer dereferences is present. */
+const SNAPSHOT = {
+  seq: 1,
+  hostGeneration: 1,
+  turn: { number: 1, activeSlot: 0, deadlineAt: 1_700_000_000_000, round: 1, actedSlots: [] },
+  weather: { wind: { magnitude: 5, directionDeg: 30, sector: 1 }, rolledAtRound: 1 },
+  players: [
+    { slot: 0, hp: 1_000, shield: 200, energy: 100, x: 300, y: 800, facing: 1, delay: 0, eliminated: false, weaponSlot: 0 },
+    { slot: 1, hp: 1_000, shield: 200, energy: 100, x: 1_300, y: 800, facing: -1, delay: 0, eliminated: false, weaponSlot: 0 },
+  ],
+  projectiles: [],
+  scores: { score: { A: 0, B: 0 }, activeTeam: "A", jewels: [] },
+  status: "playing",
+  winnerTeam: null,
+};
+
 function accepted(raw: unknown): ClientFrame {
   const parsed = parseClientFrame(JSON.stringify(raw));
   expect(parsed.ok, JSON.stringify(parsed)).toBe(true);
@@ -46,7 +62,7 @@ describe("TC-ROOM-163: the protocol is versioned and total", () => {
       accepted({ t: "team_assign", assignments: [{ playerId: "p1", team: "A" }, { playerId: "p2", team: "B" }] }),
       accepted({ t: "team_assign", assignments: [{ playerId: "p1", team: null }] }),
       accepted({ t: "start_match" }),
-      accepted({ t: "snapshot_push", snapshot: { seq: 1, hostGeneration: 1, players: [] } }),
+      accepted({ t: "snapshot_push", snapshot: SNAPSHOT }),
       accepted({ t: "match_end", winnerTeam: "A", stats: [{ slot: 0, damageDealt: 120, shotsFired: 4, hits: 3 }] }),
       accepted({ t: "room_settings", mode: "score", mapId: "map-01" }),
       accepted({ t: "loadout", items: [{ id: "item-01", qty: 2 }] }),
@@ -106,10 +122,13 @@ describe("TC-ROOM-163: the protocol is versioned and total", () => {
   });
 
   it("TC-ROOM-163: a snapshot over 8 KB is snapshot-too-large and a missing seq is bad-request", () => {
-    const bloated = { seq: 2, hostGeneration: 1, players: [], filler: "x".repeat(9_000) };
+    const bloated = { ...SNAPSHOT, filler: "x".repeat(9_000) };
     expect(rejected({ t: "snapshot_push", snapshot: bloated }).code).toBe("snapshot-too-large");
-    expect(rejected({ t: "snapshot_push", snapshot: { hostGeneration: 1, players: [] } }).code).toBe("bad-request");
-    expect(rejected({ t: "snapshot_push", snapshot: { seq: 1, players: [] } }).code).toBe("bad-request");
+    expect(rejected({ t: "snapshot_push", snapshot: { ...SNAPSHOT, hostGeneration: undefined } }).code).toBe("bad-request");
+    expect(rejected({ t: "snapshot_push", snapshot: { ...SNAPSHOT, seq: undefined } }).code).toBe("bad-request");
+    // An empty roster used to be accepted and then threw inside every peer's React tree.
+    expect(rejected({ t: "snapshot_push", snapshot: { seq: 1, hostGeneration: 1, players: [] } }).code).toBe("bad-request");
+    expect(rejected({ t: "snapshot_push", snapshot: { ...SNAPSHOT, turn: undefined } }).code).toBe("bad-request");
   });
 
   it("TC-ROOM-163: match_end needs whole-number stats for slots 0–7", () => {
@@ -127,7 +146,9 @@ describe("TC-ROOM-163: the protocol is versioned and total", () => {
 
   it("TC-ROOM-163: ping keeps the client clock so the pong can measure the round trip", () => {
     expect(accepted({ t: "ping", at: 1_700_000_000_000 })).toEqual({ t: "ping", at: 1_700_000_000_000 });
-    expect(accepted({ t: "ping" })).toEqual({ t: "ping", at: 0 });
+    // A ping with no readable clock is refused rather than coerced to 0: a 0 would measure a 56-year round trip.
+    expect(rejected({ t: "ping" }).code).toBe("bad-request");
+    expect(rejected({ t: "ping", at: 1.5 }).code).toBe("bad-request");
   });
 
   it("TC-ROOM-163: the client drops a server frame it does not know", () => {

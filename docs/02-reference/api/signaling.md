@@ -68,6 +68,12 @@ If the graced player returns within 20 s it re-joins with the same `accountId`/`
 
 Quantisation keeps an 8-player snapshot at ~300–600 B, under the 800 B budget (`NFR-04`, TC-CORE-041).
 
+**The mask is the exception, and it is one frame per carve, not a channel.** A snapshot that carries `terrain` is
+sent once by the host after a shot that carved the ground (`US-CORE-006` AC4) so every peer resolves the next hit
+against the same surface; it measures 2 256 B on `map-01` and 5 537 B on `map-06` (1 001 samples at
+`terrainStep 2`), inside the 8 KB per-frame cap and outside the 800 B state budget, which describes the
+10–20 Hz stream. `TC-CORE-041` asserts both halves: no mask by default, and a masked snapshot under the cap.
+
 ## Control channel messages
 
 | `t` | Fields | Meaning |
@@ -85,7 +91,7 @@ their own projectile locally and reconcile to the next snapshot.
 |------|------|----------|------|
 | `signal` | bursty, ≤ 20 frames per connection | 8 KB | ICE candidates are small; SDP can be ~2–4 KB |
 | `snapshot_push` | ≤ 20/s | 8 KB | Only the latest is stored |
-| `state` (per peer) | 10–20/s | 800 B | Host → each peer |
+| `state` (per peer) | 10–20/s | 800 B | Host → each peer; a mask-bearing snapshot (one per carve) is capped at 8 KB |
 | `control` | ≤ 5/s | 256 B | Input + chat |
 | Host uplink at 8 players | 15 Hz | — | ≈ 31 KB/s (7 peers × ~300 B), `OQ-24` |
 
@@ -98,7 +104,7 @@ their own projectile locally and reconcile to the next snapshot.
 | Relay isolation (`signal` reaches only `to`) | `apps/worker/tests/room-relay.test.ts` (TC-ROOM-050) |
 | Host-only enforcement on `team_assign`, `start_match`, `snapshot_push`, `match_end` | `apps/worker/tests/room-host.test.ts` (TC-NET-044) |
 | Election order, grace window, `hostGeneration` monotonicity | `apps/worker/tests/room-election.test.ts` (TC-ROOM-048) |
-| Snapshot encoding ≤ 800 B at 8 players | `packages/core/tests/snapshot.test.ts` (TC-CORE-041) |
+| Snapshot encoding ≤ 800 B at 8 players, no mask by default, mask-bearing frame ≤ 8 KB | `packages/core/tests/snapshot.test.ts` (TC-CORE-041) |
 | Input rejection rules (wrong turn, duplicate, out of range) | `packages/core/tests/input.test.ts` (TC-CORE-045) |
 
 Every oracle in this table is a file that must exist; § [Contract status](#contract-status-2026-11-05) says which
@@ -124,8 +130,9 @@ stays `1` because no deployed client exists yet.
 
 `turn` gains `queue: number[]` and `delays: number[]`; each `players[]` entry gains `shield`, `energy`, `weaponSlot`,
 `items: Array<{id:string,qty:number}>` and `bonus`; a new optional `modeState` carries `jewels[]`, `score` or
-`activeTeam`; a new optional `terrain` carries the RLE delta of carved ground. The budget stays **≤800 B at eight
-players** (`NFR-04`), asserted by `TC-CORE-041`.
+`activeTeam`; a new optional `terrain` carries the RLE mask after a carve. The state budget stays **≤800 B at eight
+players** (`NFR-04`) and a mask-bearing snapshot stays under the **8 KB** frame cap; both halves are asserted by
+`TC-CORE-041`.
 
 ## Contract status (2026-11-05)
 
@@ -149,7 +156,7 @@ believe it.
 | `peer_left.reason` | live | `apps/worker/src/room-do.ts` (`left` on `leave`, `grace` on close and heartbeat timeout) | — the roster change arrives in the following `room_state` | `apps/worker/tests/room-election.test.ts` (not written) |
 | `ping` / `pong` | live | `apps/worker/src/room-do.ts` (`ping` case + `sweepSilentSockets`) | — `pong` echoes `at` and adds `now`; 45 s of silence moves the member to `grace` | `apps/worker/tests/room.test.ts` (not written) |
 | `move`, `item`, `room_settings`, `loadout` (§ 9) | live | `apps/worker/src/room-do.ts` (`applySettings`, `setLoadout`, `relayInput`) | — `move`/`item` are relayed to the host, which validates them; the DO only refuses a non-playing room and a missing host socket | `apps/worker/tests/room-settings.test.ts` (not written) |
-| Snapshot payload additions (§ 9) | planned | `packages/core/src/snapshot.ts` has `seq`, `hostGeneration` only | add `queue`, `delays`, per-player `shield`/`energy`/`weaponSlot`/`items`/`bonus`, optional `modeState` and `terrain`, under the 800 B budget | `packages/core/tests/snapshot.test.ts` (TC-CORE-041) |
+| Snapshot payload additions (§ 9) | live, except `queue`/`delays`/`items`/`bonus`/`modeState` | `packages/core/src/snapshot.ts` carries `seq`, `hostGeneration`, per-player `shield`/`energy`/`weaponSlot` and the optional `terrain` mask | add `turn.queue`, `turn.delays`, per-player `items`/`bonus` and optional `modeState`, under the 800 B state budget; the mask rides only a carve frame, under the 8 KB cap | `packages/core/tests/snapshot.test.ts` (TC-CORE-041) |
 
 Client-side counterpart: `apps/web/src/net/signaling.ts` no longer declares its own frame types — it re-exports
 `ClientFrame`/`ServerFrame` from `protocol.ts`, so a rename on one side cannot leave the other behind. The DO parses

@@ -183,8 +183,13 @@ export async function roomPreview(env: Env, roomCode: string): Promise<Response>
  */
 export async function roomSocket(env: Env, roomCode: string, request: Request): Promise<Response> {
   if (!isValidRoomCode(roomCode)) throw new ProblemError("room-not-found", "Room codes are six characters");
+  // The DO is reached through a reserved host, so its own `request.url` can never tell it the public
+  // origin. The proxy passes it explicitly: `match_end` needs it to call back into `POST /matches`.
   return await stubFor(env, roomCode).fetch(`https://room.internal/ws`, {
-    headers: { upgrade: request.headers.get("upgrade") ?? "websocket" },
+    headers: {
+      upgrade: request.headers.get("upgrade") ?? "websocket",
+      "x-room-origin": new URL(request.url).origin,
+    },
   });
 }
 

@@ -19,6 +19,7 @@ import {
   isModeId,
   isRoomExpired,
   joinRoom,
+  MOBILES_BY_ID,
   leaveRoom,
   markDisconnected,
   parseClientFrame,
@@ -61,6 +62,11 @@ const START_REJECTIONS: Record<NonNullable<ReturnType<typeof canStart>>, ErrorCo
   "teams-unbalanced": "teams-not-balanced",
 };
 
+/** A mobile id is a stat line the host imports, so only a shipped `mbl-NN` may enter the roster. */
+function isMobileId(value: string): boolean {
+  return MOBILES_BY_ID.has(value);
+}
+
 export class Room implements DurableObject {
   private room: RoomState;
   private readonly sockets = new Map<string, WebSocket>();
@@ -69,6 +75,10 @@ export class Room implements DurableObject {
   private matchStartedAt: number | null = null;
   /** Public origin of the Worker that opened the socket, so `match_end` can call `POST /api/v1/matches`. */
   private origin: string | null = null;
+  /** What was written to storage, so a reconnect does not rewrite an unchanging constant (`N8`). */
+  private persistedOrigin: string | null = null;
+  /** The `match_recorded` payload, kept so a host retry after a network blip can be answered, not refused. */
+  private recorded: { matchId: string; winnerTeam: "A" | "B" | null; ranked: boolean; ratings: readonly { accountId: string; before: number; after: number; delta: number }[]; players: readonly { slot: number; result: "win" | "loss" | "abandon" }[] } | null = null;
 
   constructor(
     private readonly ctx: DurableObjectState,
@@ -83,6 +93,7 @@ export class Room implements DurableObject {
       if (stored) this.room = storedSnapshot ? { ...stored, lastSnapshot: storedSnapshot } : stored;
       this.matchStartedAt = storedStart ?? null;
       this.origin = storedOrigin ?? null;
+      this.persistedOrigin = storedOrigin ?? null;
     });
   }
 
@@ -168,8 +179,16 @@ export class Room implements DurableObject {
       token: null,
       lastPingAt: 0,
     });
-    this.origin = new URL(request.url).origin;
-    await this.ctx.storage.put("origin", this.origin);
+    // `request.url` here is the proxy's `https://room.internal/...` stub, so the public origin comes in
+    // on a header. Storage keeps it for the alarms, which run with no request in hand.
+    const declared = request.headers.get("x-room-origin");
+    if (declared) {
+      this.origin = declared;
+      if (this.persistedOrigin !== declared) {
+        this.persistedOrigin = declared;
+        await this.ctx.storage.put("origin", declared);
+      }
+    }
     setTimeout(() => {
       const meta = this.meta.get(server);
       if (meta && !meta.authed && server.readyState === 1) {
@@ -383,6 +402,13 @@ export class Room implements DurableObject {
       this.reject(ws, "invalid-state", "the match has not started");
       return;
     }
+    // Only the active slot may act (`TC-NET-067`); the last snapshot is the DO's only view of the turn.
+    const activeSlot = this.room.lastSnapshot?.turn.activeSlot;
+    const senderSlot = this.room.members.find((member) => member.playerId === playerId)?.slot;
+    if (activeSlot !== undefined && senderSlot !== undefined && senderSlot !== activeSlot) {
+      this.reject(ws, "unsupported-message", "only the active player may act");
+      return;
+    }
     const host = this.room.hostPlayerId ? this.sockets.get(this.room.hostPlayerId) : undefined;
     if (!host) {
       this.reject(ws, "peer-not-connected", "the host has no open socket");
@@ -398,6 +424,16 @@ export class Room implements DurableObject {
       this.reject(ws, "not-host", "only the host ends the match");
       return;
     }
+    // An `ended` room answers a retry with the stored result instead of `invalid-state`: the host may
+    // have lost the broadcast to a network blip, and `documented recovery` is a retry (`signaling.md` §2).
+    if (this.room.status === "ended") {
+      if (this.recorded) {
+        this.broadcast({ t: "match_recorded", ...this.recorded });
+        return;
+      }
+      this.reject(ws, "invalid-state", "the match was already ended and not yet recorded");
+      return;
+    }
     if (this.room.status !== "playing") {
       this.reject(ws, "invalid-state", "the room is not playing");
       return;
@@ -406,8 +442,16 @@ export class Room implements DurableObject {
     this.room = this.withActivity({ ...this.room, status: "ended" });
     await this.persist();
     this.broadcast({ t: "room_state", room: this.publicState() });
-    const recorded = await this.recordMatch(meta.token, frame, endedAt);
+    let recorded: Awaited<ReturnType<typeof this.recordMatch>>;
+    try {
+      recorded = await this.recordMatch(meta.token, frame, endedAt);
+    } catch (error) {
+      // The subrequest failed (DNS, a 500, a timeout): the host must hear an error, never a dead socket.
+      this.reject(ws, "internal", error instanceof Error ? error.message : "the match could not be recorded");
+      return;
+    }
     if (recorded.ok) {
+      this.recorded = recorded.value;
       this.broadcast({ t: "match_recorded", ...recorded.value });
       return;
     }
@@ -544,8 +588,12 @@ export class Room implements DurableObject {
               ...candidate,
               connectionState: "connected",
               seenConnected: true,
-              ...(message.mobileId ? { mobileId: message.mobileId } : {}),
-              ...(message.displayName ? { displayName: message.displayName } : {}),
+              // Gameplay data is the host's to validate, but a mobile id is a stat line the host imports,
+              // so the DO refuses an unknown one and only accepts a swap in the lobby (`US-ROOM-001`).
+              ...(message.mobileId && this.room.status === "lobby" && isMobileId(message.mobileId)
+                ? { mobileId: message.mobileId }
+                : {}),
+              ...(message.displayName && this.room.status === "lobby" ? { displayName: message.displayName } : {}),
             }
           : candidate,
       ),
@@ -570,8 +618,12 @@ export class Room implements DurableObject {
     this.room = this.withActivity(outcome.room);
     await this.persist();
     this.broadcast({ t: "peer_left", playerId, reason: "grace" });
+    this.broadcast({ t: "room_state", room: this.publicState() });
     await this.electIfHostGone(playerId);
-    await this.ctx.storage.setAlarm(Date.now() + 20_000);
+    // Keep whichever alarm is sooner: this must not clobber the 24 h match cap set on `start_match`.
+    const at = Date.now() + 20_000;
+    const existing = await this.ctx.storage.getAlarm();
+    if (existing === null || existing > at) await this.ctx.storage.setAlarm(at);
   }
 
   /**
@@ -636,6 +688,13 @@ export class Room implements DurableObject {
         ),
       };
     }
+    this.room = next;
+    // A grace that ran out is a state change every peer has to see, or the roster sticks at `grace`
+    // forever (`signaling.md` §2: `peer_left.reason` mirrors `connectionState`, and a `room_state` follows).
+    for (const member of inGrace) {
+      this.broadcast({ t: "peer_left", playerId: member.playerId, reason: "disconnected" });
+    }
+    if (inGrace.length > 0) this.broadcast({ t: "room_state", room: this.publicState() });
     if (isRoomExpired(next, now) || isIdle(next, now)) {
       next = { ...next, status: "abandoned" };
       this.room = next;

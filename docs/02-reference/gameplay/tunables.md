@@ -270,6 +270,15 @@ Eleven maps in `packages/core/src/data/maps.ts`, each with a `gravityModifier` o
 Worn avatars grant `+2…+8` to one stat (`attack` = damage multiplier, `defense`, `energy`, `delay` reduction), stacked
 from the account's equipped parts and validated server-side at loadout time — `TC-AUTH-104`, `data/accounts.md`.
 
+| Stat | Unit | Cap | Applied as |
+|---|---|---|---|
+| `attack` | percent | `+10` | damage `× (1 + attack/100)` |
+| `defense` | percent | `+10` | incoming damage `÷ (1 + defense/100)` |
+| `energy` | points | `+12` | added to the pool (`base + energy`), not a multiplier |
+| `delay` | percent | `−8` | delay `× (1 − delay/100)` |
+
+`AVATAR_CAPS` in `packages/core/src/data/avatars.ts` is the single source of these numbers (`TC-CORE-921`).
+
 ## 8. Room
 
 | Tunable | v1 | Genre | Oracle |

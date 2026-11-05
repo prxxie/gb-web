@@ -12,18 +12,20 @@ does not generate it.
 
 ## Written
 
-20 Vitest files (152 cases) and 3 Playwright specs (6 cases), green on 2026-11-05:
+34 Vitest files (256 cases) and 3 Playwright specs (6 cases), green on 2026-11-05:
 
 | Area | Files |
 |------|-------|
-| Core simulation | `packages/core/tests/ballistics.test.ts`, `combat.test.ts`, `data.test.ts`, `match.test.ts`, `room.test.ts`, `rating.test.ts`, `snapshot.test.ts`, `camera.test.ts`, `terrain.test.ts`, `movement.test.ts`, `weather.test.ts` |
+| Core simulation | `packages/core/tests/ballistics.test.ts`, `combat.test.ts`, `data.test.ts`, `match.test.ts`, `room.test.ts`, `rating.test.ts`, `snapshot.test.ts`, `camera.test.ts`, `terrain.test.ts`, `movement.test.ts`, `weather.test.ts`, `turn.test.ts`, `turn-queue.test.ts` |
+| Core content | `packages/core/tests/mobiles.test.ts` (schema, clamps, the § 4 flight table, the balance band), `maps.test.ts`, `items.test.ts`, `gimmicks.test.ts`, `modes.test.ts`, `avatars.test.ts`, `bot.test.ts` |
 | Core protocol | `packages/core/tests/protocol.test.ts` — every documented socket frame parses, an undocumented field is refused by name, the 8 KB budgets hold (TC-ROOM-163) |
 | Core boundary | `packages/core/tests/imports.test.ts` — no Phaser, network or `apps/` import; pins `lib: ["ES2023"]`, which is what makes a DOM global a type error |
 | Worker helpers | `apps/worker/tests/lib.test.ts` (pure helpers: tokens, CORS, cursors, validation) |
 | Worker environment | `apps/worker/tests/env.test.ts` — every name the code reads is declared in `wrangler.jsonc` or an example file, and no example row carries a secret |
-| Web UI | `apps/web/tests/hud.test.tsx`, `input.test.tsx` |
+| Durable Object | `apps/worker/tests/room-auth.test.ts`, `room-relay.test.ts`, `room-host.test.ts`, `room-election.test.ts`, `room-settings.test.ts` over `apps/worker/tests/support/room-harness.ts`, which fakes the Hibernation API (`ctx.acceptWebSocket`, `webSocketMessage`, `webSocketClose`, `alarm`, `storage`) |
+| Web UI | `apps/web/tests/hud.test.tsx`, `input.test.tsx`, `match-controls.test.tsx` (weapon strip, item tray, phrase picker) |
 | Browser flows | `tests/e2e/smoke.spec.ts`, `lobby.spec.ts`, `a11y.spec.ts` |
-| Repository | `tests/meta/traceability.test.ts` — checks that every TC id cited in a test exists in `test-cases.md`; it does **not** check that the cited case is the one being asserted, which is how the mis-citations in the 2026-11-05 report survived |
+| Repository | `tests/meta/traceability.test.ts` — every TC id cited in a test exists in `test-cases.md`, names a real story, and is cited in the scope its row declares (`tests/meta/traceability-scope-exceptions.txt` lists the deliberate exceptions) |
 | Repository | `tests/meta/bundle-secrets.test.ts` — builds the SPA into a temp dir and greps every asset for the Worker secret names and for real values from an untracked `apps/worker/.dev.vars` (7 s, the slowest case) |
 
 ## Planned
@@ -67,12 +69,7 @@ does not generate it.
 | `apps/worker/tests/privacy.test.ts` | `docs/01-overview/roles-and-permissions.md` |
 | `apps/worker/tests/profile.test.ts` | `docs/02-reference/api/accounts.md`, `docs/02-reference/data/accounts.md` |
 | `apps/worker/tests/ratelimit.test.ts` | `docs/03-stories/EPIC-08-ops/US-OPS-001-emit-structured-logs-and-rate-limits.md` |
-| `apps/worker/tests/room-auth.test.ts` | `docs/02-reference/api/signaling.md` |
-| `apps/worker/tests/room-election.test.ts` | `docs/02-reference/api/signaling.md` |
-| `apps/worker/tests/room-host.test.ts` | `docs/02-reference/api/signaling.md` |
-| `apps/worker/tests/room-relay.test.ts` | `docs/02-reference/api/signaling.md` |
 | `apps/worker/tests/room-rules.test.ts` | `docs/03-stories/EPIC-02-rooms/US-ROOM-003-assign-teams-and-start-the-match.md` |
-| `apps/worker/tests/room-settings.test.ts` | `docs/02-reference/api/signaling.md` |
 | `apps/worker/tests/room-validate.test.ts` | `docs/03-stories/EPIC-04-netplay/US-NET-004-reject-messages-from-the-wrong-sender.md` |
 | `apps/worker/tests/room.test.ts` | `docs/01-overview/architecture.md`, `docs/01-overview/roles-and-permissions.md`, `docs/01-overview/workflow-state-machine.md`, `docs/02-reference/api/signaling.md`, `docs/02-reference/data/README.md`, `docs/02-reference/data/room-state.md`, `docs/03-stories/EPIC-02-rooms/US-ROOM-005-elect-a-new-host-when-the-host-leaves.md`, `docs/03-stories/EPIC-04-netplay/US-NET-004-reject-messages-from-the-wrong-sender.md` |
 | `apps/worker/tests/rooms.test.ts` | `docs/02-reference/api/rooms.md`, `docs/03-stories/EPIC-02-rooms/US-ROOM-001-create-a-room-with-a-shareable-code.md` |
@@ -88,17 +85,9 @@ does not generate it.
 |------|----------|
 | `packages/core/tests/avatar.test.ts` | `docs/03-stories/EPIC-03-match-core/US-CORE-013-apply-avatar-stat-bonuses.md` |
 | `packages/core/tests/blast.test.ts` | `docs/03-stories/EPIC-03-match-core/US-CORE-003-apply-damage-with-shield-and-defense.md` |
-| `packages/core/tests/bot.test.ts` | `docs/03-stories/EPIC-03-match-core/US-CORE-005-play-against-a-bot.md` |
-| `packages/core/tests/gimmicks.test.ts` | `docs/03-stories/EPIC-03-match-core/US-CORE-011-apply-stage-gimmicks.md` |
 | `packages/core/tests/ice.test.ts` | `docs/02-reference/api/rooms.md` |
 | `packages/core/tests/input.test.ts` | `docs/02-reference/api/signaling.md` |
-| `packages/core/tests/items.test.ts` | `docs/03-stories/EPIC-03-match-core/US-CORE-009-apply-item-effects.md` |
-| `packages/core/tests/maps.test.ts` | `docs/03-stories/EPIC-03-match-core/US-CORE-012-load-the-eleven-maps.md` |
-| `packages/core/tests/mobiles.test.ts` | `docs/02-reference/data/mobiles.md`, `docs/03-stories/EPIC-03-match-core/US-CORE-007-load-mobile-stats-and-weapons.md` |
-| `packages/core/tests/modes.test.ts` | `docs/03-stories/EPIC-03-match-core/US-CORE-010-score-the-four-modes.md` |
 | `packages/core/tests/physics.test.ts` | `docs/01-overview/environment-setup.md`, `docs/02-reference/screens/match.md`, `docs/03-stories/EPIC-03-match-core/US-CORE-001-simulate-a-shot.md` |
-| `packages/core/tests/turn-queue.test.ts` | `docs/03-stories/EPIC-03-match-core/US-CORE-002-resolve-turns-and-the-clock.md` |
-| `packages/core/tests/turn.test.ts` | `docs/01-overview/workflow-state-machine.md`, `docs/02-reference/screens/match.md` |
 
 ### Browser flows (`tests/e2e/`)
 

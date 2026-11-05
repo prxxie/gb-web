@@ -75,6 +75,8 @@ export function applyBlast(
   options: { readonly defenseOf?: (player: PlayerState) => number; readonly attack?: number; readonly bloodBonus?: number } = {},
 ): readonly HitResult[] {
   const results: HitResult[] = [];
+  /** Damage this blast dealt to someone else, credited to the shooter at the end (`TC-CORE-915`). */
+  let credited = 0;
   for (const player of players) {
     if (player.eliminated) continue;
     const distance = Math.hypot(player.x - blast.x, player.y - blast.y);
@@ -98,7 +100,20 @@ export function applyBlast(
       eliminated: hp <= 0,
       damageDealt: player.slot === blast.ownerSlot ? player.damageDealt + damage : player.damageDealt,
     };
+    if (player.slot !== blast.ownerSlot) credited += damage;
     results.push({ player: next, damage, absorbed, tier, eliminated: next.eliminated });
+  }
+  // The shooter's own row carries the damage its blast did and one hit, or the score screen has no attacker.
+  const shooter = players.find((player) => player.slot === blast.ownerSlot);
+  if (shooter && credited > 0) {
+    const existing = results.findIndex((result) => result.player.slot === shooter.slot);
+    const base = existing >= 0 ? (results[existing] as HitResult).player : shooter;
+    const creditedPlayer: PlayerState = { ...base, damageDealt: base.damageDealt + credited, hits: base.hits + 1 };
+    if (existing >= 0) {
+      results[existing] = { ...(results[existing] as HitResult), player: creditedPlayer };
+    } else {
+      results.push({ player: creditedPlayer, damage: 0, absorbed: 0, tier: "none", eliminated: creditedPlayer.eliminated });
+    }
   }
   return results;
 }

@@ -5,35 +5,42 @@ D1 columns are in [data/accounts.md](../data/accounts.md).
 
 ## POST /sessions
 
-Mints the 60-minute session token used by the WebSocket and TURN calls. Two modes in one endpoint:
+Mints the 60-minute session token used by the WebSocket and TURN calls. Two modes in one endpoint, chosen by
+the `kind` field:
 
-| Mode | Credential | Result |
-|------|-----------|--------|
-| Registered | `Authorization: Bearer <clerk_jwt>` | Session token bound to `accountId` |
-| Guest | none, or `Authorization: Bearer <guest_jwt>` returned earlier | Session token bound to `guestId` |
+| Mode | `kind` | Credential | Result |
+|------|--------|-----------|--------|
+| Guest | `guest` (default) | none | Session token bound to a fresh `guestId` |
+| Account | `account` | `Authorization: Bearer <clerk_jwt>` | Session token bound to `accountId` |
 
-Request body (optional in both modes):
+Request body:
 
 | Field | Type | Required | Rule |
 |-------|------|----------|------|
-| `displayName` | string | no | Guest display name, 2–16 chars; default `Khách` / `Guest` by locale |
-| `guestId` | string (uuid) | no | Reuse an existing guest identity from `localStorage`; minted when absent |
+| `kind` | enum | no | `guest` \| `account`; anything else is `422 validation` |
+| `displayName` | string | no | Guest display name, 2–16 chars; default `Guest <first 4 of guestId>` |
+| `clerkToken` | string | no | Alternative to the `Authorization` header for the account mode |
 
 ```json
-{ "guestId": "0b0d…", "displayName": "Bao" }
+{ "kind": "guest", "displayName": "Bao" }
 ```
 
-Response `201`:
+Response `201` in both modes:
 
 | Field | Type | Meaning |
 |-------|------|---------|
 | `sessionToken` | string | HMAC-signed JWT, 60 min, claims `{ sub, kind, exp }` |
 | `expiresAt` | string | ISO-8601 expiry |
 | `subject.kind` | enum | `account` \| `guest` |
-| `subject.id` | string | `accountId` or `guestId` |
-| `displayName` | string | Effective name for the lobby |
-| `rating` | integer \| null | Present only for `account` |
-| `wsUrl` | string | Base `wss://` URL (the room code is appended) |
+| `subject.guestId` | string | Present for a guest only |
+| `subject.accountId` | string | Internal id, present for an account only — never the Clerk `sub` |
+| `subject.displayName` | string | Effective name for the lobby |
+| `subject.avatarId` | string | Accounts only |
+| `subject.rating` | integer | Accounts only |
+| `subject.ratedMatches` | integer | Accounts only |
+
+There is no `wsUrl`: the client derives it from `window.location.origin`, because a preview deployment, a
+custom domain and `localhost` all differ and the server cannot know which one the browser used.
 
 Rules: a registered caller's first request creates the `account` + `profile` rows in one transaction; a guest gets no
 server-side record at all. Errors: `401 unauthenticated` (invalid Clerk JWT), `422 validation`, `429 rate-limited`

@@ -32,14 +32,14 @@ what makes items a trade rather than free power.
 
 | # | Given | When | Then |
 |---|---|---|---|
-| AC1 | a player with one Dual | they use it and fire | two projectiles leave in one turn and the second cannot be another item (`TC-CORE-906`) |
+| AC1 | a player with one Dual | they use it and fire | two projectiles leave in one turn, the second is locked to the same weapon (`dualWeapon`), and a second item while the pair is open is rejected `dual-in-progress` (`TC-CORE-906`) |
 | AC2 | Blood then a shot | damage resolves | damage is +25 % and the buff is cleared afterwards (`TC-CORE-906`) |
 | AC3 | Energy up 2 | movement is attempted | the turn's energy budget is +60 and the delay gains `+10` (`TC-CORE-907`) |
 | AC4 | Change Wind | it is used | the wind vector is re-rolled, broadcast in the snapshot and shown in the HUD (`TC-CORE-908`) |
 | AC5 | Teleport / Team Teleport | they are used | the caster (or the whole team) moves and the position respects terrain bounds (`TC-CORE-909`) |
-| AC6 | Bunge shot | it is fired | the projectile returns toward the caster and detonates on the return leg (`TC-CORE-910`) |
+| AC6 | Bunge shot | it is fired | once its turn timer passes it decelerates and is pulled home, detonating on the return leg (`TC-CORE-910`) |
 | AC7 | Thunder | it is used | a horizontal band at the aim point is struck for its listed damage (`TC-CORE-911`) |
-| AC8 | a player with zero of an item | they try to use it | the action is rejected and no delay is charged (`TC-NET-067`) |
+| AC8 | a player with zero of an item | they try to use it | the action is rejected and no delay is charged (`TC-CORE-932`) |
 | AC9 | any item | it is used | its `delayCost` is added to the queue before the next player is chosen (`TC-CORE-901`) |
 
 ## 4. Contract
