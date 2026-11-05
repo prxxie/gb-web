@@ -1,0 +1,10 @@
+sessions 201 201
+room 201 ZGPRRU
+join 200 a23d2ba2-c24c-4208-b905-b0345dfb4ac6
+room_state host members: Host:null,Guest:null
+peer_joined seen by host: false
+team_assign ack teams: Host:A,Guest:B
+match_started seed: 3961241431 gen: 1 assignments: 2 ruleset: 2026-11-05
+snapshot relayed to guest seq: 1
+host_changed -> guest generation: 2 lastSnapshotSeq: 1
+reconnect room_state status: playing host: true snapshot replayed seq: 1

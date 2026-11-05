@@ -11,4 +11,9 @@ Status, weekly and sprint reports live here, written by `cpt-report`:
 Reports are generated from the story backlog, open questions, change requests and git history — never written from
 memory. A report that contradicts `03-stories/README.md` is a defect in the report.
 
-Nothing has been reported yet: the backlog does not exist until `cpt-plan`.
+Reported so far:
+
+| File | What it records |
+|------|-----------------|
+| [`2026-11-05-implementation-status.md`](2026-11-05-implementation-status.md) | What the one-pass implementation built, and which checks needed an environment this machine did not have |
+| [`status-2026-11-05-verification-pass.md`](status-2026-11-05-verification-pass.md) | Independent re-run of those claims, the evidence it produced under `05-quality/evidence/`, and the findings that keep stories at `ready` |
