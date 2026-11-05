@@ -36,15 +36,17 @@ the budget (`NFR-04`), and readability is worth more at this stage.
 | `room_state` | `RoomState` (as in [room-state.md](../data/room-state.md), without sockets), `you: { playerId, slot }` | Sent after successful `auth` and on every membership/team/host change |
 | `peer_joined` | `playerId`, `slot`, `room` | Fast path for the lobby UI (also reflected in the next `room_state`) |
 | `peer_left` | `playerId`, `reason`: `'left' \| 'grace' \| 'disconnected'` | Mirrors `connectionState`; the roster change itself arrives in the `room_state` that follows, so this frame stays small and carries no room |
+| `room_closed` | `reason`: `'expired' \| 'empty' \| 'closed'` | Last frame before the socket closes `4410`: the 24 h cap, an empty lobby's 60 s, or an abandonment sweep. Nothing follows it |
 | `snapshot_state` | `snapshot` (a `Snapshot`) | The one relay name: host → peers during play, and the replay a returning or promoted client receives. Discard a snapshot whose `hostGeneration` is below the current one |
 | `signal` | `from` (playerId), `payload` | Relay of a peer's `signal` |
-| `match_started` | `startedAt`, `seed`, `hostPlayerId`, `hostGeneration`, `rulesetVersion`, `assignments[]` (`{ playerId, slot, team, mobileId, accountId }`), `room` | Both peers and host switch to the match scene on this; `seed` makes weather and spawns reproducible on every client |
+| `match_started` | `startedAt`, `seed`, `hostPlayerId`, `hostGeneration`, `rulesetVersion`, `assignments[]` (`{ playerId, slot, team, mobileId, accountId, loadout }`), `room` | Both peers and host switch to the match scene on this; `seed` makes weather and spawns reproducible on every client |
 | `host_changed` | `hostPlayerId`, `hostGeneration`, `lastSnapshot`, `room` | Migration event; peers discard snapshots with a lower `hostGeneration` and resync from `room`. The graced member is not named here — `peer_left.reason` already told everyone who is in grace |
 | `match_recorded` | `matchId`, `winnerTeam`, `ranked`, `ratings[]`, `players[]` | Broadcast to every member after the write succeeds, so the results screen can show the winner and the deltas without another request. `ranked` is false and `ratings` empty for a guest, an offline room, or a ruleset mismatch (`US-RANK-003`); `winnerTeam` is echoed from the host's `match_end` so a peer that missed the final snapshot still renders the result |
 | `pong` | `at` (echo), `now` (server ms) | RTT display; `now - at` includes the round trip, so the client halves it |
 | `error` | `code`, `detail` | Codes follow the [error catalogue](README.md#error-catalogue). The socket carries no `type` URI and no `requestId`: a WS frame has no problem document, and the request id lives in the Worker log line for the same frame |
 
-Close codes: `4401` unauthenticated, `4404` room not found, `4409` room full, `4410` room closed, `4429` rate limited.
+Close codes: `4401` unauthenticated, `4404` room not found, `4409` room full, `4410` room closed, `4429` rate limited,
+`4408` heartbeat lost (three unanswered `ping`s — the client closes, the room then sees the socket close).
 
 ## Host election
 

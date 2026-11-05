@@ -137,6 +137,7 @@ export type ServerFrame =
     }
   | { readonly t: "move"; readonly from: string; readonly direction: 0 | 1; readonly run: boolean }
   | { readonly t: "item"; readonly from: string; readonly id: string }
+  | { readonly t: "room_closed"; readonly reason: "expired" | "empty" | "closed" }
   | { readonly t: "pong"; readonly at: number; readonly now: number }
   | { readonly t: "error"; readonly code: ErrorCode; readonly detail: string };
 
@@ -466,7 +467,14 @@ export function parseServerFrame(raw: string): ParseResult<ServerFrame> {
     case "move":
     case "item":
     case "pong":
-    case "room_closed":
+      return ok(parsed as unknown as ServerFrame);
+    case "room_closed": {
+      const reason = parsed["reason"];
+      if (reason !== "expired" && reason !== "empty" && reason !== "closed") {
+        return fail("bad-request", "room_closed.reason must be expired, empty or closed");
+      }
+      return ok({ t: "room_closed", reason });
+    }
     case "error":
       return ok(parsed as unknown as ServerFrame);
     default:

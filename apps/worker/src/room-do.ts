@@ -858,7 +858,7 @@ export class Room implements DurableObject {
     if (gone) {
       this.room = { ...this.room, status: "abandoned" };
       await this.ctx.storage.deleteAll();
-      this.broadcast({ t: "room_closed", room: this.publicState() });
+      this.broadcast({ t: "room_closed", reason: emptyLobby ? "empty" : this.room.members.length > 0 ? "expired" : "closed" });
       for (const socket of this.sockets.values()) socket.close(CLOSE_ROOM_CLOSED, "room closed");
       return;
     }

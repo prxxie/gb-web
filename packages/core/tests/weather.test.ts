@@ -176,8 +176,11 @@ describe("weather (US-CORE-015)", () => {
     // the agreement is within a few percent, not exact; a drift that stops tracking `½·a·t²` at all is the
     // regression this catches (it did: rounding `vx` to 0.1 lost 11 % of the push and made it non-linear).
     expect(expected).toBeGreaterThan(100);
-    expect(drift / expected).toBeGreaterThan(0.9);
-    expect(drift / expected).toBeLessThanOrEqual(1.02);
+    // The bound is set by the 0.1 position quantum, not by the force: over 126 steps a systematic 0.05 per
+    // step is 6 units on a 130-unit drift (4.6 %), which is what the integrator actually loses. A drift that
+    // breaks this band means the wind is being quantised again (it was: rounding `vx` lost 11 %).
+    expect(drift / expected).toBeGreaterThan(0.95);
+    expect(drift / expected).toBeLessThanOrEqual(1.05);
 
     // Wind is a vector: the same magnitude from the west lands symmetrically on the other side. The
     // 8.7-unit slack is the landing interpolation, which samples the crossing from whichever side the
