@@ -309,6 +309,9 @@ export interface Snapshot {
   readonly projectiles: readonly ProjectileSnapshot[];
   readonly scores: ScoreState;
   readonly status: "playing" | "ended";
+  /** RLE mask (`serializeTerrain`), present only on a snapshot that follows a carve — ~1.9 KB, so it can
+   *  not ride along at 10 Hz. Its presence is what makes host and peer masks identical (`US-CORE-006` AC4). */
+  readonly terrain?: string;
   readonly winnerTeam: Team | null;
 }
 
@@ -347,6 +350,14 @@ export interface RoomMember {
   readonly joinedAt: number;
   /** Connected at least once; reconnecting is not "joining twice". */
   readonly seenConnected: boolean;
+  /** Lobby loadout (`US-ROOM-007`); empty until the player picks consumables. */
+  readonly loadout?: readonly LoadoutEntry[];
+}
+
+/** One line of a lobby loadout: which consumable and how many (`US-MATCH-005`). */
+export interface LoadoutEntry {
+  readonly id: string;
+  readonly qty: number;
 }
 
 export interface RoomSettings {

@@ -69,6 +69,7 @@ The `covers` column names the requirement ([nonfunctional-requirements.md](../01
 | TC-ROOM-066 | US-ROOM-003 | Non-host sends `start_match` or `team_assign` | `error not-host`, roster unchanged | worker | NFR-11 |
 | TC-ROOM-148 | US-ROOM-003 | Start gating | Disabled until every slot is filled, teams equal and non-empty | e2e | `workflow-state-machine.md` |
 | TC-ROOM-162 | US-ROOM-003 | Illegal state transitions in `playing`/`ended` | Rejected with no side effects | worker | `workflow-state-machine.md` |
+| TC-ROOM-163 | US-NET-004 | Every documented client frame, and one field the frame does not document | Each documented frame parses; an unknown `t` is `unsupported-message`; an undocumented field is `bad-request` naming it; an 8 KB sdp is `payload-too-large` | unit | `api/signaling.md` § 2 |
 | TC-ROOM-046 | US-ROOM-004 | Reconnect within the 20 s grace | Slot, team and HP restored from `lastSnapshot` | e2e | NFR-07 |
 | TC-ROOM-047 | US-ROOM-004 | Grace countdown on the match screen | Overlay counts 20 → 0, then `disconnected` | e2e | NFR-07 |
 | TC-ROOM-055 | US-ROOM-004 | Kill one peer during a 2v2 | The other three keep playing; the match completes | e2e | NFR-08 |
@@ -91,7 +92,7 @@ The `covers` column names the requirement ([nonfunctional-requirements.md](../01
 | TC-CORE-020 | US-CORE-001 | `mbl-01` shot 1 at 45°, force 98, no wind | Lands at 1,988 units after 6.3 s, each position inside the golden-sample ±0.5 units band; gravity 100 u/s² adds exactly 5 u/s per step | unit | FR-04 |
 | TC-CORE-021 | US-CORE-001 | Wind +max pushes the projectile downwind | Δx increases monotonically with wind | unit | FR-04 |
 | TC-CORE-022 | US-CORE-001 | Force and angle out of the mobile's own window (`mbl-05` 25°, `mbl-15` 50°, `mbl-13` −18°) | Clamped to that mobile's `angleMin…angleMax` and `0…maxPower`, never `NaN`, and two mobiles with the same profile clamp differently | unit | FR-03 |
-| TC-CORE-023 | US-CORE-001 | Same shot, wind +10, on `mbl-01` (`mass 168`), `mbl-19` (`mass 120`) and `mbl-03` (`mass 169` at `g 118`) | Drift follows `½ · (110 × 10 / mass) · t²` — 130, 191 and 62 units — and a vertical wind component changes effective gravity (`a_y = −g + 110 × wind.y / mass`) | unit | FR-04 |
+| TC-CORE-023 | US-CORE-001 | Same shot in calm, in wind +26 and in wind −26, on `mbl-01` (`mass 168`) | Landing drift equals `½ · (windCoefficient × magnitude / mass) · t²` with `windCoefficient = 42` (`tunables.md` § 1.3) within 2 %, is linear in `magnitude`, reverses sign with the wind, and a vertical component changes effective gravity (`a_y = −g + 42 × wind.y / mass`) | unit | FR-04 |
 | TC-CORE-024 | US-CORE-003 | Blast at Inner, Mid and Outer radii | Three distinct damage tiers, 0 beyond the radius | unit | FR-06 |
 | TC-CORE-025 | US-CORE-003 | HP would go below zero | HP floored at 0, player marked `eliminated` | unit | FR-06 |
 | TC-CORE-026 | US-CORE-003 | Target with `defense 1.15` takes an Inner hit of 500 | Damage is divided by `defense` and rounded: 435 | unit | FR-06 |

@@ -87,8 +87,12 @@ export function stepProjectile(projectile: Projectile, context: StepContext): Pr
   const vy = projectile.vy + (context.gravity + wind.ay) * dt;
   return {
     ...projectile,
-    vx: roundTo(vx),
-    vy: roundTo(vy),
+    // Velocity is NOT rounded: `roundTo` is the 0.1 position quantum it takes to make a snapshot compact,
+    // and quantising a velocity that grows by 0.3 per step throws away up to 20 % of the wind push (the
+    // drift then stops being linear in `magnitude`, which `TC-CORE-023` promises). Positions keep the
+    // quantum so host and peer agree byte for byte.
+    vx,
+    vy,
     x: roundTo(projectile.x + vx * dt),
     y: roundTo(projectile.y + vy * dt),
     ageMs: projectile.ageMs + (context.stepMs ?? TUNABLES.stepMs),

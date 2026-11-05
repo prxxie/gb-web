@@ -1,4 +1,5 @@
 import type { PlayerSnapshot, ProjectileSnapshot, Snapshot } from "./types.js";
+import { deserializeTerrain, serializeTerrain, type Terrain } from "./terrain.js";
 import { TUNABLES, roundTo } from "./tuning.js";
 import type { MatchState } from "./types.js";
 
@@ -17,15 +18,22 @@ export interface WireSnapshot {
   readonly j: readonly number[]; // jewel x,y,carriedBy triples
   readonly sc: readonly [number, number]; // team scores
   readonly st: string; // status
+  readonly m?: string; // terrain RLE, only after a carve
   readonly wt: string | null; // winner team
 }
 
 export interface SnapshotOptions {
   /** Current weapon slot per player, when the caller tracks the aim UI state. */
   readonly weaponSlots?: Readonly<Record<number, 0 | 1 | 2>>;
+  /** Include the terrain mask. The host sets this on the snapshot that follows a carve, not on every one. */
+  readonly includeTerrain?: boolean;
 }
 
-export function toSnapshot(state: MatchState, hostGeneration: number): Snapshot {
+export function toSnapshot(
+  state: MatchState,
+  hostGeneration: number,
+  options: SnapshotOptions = {},
+): Snapshot {
   return {
     seq: state.seq,
     hostGeneration,
@@ -54,6 +62,7 @@ export function toSnapshot(state: MatchState, hostGeneration: number): Snapshot 
         shotClass: projectile.shotClass,
       }),
     ),
+    ...(options.includeTerrain ? { terrain: serializeTerrain(heightsAsTerrain(state)) } : {}),
     scores: {
       score: { A: state.scores.score.A, B: state.scores.score.B },
       activeTeam: state.scores.activeTeam,
@@ -65,7 +74,7 @@ export function toSnapshot(state: MatchState, hostGeneration: number): Snapshot 
 }
 
 export function toWire(state: MatchState, hostGeneration: number, options: SnapshotOptions = {}): WireSnapshot {
-  const snapshot = toSnapshot(state, hostGeneration);
+  const snapshot = toSnapshot(state, hostGeneration, options);
   return {
     s: snapshot.seq,
     g: snapshot.hostGeneration,
@@ -86,6 +95,7 @@ export function toWire(state: MatchState, hostGeneration: number, options: Snaps
     j: snapshot.scores.jewels.flatMap((jewel) => [jewel.x, jewel.y, jewel.carriedBy ?? -1]),
     sc: [snapshot.scores.score.A, snapshot.scores.score.B],
     st: snapshot.status,
+    ...(snapshot.terrain === undefined ? {} : { m: snapshot.terrain }),
     wt: snapshot.winnerTeam,
   };
 }
@@ -184,6 +194,7 @@ export function decodeSnapshot(text: string): Snapshot {
       jewels: chunkJewels(wire.j ?? []),
     },
     status: (wire.st as Snapshot["status"]) ?? "playing",
+    ...(wire.m === undefined ? {} : { terrain: wire.m }),
     winnerTeam: (wire.wt as Snapshot["winnerTeam"]) ?? null,
   };
 }
@@ -219,6 +230,8 @@ export interface ApplyResult {
   readonly players: MatchState["players"];
   readonly seq: number;
   readonly changed: boolean;
+  /** The decoded mask as match state stores it (heights), present only when the snapshot carried one. */
+  readonly terrain?: readonly number[];
 }
 
 export function applySnapshot(state: MatchState, snapshot: Snapshot): ApplyResult {
@@ -237,10 +250,17 @@ export function applySnapshot(state: MatchState, snapshot: Snapshot): ApplyResul
       eliminated: remote.eliminated,
     };
   });
-  return { players, seq: snapshot.seq, changed: true };
+  const terrain =
+    snapshot.terrain === undefined ? undefined : Array.from(deserializeTerrain(state.mapId, snapshot.terrain).heights);
+  return { players, seq: snapshot.seq, changed: true, ...(terrain ? { terrain } : {}) };
 }
 
 /** Size of a snapshot for the current state, in bytes — used by tests and the budget check. */
+/** `MatchState` keeps the mask as plain heights; the RLE works on a `Terrain`. */
+function heightsAsTerrain(state: MatchState): Terrain {
+  return { step: state.terrainStep, heights: Float64Array.from(state.terrain), width: TUNABLES.mapWidth };
+}
+
 export function snapshotBytes(state: MatchState, hostGeneration: number): number {
   return encodeBytes(encodeSnapshot(toSnapshot(state, hostGeneration)));
 }

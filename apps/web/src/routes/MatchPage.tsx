@@ -264,13 +264,31 @@ export function MatchPage(): JSX.Element {
           ...(server.username ? { username: server.username } : {}),
           ...(server.credential ? { credential: server.credential } : {}),
         })),
-        send: (channel) => socket.current?.send({ t: "signal", to: channel.to, kind: channel.kind, payload: channel.payload }),
+        send: (channel) =>
+          socket.current?.send({
+            t: "signal",
+            to: channel.to,
+            payload:
+              channel.kind === "candidate"
+                ? { kind: "candidate", candidate: channel.payload }
+                : { kind: channel.kind, sdp: (channel.payload as RTCSessionDescriptionInit).sdp ?? "" },
+          }),
         onSnapshot: (snapshot) => {
           const current = stateRef.current;
           if (!current) return;
           const applied = applySnapshot(current, snapshot);
           if (!applied.changed) return;
-          commit({ ...current, players: applied.players, seq: applied.seq, turn: snapshot.turn, weather: snapshot.weather }, []);
+          commit(
+            {
+              ...current,
+              players: applied.players,
+              seq: applied.seq,
+              turn: snapshot.turn,
+              weather: snapshot.weather,
+              ...(applied.terrain ? { terrain: applied.terrain } : {}),
+            },
+            [],
+          );
         },
         onControl: (from, message) => {
           const current = stateRef.current;
@@ -296,7 +314,12 @@ export function MatchPage(): JSX.Element {
       mobileId: localPlayer?.mobileId ?? "mbl-01",
       onMessage: (message: ServerMessage) => {
         if (message.t === "signal") {
-          void mesh.current?.applySignal(message.from, message.kind, message.payload);
+          const signal = message.payload;
+          void mesh.current?.applySignal(
+            message.from,
+            signal.kind,
+            signal.kind === "candidate" ? signal.candidate : { type: signal.kind, sdp: signal.sdp },
+          );
           return;
         }
         if (message.t === "host_changed") {

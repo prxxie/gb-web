@@ -33,8 +33,8 @@ distance and max incline and paid out of its Energy ``
 | # | Given | When | Then |
 |---|---|---|---|
 | AC1 | `mbl-01` (`moveDistance 88`, `energy 105`, `moveEnergy 12`, `moveDelay +12`, one move per turn) | it walks once and fires | energy drops by 12, the queue gains +12, and a second move in the same turn is refused (`TC-CORE-904`) |
-| AC2 | `energy 5` on a mobile whose walk costs 12 | a move is attempted | it is refused with reason `energy`, and at `energy 0` the mobile is a fixed turret (`TC-CORE-904`) |
-| AC3 | a slope steeper than `maxIncline` | the unit tries to climb | it stops at the slope and cannot pass (`TC-CORE-904`) |
+| AC2 | `energy 5` on a mobile whose walk costs 12 | a move is attempted | it is refused with reason `not-enough-energy`, and at `energy 0` the mobile is a fixed turret (`TC-CORE-904`) |
+| AC3 | a slope steeper than `maxIncline` | the unit tries to climb | it is refused with `too-steep` and does not pass — checked along the whole path, not only at the destination, so a cliff between the two ends still blocks. Walking **down** is never refused: a crater is cover, not a wall (`TC-CORE-904`) |
 | AC4 | a unit at the map edge | it runs outward | it stops at the bound and keeps its remaining energy (`TC-CORE-904`) |
 | AC7 | `mbl-13` Cinder Fox (`maxMovesPerTurn 2`, `runMultiplier 1.9`, `moveEnergy 8`) | it walks twice, then runs | two walks are allowed, the run covers `110 × 1.9 = 209 px` for 16 energy, and a third action is refused (`TC-CORE-904`) |
 | AC8 | two mobiles with different `moveDistance` | each walks once at full energy | the distance covered equals the mobile's own `moveDistance`, never a global constant (`TC-CORE-904`) |

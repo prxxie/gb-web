@@ -391,6 +391,9 @@ function resolveShot(
     },
     terrain,
   );
+  // A crater under a unit takes the ground out from under it; it falls to the new surface instead of
+  // floating (`US-CORE-006` AC3).
+  if (carved) next = reground(next);
 
   events.push({
     kind: "shot",
@@ -570,12 +573,14 @@ export function passTurn(state: MatchState, now: number): InputResult {
   return applyInput(state, { kind: "skip", slot: state.turn.activeSlot, seq: state.seq }, now);
 }
 
-/** Re-ground every unit after terrain changed. */
+/**
+ * Re-ground every unit after terrain changed (`US-CORE-006` AC3). `seq` is left alone: the caller has
+ * already committed the action, and a second bump would make one shot look like two inputs.
+ */
 export function reground(state: MatchState): MatchState {
   const terrain = terrainOf(state);
   return {
     ...state,
     players: state.players.map((player) => ({ ...player, y: groundY(terrain, player.x) - 8 })),
-    seq: state.seq + 1,
   };
 }

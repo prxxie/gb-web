@@ -9,16 +9,24 @@
  * Wire protocol: `docs/02-reference/api/signaling.md`.
  */
 import {
+  PING_INTERVAL_MS,
+  PING_MISSES_BEFORE_GRACE,
   RULESET_VERSION,
   canStart,
   createRoom,
   electHost,
+  isIdle,
+  isModeId,
+  isRoomExpired,
   joinRoom,
   leaveRoom,
   markDisconnected,
-  isIdle,
-  isRoomExpired,
+  parseClientFrame,
+  type ErrorCode,
   type JoinRequest,
+  type LoadoutEntry,
+  type MatchEndFrame,
+  type MatchStat,
   type RoomMember,
   type RoomSettings,
   type RoomState,
@@ -32,28 +40,35 @@ const CLOSE_UNAUTHENTICATED = 4401;
 const CLOSE_ROOM_NOT_FOUND = 4404;
 const CLOSE_ROOM_CLOSED = 4410;
 
-type ClientMessage =
-  | { t: "auth"; token?: string; mobileId?: string; displayName?: string; avatarId?: string }
-  | { t: "signal"; to: string; payload: unknown }
-  | { t: "team_assign"; assignments: readonly { playerId: string; team: "A" | "B" | null }[] }
-  | { t: "start_match" }
-  | { t: "snapshot_push"; snapshot: Snapshot }
-  | { t: "match_end"; winner: "A" | "B" | null }
-  | { t: "leave" }
-  | { t: "ping" };
-
 interface SocketMeta {
   playerId: string | null;
   authed: boolean;
   /** Identity the Worker verified for this connection; the client cannot set these headers (`NFR-11`). */
   accountId: string | null;
   guestId: string | null;
+  /** The session the socket authenticated with, kept in memory only, used to record the match as the host. */
+  token: string | null;
+  /** Last heartbeat received; three missed ones move the member to `grace` (`US-ROOM-002` AC6). */
+  lastPingAt: number;
 }
+
+/** Core refusal → the code the client branches on (`docs/02-reference/api/README.md`). */
+const START_REJECTIONS: Record<NonNullable<ReturnType<typeof canStart>>, ErrorCode> = {
+  "not-host": "not-host",
+  "not-lobby": "invalid-state",
+  "not-full": "room-not-full",
+  "not-enough-players": "not-enough-players",
+  "teams-unbalanced": "teams-not-balanced",
+};
 
 export class Room implements DurableObject {
   private room: RoomState;
   private readonly sockets = new Map<string, WebSocket>();
   private readonly meta = new WeakMap<WebSocket, SocketMeta>();
+  /** When `match_started` was sent; the match id and duration come from it, not from the client. */
+  private matchStartedAt: number | null = null;
+  /** Public origin of the Worker that opened the socket, so `match_end` can call `POST /api/v1/matches`. */
+  private origin: string | null = null;
 
   constructor(
     private readonly ctx: DurableObjectState,
@@ -63,7 +78,11 @@ export class Room implements DurableObject {
     void this.ctx.blockConcurrencyWhile(async () => {
       const stored = await this.ctx.storage.get<RoomState>("room");
       const storedSnapshot = await this.ctx.storage.get<Snapshot>("snapshot");
+      const storedStart = await this.ctx.storage.get<number>("matchStartedAt");
+      const storedOrigin = await this.ctx.storage.get<string>("origin");
       if (stored) this.room = storedSnapshot ? { ...stored, lastSnapshot: storedSnapshot } : stored;
+      this.matchStartedAt = storedStart ?? null;
+      this.origin = storedOrigin ?? null;
     });
   }
 
@@ -83,9 +102,10 @@ export class Room implements DurableObject {
     if (action === "ws") return this.handleUpgrade(request);
     if (action === "join") return this.handleJoin(request);
     if (action === "leave") return this.handleLeave(request);
-    if (action === "settings") return this.handleSettings(request);
-    if (action === "start") return this.handleStart(request);
     if (action === "state") return Response.json(this.publicState());
+    // `POST …/settings` and `POST …/start` used to live here. Both bypassed the socket guards and the
+    // second one stamped `rulesetVersion: settings.mode`, which would rank a match under the wrong
+    // ruleset; `room_settings` and `start_match` now own those two jobs (`signaling.md` § Contract status).
     return new Response("not found", { status: 404 });
   }
 
@@ -127,52 +147,8 @@ export class Room implements DurableObject {
     const outcome = leaveRoom(this.room, playerId, Date.now());
     this.room = this.withActivity(outcome.room);
     await this.persist();
-    this.broadcast({ t: "peer_left", playerId, room: this.publicState() });
-    return Response.json({ room: this.publicState() });
-  }
-
-  private async handleSettings(request: Request): Promise<Response> {
-    const body = (await request.json()) as {
-      playerId: string;
-      settings?: Partial<RoomState["settings"]>;
-      teamAssignments?: readonly { playerId: string; team: "A" | "B" | null }[];
-    };
-    if (body.playerId !== this.room.hostPlayerId) {
-      return Response.json({ type: "not-host" }, { status: 403 });
-    }
-    let next: RoomState = {
-      ...this.room,
-      settings: { ...this.room.settings, ...(body.settings ?? {}) },
-    };
-    for (const assignment of body.teamAssignments ?? []) {
-      next = {
-        ...next,
-        members: next.members.map((member) =>
-          member.playerId === assignment.playerId ? { ...member, team: assignment.team } : member,
-        ),
-      };
-    }
-    this.room = this.withActivity(next);
-    await this.persist();
+    this.broadcast({ t: "peer_left", playerId, reason: "left" });
     this.broadcast({ t: "room_state", room: this.publicState() });
-    return Response.json({ room: this.publicState() });
-  }
-
-  private async handleStart(request: Request): Promise<Response> {
-    const { playerId, seed } = (await request.json()) as { playerId: string; seed: number };
-    const rejection = canStart(this.room, playerId);
-    if (rejection) return Response.json({ type: rejection }, { status: rejection === "not-host" ? 403 : 409 });
-    const startedAt = Date.now();
-    this.room = this.withActivity({ ...this.room, status: "playing" });
-    await this.persist();
-    this.broadcast({
-      t: "match_started",
-      startedAt,
-      seed,
-      rulesetVersion: this.room.settings.mode,
-      room: this.publicState(),
-    });
-    await this.ctx.storage.setAlarm(startedAt + 24 * 60 * 60 * 1000);
     return Response.json({ room: this.publicState() });
   }
 
@@ -184,7 +160,16 @@ export class Room implements DurableObject {
     const [client, server] = Object.values(pair) as [WebSocket, WebSocket];
     void request;
     this.ctx.acceptWebSocket(server);
-    this.meta.set(server, { playerId: null, authed: false, accountId: null, guestId: null });
+    this.meta.set(server, {
+      playerId: null,
+      authed: false,
+      accountId: null,
+      guestId: null,
+      token: null,
+      lastPingAt: 0,
+    });
+    this.origin = new URL(request.url).origin;
+    await this.ctx.storage.put("origin", this.origin);
     setTimeout(() => {
       const meta = this.meta.get(server);
       if (meta && !meta.authed && server.readyState === 1) {
@@ -196,119 +181,325 @@ export class Room implements DurableObject {
 
   async webSocketMessage(ws: WebSocket, raw: string | ArrayBuffer): Promise<void> {
     const text = typeof raw === "string" ? raw : new TextDecoder().decode(raw);
-    let message: ClientMessage;
-    try {
-      message = JSON.parse(text) as ClientMessage;
-    } catch {
-      this.send(ws, { t: "error", code: "unsupported-message", detail: "body is not JSON" });
+    const parsed = parseClientFrame(text);
+    if (!parsed.ok) {
+      this.reject(ws, parsed.code, parsed.detail);
       return;
     }
-    const meta = this.meta.get(ws) ?? { playerId: null, authed: false, accountId: null, guestId: null };
-    if (message.t === "auth") {
-      await this.authenticate(ws, message);
+    const frame = parsed.frame;
+    if (frame.t === "auth") {
+      await this.authenticate(ws, frame);
       return;
     }
-    if (!meta.authed || !meta.playerId) {
+    const meta = this.meta.get(ws);
+    if (!meta?.authed || !meta.playerId) {
       ws.close(CLOSE_UNAUTHENTICATED, "auth required");
       return;
     }
-    switch (message.t) {
-      case "signal": {
-        const target = this.sockets.get(message.to);
-        if (!target) {
-          this.send(ws, { t: "error", code: "unsupported-message", detail: "peer is not connected" });
-          return;
-        }
-        this.send(target, { t: "signal", from: meta.playerId, payload: message.payload });
-        return;
-      }
-      case "team_assign": {
-        if (meta.playerId !== this.room.hostPlayerId) {
-          this.send(ws, { t: "error", code: "not-host" });
-          return;
-        }
-        const assignments = message.assignments ?? [];
-        this.room = this.withActivity({
-          ...this.room,
-          members: this.room.members.map((member) => {
-            const found = assignments.find((assignment) => assignment.playerId === member.playerId);
-            return found ? { ...member, team: found.team } : member;
-          }),
-        });
+    const playerId = meta.playerId;
+    switch (frame.t) {
+      case "signal":
+        return this.relaySignal(ws, playerId, frame);
+      case "team_assign":
+        return this.assignTeams(ws, playerId, frame);
+      case "start_match":
+        return this.startMatch(ws, playerId);
+      case "snapshot_push":
+        return this.pushSnapshot(ws, playerId, frame);
+      case "match_end":
+        return this.endMatch(ws, meta, frame);
+      case "room_settings":
+        return this.applySettings(ws, playerId, frame);
+      case "loadout":
+        return this.setLoadout(ws, playerId, frame);
+      case "move":
+      case "item":
+        return this.relayInput(ws, playerId, frame);
+      case "leave": {
+        const wasHost = this.room.hostPlayerId === playerId;
+        const outcome = leaveRoom(this.room, playerId, Date.now());
+        this.room = this.withActivity(outcome.room);
         await this.persist();
+        this.sockets.delete(playerId);
+        this.meta.delete(ws);
+        this.broadcast({ t: "peer_left", playerId, reason: "left" });
+        if (wasHost) await this.announceHostChange(playerId);
         this.broadcast({ t: "room_state", room: this.publicState() });
         return;
       }
-      case "start_match": {
-        const rejection = canStart(this.room, meta.playerId);
-        if (rejection) {
-          this.send(ws, { t: "error", code: rejection });
-          return;
-        }
-        const seed = crypto.getRandomValues(new Uint32Array(1))[0] ?? 1;
-        this.room = this.withActivity({ ...this.room, status: "playing" });
-        await this.persist();
-        this.broadcast({
-          t: "match_started",
-          startedAt: Date.now(),
-          seed,
-          hostPlayerId: this.room.hostPlayerId,
-          hostGeneration: this.room.hostGeneration,
-          rulesetVersion: RULESET_VERSION,
-          assignments: this.room.members.map((member) => ({
-            playerId: member.playerId,
-            slot: member.slot,
-            team: member.team,
-            mobileId: member.mobileId,
-            accountId: member.accountId,
-          })),
-          room: this.publicState(),
-        });
+      case "ping": {
+        this.meta.set(ws, { ...meta, lastPingAt: Date.now() });
+        this.send(ws, { t: "pong", at: frame.at, now: Date.now() });
+        await this.scheduleHeartbeatSweep();
         return;
       }
-      case "snapshot_push": {
-        if (meta.playerId !== this.room.hostPlayerId) {
-          this.send(ws, { t: "error", code: "not-host" });
-          return;
-        }
-        const snapshot = message.snapshot;
-        if (JSON.stringify(snapshot).length > 8_192) {
-          this.send(ws, { t: "error", code: "snapshot-too-large" });
-          return;
-        }
-        if (this.room.lastSnapshot && snapshot.seq <= this.room.lastSnapshot.seq) return;
-        this.room = { ...this.room, lastSnapshot: snapshot, lastActivityAt: Date.now() };
-        await this.ctx.storage.put("snapshot", snapshot);
-        for (const [playerId, socket] of this.sockets) {
-          if (playerId === meta.playerId) continue;
-          this.send(socket, { t: "snapshot", snapshot });
-        }
-        return;
-      }
-      case "match_end": {
-        if (meta.playerId !== this.room.hostPlayerId) {
-          this.send(ws, { t: "error", code: "not-host" });
-          return;
-        }
-        this.room = this.withActivity({ ...this.room, status: "ended" });
-        await this.persist();
-        this.broadcast({ t: "match_ended", winner: message.winner, room: this.publicState() });
-        return;
-      }
-      case "leave": {
-        const outcome = leaveRoom(this.room, meta.playerId, Date.now());
-        this.room = this.withActivity(outcome.room);
-        await this.persist();
-        this.sockets.delete(meta.playerId);
-        this.broadcast({ t: "peer_left", playerId: meta.playerId, room: this.publicState() });
-        return;
-      }
-      case "ping":
-        this.send(ws, { t: "pong", at: Date.now() });
-        return;
-      default:
-        this.send(ws, { t: "error", code: "unsupported-message" });
     }
+  }
+
+  /** `signal` reaches only its `to`, and never the sender (`US-ROOM-006`, TC-ROOM-050). */
+  private relaySignal(ws: WebSocket, playerId: string, frame: { to: string; payload: unknown }): void {
+    if (frame.to === playerId) {
+      this.reject(ws, "bad-request", "a client cannot signal itself");
+      return;
+    }
+    const target = this.sockets.get(frame.to);
+    const member = this.room.members.find((candidate) => candidate.playerId === frame.to);
+    if (!target || !member) {
+      // An offline peer and a stranger are answered identically, so the socket cannot be used to probe
+      // who is in the room (`US-ROOM-006` AC2).
+      this.reject(ws, "peer-not-connected", "the peer has no open socket");
+      return;
+    }
+    this.send(target, { t: "signal", from: playerId, payload: frame.payload });
+  }
+
+  /** One frame carries the whole roster, so a half-applied assignment cannot exist (`US-ROOM-003`). */
+  private async assignTeams(ws: WebSocket, playerId: string, frame: { assignments: readonly { playerId: string; team: "A" | "B" | null }[] }): Promise<void> {
+    if (playerId !== this.room.hostPlayerId) {
+      this.reject(ws, "not-host", "only the host assigns teams");
+      return;
+    }
+    if (this.room.status !== "lobby") {
+      this.reject(ws, "invalid-state", "teams are locked once the match starts");
+      return;
+    }
+    const known = new Set(this.room.members.map((member) => member.playerId));
+    const unknown = frame.assignments.find((assignment) => !known.has(assignment.playerId));
+    if (unknown) {
+      this.reject(ws, "bad-request", `${unknown.playerId} is not in this room`);
+      return;
+    }
+    const members = this.room.members.map((member) => {
+      const found = frame.assignments.find((assignment) => assignment.playerId === member.playerId);
+      return found ? { ...member, team: found.team } : member;
+    });
+    const next: RoomState = { ...this.room, members };
+    // Equality is `start_match`'s rule, not this one: a host has to be able to seat the first player.
+    // What is enforced here is capacity — a team never holds more than its share of the seats.
+    const seats = Math.floor(this.room.settings.maxPlayers / 2);
+    const counts = { A: 0, B: 0 };
+    for (const member of members) if (member.team) counts[member.team] += 1;
+    if (counts.A > seats || counts.B > seats) {
+      this.reject(ws, "bad-request", `a team holds at most ${seats} players at ${this.room.settings.maxPlayers} seats`);
+      return;
+    }
+    this.room = this.withActivity(next);
+    await this.persist();
+    this.broadcast({ t: "room_state", room: this.publicState() });
+  }
+
+  private async startMatch(ws: WebSocket, playerId: string): Promise<void> {
+    const rejection = canStart(this.room, playerId);
+    if (rejection) {
+      this.reject(ws, START_REJECTIONS[rejection], "the room is not ready to start");
+      return;
+    }
+    const startedAt = Date.now();
+    const seed = crypto.getRandomValues(new Uint32Array(1))[0] ?? 1;
+    this.room = this.withActivity({ ...this.room, status: "playing" });
+    this.matchStartedAt = startedAt;
+    await this.persist();
+    await this.ctx.storage.put("matchStartedAt", startedAt);
+    this.broadcast({
+      t: "match_started",
+      startedAt,
+      seed,
+      hostPlayerId: this.room.hostPlayerId,
+      hostGeneration: this.room.hostGeneration,
+      // Stamped by the deployed build, never by the client (`US-ROOM-003` AC4).
+      rulesetVersion: RULESET_VERSION,
+      assignments: this.room.members.map((member) => ({
+        playerId: member.playerId,
+        slot: member.slot,
+        team: member.team,
+        mobileId: member.mobileId,
+        accountId: member.accountId,
+        loadout: member.loadout ?? [],
+      })),
+      room: this.publicState(),
+    });
+    await this.ctx.storage.setAlarm(startedAt + 24 * 60 * 60 * 1000);
+  }
+
+  private async pushSnapshot(ws: WebSocket, playerId: string, frame: { snapshot: Snapshot }): Promise<void> {
+    if (playerId !== this.room.hostPlayerId) {
+      this.reject(ws, "not-host", "only the host pushes snapshots");
+      return;
+    }
+    if (this.room.status !== "playing") {
+      this.reject(ws, "invalid-state", "the room is not playing");
+      return;
+    }
+    const snapshot = frame.snapshot;
+    if (this.room.lastSnapshot && snapshot.seq <= this.room.lastSnapshot.seq) return;
+    this.room = { ...this.room, lastSnapshot: snapshot, lastActivityAt: Date.now() };
+    await this.ctx.storage.put("snapshot", snapshot);
+    for (const [targetId, socket] of this.sockets) {
+      if (targetId === playerId) continue;
+      this.send(socket, { t: "snapshot_state", snapshot });
+    }
+  }
+
+  /** Host-only, lobby-only settings (`US-ROOM-007`). */
+  private async applySettings(ws: WebSocket, playerId: string, frame: { mode: string; mapId: string }): Promise<void> {
+    if (playerId !== this.room.hostPlayerId) {
+      this.reject(ws, "not-host", "only the host changes the room settings");
+      return;
+    }
+    if (this.room.status !== "lobby") {
+      this.reject(ws, "invalid-state", "settings are locked once the match starts");
+      return;
+    }
+    if (!isModeId(frame.mode)) {
+      this.reject(ws, "bad-request", `${frame.mode} is not a mode`);
+      return;
+    }
+    this.room = this.withActivity({ ...this.room, settings: { ...this.room.settings, mode: frame.mode, mapId: frame.mapId } });
+    await this.persist();
+    this.broadcast({ t: "room_state", room: this.publicState() });
+  }
+
+  /** Any member, lobby only; the eleven-item budget is checked by the parser (`US-ROOM-007`). */
+  private async setLoadout(ws: WebSocket, playerId: string, frame: { items: readonly LoadoutEntry[] }): Promise<void> {
+    if (this.room.status !== "lobby") {
+      this.reject(ws, "invalid-state", "the loadout is locked once the match starts");
+      return;
+    }
+    this.room = this.withActivity({
+      ...this.room,
+      members: this.room.members.map((member) => (member.playerId === playerId ? { ...member, loadout: frame.items } : member)),
+    });
+    await this.persist();
+    this.broadcast({ t: "room_state", room: this.publicState() });
+  }
+
+  /**
+   * `move` and `item` are validated by the host, not here: the Worker has no board, no energy and no
+   * inventory. Relaying them keeps the room socket from being a gameplay authority (`ADR-0004`).
+   */
+  private relayInput(ws: WebSocket, playerId: string, frame: { t: "move"; direction: 0 | 1; run: boolean } | { t: "item"; id: string }): void {
+    if (playerId === this.room.hostPlayerId) return;
+    if (this.room.status !== "playing") {
+      this.reject(ws, "invalid-state", "the match has not started");
+      return;
+    }
+    const host = this.room.hostPlayerId ? this.sockets.get(this.room.hostPlayerId) : undefined;
+    if (!host) {
+      this.reject(ws, "peer-not-connected", "the host has no open socket");
+      return;
+    }
+    this.send(host, frame.t === "move"
+      ? { t: "move", from: playerId, direction: frame.direction, run: frame.run }
+      : { t: "item", from: playerId, id: frame.id });
+  }
+
+  private async endMatch(ws: WebSocket, meta: SocketMeta, frame: MatchEndFrame): Promise<void> {
+    if (meta.playerId !== this.room.hostPlayerId) {
+      this.reject(ws, "not-host", "only the host ends the match");
+      return;
+    }
+    if (this.room.status !== "playing") {
+      this.reject(ws, "invalid-state", "the room is not playing");
+      return;
+    }
+    const endedAt = Date.now();
+    this.room = this.withActivity({ ...this.room, status: "ended" });
+    await this.persist();
+    this.broadcast({ t: "room_state", room: this.publicState() });
+    const recorded = await this.recordMatch(meta.token, frame, endedAt);
+    if (recorded.ok) {
+      this.broadcast({ t: "match_recorded", ...recorded.value });
+      return;
+    }
+    this.reject(ws, "internal", recorded.detail);
+  }
+
+  /**
+   * `POST /api/v1/matches` from inside the object (`US-RANK-001`). The id and the timestamps come from
+   * the DO, so the host cannot backdate a match or record one twice: `409 match-already-recorded` on a
+   * retry counts as success.
+   */
+  private async recordMatch(
+    token: string | null,
+    frame: MatchEndFrame,
+    endedAt: number,
+  ): Promise<{ ok: true; value: { matchId: string; winnerTeam: "A" | "B" | null; ranked: boolean; ratings: readonly { accountId: string; before: number; after: number; delta: number }[]; players: readonly { slot: number; result: "win" | "loss" | "abandon" }[] } } | { ok: false; detail: string }> {
+    const startedAt = this.matchStartedAt ?? endedAt;
+    const matchId = `${this.room.roomCode}-${startedAt}`;
+    const players = this.matchPlayers(frame.stats);
+    const unranked = {
+      matchId,
+      winnerTeam: frame.winnerTeam,
+      ranked: false,
+      ratings: [] as readonly { accountId: string; before: number; after: number; delta: number }[],
+      players: [] as readonly { slot: number; result: "win" | "loss" | "abandon" }[],
+    };
+    if (!this.origin || !token || !players.every((player) => player.accountId !== null)) {
+      // A guest room, or a host promoted mid-match, cannot be rated; the results screen still needs a winner.
+      return { ok: true, value: unranked };
+    }
+    const response = await fetch(new URL("/api/v1/matches", this.origin).toString(), {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${token}`,
+        "idempotency-key": matchId,
+      },
+      body: JSON.stringify({
+        matchId,
+        roomCode: this.room.roomCode,
+        rulesetVersion: RULESET_VERSION,
+        startedAt: new Date(startedAt).toISOString(),
+        endedAt: new Date(endedAt).toISOString(),
+        winnerTeam: frame.winnerTeam,
+        abandoned: false,
+        players,
+      }),
+    });
+    if (response.status === 409) return { ok: true, value: unranked };
+    if (response.status === 201) {
+      const body = (await response.json()) as {
+        matchId: string;
+        ranked: boolean;
+        ratings: readonly { accountId: string; before: number | null; after: number | null }[];
+      };
+      return {
+        ok: true,
+        value: {
+          matchId: body.matchId,
+          winnerTeam: frame.winnerTeam,
+          ranked: body.ranked,
+          ratings: body.ratings
+            .filter((rating) => rating.before !== null && rating.after !== null)
+            .map((rating) => ({
+              accountId: rating.accountId,
+              before: rating.before as number,
+              after: rating.after as number,
+              delta: (rating.after as number) - (rating.before as number),
+            })),
+          players: players.map((player) => ({
+            slot: player.slot,
+            result: frame.winnerTeam === null ? "loss" : player.team === frame.winnerTeam ? "win" : "loss",
+          })),
+        },
+      };
+    }
+    const detail = await response.text();
+    return { ok: false, detail: `the match record was refused (${response.status}): ${detail.slice(0, 120)}` };
+  }
+
+  private matchPlayers(stats: readonly MatchStat[]) {
+    return stats.map((stat) => {
+      const member = this.room.members.find((candidate) => candidate.slot === stat.slot);
+      return {
+        slot: stat.slot,
+        team: member?.team ?? ("A" as const),
+        accountId: member?.accountId ?? null,
+        damageDealt: stat.damageDealt,
+        shotsFired: stat.shotsFired,
+        hits: stat.hits,
+      };
+    });
   }
 
   /**
@@ -317,14 +508,10 @@ export class Room implements DurableObject {
    */
   private async authenticate(
     ws: WebSocket,
-    message: { token?: string; mobileId?: string; displayName?: string },
+    message: { token: string; mobileId?: string; displayName?: string; avatarId?: string },
   ): Promise<void> {
     const meta = this.meta.get(ws);
     if (!meta) return;
-    if (!message.token) {
-      ws.close(CLOSE_UNAUTHENTICATED, "auth token required");
-      return;
-    }
     let subject: SessionSubject;
     try {
       subject = (await verifySession(message.token, this.env.SESSION_TOKEN_SECRET)).sub;
@@ -347,7 +534,7 @@ export class Room implements DurableObject {
       this.send(previous, { t: "error", code: "unsupported-message", detail: "replaced by a newer connection" });
       previous.close(4408, "replaced");
     }
-    this.meta.set(ws, { ...meta, playerId, authed: true });
+    this.meta.set(ws, { ...meta, playerId, authed: true, token: message.token, lastPingAt: Date.now() });
     this.sockets.set(playerId, ws);
     this.room = this.withActivity({
       ...this.room,
@@ -375,25 +562,60 @@ export class Room implements DurableObject {
   async webSocketClose(ws: WebSocket): Promise<void> {
     const meta = this.meta.get(ws);
     if (!meta?.playerId) return;
-    this.sockets.delete(meta.playerId);
-    const outcome = markDisconnected(this.room, meta.playerId, Date.now());
-    const next: RoomState = { ...outcome.room };
-    const hostGone = this.room.hostPlayerId === meta.playerId;
-    this.room = this.withActivity(hostGone ? { ...next, hostPlayerId: electHost(next) } : next);
+    const playerId = meta.playerId;
+    this.sockets.delete(playerId);
+    this.meta.delete(ws);
+    // A dropped socket starts the 20 s grace timer instead of removing the member (`US-ROOM-004`).
+    const outcome = markDisconnected(this.room, playerId, Date.now());
+    this.room = this.withActivity(outcome.room);
     await this.persist();
-    this.broadcast({ t: "peer_left", playerId: meta.playerId, room: this.publicState() });
-    if (hostGone && this.room.hostPlayerId) {
-      this.broadcast({
-        t: "host_changed",
-        hostPlayerId: this.room.hostPlayerId,
-        hostGeneration: this.room.hostGeneration + 1,
-        lastSnapshot: this.room.lastSnapshot,
-        room: this.publicState(),
-      });
-      this.room = { ...this.room, hostGeneration: this.room.hostGeneration + 1 };
-      await this.persist();
-    }
+    this.broadcast({ t: "peer_left", playerId, reason: "grace" });
+    await this.electIfHostGone(playerId);
     await this.ctx.storage.setAlarm(Date.now() + 20_000);
+  }
+
+  /**
+   * Election happens in exactly one place (`US-ROOM-005`): the longest-connected peer becomes host,
+   * `hostGeneration` goes up by one, and every peer is told to drop snapshots from the old generation.
+   */
+  private async electIfHostGone(previousHostId: string): Promise<void> {
+    if (this.room.hostPlayerId !== previousHostId) return;
+    this.room = { ...this.room, hostPlayerId: electHost(this.room) };
+    await this.announceHostChange(previousHostId);
+  }
+
+  /** Broadcasts `host_changed` for a host that is already known to be gone. */
+  private async announceHostChange(previousHostId: string): Promise<void> {
+    const nextHost = this.room.hostPlayerId;
+    if (!nextHost) {
+      this.room = this.withActivity({
+        ...this.room,
+        status: this.room.status === "playing" ? "abandoned" : this.room.status,
+      });
+      await this.persist();
+      this.broadcast({ t: "room_state", room: this.publicState() });
+      return;
+    }
+    this.room = this.withActivity({
+      ...this.room,
+      hostGeneration: this.room.hostGeneration + (previousHostId === nextHost ? 0 : 1),
+      members: this.room.members.map((member) =>
+        member.playerId === nextHost
+          ? { ...member, role: "host" as const }
+          : member.role === "host"
+            ? { ...member, role: "player" as const }
+            : member,
+      ),
+    });
+    await this.persist();
+    this.broadcast({
+      t: "host_changed",
+      hostPlayerId: nextHost,
+      hostGeneration: this.room.hostGeneration,
+      lastSnapshot: this.room.lastSnapshot ?? null,
+      room: this.publicState(),
+    });
+    this.broadcast({ t: "room_state", room: this.publicState() });
   }
 
   async webSocketError(ws: WebSocket): Promise<void> {
@@ -403,6 +625,7 @@ export class Room implements DurableObject {
   /** Alarms do the lifecycle work: grace expiry, forfeit, idle expiry. */
   async alarm(): Promise<void> {
     const now = Date.now();
+    await this.sweepSilentSockets(now);
     const inGrace = this.room.members.filter((member) => member.connectionState === "grace");
     let next = this.room;
     for (const member of inGrace) {
@@ -426,11 +649,45 @@ export class Room implements DurableObject {
     await this.scheduleSweep();
   }
 
+  /**
+   * A `ping` every `PING_INTERVAL_MS` with three missed ones allowed (`US-ROOM-002` AC6). The client
+   * cannot lie about this: silence is what is measured, not a claimed timestamp.
+   */
+  private async sweepSilentSockets(now: number): Promise<void> {
+    const deadline = PING_INTERVAL_MS * PING_MISSES_BEFORE_GRACE;
+    let silent: string | null = null;
+    for (const socket of this.sockets.values()) {
+      const meta = this.meta.get(socket);
+      if (!meta?.playerId || !meta.authed) continue;
+      if (now - meta.lastPingAt <= deadline) continue;
+      silent = meta.playerId;
+      this.sockets.delete(meta.playerId);
+      this.meta.delete(socket);
+      if (socket.readyState === 1) socket.close(4408, "heartbeat timeout");
+      const outcome = markDisconnected(this.room, meta.playerId, now);
+      this.room = this.withActivity(outcome.room);
+      this.broadcast({ t: "peer_left", playerId: meta.playerId, reason: "grace" });
+      await this.electIfHostGone(meta.playerId);
+    }
+    if (silent) await this.persist();
+  }
+
+  private async scheduleHeartbeatSweep(): Promise<void> {
+    const at = Date.now() + PING_INTERVAL_MS * PING_MISSES_BEFORE_GRACE;
+    const existing = await this.ctx.storage.getAlarm();
+    if (existing === null || existing > at) await this.ctx.storage.setAlarm(at);
+  }
+
   private async scheduleSweep(): Promise<void> {
     if (this.sockets.size > 0) return;
     const at = this.room.lastActivityAt + 60_000;
     const existing = await this.ctx.storage.getAlarm();
     if (existing === null || existing > at) await this.ctx.storage.setAlarm(at);
+  }
+
+  /** One shape for every refusal: `{t:"error", code, detail}` (`signaling.md` § 3). */
+  private reject(ws: WebSocket, code: ErrorCode, detail: string): void {
+    this.send(ws, { t: "error", code, detail });
   }
 
   private send(ws: WebSocket, payload: unknown): void {

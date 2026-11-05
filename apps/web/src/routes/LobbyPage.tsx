@@ -126,8 +126,17 @@ export function LobbyPage(): JSX.Element {
     }
   };
 
+  /**
+   * One frame carries the whole roster (`US-ROOM-003`): the host sends the desired end state, so a
+   * dropped or re-ordered frame can never leave half the room reassigned.
+   */
   const assign = (playerIdToMove: string, team: "A" | "B"): void => {
-    socket.current?.send({ t: "team_assign", playerId: playerIdToMove, team });
+    if (!room) return;
+    const assignments = room.members.map((member) => ({
+      playerId: member.playerId,
+      team: member.playerId === playerIdToMove ? team : member.team,
+    }));
+    socket.current?.send({ t: "team_assign", assignments });
   };
 
   const start = (): void => {

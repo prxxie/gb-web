@@ -12,11 +12,12 @@ does not generate it.
 
 ## Written
 
-15 Vitest files (110 cases) and 3 Playwright specs (6 cases), green on 2026-11-05:
+20 Vitest files (152 cases) and 3 Playwright specs (6 cases), green on 2026-11-05:
 
 | Area | Files |
 |------|-------|
-| Core simulation | `packages/core/tests/ballistics.test.ts`, `combat.test.ts`, `data.test.ts`, `match.test.ts`, `room.test.ts`, `rating.test.ts`, `snapshot.test.ts`, `camera.test.ts` |
+| Core simulation | `packages/core/tests/ballistics.test.ts`, `combat.test.ts`, `data.test.ts`, `match.test.ts`, `room.test.ts`, `rating.test.ts`, `snapshot.test.ts`, `camera.test.ts`, `terrain.test.ts`, `movement.test.ts`, `weather.test.ts` |
+| Core protocol | `packages/core/tests/protocol.test.ts` — every documented socket frame parses, an undocumented field is refused by name, the 8 KB budgets hold (TC-ROOM-163) |
 | Core boundary | `packages/core/tests/imports.test.ts` — no Phaser, network or `apps/` import; pins `lib: ["ES2023"]`, which is what makes a DOM global a type error |
 | Worker helpers | `apps/worker/tests/lib.test.ts` (pure helpers: tokens, CORS, cursors, validation) |
 | Worker environment | `apps/worker/tests/env.test.ts` — every name the code reads is declared in `wrangler.jsonc` or an example file, and no example row carries a secret |
@@ -95,13 +96,9 @@ does not generate it.
 | `packages/core/tests/maps.test.ts` | `docs/03-stories/EPIC-03-match-core/US-CORE-012-load-the-eleven-maps.md` |
 | `packages/core/tests/mobiles.test.ts` | `docs/02-reference/data/mobiles.md`, `docs/03-stories/EPIC-03-match-core/US-CORE-007-load-mobile-stats-and-weapons.md` |
 | `packages/core/tests/modes.test.ts` | `docs/03-stories/EPIC-03-match-core/US-CORE-010-score-the-four-modes.md` |
-| `packages/core/tests/move.test.ts` | `docs/03-stories/EPIC-03-match-core/US-CORE-008-move-with-energy.md` |
 | `packages/core/tests/physics.test.ts` | `docs/01-overview/environment-setup.md`, `docs/02-reference/screens/match.md`, `docs/03-stories/EPIC-03-match-core/US-CORE-001-simulate-a-shot.md` |
-| `packages/core/tests/protocol.test.ts` | `docs/02-reference/api/signaling.md`, `docs/02-reference/data/room-state.md` |
-| `packages/core/tests/terrain.test.ts` | `docs/03-stories/EPIC-03-match-core/US-CORE-006-carve-terrain-on-impact.md` |
 | `packages/core/tests/turn-queue.test.ts` | `docs/03-stories/EPIC-03-match-core/US-CORE-002-resolve-turns-and-the-clock.md` |
 | `packages/core/tests/turn.test.ts` | `docs/01-overview/workflow-state-machine.md`, `docs/02-reference/screens/match.md` |
-| `packages/core/tests/weather.test.ts` | `docs/02-reference/screens/match.md`, `docs/03-stories/EPIC-03-match-core/US-CORE-015-roll-the-weather-each-round.md` |
 
 ### Browser flows (`tests/e2e/`)
 
