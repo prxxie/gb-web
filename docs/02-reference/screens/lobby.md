@@ -25,7 +25,7 @@ over the WebSocket ([signaling.md](../api/signaling.md)).
 | Room code | text + copy button | route param | `navigator.clipboard.writeText`; fallback selects the text |
 | Occupancy | `n/max` | `room_state.members`, `maxPlayers` | — |
 | Team columns | list of slots per team | `member.team`, `member.slot` | Empty slots render `— trống —` |
-| Member row | avatar, name, host badge, connection dot | `member` | `grace` shows a pulsing dot + `Đang kết nối lại` |
+| Member row | avatar, name, host badge, connection dot | `member` | `grace` shows a pulsing dot + `Đang kết nối lại`. The avatar is a 28 px disc carrying the pick's number (`avatar-09` → `09`, `default` → `–`) until the images ship (`OQ-12`); it reads `member.avatarId`, so a peer's new pick appears on the next `room_state` |
 | `Bắt đầu` | primary button, host only | — | Disabled until teams are equal and non-empty; tooltip says why |
 | `Chuyển đội` | secondary, per member | host only via `team_assign` | Absent for peers |
 | `Rời phòng` | text button | — | `leave` then `/` |

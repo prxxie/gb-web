@@ -9,7 +9,7 @@
  *
  * Not collected: the vitest glob only picks up `*.test.ts`.
  */
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { DatabaseSync } from "node:sqlite";
 import { fileURLToPath } from "node:url";
 import type { Env } from "../../src/lib/db.js";
@@ -18,7 +18,16 @@ import { Room } from "../../src/room-do.js";
 
 export const TEST_SECRET = "route-harness-secret";
 export const TEST_ORIGIN = "https://gbw.test";
-const SCHEMA = fileURLToPath(new URL("../../migrations/0001_init.sql", import.meta.url));
+const MIGRATIONS = fileURLToPath(new URL("../../migrations/", import.meta.url));
+
+/** Every committed migration, in filename order — the same sequence `wrangler d1 migrations apply` runs. */
+function schema(): string {
+  return readdirSync(MIGRATIONS)
+    .filter((file) => file.endsWith(".sql"))
+    .sort()
+    .map((file) => readFileSync(`${MIGRATIONS}${file}`, "utf8"))
+    .join("\n");
+}
 
 export interface RunResult {
   readonly success: boolean;
@@ -61,9 +70,9 @@ export class FakeDb {
   readonly sql: DatabaseSync;
   readonly batches: number = 0;
 
-  constructor(schemaPath: string = SCHEMA) {
+  constructor(ddl: string = schema()) {
     this.sql = new DatabaseSync(":memory:");
-    this.sql.exec(readFileSync(schemaPath, "utf8"));
+    this.sql.exec(ddl);
   }
 
   prepare(text: string): FakeStatement {

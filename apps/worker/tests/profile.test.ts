@@ -102,6 +102,21 @@ describe("PATCH /me", () => {
     expect(harness.db.profile.get("acc_1")?.["avatar_id"]).toBe("avatar-12");
   });
 
+  it("TC-AUTH-150: saving the same name keeps its uniqueness key and touches nothing else", async () => {
+    const { harness, authorization } = await signedIn("Bao Tran");
+    const before = { ...(harness.db.profile.get("acc_1") ?? {}) };
+
+    const response = await patchMe(harness, authorization, { displayName: "Bao Tran" });
+
+    expect(response.status).toBe(200);
+    const after = harness.db.profile.get("acc_1") ?? {};
+    // AC1: the key that makes the name unique does not move, and a no-op save writes no other column.
+    expect(after["display_name_key"]).toBe(before["display_name_key"]);
+    for (const column of ["avatar_id", "rating", "rated_matches", "created_at"]) {
+      expect(after[column]).toEqual(before[column]);
+    }
+  });
+
   it("returns exactly the GET /me representation", async () => {
     const { harness, authorization } = await signedIn();
 
@@ -124,6 +139,22 @@ describe("PATCH /me", () => {
       const problem = (await response.json()) as { errors?: { field: string }[] };
       expect(problem.errors?.map((error) => error.field)).toEqual(["avatarId"]);
       expect(harness.db.profile.get("acc_1")?.["avatar_id"]).toBe("avatar-03");
+    }
+  });
+
+  it("rejects markup and control characters and keeps the stored name", async () => {
+    // `US-AUTH-003` AC6: a name is text. `<script>`, an ampersand, a newline, a tab and a NUL are all
+    // outside the accepted alphabet, so they are refused at the boundary and can never be stored for a
+    // peer to render.
+    for (const displayName of ["<script>alert(1)</script>", "Bao <b>&</b>", "Bao\nTran", "Bao\tTran", "Bao\u0000"]) {
+      const { harness, authorization } = await signedIn("Bao Tran");
+
+      const response = await patchMe(harness, authorization, { displayName });
+
+      expect(response.status, JSON.stringify(displayName)).toBe(422);
+      const problem = (await response.json()) as { errors?: { field: string }[] };
+      expect(problem.errors?.map((error) => error.field), JSON.stringify(displayName)).toEqual(["displayName"]);
+      expect(harness.db.profile.get("acc_1")?.["display_name"]).toBe("Bao Tran");
     }
   });
 

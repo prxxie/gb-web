@@ -6,13 +6,14 @@
  * either exists with its players and rating rows, or not at all. `Idempotency-Key` replay is stored
  * next to the match so a client retry can never record it twice (`matches.md`, 24 h).
  */
-import { clampRating, expectedScore, isValidRoomCode, kFactor, RULESET_VERSION } from "@gbw/core";
+import { clampRating, delta as eloDelta, isRanked, isValidRoomCode, RULESET_VERSION } from "@gbw/core";
 import type { Env, ProfileRow } from "../lib/db.js";
 import {
   decodeHistoryCursor,
   encodeHistoryCursor,
   findHistoryPage,
   findMatchById,
+  findMatchByRoomOccurrence,
   findOpponents,
   findProfile,
   findSubmission,
@@ -130,7 +131,8 @@ function parseSubmission(body: Record<string, unknown>): MatchSubmission {
 
   const teamA = players.filter((player) => player.team === "A").length;
   const teamB = players.filter((player) => player.team === "B").length;
-  if (teamA > 0 && teamB > 0 && teamA !== teamB) field.fail("players", "teams must have equal sizes");
+  if (teamA === 0 || teamB === 0) field.fail("players", "must seat at least one player on each team");
+  if (teamA !== teamB) field.fail("players", "teams must have equal sizes");
 
   if (startedAt !== "" && endedAt !== "") {
     const duration = Date.parse(endedAt) - Date.parse(startedAt);
@@ -163,17 +165,50 @@ function rateTeam(
   profiles: ReadonlyMap<string, ProfileRow>,
   winnerTeam: "A" | "B",
   opponentAverage: number,
-  ownAverage: number,
 ): RatingChange[] {
-  const expected = expectedScore(ownAverage, opponentAverage);
   return players.map((player) => {
     const profile = profiles.get(player.accountId!);
     if (!profile) throw new ProblemError("internal", "A rated player has no profile");
     const score = player.team === winnerTeam ? 1 : 0;
     const before = profile.rating;
-    const after = clampRating(before + Math.round(kFactor(profile.rated_matches) * (score - expected)));
+    // The rounding lives in `delta()` and nowhere else (`US-RANK-002` §5), so the response, the history row
+    // and the stored rating can never disagree by a point.
+    const after = clampRating(before + eloDelta(before, opponentAverage, score, profile.rated_matches));
     return { accountId: player.accountId!, before, after, delta: after - before };
   });
+}
+
+/** The reason vocabulary of `screens/results.md`; `null` when the match was rated. */
+type RankedReason = "guest" | "abandoned" | "ruleset_mismatch" | null;
+
+/**
+ * The room's host, as the Durable Object reports it (`US-RANK-001` AC3). The session proves who calls; only the
+ * room knows who hosts. `null` means "cannot be proved" — an object nobody has joined yet, an unreachable
+ * object, or a host seated as a guest — and the caller then falls back to the participant rule.
+ */
+async function roomHostAccountId(env: Env, roomCode: string): Promise<string | null> {
+  try {
+    const stub = env.ROOMS.get(env.ROOMS.idFromName(roomCode));
+    const response = await stub.fetch("https://room.internal/state");
+    if (!response.ok) return null;
+    const state = (await response.json()) as {
+      roomCode?: string;
+      hostPlayerId?: string | null;
+      members?: readonly { playerId?: string; accountId?: string | null }[];
+    };
+    if (state.roomCode !== roomCode) return null;
+    const host = state.members?.find((member) => member.playerId === state.hostPlayerId);
+    return host?.accountId ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** `409` for a match that is already stored; the body names it so the client can load the record (`AC2`). */
+function alreadyRecorded(matchId: string): ProblemError {
+  return new ProblemError("match-already-recorded", "This match is already recorded", [
+    { field: "matchId", detail: matchId },
+  ]);
 }
 
 export async function submitMatch(request: Request, env: Env, session: SessionToken): Promise<Response> {
@@ -207,15 +242,17 @@ export async function submitMatch(request: Request, env: Env, session: SessionTo
   if (!submission.players.some((player) => player.accountId === accountId)) {
     throw new ProblemError("forbidden", "Only a participant can record a match");
   }
+  // `US-RANK-001` AC3: the room names its host. The wire carries no proof of the role beyond the room's own
+  // answer, so a room that cannot name a signed-in host falls back to the participant rule above.
+  const hostAccountId = await roomHostAccountId(env, submission.roomCode);
+  if (hostAccountId !== null && hostAccountId !== accountId) {
+    throw new ProblemError("not-host", "Only the host of the room can record its match");
+  }
 
   const matchId = submission.matchId ?? crypto.randomUUID();
-  if (await findMatchById(env.GBW_DB, matchId)) {
-    throw new ProblemError("match-already-recorded", "This match already exists");
-  }
-  const duplicate = await env.GBW_DB.prepare("SELECT match_id FROM match_record WHERE room_code = ? AND started_at = ?")
-    .bind(submission.roomCode, submission.startedAt)
-    .first<{ match_id: string }>();
-  if (duplicate) throw new ProblemError("match-already-recorded", "This room occurrence is already recorded");
+  if (await findMatchById(env.GBW_DB, matchId)) throw alreadyRecorded(matchId);
+  const duplicate = await findMatchByRoomOccurrence(env.GBW_DB, submission.roomCode, submission.startedAt);
+  if (duplicate) throw alreadyRecorded(duplicate.match_id);
 
   const profiles = new Map<string, ProfileRow>();
   const unregistered: FieldError[] = [];
@@ -233,11 +270,20 @@ export async function submitMatch(request: Request, env: Env, session: SessionTo
   const teamA = registered.filter((player) => player.team === "A");
   const teamB = registered.filter((player) => player.team === "B");
   const abandoned = submission.abandoned;
-  const ranked =
-    !abandoned &&
-    submission.rulesetVersion === RULESET_VERSION &&
-    teamA.length > 0 &&
-    teamB.length > 0;
+  const rulesetMismatch = submission.rulesetVersion !== RULESET_VERSION;
+  // A seat without an `accountId` is a guest or a bot; the wire does not distinguish them. Neither is rated
+  // (`US-RANK-001` AC5), but only a bot seat voids the match (`US-RANK-002` AC7). Bot matches end inside the room
+  // and never reach this route, so `hasBot` is false here; what can empty a team is a seat with no account.
+  const ranked = isRanked({ hasBot: false, abandoned, rulesetMismatch }) && teamA.length > 0 && teamB.length > 0;
+  // An unranked match always states why (`US-RANK-001` AC6). `guest` is also the answer when a team has no
+  // registered player: the seat that emptied it is a seat without an account.
+  const rankedReason: RankedReason = ranked
+    ? null
+    : abandoned
+      ? "abandoned"
+      : rulesetMismatch
+        ? "ruleset_mismatch"
+        : "guest";
 
   const changes: RatingChange[] = [];
   if (ranked) {
@@ -245,8 +291,8 @@ export async function submitMatch(request: Request, env: Env, session: SessionTo
       players.reduce((sum, player) => sum + profiles.get(player.accountId!)!.rating, 0) / players.length;
     const averageA = average(teamA);
     const averageB = average(teamB);
-    changes.push(...rateTeam(teamA, profiles, submission.winnerTeam!, averageB, averageA));
-    changes.push(...rateTeam(teamB, profiles, submission.winnerTeam!, averageA, averageB));
+    changes.push(...rateTeam(teamA, profiles, submission.winnerTeam!, averageB));
+    changes.push(...rateTeam(teamB, profiles, submission.winnerTeam!, averageA));
   }
   const changeByAccount = new Map(changes.map((change) => [change.accountId, change]));
 
@@ -256,8 +302,9 @@ export async function submitMatch(request: Request, env: Env, session: SessionTo
   const statements: D1PreparedStatement[] = [
     env.GBW_DB.prepare(
       `INSERT INTO match_record (match_id, room_code, player_count, team_a_slots, team_b_slots, winner_team, ranked,
-                                 ruleset_version, duration_ms, started_at, ended_at, submitted_by, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                                 ranked_reason, ruleset_version, duration_ms, started_at, ended_at, submitted_by,
+                                 created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     ).bind(
       matchId,
       submission.roomCode,
@@ -266,6 +313,7 @@ export async function submitMatch(request: Request, env: Env, session: SessionTo
       slots(submission.players.filter((player) => player.team === "B")),
       submission.winnerTeam,
       ranked ? 1 : 0,
+      rankedReason,
       submission.rulesetVersion,
       Date.parse(submission.endedAt) - Date.parse(submission.startedAt),
       submission.startedAt,
@@ -313,6 +361,7 @@ export async function submitMatch(request: Request, env: Env, session: SessionTo
   const payload = {
     matchId,
     ranked,
+    rankedReason,
     ratings: changes.map((change) => ({
       accountId: change.accountId,
       before: change.before,
@@ -336,7 +385,15 @@ export async function submitMatch(request: Request, env: Env, session: SessionTo
     );
   }
 
-  await env.GBW_DB.batch(statements);
+  try {
+    await env.GBW_DB.batch(statements);
+  } catch (error) {
+    // `US-RANK-001` AC7: the unique index is what decides a duplicate, so a loser of the race lands here
+    // instead of on a second read. The failed batch is rolled back whole — no rating is applied twice.
+    const raced = await findMatchByRoomOccurrence(env.GBW_DB, submission.roomCode, submission.startedAt);
+    if (raced) throw alreadyRecorded(raced.match_id);
+    throw error;
+  }
 
   return Response.json(payload, { status: 201 });
 }
@@ -368,6 +425,8 @@ export async function myMatches(request: Request, env: Env, session: SessionToke
     }
   }
 
+  // Exactly the fields `matches.md` § GET /me/matches lists: the screen renders a row, and anything else on the
+  // wire is a field the client would have to learn to ignore.
   const items = page.map((row) => ({
     matchId: row.match_id,
     playedAt: row.ended_at,
@@ -377,8 +436,7 @@ export async function myMatches(request: Request, env: Env, session: SessionToke
     damageDealt: row.damage_dealt,
     shotsFired: row.shots_fired,
     hits: row.hits,
-    ratingDelta:
-      row.rating_before === null || row.rating_after === null ? null : row.rating_after - row.rating_before,
+    ratingDelta: row.rating_before === null || row.rating_after === null ? null : row.rating_after - row.rating_before,
     rulesetVersion: row.ruleset_version,
   }));
   const last = page[page.length - 1];

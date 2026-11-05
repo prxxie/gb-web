@@ -8,26 +8,15 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: "prompt",
-      includeAssets: ["icons/icon-192.png", "icons/icon-512.png"],
-      manifest: {
-        name: "GBW — Turn-based artillery duel",
-        short_name: "GBW",
-        description: "Turn-based artillery duel for mobile browsers.",
-        lang: "vi",
-        start_url: "/",
-        scope: "/",
-        display: "fullscreen",
-        orientation: "landscape",
-        background_color: "#0b1220",
-        theme_color: "#0b1220",
-        icons: [
-          { src: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
-          { src: "/icons/icon-512.png", sizes: "512x512", type: "image/png" },
-          { src: "/icons/icon-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
-        ],
-      },
+      // `US-PWA-001` AC1/AC5: the app registers the worker itself (`src/app/serviceWorker.ts`), so a new
+      // deploy parks a waiting worker and the visible "Cập nhật" prompt decides when it takes over.
+      injectRegister: null,
+      // The manifest is a static file in `public/`, not generated here: one source for dev, preview and the
+      // deployed build, and no second `<link>` to reconcile with the one `index.html` already has.
+      manifest: false,
+      includeAssets: ["manifest.webmanifest", "icons/icon-192.png", "icons/icon-512.png"],
       workbox: {
-        globPatterns: ["**/*.{js,css,html,json,png,svg,webp,woff2}"],
+        globPatterns: ["**/*.{js,css,html,json,webmanifest,png,svg,webp,woff2}"],
         navigateFallback: "/index.html",
         navigateFallbackDenylist: [/^\/api\//],
         cleanupOutdatedCaches: true,

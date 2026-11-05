@@ -7,7 +7,8 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useLocale, useSession } from "../app/providers";
-import { api } from "../lib/api";
+import { api, errorMessage } from "../lib/api";
+import { InstallPrompt } from "../components/InstallPrompt";
 import type { JSX } from "react";
 
 interface ResultPayload {
@@ -81,9 +82,9 @@ export function ResultsPage(): JSX.Element {
           ratings: [],
         });
       })
-      .catch(() => {
+      .catch((caught: unknown) => {
         // `409` means another client already recorded it; anything else is shown, never retried twice.
-        setError(t("common.retry"));
+        setError(errorMessage(caught, t));
       });
   }, [payload, session, t]);
 
@@ -154,6 +155,8 @@ export function ResultsPage(): JSX.Element {
           </button>
         </Link>
       </div>
+      {/* The only place the install offer appears: after a match, when the player is not mid-task. */}
+      <InstallPrompt />
     </div>
   );
 }

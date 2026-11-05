@@ -42,7 +42,7 @@ Response `201`:
 | Field | Type | Meaning |
 |-------|------|---------|
 | `matchId` | string | Server-minted |
-| `ranked` | boolean | `false` when any participant is a guest/bot or the ruleset is stale |
+| `ranked` | boolean | `false` when a team has no registered player, a bot is seated, the match is abandoned or the ruleset is stale. A guest seat alone does **not** unrank it: the guest is skipped and the registered players still move (`US-RANK-002` AC7) |
 | `ratings` | array | `{ accountId, before, after, delta }` per registered participant; empty when unranked |
 
 Errors: `403 forbidden` (submitter is not a participant or was not the host), `422 validation` (any rule above),

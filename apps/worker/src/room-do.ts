@@ -743,6 +743,9 @@ export class Room implements DurableObject {
                 ? { mobileId: message.mobileId }
                 : {}),
               ...(message.displayName && this.room.status === "lobby" ? { displayName: message.displayName } : {}),
+              // The avatar is a cosmetic pick, so it may change wherever the name may (`US-AUTH-003` AC5):
+              // the roster a peer renders reads it from the member record, not from the profile row.
+              ...(message.avatarId && this.room.status === "lobby" ? { avatarId: message.avatarId } : {}),
             }
           : candidate,
       ),

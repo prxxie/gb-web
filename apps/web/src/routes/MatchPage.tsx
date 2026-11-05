@@ -26,7 +26,6 @@ import {
 } from "@gbw/core";
 import { mountBattle, type BattleHandle } from "../game/scene";
 import { DirectionPad, type PadAction } from "../components/DirectionPad";
-import { OrientationGate } from "../components/OrientationGate";
 import { PhrasePicker, type ChatKind } from "../components/PhrasePicker";
 import { Ruler } from "../components/Ruler";
 import { ItemTray } from "../components/ItemTray";
@@ -34,6 +33,7 @@ import { WeaponStrip, type WeaponSlot } from "../components/WeaponStrip";
 import { WindDial } from "../components/WindDial";
 import { defaultWindow, type CameraWindow } from "@gbw/core";
 import { useLocale } from "../app/providers";
+import { useLiveAnnouncement } from "../app/useLiveAnnouncement";
 import { translate, type Locale } from "../i18n";
 import { createMesh, type Mesh } from "../net/mesh";
 import { itemFrame } from "../net/frames";
@@ -458,6 +458,14 @@ export function MatchPage(): JSX.Element {
 
   const clock = state ? Math.max(0, Math.ceil((state.turn.deadlineAt - Date.now()) / 1000)) : 0;
 
+  // One polite live region per screen (`US-PWA-004` AC5): it reads the active player and their HP whenever
+  // either changes, throttled to one update per second. The canvas is `aria-hidden`, so this text is the
+  // only way a screen reader learns the state of the battlefield.
+  const activePlayer = state ? state.players.find((player) => player.slot === state.turn.activeSlot) ?? null : null;
+  const announcement = useLiveAnnouncement(
+    activePlayer ? t("match.announce.turn", { name: activePlayer.displayName, hp: activePlayer.hp }) : "",
+  );
+
   if (!plan || !state) {
     return (
       <div className="screen screen--center">
@@ -467,130 +475,131 @@ export function MatchPage(): JSX.Element {
   }
 
   return (
-    <OrientationGate message={t("match.zoom.hint")}>
-      <div className="match" data-testid="match-screen">
-        <div className="match__canvas" ref={container} aria-hidden="true" />
-        <div className="match__hud">
-          <div className="match__top">
-            <div className="match__roster">
-              {state.players.map((player) => (
-                <div
-                  key={player.slot}
-                  className={`match__player${player.slot === state.turn.activeSlot ? " match__player--active" : ""}`}
-                  data-testid={`roster-${player.slot}`}
-                >
-                  <div>{player.displayName}</div>
-                  <div className="muted">
-                    {player.eliminated ? t("match.eliminated") : `${player.hp}/${getMobile(player.mobileId).maxHp}`}
-                    {player.shield > 0 ? ` +${player.shield}` : ""}
-                  </div>
-                </div>
-              ))}
-            </div>
-            <div className="row">
-              <WindDial weather={state.weather} label={t("match.wind")} />
-              <div className="match__clock" data-testid="turn-clock">
-                {clock}s
-              </div>
-            </div>
-          </div>
-
-          <Ruler window={camera} unitLabel={t("match.ruler.unit")} />
-
-          <div className="match__power">
-            <div className="match__power-value" data-testid="power-value" aria-live="polite">
-              {power.toFixed(2)}
-            </div>
-            <div className="muted">
-              {isMyTurn
-                ? t("match.yourTurn")
-                : t("match.waitingTurn", {
-                    name: state?.players.find((player) => player.slot === state.turn.activeSlot)?.displayName ?? "…",
-                  })}
-            </div>
-          </div>
-
-          <DirectionPad
-            enabled={isMyTurn}
-            canMove={Boolean(localPlayer && localPlayer.energy > 0)}
-            energy={localPlayer?.energy ?? 0}
-            labels={{
-              up: t("match.angle.up"),
-              down: t("match.angle.down"),
-              left: t("match.move.left"),
-              right: t("match.move.right"),
-            }}
-            onAction={onPad}
-            onRepeat={onRepeat}
-          />
-
-          <div className="match__loadout">
-            <WeaponStrip
-              weapons={mobile.weapons}
-              active={weaponSlot}
-              charges={[1, 1, localPlayer?.superShotUsed ? 0 : 1]}
-              names={[t("match.weapon.1"), t("match.weapon.2"), t("match.weapon.3")]}
-              chargeLabels={[
-                t("match.weapon.ready"),
-                t("match.weapon.ready"),
-                localPlayer?.superShotUsed ? t("match.weapon.spent") : t("match.weapon.charge", { count: 1, max: 1 }),
-              ]}
-              label={t("match.weapon.group")}
-              disabled={!isMyTurn || lockedTurn === state.turn.number}
-              onSelect={selectWeapon}
-            />
-            <ItemTray
-              items={Object.entries(localPlayer?.items ?? {}).map(([id, qty]) => ({
-                id,
-                qty,
-                delay: ITEMS_BY_ID.get(id)?.delayCost ?? 0,
-              }))}
-              labels={{
-                toggle: t("match.item.tray"),
-                empty: t("match.item.empty"),
-                quantity: t("match.item.quantity"),
-                delay: t("match.item.delay"),
-              }}
-              enabled={isMyTurn}
-              onUse={onUseItem}
-            />
-          </div>
-
-          <PhrasePicker
-            skipEnabled={isMyTurn}
-            phraseIds={PHRASE_IDS}
-            emoteIds={EMOTE_IDS}
-            labels={{
-              skip: t("match.skip"),
-              phrases: t("match.phrases.title"),
-              emotes: t("match.emotes.title"),
-            }}
-            phraseText={(id) => t(`match.phrase.${id}`)}
-            emoteText={(id) => t(`match.emote.${id}`)}
-            onSkip={onSkip}
-            onChat={onChat}
-          />
-
-          {status === "reconnecting" ? <div className="overlay">{t("match.reconnecting")}</div> : null}
-          {chat ? (
-            <div className="chat-bubble" role="status" data-testid="chat-bubble">
-              {t("match.chat.bubble", {
-                name: state.players.find((player) => player.slot === plan.localSlot)?.displayName ?? "",
-                text: t(chat.kind === "emote" ? `match.emote.${chat.id}` : `match.phrase.${chat.id}`),
-              })}
-            </div>
-          ) : null}
-          {banner ? <div className="banner">{banner}</div> : null}
-          {feed.length > 0 ? (
-            <div className="banner" style={{ top: "auto", bottom: "96px" }} data-testid="event-feed">
-              {feed.map((event, index) => (
-                <div key={index}>{describeEvent(event, locale)}</div>
-              ))}
-            </div>
-          ) : null}
-        </div>
+    <div className="match" data-testid="match-screen">
+      <div className="sr-only" role="status" aria-live="polite" data-testid="match-announce">
+        {announcement}
       </div>
-    </OrientationGate>
+      <div className="match__canvas" ref={container} aria-hidden="true" />
+      <div className="match__hud">
+        <div className="match__top">
+          <div className="match__roster">
+            {state.players.map((player) => (
+              <div
+                key={player.slot}
+                className={`match__player${player.slot === state.turn.activeSlot ? " match__player--active" : ""}`}
+                data-testid={`roster-${player.slot}`}
+              >
+                <div>{player.displayName}</div>
+                <div className="muted">
+                  {player.eliminated ? t("match.eliminated") : `${player.hp}/${getMobile(player.mobileId).maxHp}`}
+                  {player.shield > 0 ? ` +${player.shield}` : ""}
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="row">
+            <WindDial weather={state.weather} label={t("match.wind")} />
+            <div className="match__clock" data-testid="turn-clock">
+              {clock}s
+            </div>
+          </div>
+        </div>
+
+        <Ruler window={camera} unitLabel={t("match.ruler.unit")} />
+
+        <div className="match__power">
+          <div className="match__power-value" data-testid="power-value">
+            {power.toFixed(2)}
+          </div>
+          <div className="muted">
+            {isMyTurn
+              ? t("match.yourTurn")
+              : t("match.waitingTurn", {
+                  name: state?.players.find((player) => player.slot === state.turn.activeSlot)?.displayName ?? "…",
+                })}
+          </div>
+        </div>
+
+        <DirectionPad
+          enabled={isMyTurn}
+          canMove={Boolean(localPlayer && localPlayer.energy > 0)}
+          energy={localPlayer?.energy ?? 0}
+          labels={{
+            up: t("match.angle.up"),
+            down: t("match.angle.down"),
+            left: t("match.move.left"),
+            right: t("match.move.right"),
+          }}
+          onAction={onPad}
+          onRepeat={onRepeat}
+        />
+
+        <div className="match__loadout">
+          <WeaponStrip
+            weapons={mobile.weapons}
+            active={weaponSlot}
+            charges={[1, 1, localPlayer?.superShotUsed ? 0 : 1]}
+            names={[t("match.weapon.1"), t("match.weapon.2"), t("match.weapon.3")]}
+            chargeLabels={[
+              t("match.weapon.ready"),
+              t("match.weapon.ready"),
+              localPlayer?.superShotUsed ? t("match.weapon.spent") : t("match.weapon.charge", { count: 1, max: 1 }),
+            ]}
+            label={t("match.weapon.group")}
+            disabled={!isMyTurn || lockedTurn === state.turn.number}
+            onSelect={selectWeapon}
+          />
+          <ItemTray
+            items={Object.entries(localPlayer?.items ?? {}).map(([id, qty]) => ({
+              id,
+              qty,
+              delay: ITEMS_BY_ID.get(id)?.delayCost ?? 0,
+            }))}
+            labels={{
+              toggle: t("match.item.tray"),
+              empty: t("match.item.empty"),
+              quantity: t("match.item.quantity"),
+              delay: t("match.item.delay"),
+            }}
+            enabled={isMyTurn}
+            onUse={onUseItem}
+          />
+        </div>
+
+        <PhrasePicker
+          skipEnabled={isMyTurn}
+          phraseIds={PHRASE_IDS}
+          emoteIds={EMOTE_IDS}
+          labels={{
+            skip: t("match.skip"),
+            phrases: t("match.phrases.title"),
+            emotes: t("match.emotes.title"),
+          }}
+          phraseText={(id) => t(`match.phrase.${id}`)}
+          emoteText={(id) => t(`match.emote.${id}`)}
+          onSkip={onSkip}
+          onChat={onChat}
+        />
+
+        {status === "reconnecting" ? <div className="overlay">{t("match.reconnecting")}</div> : null}
+        {chat ? (
+          <div className="chat-bubble" data-testid="chat-bubble">
+            {t("match.chat.bubble", {
+              name: state.players.find((player) => player.slot === plan.localSlot)?.displayName ?? "",
+              text: t(chat.kind === "emote" ? `match.emote.${chat.id}` : `match.phrase.${chat.id}`),
+            })}
+          </div>
+        ) : null}
+        {banner ? <div className="banner">{banner}</div> : null}
+        {feed.length > 0 ? (
+          <div className="banner" style={{ top: "auto", bottom: "96px" }} data-testid="event-feed">
+            {feed.map((event, index) => (
+              <div key={index}>{describeEvent(event, locale)}</div>
+            ))}
+          </div>
+        ) : null}
+      </div>
+    </div>
   );
 }
 

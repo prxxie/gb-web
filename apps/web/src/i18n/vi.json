@@ -1,6 +1,12 @@
 {
   "app.title": "Bắn Súng Đạn Đạo",
   "app.tagline": "Đấu trường pháo binh theo lượt",
+  "orientation.rotate": "Xoay ngang thiết bị để chơi.",
+  "install.hint": "Cài ứng dụng để chơi cả khi không có mạng.",
+  "install.action": "Cài ứng dụng",
+  "update.available": "Đã có phiên bản mới.",
+  "update.apply": "Cập nhật",
+  "update.later": "Để sau",
   "main.playBot": "Chơi với máy",
   "main.createRoom": "Tạo phòng",
   "main.joinRoom": "Vào phòng",
@@ -59,6 +65,8 @@
   "match.event.reject": "Từ chối: {reason}",
   "match.ruler.unit": "{units} đơn vị",
   "match.zoom.hint": "Chạm hai ngón để phóng to",
+  "match.loading": "Đang tải trận đấu…",
+  "match.announce.turn": "Lượt của {name}, còn {hp} máu.",
   "match.reconnecting": "Đang kết nối lại…",
   "match.hostChanged": "Chủ phòng mới: {name}",
   "match.eliminated": "Đã bị hạ",
@@ -134,6 +142,7 @@
   "leaderboard.new": "Mới",
   "leaderboard.you": "Bạn",
   "leaderboard.empty": "Chưa có ai trên bảng xếp hạng.",
+  "signIn.offline": "Cần có mạng để đăng nhập.",
   "signIn.title": "Đăng nhập",
   "signIn.google": "Tiếp tục với Google",
   "signIn.email": "Tiếp tục với email",
@@ -157,5 +166,6 @@
   "errors.snapshot-too-large": "Dữ liệu trận quá lớn.",
   "errors.internal": "Máy chủ gặp sự cố.",
   "errors.network": "Không kết nối được máy chủ.",
+  "errors.generic": "Không xử lý được phản hồi của máy chủ.",
   "match.disconnected": "Mất kết nối với phòng."
 }

@@ -65,11 +65,11 @@ describe("TC-RANK-114: the K factor settles", () => {
 });
 
 describe("TC-RANK-116: what makes a match ranked", () => {
-  it("refuses a guest, a bot, an abandoned match or a stale ruleset", () => {
-    expect(isRanked({ hasGuest: false, hasBot: false, abandoned: false, rulesetMismatch: false })).toBe(true);
-    expect(isRanked({ hasGuest: true, hasBot: false, abandoned: false, rulesetMismatch: false })).toBe(false);
-    expect(isRanked({ hasGuest: false, hasBot: true, abandoned: false, rulesetMismatch: false })).toBe(false);
-    expect(isRanked({ hasGuest: false, hasBot: false, abandoned: true, rulesetMismatch: false })).toBe(false);
-    expect(isRanked({ hasGuest: false, hasBot: false, abandoned: false, rulesetMismatch: true })).toBe(false);
+  it("refuses a bot, an abandoned match or a stale ruleset, but not a guest seat", () => {
+    // `US-RANK-002` AC7: a guest has no account to rate, so the seat is skipped and the match still counts.
+    expect(isRanked({ hasBot: false, abandoned: false, rulesetMismatch: false })).toBe(true);
+    expect(isRanked({ hasBot: true, abandoned: false, rulesetMismatch: false })).toBe(false);
+    expect(isRanked({ hasBot: false, abandoned: true, rulesetMismatch: false })).toBe(false);
+    expect(isRanked({ hasBot: false, abandoned: false, rulesetMismatch: true })).toBe(false);
   });
 });

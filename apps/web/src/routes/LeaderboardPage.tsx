@@ -4,6 +4,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useLocale, useSession } from "../app/providers";
 import { api, type LeaderboardEntry, type LeaderboardResponse } from "../lib/api";
+import { useOnline } from "../lib/online.js";
 import type { JSX } from "react";
 
 export function LeaderboardPage(): JSX.Element {
@@ -14,9 +15,16 @@ export function LeaderboardPage(): JSX.Element {
   const [you, setYou] = useState<LeaderboardResponse["you"]>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const online = useOnline();
 
   const load = useCallback(
     async (next: string | null, reset: boolean) => {
+      // Offline the ranking is not cached anywhere, so say so instead of failing a request (`US-PWA-001` §5).
+      if (!online) {
+        setLoading(false);
+        setError(t("main.offline"));
+        return;
+      }
       setLoading(true);
       setError(null);
       try {
@@ -30,7 +38,7 @@ export function LeaderboardPage(): JSX.Element {
         setLoading(false);
       }
     },
-    [session?.token, t],
+    [session?.token, t, online],
   );
 
   useEffect(() => {
@@ -76,7 +84,7 @@ export function LeaderboardPage(): JSX.Element {
       </table>
 
       {entries.length === 0 && !loading ? <p className="muted">{t("leaderboard.empty")}</p> : null}
-      {error ? <p className="muted">{error}</p> : null}
+      {error ? <p className="muted" data-testid="leaderboard-error">{error}</p> : null}
       {cursor ? (
         <button type="button" onClick={() => void load(cursor, false)} disabled={loading}>
           {t("profile.loadMore")}

@@ -2,24 +2,32 @@
 /**
  * TC-PWA-152: the rotate gate (`US-PWA-003`).
  *
- * Portrait must show the "rotate your device" overlay; landscape must show the game and nothing else.
- * The gate never unmounts its children — a rotation must not reset the match.
+ * Portrait gives one sentence and a locale toggle and nothing else; landscape gives the game. The gate
+ * hides its children but never unmounts them, so rotating never resets the match. Portrait is decided by
+ * the *viewport's shape* as well as the media query, because a narrow desktop window reports landscape
+ * while still being taller than it is wide (AC6).
  */
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { act, cleanup, render, screen } from "@testing-library/react";
-import { OrientationGate } from "../src/components/OrientationGate";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { act, cleanup, render, screen, within } from "@testing-library/react";
+import type { JSX } from "react";
+import { ORIENTATION_DEBOUNCE_MS, OrientationGate } from "../src/components/OrientationGate";
 
-const MESSAGE = "Xoay ngang thiết bị để chơi";
+const MESSAGE = "Xoay ngang thiết bị để chơi.";
 
 type Listener = (event: MediaQueryListEvent) => void;
 
-let portrait = false;
+let landscapeQueryMatches = true;
 const listeners = new Set<Listener>();
 
-function stubOrientation() {
+function setViewport(width: number, height: number): void {
+  Object.defineProperty(window, "innerWidth", { configurable: true, writable: true, value: width });
+  Object.defineProperty(window, "innerHeight", { configurable: true, writable: true, value: height });
+}
+
+function stubOrientation(): void {
   listeners.clear();
   window.matchMedia = ((query: string) => ({
-    matches: query.includes("orientation: portrait") ? portrait : false,
+    matches: query.includes("orientation: landscape") ? landscapeQueryMatches : false,
     media: query,
     onchange: null,
     addEventListener: (_: string, listener: Listener) => listeners.add(listener),
@@ -30,27 +38,37 @@ function stubOrientation() {
   })) as unknown as typeof window.matchMedia;
 }
 
-function rotate(toPortrait: boolean) {
-  portrait = toPortrait;
+function fireOrientationChange(matches: boolean): void {
+  landscapeQueryMatches = matches;
   act(() => {
-    for (const listener of listeners) listener({ matches: toPortrait } as MediaQueryListEvent);
+    for (const listener of listeners) listener({ matches } as MediaQueryListEvent);
   });
 }
 
-function gate() {
+function fireResize(): void {
+  act(() => {
+    window.dispatchEvent(new Event("resize"));
+  });
+}
+
+function gate(action?: JSX.Element) {
   return render(
-    <OrientationGate message={MESSAGE}>
+    <OrientationGate message={MESSAGE} action={action}>
       <div data-testid="battle">trận đấu</div>
     </OrientationGate>,
   );
 }
 
 beforeEach(() => {
-  portrait = false;
+  landscapeQueryMatches = true;
+  setViewport(844, 390);
   stubOrientation();
 });
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.useRealTimers();
+});
 
 describe("TC-PWA-152: landscape", () => {
   it("shows the game and no rotate overlay", () => {
@@ -58,46 +76,75 @@ describe("TC-PWA-152: landscape", () => {
     expect(screen.queryByTestId("orientation-hint")).toBeNull();
     expect(screen.getByTestId("battle")).toBeVisible();
   });
-
-  it("keeps the gate itself visible", () => {
-    gate();
-    expect(screen.getByTestId("orientation-gate")).toBeVisible();
-  });
 });
 
 describe("TC-PWA-152: portrait", () => {
-  it("renders the rotate instruction", () => {
-    portrait = true;
+  it("renders one sentence of instruction, visible over everything else", () => {
+    setViewport(390, 844);
+    landscapeQueryMatches = false;
     gate();
+    expect(screen.getByTestId("orientation-hint")).toBeVisible();
     expect(screen.getByTestId("orientation-hint")).toHaveTextContent(MESSAGE);
   });
 
-  it("hides the battle while the device is upright", () => {
-    portrait = true;
+  it("hides the game while the device is upright", () => {
+    setViewport(390, 844);
+    landscapeQueryMatches = false;
     gate();
     expect(screen.getByTestId("battle")).not.toBeVisible();
   });
 
-  it("keeps the battle mounted so rotating does not reset the match", () => {
-    portrait = true;
+  it("keeps the game mounted so rotating does not reset the match", () => {
+    setViewport(390, 844);
+    landscapeQueryMatches = false;
     gate();
     expect(screen.getByTestId("battle")).toBeInTheDocument();
   });
 
-  it("the rotate instruction is actually visible to the player", () => {
-    // AC2 of US-PWA-003 is "a full-screen overlay". The gate hides its own ancestor in portrait, so
-    // the message renders but the player sees a blank screen.
-    portrait = true;
+  it("offers the locale toggle and no other control", () => {
+    setViewport(390, 844);
+    landscapeQueryMatches = false;
+    gate(<button type="button">EN</button>);
+    const hint = screen.getByTestId("orientation-hint");
+    expect(within(hint).getAllByRole("button")).toHaveLength(1);
+    expect(within(hint).queryAllByRole("link")).toHaveLength(0);
+  });
+});
+
+describe("TC-PWA-152: detecting the change", () => {
+  it("reacts to the orientation media query immediately", () => {
+    gate();
+    expect(screen.queryByTestId("orientation-hint")).toBeNull();
+    setViewport(390, 844);
+    fireOrientationChange(false);
+    expect(screen.getByTestId("orientation-hint")).toBeVisible();
+    setViewport(844, 390);
+    fireOrientationChange(true);
+    expect(screen.queryByTestId("orientation-hint")).toBeNull();
+  });
+
+  it("treats a tall desktop window as portrait even when the query says landscape (AC6)", () => {
+    setViewport(600, 900);
+    landscapeQueryMatches = true;
     gate();
     expect(screen.getByTestId("orientation-hint")).toBeVisible();
   });
 
-  it("reacts to the orientation change event", () => {
+  it("debounces resize so a drag across the breakpoint does not thrash", () => {
+    vi.useFakeTimers();
     gate();
+    setViewport(390, 844);
+    fireResize();
     expect(screen.queryByTestId("orientation-hint")).toBeNull();
-    rotate(true);
-    expect(screen.getByTestId("orientation-hint")).toHaveTextContent(MESSAGE);
-    rotate(false);
-    expect(screen.queryByTestId("orientation-hint")).toBeNull();
+    act(() => vi.advanceTimersByTime(ORIENTATION_DEBOUNCE_MS));
+    expect(screen.getByTestId("orientation-hint")).toBeVisible();
+  });
+
+  it("evaluates before the first paint, so there is no flash of the game", () => {
+    setViewport(390, 844);
+    landscapeQueryMatches = false;
+    gate();
+    // The very first render already carries the overlay; nothing waited for an effect or an event.
+    expect(screen.getByTestId("orientation-hint")).toBeVisible();
   });
 });

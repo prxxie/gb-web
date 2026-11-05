@@ -80,10 +80,12 @@ export function rateMatch(input: RatedMatchInput): readonly RatingChange[] {
 
 /** True when the match may change ratings (`matches.md` § Validation). */
 export function isRanked(input: {
-  readonly hasGuest: boolean;
   readonly hasBot: boolean;
   readonly abandoned: boolean;
   readonly rulesetMismatch: boolean;
 }): boolean {
-  return !input.hasGuest && !input.hasBot && !input.abandoned && !input.rulesetMismatch;
+  // A guest seat does not void a match (`US-RANK-002` AC7): the seat has no account to rate, so it is skipped and
+  // the registered players on both teams are still rated against each other. Bots are different — a bot match is
+  // practice, and an abandoned or stale-ruleset match is not comparable (`US-RANK-001` AC5/AC6).
+  return !input.hasBot && !input.abandoned && !input.rulesetMismatch;
 }

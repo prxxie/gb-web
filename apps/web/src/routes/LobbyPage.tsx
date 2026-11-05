@@ -4,7 +4,7 @@
  * The lobby is a view of the room state the Durable Object broadcasts; the page never decides who
  * may start — `canStart` from `@gbw/core` does, and the server enforces the same rule.
  */
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { MOBILES, canStart, defaultSettings, type ClientFrame, type LoadoutEntry, type RoomSettings, type RoomState } from "@gbw/core";
 import { useLocale, useSession } from "../app/providers";
@@ -15,6 +15,15 @@ import { connectWithReconnect, type ReconnectingSocket } from "../net/reconnect"
 import type { ServerMessage } from "../net/signaling";
 import type { PlannedMatch } from "./MatchPage";
 import type { JSX } from "react";
+
+/**
+ * Avatar images have not shipped yet (`OQ-12`), so the roster shows the pick's number — honest, and it makes a
+ * change visible in a screenshot. `default` (no pick made) shows a dash.
+ */
+function avatarLabel(avatarId: string): string {
+  const digits = /(\d{2})$/.exec(avatarId)?.[1];
+  return digits ?? "–";
+}
 
 export function LobbyPage(): JSX.Element {
   const { code = "" } = useParams<{ code: string }>();
@@ -29,9 +38,41 @@ export function LobbyPage(): JSX.Element {
   const [loadout, setLoadout] = useState<readonly LoadoutEntry[]>([]);
   const socket = useRef<ReconnectingSocket | null>(null);
   const joined = useRef(false);
+  /** The identity this socket last authenticated with, so a rename sends one frame and not one per render. */
+  const pushedIdentity = useRef<string | null>(null);
+  const token = session?.token ?? null;
+  const identity = useMemo(
+    () => ({
+      displayName: session?.subject.displayName ?? "",
+      avatarId: session?.subject.avatarId ?? "default",
+    }),
+    [session?.subject.displayName, session?.subject.avatarId],
+  );
+  /** The newest identity, readable from callbacks that were created before the player edited it. */
+  const identityRef = useRef(identity);
+  identityRef.current = identity;
 
   const self = useMemo(() => room?.members.find((member) => member.playerId === playerId) ?? null, [room, playerId]);
   const isHost = Boolean(self && room && room.hostPlayerId === self.playerId);
+
+  /**
+   * A rename reaches the room through the frame the Durable Object already handles (`US-AUTH-003` AC7):
+   * `auth` on an open socket updates the member record in the lobby and answers with `room_state`, so
+   * peers see the new name within one round trip — no new frame type, no rejoin.
+   */
+  const pushIdentity = useCallback((): void => {
+    const live = identityRef.current;
+    const key = `${live.displayName}\u0000${live.avatarId}`;
+    if (!socket.current || !token || pushedIdentity.current === key) return;
+    pushedIdentity.current = key;
+    socket.current.send({ t: "auth", token, displayName: live.displayName, mobileId, avatarId: live.avatarId });
+  }, [token, mobileId]);
+
+  // The player edited the profile: the socket has to hear the new identity. At mount and on any other
+  // re-render the key matches what was already sent, so this sends nothing.
+  useEffect(() => {
+    pushIdentity();
+  }, [pushIdentity, identity.displayName, identity.avatarId]);
 
   useEffect(() => {
     if (!session || joined.current) return;
@@ -39,15 +80,17 @@ export function LobbyPage(): JSX.Element {
     const base = window.location.origin.replace(/^http/, "ws");
     const stored = sessionStorage.getItem(`gbw.room.${code}`);
     let cancelled = false;
+    /** What this socket authenticates with when it opens; a later rename is pushed over it. */
+    const connected = { displayName: session.subject.displayName, avatarId: session.subject.avatarId ?? "default" };
 
     /** The first arrival joins with its own identity; anyone returning keeps the playerId the room gave it. */
     const enter = async (): Promise<string | null> => {
       if (stored) return stored;
       try {
         const joinedRoom = await api.joinRoom(session.token, code, {
-          displayName: session.subject.displayName,
+          displayName: connected.displayName,
           mobileId,
-          avatarId: session.subject.avatarId ?? "default",
+          avatarId: connected.avatarId,
         });
         sessionStorage.setItem(`gbw.room.${code}`, joinedRoom.playerId);
         return joinedRoom.playerId;
@@ -65,12 +108,13 @@ export function LobbyPage(): JSX.Element {
         return;
       }
       setPlayerId(selfId);
+      pushedIdentity.current = `${connected.displayName}\u0000${connected.avatarId}`;
       socket.current = connectWithReconnect({
         wsUrl: `${base}/api/v1/rooms/${code}/ws`,
         token: session.token,
-        displayName: session.subject.displayName,
+        displayName: connected.displayName,
         mobileId,
-        avatarId: session.subject.avatarId ?? "default",
+        avatarId: connected.avatarId,
         onMessage: (message: ServerMessage) => {
           if (message.t === "room_state") {
             setRoom(message.room);
@@ -116,8 +160,17 @@ export function LobbyPage(): JSX.Element {
           }
         },
         onReconnecting: () => setStatus("reconnecting"),
+        onReconnected: () => {
+          setStatus("live");
+          // The reopened socket authenticated with the identity captured above, which may be older than
+          // an edit made while it was down; forgetting the pushed key lets the live one go out again.
+          pushedIdentity.current = `${connected.displayName}\u0000${connected.avatarId}`;
+          pushIdentity();
+        },
         onFatal: () => setStatus("closed"),
       });
+      // A rename that landed while the join was in flight is newer than the identity just sent.
+      pushIdentity();
     });
 
     return () => {
@@ -250,6 +303,16 @@ export function LobbyPage(): JSX.Element {
             {teams[team].length === 0 ? <p className="muted">—</p> : null}
             {teams[team].map((member) => (
               <div key={member.playerId} className="row">
+                {/* `US-AUTH-003` AC5: the avatar a peer picked shows up in the roster, which reads it from
+                    the member record the room broadcasts rather than from this device's own profile. */}
+                <span
+                  className="lobby__avatar"
+                  data-testid={`roster-avatar-${member.playerId}`}
+                  title={member.avatarId}
+                  aria-hidden="true"
+                >
+                  {avatarLabel(member.avatarId)}
+                </span>
                 <span>{member.displayName}</span>
                 {member.playerId === room?.hostPlayerId ? <span className="badge">{t("lobby.host")}</span> : null}
                 {member.connectionState !== "connected" ? <span className="badge">{t("lobby.reconnecting")}</span> : null}

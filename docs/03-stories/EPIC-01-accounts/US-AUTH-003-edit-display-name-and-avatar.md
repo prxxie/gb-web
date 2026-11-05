@@ -39,7 +39,7 @@ the avatar comes from a fixed set shipped with the app. Both are written only th
 | AC3 | A name of 1 or 17 characters, or an unknown `avatarId` | It is saved | `422 validation_failed` naming the field (`TC-AUTH-102`) |
 | AC4 | The profile screen | The name field is edited and saved | The new value is shown optimistically, and on `409` it reverts with an inline field error (`TC-AUTH-140`) |
 | AC5 | The avatar picker | An avatar is chosen | It is saved without reloading the page and appears in the lobby roster after the next `room_state` |
-| AC6 | A name containing `<script>` or a newline | It is saved | Stored as text and rendered escaped everywhere; newlines and control characters are rejected |
+| AC6 | A name containing markup (`<b>`, `&`) or a control character (newline, tab) | It is saved | `422 validation_failed` naming `displayName`, nothing written; a stored name that does contain markup renders as text, never as markup (`TC-AUTH-145`) |
 | AC7 | Two players in a lobby | One changes their name | The other's roster updates within 1 s without a rejoin |
 
 ## 4. Contract
@@ -62,13 +62,25 @@ collapse internal whitespace to a single space.
 - Uniqueness is case- and diacritic-insensitive so `Bảo` and `bao` cannot coexist.
 - The DO reads the name from the member record captured at join time; a rename reaches peers through the next
   `room_state`, not through a targeted message.
+- The client has one way to make that `room_state` happen: it re-sends `auth` on the socket it already holds. In the
+  lobby the DO rewrites the member record from that frame, persists, and answers with `room_state` (and broadcasts
+  `peer_joined` to the others), so a rename needs no new frame type and no rejoin. The `PATCH /me` answer is also
+  written into the stored session, so the next join authenticates with the new name.
+- That same frame carries `avatarId`, and `authenticate()` writes it into the member record beside `displayName`
+  (`apps/worker/src/room-do.ts`, lobby only). The roster renders `member.avatarId` as a 28 px disc carrying the pick's
+  number (`avatar-09` → `09`, `default` → `–`) because the images have not shipped (`OQ-12`); the shape is documented
+  in `docs/02-reference/screens/lobby.md` § Member row, so the disc is replaced by an image without changing the
+  contract.
 
 ## 6. Implementation notes
 
-- `apps/worker/src/routes/me.ts`; validation with `zod`; the normaliser is shared with the migration that backfills
+- `apps/worker/src/routes/accounts.ts` (`patchMe`); validation with the hand-rolled `Field`/`readJson` helpers in
+  `apps/worker/src/lib/validation.ts`, not `zod`; the normaliser is shared with the migration that backfills
   `display_name_key`.
 - `UNIQUE(display_name_key)` violation is mapped to `409 display-name-taken` — never surface the SQL error.
-- Avatar images are AI-generated (`OQ-12`) and shipped in the web bundle under `assets/avatars/`.
+- Avatar images are AI-generated (`OQ-12`) and have not shipped: no `assets/avatars/` exists, so the picker lists the
+  ids `avatar-01`…`avatar-12` as text (`apps/web/src/routes/ProfilePage.tsx` `AVATAR_IDS`). The loadout parts
+  (`av-head-01`…) are a different vocabulary and `PATCH /me` answers one with `422`.
 
 ## 7. Out of scope
 
@@ -77,8 +89,11 @@ collapse internal whitespace to a single space.
 
 ## 8. Test notes
 
-`TC-AUTH-101`, `TC-AUTH-102`, `TC-AUTH-140`. The normalisation cases are a table-driven unit test
-(`apps/worker/tests/display-name.test.ts`). Red first: `apps/worker/tests/accounts.test.ts::duplicate_key_conflicts`.
+`TC-AUTH-101`, `TC-AUTH-102`, `TC-AUTH-140`, `TC-AUTH-144`, `TC-AUTH-145`, `TC-AUTH-146`, `TC-AUTH-147`,
+`TC-AUTH-148`, `TC-AUTH-149`.
+The normalisation cases are a table-driven unit test
+(`apps/worker/tests/display-name.test.ts`). - **Red:** `apps/web/tests/profile.test.tsx` and `apps/web/tests/lobby-rename.test.tsx` — the profile screen had no
+  inline error branch and no avatar persistence, and the lobby never re-sent `auth`, so AC4, AC5 and AC7 failed.
 
 ## 9. Open questions
 
@@ -91,4 +106,8 @@ collapse internal whitespace to a single space.
 
 ## Delivery status — 2026-11-05
 
-**in-progress.** code complete (`PATCH /me`, `display_name_key`, avatar set). Remaining step: a signed-in session, then `TC-AUTH-101/102/140`.
+**in-progress.** `PATCH /me`, `display_name_key`, avatar set, the profile screen (optimistic save, `409`/`422` field
+errors, avatar picker over `avatar-01`…`avatar-12`), the stored-session update and the lobby `auth` re-send are all
+covered by tests (`apps/web/tests/profile.test.tsx`, `apps/web/tests/lobby-rename.test.tsx`,
+`apps/worker/tests/profile.test.ts`, `apps/worker/tests/display-name.test.ts`). Remaining: a signed-in session for the
+`TC-AUTH-140/143` e2e rows, and AC5's roster clause, which needs the `room-do.ts` change recorded in §5.

@@ -150,14 +150,14 @@ describe("the table in US-RANK-002 §4", () => {
   it("TC-RANK-058: an unranked match changes no rating", () => {
     // Arrange — AC5: `ranked = 0` means no rating_history rows
     const cases = [
-      { hasGuest: true, hasBot: false, abandoned: false, rulesetMismatch: false },
-      { hasGuest: false, hasBot: false, abandoned: true, rulesetMismatch: false },
-      { hasGuest: false, hasBot: false, abandoned: false, rulesetMismatch: true },
+      { hasBot: true, abandoned: false, rulesetMismatch: false },
+      { hasBot: false, abandoned: true, rulesetMismatch: false },
+      { hasBot: false, abandoned: false, rulesetMismatch: true },
     ];
 
     // Act + Assert
     for (const row of cases) expect(isRanked(row)).toBe(false);
-    expect(isRanked({ hasGuest: false, hasBot: false, abandoned: false, rulesetMismatch: false })).toBe(true);
+    expect(isRanked({ hasBot: false, abandoned: false, rulesetMismatch: false })).toBe(true);
   });
 
   it("TC-RANK-113: delta is always an integer", () => {

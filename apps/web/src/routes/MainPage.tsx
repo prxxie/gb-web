@@ -6,7 +6,7 @@ import { useOnline } from "../lib/online.js";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { MOBILES, MODES, MAPS, makeRoomCode, type ModeId } from "@gbw/core";
 import { useLocale, useSession } from "../app/providers";
-import { ApiError, api } from "../lib/api";
+import { ApiError, api, errorMessage } from "../lib/api";
 import type { PlannedMatch } from "./MatchPage";
 import type { JSX } from "react";
 
@@ -74,8 +74,8 @@ export function MainPage(): JSX.Element {
       // The lobby reuses the seat this call created instead of creating a second one.
       sessionStorage.setItem(`gbw.room.${room.roomCode}`, room.playerId);
       navigate(`/lobby/${room.roomCode}`);
-    } catch {
-      setError(t("common.retry"));
+    } catch (caught) {
+      setError(errorMessage(caught, t));
     } finally {
       setBusy(false);
     }
@@ -99,7 +99,7 @@ export function MainPage(): JSX.Element {
           ? t("errors.room-not-found")
           : type === "room-closed"
             ? t("errors.room-closed")
-            : t("common.retry"),
+            : errorMessage(caught, t),
       );
     } finally {
       setBusy(false);
@@ -113,7 +113,17 @@ export function MainPage(): JSX.Element {
         <p className="muted">{t("app.tagline")}</p>
         <div className="row">
           <span className="badge">{session?.subject.kind === "account" ? session.subject.displayName : t("signIn.guest")}</span>
-          {session?.subject.kind !== "account" ? <Link to="/sign-in">{t("main.signIn")}</Link> : null}
+          {session?.subject.kind !== "account" ? (
+            online ? (
+              <Link to="/sign-in">{t("main.signIn")}</Link>
+            ) : (
+              // Offline the offer stays visible but inert, so the menu explains itself instead of
+              // sending the player to a route that cannot work (`US-PWA-001` §5).
+              <span className="muted" aria-disabled="true" data-testid="signin-disabled">
+                {t("main.signIn")}
+              </span>
+            )
+          ) : null}
           <Link to="/profile">{t("main.profile")}</Link>
           <Link to="/leaderboard">{t("main.leaderboard")}</Link>
         </div>
@@ -139,7 +149,6 @@ export function MainPage(): JSX.Element {
         <button type="button" className="primary" data-testid="play-bot" onClick={startBot}>
           {t("main.playBot")}
         </button>
-        {online ? null : <p className="muted">{t("main.offline")}</p>}
       </section>
 
       <section className="card">
@@ -160,9 +169,16 @@ export function MainPage(): JSX.Element {
             ))}
           </select>
         </div>
-        <button type="button" className="primary" data-testid="create-room" onClick={() => void createRoom()} disabled={!session || busy}>
+        <button
+          type="button"
+          className="primary"
+          data-testid="create-room"
+          onClick={() => void createRoom()}
+          disabled={!session || busy || !online}
+        >
           {t("main.createRoom")}
         </button>
+        {online ? null : <p className="muted" data-testid="offline-rooms">{t("main.offline")}</p>}
       </section>
 
       <section className="card">
@@ -181,7 +197,12 @@ export function MainPage(): JSX.Element {
           value={code}
           onChange={(event) => setCode(event.target.value.toUpperCase().replace(CODE_ALPHABET, "").slice(0, 6))}
         />
-        <button type="button" data-testid="join-room" onClick={() => void joinRoom()} disabled={code.length !== 6 || busy}>
+        <button
+          type="button"
+          data-testid="join-room"
+          onClick={() => void joinRoom()}
+          disabled={code.length !== 6 || busy || !online}
+        >
           {t("main.joinRoom")}
         </button>
         {error ? <p className="muted">{error}</p> : null}

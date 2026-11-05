@@ -20,6 +20,8 @@ export type ProblemType =
   | "unsupported-message"
   | "snapshot-too-large"
   | "internal"
+  /** A `type` suffix this client does not know: the screen shows `errors.generic` plus the server title. */
+  | "unknown"
   | "network";
 
 export interface ProblemBody {
@@ -36,27 +38,51 @@ export class ApiError extends Error {
   readonly status: number;
   readonly requestId: string | undefined;
   readonly fields: readonly { field: string; detail: string }[];
+  /** The server's `title`, kept for a type the client has no string for (`US-PWA-002` AC6). */
+  readonly title: string;
 
-  constructor(type: ProblemType, status: number, message: string, requestId?: string, fields: readonly { field: string; detail: string }[] = []) {
+  constructor(
+    type: ProblemType,
+    status: number,
+    message: string,
+    requestId?: string,
+    fields: readonly { field: string; detail: string }[] = [],
+    title = "",
+  ) {
     super(message);
     this.name = "ApiError";
     this.type = type;
     this.status = status;
     this.requestId = requestId;
     this.fields = fields;
+    this.title = title;
   }
 
-  /** The dictionary key a screen should render (`errors.<type>`). */
+  /** The dictionary key a screen should render (`errors.<type>`); an unknown type falls back to `errors.generic`. */
   get messageKey(): string {
-    return `errors.${this.type}`;
+    return this.type === "unknown" ? "errors.generic" : `errors.${this.type}`;
   }
+
+  /** A second line for the screen: the server's own wording, shown only when the type is unknown. */
+  get subtitle(): string | null {
+    return this.type === "unknown" && this.title.length > 0 ? this.title : null;
+  }
+}
+
+/**
+ * The line a screen shows for a failed request (`US-PWA-002` AC6): the dictionary entry for the problem
+ * type, plus the server's own `title` when the client has no entry for that type.
+ */
+export function errorMessage(caught: unknown, t: (key: string) => string): string {
+  if (!(caught instanceof ApiError)) return t("common.retry");
+  const subtitle = caught.subtitle;
+  return subtitle ? `${t(caught.messageKey)} ${subtitle}` : t(caught.messageKey);
 }
 
 const BASE = (import.meta.env.VITE_API_BASE ?? "/api/v1").replace(/\/$/, "");
 
 function typeFromBody(body: Partial<ProblemBody>, status: number): ProblemType {
   const raw = body.type ?? "";
-  const suffix = raw.includes("/") ? raw.slice(raw.lastIndexOf("/") + 1) : raw;
   const known: readonly string[] = [
     "validation",
     "bad-request",
@@ -73,7 +99,11 @@ function typeFromBody(body: Partial<ProblemBody>, status: number): ProblemType {
     "snapshot-too-large",
     "internal",
   ];
-  if (known.includes(suffix)) return suffix as ProblemType;
+  if (raw.length > 0) {
+    const suffix = raw.includes("/") ? raw.slice(raw.lastIndexOf("/") + 1) : raw;
+    return known.includes(suffix) ? (suffix as ProblemType) : "unknown";
+  }
+  // No problem document at all — a proxy or a crash. The status is the only signal left.
   if (status === 401) return "unauthenticated";
   if (status === 403) return "forbidden";
   if (status === 404) return "room-not-found";
@@ -120,6 +150,7 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
       problem.detail ?? problem.title ?? `Request failed with ${response.status}`,
       problem.request_id ?? response.headers.get("x-request-id") ?? undefined,
       problem.errors ?? [],
+      problem.title ?? "",
     );
   }
   return parsed as T;
@@ -145,8 +176,15 @@ export interface ProfileResponse {
   readonly avatarId: string;
   readonly rating: number;
   readonly ratedMatches: number;
-  readonly updatedAt: string;
-  readonly stats: { readonly matches: number; readonly wins: number; readonly bestDamage: number };
+  /** `GET /me` aggregates over `match_player`, not the individual match rows (`api/accounts.md`). */
+  readonly stats: {
+    readonly matches: number;
+    readonly wins: number;
+    readonly losses: number;
+    readonly abandons: number;
+  };
+  readonly createdAt: string;
+  readonly deletionScheduledFor: string | null;
 }
 
 export interface LeaderboardEntry {

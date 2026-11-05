@@ -34,10 +34,13 @@ describe("TC-MATCH-921: ruler", () => {
 describe("TC-PWA-162: orientation gate", () => {
   it("keeps children mounted but hidden in portrait", () => {
     const listeners: ((event: MediaQueryListEvent) => void)[] = [];
+    const portrait = { width: window.innerWidth, height: window.innerHeight };
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: 390 });
+    Object.defineProperty(window, "innerHeight", { configurable: true, value: 844 });
     Object.defineProperty(window, "matchMedia", {
       writable: true,
       value: (query: string) => ({
-        matches: true,
+        matches: false,
         media: query,
         addEventListener: (_: string, listener: (event: MediaQueryListEvent) => void) => listeners.push(listener),
         removeEventListener: () => undefined,
@@ -46,14 +49,20 @@ describe("TC-PWA-162: orientation gate", () => {
         dispatchEvent: () => false,
       }),
     });
-    render(
-      <OrientationGate message="Xoay ngang">
-        <p>Battlefield</p>
-      </OrientationGate>,
-    );
-    expect(screen.getByText("Battlefield")).toBeInTheDocument();
-    expect(screen.getByTestId("orientation-hint")).toBeInTheDocument();
-    expect(listeners.length).toBeGreaterThan(0);
+    try {
+      render(
+        <OrientationGate message="Xoay ngang">
+          <p>Battlefield</p>
+        </OrientationGate>,
+      );
+      expect(screen.getByText("Battlefield")).toBeInTheDocument();
+      expect(screen.getByText("Battlefield")).not.toBeVisible();
+      expect(screen.getByTestId("orientation-hint")).toBeInTheDocument();
+      expect(listeners.length).toBeGreaterThan(0);
+    } finally {
+      Object.defineProperty(window, "innerWidth", { configurable: true, value: portrait.width });
+      Object.defineProperty(window, "innerHeight", { configurable: true, value: portrait.height });
+    }
   });
 });
 

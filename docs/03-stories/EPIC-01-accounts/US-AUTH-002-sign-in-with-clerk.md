@@ -86,9 +86,11 @@ cached in module scope for 10 minutes; claims checked: `exp`, `nbf`, `azp` ∈ a
 
 ## 8. Test notes
 
-`TC-AUTH-137`, `TC-AUTH-138`; worker tests use a locally generated RSA key pair plus a stubbed JWKS endpoint.
-`TC-AUTH-074` (owned by [US-AUTH-001](US-AUTH-001-continue-as-a-guest.md)) also covers the registered branch of
-`/sessions`. Red first: `apps/worker/tests/sessions.test.ts::registered_session_creates_profile`.
+`TC-AUTH-137`, `TC-AUTH-138`, `TC-AUTH-151`…`TC-AUTH-156`; worker tests use a locally generated RSA key pair plus a
+stubbed JWKS endpoint (`apps/worker/tests/support/clerk.ts`). `TC-AUTH-074` (owned by
+[US-AUTH-001](US-AUTH-001-continue-as-a-guest.md)) also covers the registered branch of `/sessions`.
+- **Red:** `apps/worker/tests/auth.test.ts` — "answers 503 with a retry hint when the JWKS endpoint is unavailable and
+  nothing is cached" asserted `401`, and no case refused a foreign `azp` at all.
 
 ## 9. Open questions
 

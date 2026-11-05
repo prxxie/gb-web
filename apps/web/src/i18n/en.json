@@ -1,6 +1,12 @@
 {
   "app.title": "Turn-Based Artillery",
   "app.tagline": "A mobile artillery arena",
+  "orientation.rotate": "Rotate the device to landscape to play.",
+  "install.hint": "Install the app to play without a network.",
+  "install.action": "Install app",
+  "update.available": "A new version is available.",
+  "update.apply": "Update",
+  "update.later": "Later",
   "main.playBot": "Play the bot",
   "main.createRoom": "Create a room",
   "main.joinRoom": "Join a room",
@@ -59,6 +65,8 @@
   "match.event.reject": "Rejected: {reason}",
   "match.ruler.unit": "{units} units",
   "match.zoom.hint": "Use two fingers to zoom",
+  "match.loading": "Loading the match…",
+  "match.announce.turn": "{name}'s turn, {hp} HP left.",
   "match.reconnecting": "Reconnecting…",
   "match.hostChanged": "New host: {name}",
   "match.eliminated": "Eliminated",
@@ -134,6 +142,7 @@
   "leaderboard.new": "New",
   "leaderboard.you": "You",
   "leaderboard.empty": "Nobody is on the leaderboard yet.",
+  "signIn.offline": "Signing in needs a network connection.",
   "signIn.title": "Sign in",
   "signIn.google": "Continue with Google",
   "signIn.email": "Continue with email",
@@ -157,5 +166,6 @@
   "errors.snapshot-too-large": "The match data is too large.",
   "errors.internal": "The server hit a problem.",
   "errors.network": "Could not reach the server.",
+  "errors.generic": "The server response could not be handled.",
   "match.disconnected": "Lost the room connection."
 }

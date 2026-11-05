@@ -61,6 +61,25 @@ export async function upgradeToAccount(clerkToken: string): Promise<Session> {
   return session;
 }
 
+/**
+ * Rewrite the stored identity after the player edits it (`US-AUTH-003` AC5/AC7).
+ *
+ * `ensureSession()` reuses the stored subject instead of asking `GET /me`, so without this a rename
+ * would live only in the profile screen while the room join and the `auth` frame kept the old name.
+ * Returns the merged session, or `null` when nothing is stored.
+ */
+export function updateSubject(patch: { displayName?: string; avatarId?: string }): Session | null {
+  const session = currentSession();
+  if (!session) return null;
+  const next: Session = { ...session, subject: { ...session.subject, ...patch } };
+  try {
+    sessionStorage.setItem(KEY, JSON.stringify(next));
+  } catch {
+    /* private mode: the session lasts as long as this page */
+  }
+  return next;
+}
+
 export function clearSession(): void {
   try {
     sessionStorage.removeItem(KEY);

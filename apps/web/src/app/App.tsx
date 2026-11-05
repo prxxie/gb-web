@@ -1,8 +1,9 @@
 import { Suspense, lazy } from "react";
 import { createBrowserRouter, Navigate, RouterProvider } from "react-router-dom";
 import { ErrorBoundary } from "./ErrorBoundary";
+import { RouteFrame } from "./RouteFrame";
 import { Shell } from "./Shell";
-import { LocaleProvider, SessionProvider } from "./providers";
+import { LocaleProvider, SessionProvider, useLocale } from "./providers";
 import { LeaderboardPage } from "../routes/LeaderboardPage";
 import { LobbyPage } from "../routes/LobbyPage";
 import { MainPage } from "../routes/MainPage";
@@ -18,37 +19,47 @@ import { ResultsPage } from "../routes/ResultsPage";
 const MatchPage = lazy(() => import("../routes/MatchPage").then((module) => ({ default: module.MatchPage })));
 const SignInPage = lazy(() => import("../routes/SignInPage").then((module) => ({ default: module.SignInPage })));
 
-function Pending({ label }: { label: string }) {
+function Pending({ messageKey }: { messageKey: string }) {
+  const { t } = useLocale();
   return (
-    <div className="screen" role="status" aria-live="polite">
-      <p>{label}</p>
+    <div className="screen" role="status">
+      <p>{t(messageKey)}</p>
     </div>
   );
 }
 
+/**
+ * Every route renders inside `RouteFrame`, which owns the two things that need the current path: the
+ * update prompt (suspended on `/match/:code`) and moving focus to the new screen's heading.
+ */
 const router = createBrowserRouter([
-  { path: "/", element: <MainPage /> },
   {
-    path: "/sign-in",
-    element: (
-      <Suspense fallback={<Pending label="Đang tải…" />}>
-        <SignInPage />
-      </Suspense>
-    ),
+    element: <RouteFrame />,
+    children: [
+      { path: "/", element: <MainPage /> },
+      {
+        path: "/sign-in",
+        element: (
+          <Suspense fallback={<Pending messageKey="common.loading" />}>
+            <SignInPage />
+          </Suspense>
+        ),
+      },
+      { path: "/profile", element: <ProfilePage /> },
+      { path: "/leaderboard", element: <LeaderboardPage /> },
+      { path: "/lobby/:code", element: <LobbyPage /> },
+      {
+        path: "/match/:code",
+        element: (
+          <Suspense fallback={<Pending messageKey="match.loading" />}>
+            <MatchPage />
+          </Suspense>
+        ),
+      },
+      { path: "/results/:code", element: <ResultsPage /> },
+      { path: "*", element: <Navigate to="/" replace /> },
+    ],
   },
-  { path: "/profile", element: <ProfilePage /> },
-  { path: "/leaderboard", element: <LeaderboardPage /> },
-  { path: "/lobby/:code", element: <LobbyPage /> },
-  {
-    path: "/match/:code",
-    element: (
-      <Suspense fallback={<Pending label="Đang tải trận đấu…" />}>
-        <MatchPage />
-      </Suspense>
-    ),
-  },
-  { path: "/results/:code", element: <ResultsPage /> },
-  { path: "*", element: <Navigate to="/" replace /> },
 ]);
 
 export function App() {

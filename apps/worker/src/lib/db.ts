@@ -50,6 +50,8 @@ export interface MatchRecordRow {
   readonly team_b_slots: string;
   readonly winner_team: string | null;
   readonly ranked: number;
+  /** Why the match was not rated (`US-RANK-001` AC6); `null` when `ranked = 1`. */
+  readonly ranked_reason: string | null;
   readonly ruleset_version: string;
   readonly duration_ms: number;
   readonly started_at: string;
@@ -157,7 +159,12 @@ export interface MatchHistoryCursor {
 
 export interface MatchHistoryRow {
   readonly match_id: string;
+  readonly room_code: string;
   readonly ended_at: string;
+  readonly winner_team: string | null;
+  readonly player_count: number;
+  readonly ranked: number;
+  readonly ranked_reason: string | null;
   readonly ruleset_version: string;
   readonly team: string;
   readonly result: string;
@@ -177,7 +184,8 @@ export async function findHistoryPage(
 ): Promise<MatchHistoryRow[]> {
   const rows = await db
     .prepare(
-      `SELECT m.match_id, m.ended_at, m.ruleset_version,
+      `SELECT m.match_id, m.room_code, m.ended_at, m.winner_team, m.player_count, m.ranked, m.ranked_reason,
+              m.ruleset_version,
               p.team, p.result, p.damage_dealt, p.shots_fired, p.hits, p.rating_before, p.rating_after
          FROM match_player p JOIN match_record m ON m.match_id = p.match_id
         WHERE p.account_id = ? ${
@@ -233,6 +241,21 @@ export async function findMatchById(db: D1Database, matchId: string): Promise<Ma
   return await db.prepare("SELECT * FROM match_record WHERE match_id = ?").bind(matchId).first<MatchRecordRow>();
 }
 
+/**
+ * The record of one room occurrence (`idx_match_unique`). Read after a failed batch as well as before it:
+ * the index is what decides a duplicate, not the read (`US-RANK-001` AC7).
+ */
+export async function findMatchByRoomOccurrence(
+  db: D1Database,
+  roomCode: string,
+  startedAt: string,
+): Promise<{ readonly match_id: string } | null> {
+  return await db
+    .prepare("SELECT match_id FROM match_record WHERE room_code = ? AND started_at = ?")
+    .bind(roomCode, startedAt)
+    .first<{ match_id: string }>();
+}
+
 export interface SubmissionRow {
   readonly idempotency_key: string;
   readonly account_id: string;
@@ -282,6 +305,32 @@ export async function findLeaderboard(
 
 export function encodeCursor(value: string): string {
   return btoa(value).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+/**
+ * The 1-based position the row would hold on the leaderboard (`US-RANK-004` AC3), or `null` when the account
+ * is not ranked at all (no profile, or no rated match yet). Same ordering and exclusions as `findLeaderboard`,
+ * so a rank read here always agrees with the page it is shown next to.
+ */
+export async function findLeaderboardRank(
+  db: D1Database,
+  accountId: string,
+  rating: number,
+  ratedMatches: number,
+): Promise<number | null> {
+  if (ratedMatches < 1) return null;
+  const row = await db
+    .prepare(
+      `SELECT COUNT(*) + 1 AS ahead
+         FROM profile
+        WHERE (SELECT status FROM account WHERE account_id = profile.account_id) = 'active'
+          AND rated_matches > 0
+          AND (rating > ? OR (rating = ? AND rated_matches > ?)
+               OR (rating = ? AND rated_matches = ? AND account_id < ?))`,
+    )
+    .bind(rating, rating, ratedMatches, rating, ratedMatches, accountId)
+    .first<{ ahead: number }>();
+  return row === null ? null : Number(row.ahead);
 }
 
 export function decodeCursor(cursor: string): string {

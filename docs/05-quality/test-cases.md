@@ -15,12 +15,15 @@ The `covers` column names the requirement ([nonfunctional-requirements.md](../01
 
 | ID | Story | Case | Expected | Level | Covers |
 |----|-------|------|----------|-------|--------|
-| TC-FND-001 | US-FND-002 | `GET /api/v1/health` on a fresh worker | `200 {"status":"ok","version":"<sha>"}` | worker | operational — see `08-ops/slo.md` |
-| TC-FND-002 | US-FND-001 | Every env var the code reads has a row in `apps/worker/.dev.vars.example` or `apps/web/.env.example`, and no row holds a secret | Names match the code; the only values allowed are public defaults (`VITE_API_BASE=/api/v1`) | worker | NFR-12 |
-| TC-FND-012 | US-FND-001 | Built web assets scanned for secret values | No match for `SESSION_TOKEN_SECRET`, `TURN_KEY_API_TOKEN` | web | NFR-12 |
-| TC-FND-018 | US-FND-001 | `packages/core` imports no DOM, Phaser or network module | Static import scan is empty | unit | NFR-22 |
-| TC-FND-070 | US-FND-002 | Response shapes for all endpoints | Match `openapi.yaml` (schemathesis or explicit fixtures) | worker | `api/README.md` |
-| TC-FND-100 | US-FND-002 | Migrations apply to an empty D1 | Schema equals `data/README.md` | worker | ADR-0003 |
+| TC-FND-001 | US-FND-002 | AC1 — `GET /api/v1/health` on a fresh worker | `200 {"status":"ok","version":"<sha>"}` | worker | operational — see `08-ops/slo.md` |
+| TC-FND-002 | US-FND-001 | AC5 — every env var the code reads has a row in `apps/worker/.dev.vars.example` or `apps/web/.env.example`, and no row holds a secret | Names match the code; the only values allowed are public defaults (`VITE_API_BASE=/api/v1`) | worker | NFR-12 |
+| TC-FND-012 | US-FND-001 | AC4 — built web assets scanned for secret values | No match for `SESSION_TOKEN_SECRET`, `TURN_KEY_API_TOKEN` | web | NFR-12 |
+| TC-FND-018 | US-FND-001 | AC3 — `packages/core` imports no DOM, Phaser or network module | Static import scan is empty | unit | NFR-22 |
+| TC-FND-071 | US-FND-002 | AC2 — a route throws `validation_failed` | `application/problem+json` with `type`, `title`, `status`, `detail`, `instance`, `request_id`, fields under `errors[]` | worker | `api/README.md` |
+| TC-FND-072 | US-FND-002 | AC3 — a route throws an unexpected `Error` | `500` `…/internal`, no stack trace, no SQL, same `request_id` as the log line | worker | NFR-24 |
+| TC-FND-073 | US-FND-002 | AC5 — an unknown route | `404` `not-found` with `instance`, no crash, `ROOMS` still bound | worker | `api/README.md` |
+| TC-FND-070 | US-FND-002 | AC6 — response shapes for all endpoints match `openapi.yaml` | Match `openapi.yaml` (schemathesis or explicit fixtures) | worker | `api/README.md` |
+| TC-FND-100 | US-FND-002 | AC4 — migrations apply to an empty D1 | Schema equals `data/README.md` | worker | ADR-0003 |
 | TC-FND-901 | US-FND-004 | Open a pull request touching `apps/web` | Pages preview + `-preview` worker URLs and the commit sha appear in the PR comment | manual | NFR-13 (deploy hygiene) |
 | TC-FND-902 | US-FND-004 | Rehearse the documented rollback on preview | Previous worker and Pages build serve again within 5 min; `/health` reports the previous sha | manual | deployment.md |
 
@@ -32,11 +35,24 @@ The `covers` column names the requirement ([nonfunctional-requirements.md](../01
 | TC-AUTH-065 | US-AUTH-001 | Guest calls `/me`, `start_match`, `team_assign` | `401`/`403`, room state unaffected | worker | NFR-11 |
 | TC-AUTH-074 | US-AUTH-001 | `POST /sessions` as guest and as registered | Correct `subject.kind`, 60-min expiry, `wsUrl` present | worker | FR-01 |
 | TC-AUTH-135 | US-AUTH-001 | Guest path from the main menu | No sign-in prompt, room created | e2e | roles |
-| TC-AUTH-137 | US-AUTH-002 | Guest escape from the sign-in screen | Returns to `/` without an error | e2e | roles |
-| TC-AUTH-138 | US-AUTH-002 | `returnTo=https://evil.example` on sign-in | Ignored; lands on `/` | e2e | NFR-11 |
-| TC-AUTH-101 | US-AUTH-003 | Duplicate `display_name_key` after normalisation | `409 display-name-taken`, previous value kept | worker | `data/accounts.md` |
-| TC-AUTH-102 | US-AUTH-003 | Display name of 1 or 17 characters, or unknown avatar | `422 validation_failed` naming the field | worker | `data/accounts.md` |
-| TC-AUTH-140 | US-AUTH-003 | Profile name saved, then a `409` | Optimistic value reverts with an inline field error | e2e | `data/accounts.md` |
+| TC-AUTH-151 | US-AUTH-002 | AC1 — an account session is minted from a Clerk JWT | `201`, `subject.kind` is `account`, the session `sub` is the internal `accountId`, never Clerk's `sub` | worker | `api/accounts.md` |
+| TC-AUTH-152 | US-AUTH-002 | AC2 — a first-ever sign-in | Exactly one `account` and one `profile` row, `rating` 1200, `rated_matches` 0, generated `display_name` | worker | `data/accounts.md` |
+| TC-AUTH-153 | US-AUTH-002 | AC3 — a JWT signed by an unknown key, expired, or with a foreign `azp` | `401 unauthenticated` and nothing written | worker | NFR-11 |
+| TC-AUTH-154 | US-AUTH-002 | AC4 — the JWKS endpoint is unreachable | A cached key still verifies; with no cache the answer is `503` with `retryAfterSeconds`, never `500` | worker | `api/README.md` |
+| TC-AUTH-155 | US-AUTH-002 | AC7 — an unauthenticated call to a protected endpoint | `401` with the standard problem body and no redirect | worker | NFR-11 |
+| TC-AUTH-156 | US-AUTH-002 | AC1 (client) — the sign-in replaces the guest session | After Clerk reports a session, `upgradeToAccount` runs and the adopted session has `kind: account` | web | `screens/signin.md` |
+| TC-AUTH-137 | US-AUTH-002 | AC5 — guest escape from the sign-in screen | Returns to `/` without an error | e2e | roles |
+| TC-AUTH-138 | US-AUTH-002 | AC6 — `returnTo=https://evil.example` on sign-in | Ignored; lands on `/` | e2e | NFR-11 |
+| TC-AUTH-150 | US-AUTH-003 | AC1 — a name saved unchanged | `200`, `display_name_key` unchanged, no other profile column written | worker | `data/accounts.md` |
+| TC-AUTH-101 | US-AUTH-003 | AC2 — duplicate `display_name_key` after normalisation | `409 display-name-taken`, previous value kept | worker | `data/accounts.md` |
+| TC-AUTH-102 | US-AUTH-003 | AC3 — display name of 1 or 17 characters, or unknown avatar | `422 validation_failed` naming the field | worker | `data/accounts.md` |
+| TC-AUTH-144 | US-AUTH-003 | AC5 — avatar picker saves through `PATCH /me` | Pick `avatar-09` → one `PATCH {avatarId}` → `GET /me` returns it after a remount | web | `screens/profile.md` |
+| TC-AUTH-145 | US-AUTH-003 | AC6 — a display name is text, never markup (boundary) | `<script>`, `<b>&</b>`, newline, tab, NUL → `422` naming `displayName`, row unchanged | worker | AC6 |
+| TC-AUTH-148 | US-AUTH-003 | AC6 — a stored markup name renders as characters | Input value and `textContent` match; no `<b>` element and no `<b>` in `innerHTML` | web | AC6 |
+| TC-AUTH-146 | US-AUTH-003 | AC7 — a rename reaches the room over `auth` | Lobby mounted, identity edited → exactly one `auth` frame with the new name, peers get the `room_state` that carries it | web | `US-AUTH-003` § 5 |
+| TC-AUTH-149 | US-AUTH-003 | AC5 — the picked avatar shows in the lobby roster | Roster cell reads the member's `avatarId` and changes on the next `room_state`, no reload | web | AC5 |
+| TC-AUTH-147 | US-AUTH-003 | AC5/AC7 — the edited identity lands in the stored session | `PATCH /me` `200` → `gbw.session` subject updated; `409` → unchanged | web | AC5/AC7 |
+| TC-AUTH-140 | US-AUTH-003 | AC4 — profile name saved, then a `409` | Optimistic value reverts with an inline field error | web | `data/accounts.md` |
 | TC-AUTH-143 | US-AUTH-003 | Guest opens `/profile` | Redirect to `/sign-in` | e2e | roles |
 | TC-AUTH-069 | US-AUTH-004 | `DELETE /me` during a live room | `409`, nothing deleted | worker | NFR-13 |
 | TC-AUTH-075 | US-AUTH-004 | Any response for another account | Contains no `accountId`/`guestId`/email | worker | NFR-13 |
@@ -221,6 +237,7 @@ The `covers` column names the requirement ([nonfunctional-requirements.md](../01
 | TC-PWA-130 | US-PWA-002 | Every route in both locales at both landscape sizes | No overflow, no missing key, no untranslated string | e2e | NFR-18 |
 | TC-PWA-162 | US-PWA-002 | 30 % text expansion fixture in `vi` and `en` | No overflow in the lobby and results layouts | e2e | NFR-18 |
 | TC-PWA-063 | US-PWA-003 | Portrait viewport | Rotate notice only, no gameplay input; rotation mid-match keeps state | e2e | NFR-19 |
+| TC-PWA-190 | US-PWA-004 | AC7 — focus moves into the mounted route | The route's `h1` takes focus on mount, and a back navigation returns it to the invoking control | web | NFR-16 |
 | TC-PWA-131 | US-PWA-004 | Route change with keyboard focus | Focus moves to the route `h1`, returns to the invoking control on back | e2e | NFR-16 |
 | TC-PWA-158 | US-PWA-004 | axe-core on every route, both locales | Zero WCAG 2.2 AA violations | e2e | NFR-16 |
 | TC-PWA-159 | US-PWA-004 | 200 % font size on lobby and results | No clipped text, no overlap | e2e | NFR-16 |
@@ -268,7 +285,7 @@ unrelated meanings), so every row below names the one thing it proves.
 
 | ID | Story | Case | Expected | Level | Covers |
 |----|-------|------|----------|-------|--------|
-| TC-FND-131 | US-FND-003 | A direct URL (`/lobby/ABC234`, `/match/ABC234`) renders the shell and the locale toggle | Shell renders without a 404 and the toggle switches VI↔EN | web | `US-FND-003` AC1, AC2, AC5 |
+| TC-FND-131 | US-FND-003 | AC1, AC2, AC5 — a direct URL (`/lobby/ABC234`, `/match/ABC234`) renders the shell and the locale toggle | Shell renders without a 404 and the toggle switches VI↔EN | web | `US-FND-003` AC1, AC2, AC5 |
 | TC-MATCH-914 | US-MATCH-002 | Drag distance maps to the power ring radius | Radius grows with the pull and stops at the maximum | web | `US-MATCH-002` §4 |
 | TC-NET-045 | US-NET-004 | A peer sends `team_assign`; the host sends it after the start | `not-host` while a peer, `invalid-state` once playing; the roster is unchanged | worker | `US-NET-004` §2 roster |
 | TC-NET-066 | US-NET-004 | A socket signals itself, then signals a seated member with no socket | `bad-request`, then `peer-not-connected`; no frame is relayed | worker | `US-NET-004` §3 `signal` |

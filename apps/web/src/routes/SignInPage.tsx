@@ -8,6 +8,7 @@ import { Suspense, lazy, useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useLocale, useSession } from "../app/providers";
 import { upgradeToAccount } from "../lib/session";
+import { useOnline } from "../lib/online.js";
 import type { JSX } from "react";
 
 const publishableKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY as string | undefined;
@@ -61,6 +62,7 @@ const ClerkSignIn = lazy(async () => {
 
 export function SignInPage(): JSX.Element {
   const { t } = useLocale();
+  const online = useOnline();
   const { refresh } = useSession();
   const [params] = useSearchParams();
   const [returnTo, setReturnTo] = useState("/");
@@ -78,15 +80,22 @@ export function SignInPage(): JSX.Element {
   return (
     <div className="screen screen--center">
       <h1>{t("signIn.title")}</h1>
-      {publishableKey ? (
-        <Suspense fallback={<p className="muted">{t("common.loading")}</p>}>
-          <ClerkSignIn />
-        </Suspense>
+      {online ? (
+        publishableKey ? (
+          <Suspense fallback={<p className="muted">{t("common.loading")}</p>}>
+            <ClerkSignIn />
+          </Suspense>
+        ) : (
+          <div className="card">
+            <p>{t("signIn.note")}</p>
+            <p className="muted">VITE_CLERK_PUBLISHABLE_KEY</p>
+          </div>
+        )
       ) : (
-        <div className="card">
-          <p>{t("signIn.note")}</p>
-          <p className="muted">VITE_CLERK_PUBLISHABLE_KEY</p>
-        </div>
+        // Signing in is a network action; offline the route says so rather than mounting the Clerk chunk.
+        <p className="muted" data-testid="signin-offline">
+          {t("signIn.offline")}
+        </p>
       )}
       <div className="row">
         <Link to={returnTo}>
