@@ -108,7 +108,7 @@ export async function handleFetch(request: Request, env: Env): Promise<Response>
           }
         : {}),
     });
-    return problemResponse(problem, requestId, cors.origin);
+    return problemResponse(problem, requestId, cors.origin, new URL(request.url).pathname);
   }
 
   // Every completed request gets exactly one line — including a 4xx a route returned without throwing.
@@ -185,7 +185,9 @@ async function routeToHandler(request: Request, env: Env, url: URL, requestId: s
   if (rest === "/leaderboard" && request.method === "GET") {
     return await leaderboard(request, env, await optionalSession(request, env));
   }
-  throw new ProblemError("bad-request", `Unknown route ${request.method} ${path}`);
+  // A path that exists nowhere is a 404, not a 400: the request is well formed and the resource is not
+  // there, and a client that retries a 400 is doing something different from one that gives up on a 404.
+  throw new ProblemError("not-found", `Unknown route ${request.method} ${path}`);
 }
 
 function rest_safe(path: string, prefix: string): string {

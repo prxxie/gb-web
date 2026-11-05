@@ -12,7 +12,7 @@ does not generate it.
 
 ## Written
 
-73 Vitest files (653 cases) across the four suites, and 7 Playwright specs, green on 2026-11-05:
+73 Vitest files (662 cases) across the four suites, and 4 Playwright specs (32 cases), green on 2026-11-05:
 
 | Area | Files |
 |------|-------|
@@ -20,7 +20,7 @@ does not generate it.
 | Worker and Durable Object | `apps/worker/tests/accounts.test.ts`, `apps/worker/tests/api-contract.test.ts`, `apps/worker/tests/auth.test.ts`, `apps/worker/tests/authz.test.ts`, `apps/worker/tests/deletion.test.ts`, `apps/worker/tests/display-name.test.ts`, `apps/worker/tests/elo.test.ts`, `apps/worker/tests/env.test.ts`, `apps/worker/tests/health.test.ts`, `apps/worker/tests/history.test.ts`, `apps/worker/tests/leaderboard.test.ts`, `apps/worker/tests/lib.test.ts`, `apps/worker/tests/logging.test.ts`, `apps/worker/tests/matches.test.ts`, `apps/worker/tests/metrics.test.ts`, `apps/worker/tests/migrations.test.ts`, `apps/worker/tests/privacy.test.ts`, `apps/worker/tests/profile.test.ts`, `apps/worker/tests/ratelimit.test.ts`, `apps/worker/tests/room-auth.test.ts`, `apps/worker/tests/room-election.test.ts`, `apps/worker/tests/room-host.test.ts`, `apps/worker/tests/room-relay.test.ts`, `apps/worker/tests/room-rules.test.ts`, `apps/worker/tests/room-settings.test.ts`, `apps/worker/tests/room-validate.test.ts`, `apps/worker/tests/room.test.ts`, `apps/worker/tests/rooms.test.ts`, `apps/worker/tests/schema-whitelist.test.ts`, `apps/worker/tests/sessions.test.ts`, `apps/worker/tests/signaling.test.ts`, `apps/worker/tests/state-machine.test.ts`, `apps/worker/tests/turn.test.ts` |
 | Web UI | `apps/web/tests/aim.test.tsx`, `apps/web/tests/camera.test.tsx`, `apps/web/tests/direction-pad.test.tsx`, `apps/web/tests/gestures.test.tsx`, `apps/web/tests/hud.test.tsx`, `apps/web/tests/i18n.test.tsx`, `apps/web/tests/input.test.tsx`, `apps/web/tests/lobby-settings.test.tsx`, `apps/web/tests/match-controls.test.tsx`, `apps/web/tests/orientation.test.tsx`, `apps/web/tests/phrases.test.tsx`, `apps/web/tests/power-ring.test.tsx`, `apps/web/tests/ruler.test.tsx`, `apps/web/tests/shell.test.tsx`, `apps/web/tests/weapon-strip.test.tsx`, `apps/web/tests/wind-dial.test.tsx` |
 | Repository | `tests/meta/bundle-secrets.test.ts`, `tests/meta/traceability.test.ts` |
-| Browser flows | `tests/e2e/a11y.spec.ts`, `tests/e2e/bundle.spec.ts`, `tests/e2e/lobby.spec.ts`, `tests/e2e/main.spec.ts`, `tests/e2e/routes.spec.ts`, `tests/e2e/signin.spec.ts`, `tests/e2e/smoke.spec.ts` |
+| Browser flows | `tests/e2e/a11y.spec.ts`, `tests/e2e/bundle.spec.ts`, `tests/e2e/lobby.spec.ts`, `tests/e2e/main.spec.ts`, `tests/e2e/migration.spec.ts`, `tests/e2e/routes.spec.ts`, `tests/e2e/signin.spec.ts`, `tests/e2e/smoke.spec.ts` |
 
 Each `apps/worker/tests/room-*.ts` file drives the real `Room` object through
 `apps/worker/tests/support/room-harness.ts` (a Hibernation-API fake) or the real route through
@@ -38,7 +38,6 @@ asserts the same SQL that production runs.
 | `tests/e2e/fullscreen.spec.ts` | `docs/02-reference/screens/match.md` |
 | `tests/e2e/leaderboard.spec.ts` | `docs/02-reference/screens/leaderboard.md` |
 | `tests/e2e/match.spec.ts` | `docs/02-reference/screens/match.md`, `docs/03-stories/EPIC-05-match-ui/US-MATCH-001-render-the-battlefield.md` |
-| `tests/e2e/migration.spec.ts` | `docs/02-reference/screens/match.md` |
 | `tests/e2e/offline.spec.ts` | `docs/02-reference/screens/main.md`, `docs/02-reference/screens/match.md` |
 | `tests/e2e/orientation.spec.ts` | `docs/02-reference/screens/README.md` |
 | `tests/e2e/privacy.spec.ts` | `docs/03-stories/EPIC-02-rooms/US-ROOM-006-relay-signaling-and-issue-turn-credentials.md` |

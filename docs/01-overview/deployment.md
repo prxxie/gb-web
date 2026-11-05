@@ -68,7 +68,7 @@ for the deploy step. A PR from a fork does not get secrets and therefore does no
 
 | Check | Command | Pass |
 |-------|---------|------|
-| API alive | `curl -fsS https://api.gbw.<domain>/api/v1/health` | `200`, `{"status":"ok","version":"<git sha>"}` |
+| API alive | `curl -fsS https://api.gbw.<domain>/api/v1/health` | `200`, `{"status":"ok","version":"<git sha, or the deploy tag>"}` |
 | Static app | `curl -fsSI https://gbw.<domain>/` | `200`, `content-type: text/html`, service worker reachable |
 | Sign-in route loads Clerk | Playwright `tests/e2e/prod-smoke.spec.ts` against production | Sign-in card renders for both locales |
 | Room round trip | Same spec: two contexts create/join a room | Roster shows 2 members within 5 s |

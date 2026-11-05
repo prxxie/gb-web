@@ -25,6 +25,17 @@ export function weatherSequence(seed: number, rounds: number): readonly Weather[
   return Array.from({ length: rounds }, (_, index) => rollWeather(seed, index + 1));
 }
 
+/**
+ * Take an incoming weather only when it belongs to a later round than the one in hand.
+ *
+ * The wire can deliver a `weather` event after a newer one (a `gust` spike and the round roll are two
+ * events in the same turn), so "last one wins" is wrong: the round number is the tie-break, and an equal
+ * round means the frame is a duplicate (`US-CORE-015` AC7, `TC-NET-004`).
+ */
+export function newerWeather(current: Weather, incoming: Weather): Weather {
+  return incoming.rolledAtRound > current.rolledAtRound ? incoming : current;
+}
+
 export function isCalm(weather: Weather): boolean {
   return weather.wind.magnitude === 0;
 }

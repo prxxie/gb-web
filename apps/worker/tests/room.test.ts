@@ -71,16 +71,16 @@ describe("grace and host election (US-ROOM-004, US-ROOM-005)", () => {
     // Act
     await harness.close(host);
 
-    // Assert — signaling.md §4: the host stays host until the grace alarm elects
+    // Assert — signaling.md §4: the seat enters grace, but the *role* moves at once (`US-ROOM-005` AC1)
     const member = harness.state().members.find((candidate) => candidate.playerId === "h");
     expect(member?.connectionState).toBe("grace");
-    expect(member?.role).toBe("host");
+    expect(member?.role).toBe("player");
     const [left] = peer.framesOf("peer_left");
     expect(left?.["reason"]).toBe("grace");
   });
 
-  it("TC-ROOM-048: the election waits for the 20 s grace", async () => {
-    // Arrange — signaling.md §4 says the *alarm* elects, so no election has happened yet
+  it("TC-ROOM-048: the close itself elects, so authority never waits for the seat's grace", async () => {
+    // Arrange — `US-ROOM-005` AC1 plus NFR-06: promotion inside 5 s, and only the *seat* keeps its grace
     const { harness, host } = await startRoom();
     await harness.close(host);
 
@@ -88,8 +88,8 @@ describe("grace and host election (US-ROOM-004, US-ROOM-005)", () => {
     const state = harness.state();
 
     // Assert
-    expect(state.hostPlayerId).toBe("h");
-    expect(state.hostGeneration).toBe(1);
+    expect(state.hostPlayerId).not.toBe("h");
+    expect(state.hostGeneration).toBe(2);
   });
 
   it("TC-ROOM-048: after the grace alarm the oldest peer hosts, generation goes up, exactly one host role", async () => {

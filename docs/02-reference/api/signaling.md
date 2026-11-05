@@ -50,14 +50,18 @@ Close codes: `4401` unauthenticated, `4404` room not found, `4409` room full, `4
 
 ## Host election
 
-On the host's socket closing: mark it `grace` and arm the 20 s grace alarm. The election itself runs when that alarm fires — a host that is merely `grace` keeps the role, because a two-second tunnel must not hand the room over. The alarm elects the **longest-connected
-connected peer** (`joinedAt` ascending, `slot` ascending as tie-break). Increment `hostGeneration`, broadcast
-`host_changed` with the stored `lastSnapshot`, and promote that member to `role: 'host'`. Election is skipped when no
-peer is `connected` (room → `abandoned`) or when the room is in `lobby` (the room simply waits for a new host to join
-and claim by `POST /rooms`-less path: the earliest joiner becomes host automatically).
+On the host's socket closing: mark its seat `grace` (the 20 s window `US-ROOM-004` gives a phone that dropped), and
+**promote at once** — authority over physics cannot wait 20 s (`US-ROOM-005` AC1, `NFR-06`). The promoted member is the
+oldest `connected` peer still holding a socket (`joinedAt` ascending, `slot` ascending as tie-break); a peer that is
+only `grace` is never promoted. Increment `hostGeneration`, broadcast `host_changed` with the stored `lastSnapshot`, and
+give that member `role: 'host'`.
+
+The promotion is then **verified**: five seconds later an alarm checks that the new host is actually live. If it is not,
+the next candidate is tried exactly once; if that fails too, the room is `abandoned` (`US-ROOM-005` AC3, `TC-ROOM-169`).
+A lobby is never abandoned this way — it simply waits for a member to be promoted by the same rule.
 
 If the graced player returns within 20 s it re-joins with the same `accountId`/`guestId`, keeps its slot, and is a peer
-(`NFR-07`).
+(`NFR-07`): the seat was held, the role was not.
 
 ## Snapshot payload (`state` channel)
 
@@ -133,11 +137,14 @@ stays `1` because no deployed client exists yet.
 
 ### Snapshot additions
 
-`turn` gains `queue: number[]` and `delays: number[]`; each `players[]` entry gains `shield`, `energy`, `weaponSlot`,
-`items: Array<{id:string,qty:number}>` and `bonus`; a new optional `modeState` carries `jewels[]`, `score` or
-`activeTeam`; a new optional `terrain` carries the RLE mask after a carve. The state budget stays **≤800 B at eight
-players** (`NFR-04`) and a mask-bearing snapshot stays under the **8 KB** frame cap; both halves are asserted by
-`TC-CORE-041`.
+`turn` gains `queue: number[]` and `delays: number[]`; each `players[]` entry gains `shield`, `energy` and `weaponSlot`
+(the slot that seat last fired with — the host tracks it from accepted `input` frames, it is not a property of the
+player); `sc` carries the two team scores, `j` the jewel triples (`x, y, carriedBy`) and `at` the tag flag (omitted
+while it is A); `v` carries `rulesetVersion`, so a peer can refuse to rank a match it did not play under; a new
+optional `terrain` carries the RLE mask after a carve. `applySnapshot` restores all of it — scores, jewels, the tag
+flag and the version — so a peer's result screen and jewel HUD match the host's (`TC-CORE-042`). The state budget
+stays **≤800 B at eight players** (`NFR-04`) and a mask-bearing snapshot stays under the **8 KB** frame cap; both
+halves are asserted by `TC-CORE-041`.
 
 ## Contract status (2026-11-05)
 

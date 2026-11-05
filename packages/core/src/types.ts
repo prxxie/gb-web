@@ -327,6 +327,8 @@ export interface Snapshot {
    *  not ride along at 10 Hz. Its presence is what makes host and peer masks identical (`US-CORE-006` AC4). */
   readonly terrain?: string;
   readonly winnerTeam: Team | null;
+  /** The ruleset the host played under, so a peer can refuse to rank across a version change (`US-CORE-007` AC5). */
+  readonly rulesetVersion?: string;
 }
 
 export interface PlayerSnapshot {

@@ -156,7 +156,7 @@ describe("Clerk JWT verification", () => {
     }
   });
 
-  it("answers 401, not 500, when the JWKS endpoint is unavailable", async () => {
+  it("answers 503 with a retry hint when the JWKS endpoint is unavailable and nothing is cached", async () => {
     const broken = await fakeClerk({ brokenJwks: true });
     try {
       const token = await broken.sign("user_1");
@@ -166,9 +166,31 @@ describe("Clerk JWT verification", () => {
         testEnv().env,
       );
 
-      expect(response.status).toBe(401);
+      // The token may well be valid; we simply could not check it, and that is retryable (`AC4`).
+      expect(response.status).toBe(503);
+      const problem = (await response.json()) as Record<string, unknown>;
+      expect(String(problem["type"])).toMatch(/\/problems\/unavailable$/);
+      expect(problem["retryAfterSeconds"]).toBeGreaterThan(0);
     } finally {
       broken.restore();
+    }
+  });
+
+  it("refuses a token Clerk minted for another application", async () => {
+    const clerk = await fakeClerk();
+    try {
+      const token = await clerk.sign("user_1", undefined, { azp: "https://evil.example" });
+
+      const response = await handleFetch(
+        jsonRequest(SESSIONS, { kind: "account" }, { authorization: `Bearer ${token}` }),
+        testEnv().env,
+      );
+
+      expect(response.status).toBe(401);
+      const problem = (await response.json()) as Record<string, unknown>;
+      expect(problem["type"]).toMatch(/unauthenticated/);
+    } finally {
+      clerk.restore();
     }
   });
 

@@ -3,6 +3,8 @@ import { getMap } from "../src/data/maps.js";
 import { getMobile } from "../src/data/mobiles.js";
 import {
   GIMMICK_IDS,
+  HEAL_ZONE_RADIUS,
+  HEAL_ZONE_X,
   applyGimmicks,
   returnsOffMapShots,
   visibilityMultiplier,
@@ -155,7 +157,7 @@ describe("gimmicks", () => {
     const wounded: MatchState = {
       ...state,
       players: state.players.map((player) =>
-        player.slot === 0 ? { ...player, hp: Math.max(1, player.hp - 400) } : player,
+        player.slot === 0 ? { ...player, x: HEAL_ZONE_X, hp: Math.max(1, player.hp - 400) } : player,
       ),
     };
 
@@ -168,18 +170,41 @@ describe("gimmicks", () => {
     );
   });
 
+  it("TC-CORE-919: a unit outside the heal zone gains nothing", () => {
+    const state = match("map-02");
+    const outside: MatchState = {
+      ...state,
+      players: state.players.map((player) =>
+        player.slot === 0 ? { ...player, x: HEAL_ZONE_X + HEAL_ZONE_RADIUS + 40, hp: 200 } : player,
+      ),
+    };
+    const healed = applyGimmicks(outside, 2, getMap("map-02"));
+    expect(healed.events.some((event) => event.kind === "heal")).toBe(false);
+    expect(healed.players.find((player) => player.slot === 0)!.hp).toBe(200);
+  });
+
   it("TC-CORE-919: the heal zone never takes a unit above its own maximum health", () => {
     const state = match("map-02");
     const mobile = getMobile("mbl-01");
     const nearFull: MatchState = {
       ...state,
       players: state.players.map((player) =>
-        player.slot === 0 ? { ...player, hp: mobile.maxHp - 5 } : player,
+        player.slot === 0 ? { ...player, x: HEAL_ZONE_X, hp: mobile.maxHp - 5 } : player,
       ),
     };
 
     const healed = applyGimmicks(nearFull, 2, getMap("map-02"));
     expect(healed.players.find((player) => player.slot === 0)!.hp).toBe(mobile.maxHp);
+  });
+
+  it("TC-CORE-918: a wind map re-rolls twice and plays the second roll", () => {
+    const state = match("map-05");
+    const played = applyGimmicks(state, 2, getMap("map-05"));
+    // The map rolls its weather for the round; the gimmick rolls again and the second roll is the one that
+    // stands, so the result is the roll of round × 2 and not the round's own weather.
+    expect(played.weather.rolledAtRound).toBe(2);
+    expect(played.weather.wind).toEqual(rollWeather(state.seed, 4).wind);
+    expect(played.weather.wind).not.toEqual(rollWeather(state.seed, 2).wind);
   });
 
   it("TC-CORE-931: fog halves the visible window and leaves the battle state alone", () => {

@@ -69,9 +69,9 @@ export function currentHost(room: RoomState): RoomMember | undefined {
  * Longest-connected peer becomes host (`US-ROOM-005`): the oldest `joinedAt`, ties broken by slot.
  * Grace and disconnected members are skipped so a dropped peer cannot inherit the match.
  */
-export function electHost(room: RoomState): string | null {
+export function electHost(room: RoomState, exclude: readonly string[] = []): string | null {
   const candidates = room.members
-    .filter((member) => member.playerId !== room.hostPlayerId)
+    .filter((member) => member.playerId !== room.hostPlayerId && !exclude.includes(member.playerId))
     .sort((a, b) => a.joinedAt - b.joinedAt || a.slot - b.slot);
   // A peer already inside its grace window cannot take the host role: promoting it would hand the room to a
   // socket that is gone, so the oldest *connected* peer wins and a disconnected one is only the last resort.
@@ -288,6 +288,22 @@ export interface CreateRoomOptions {
 }
 
 /** A fresh lobby. The worker creates one per code; tests create one per case. */
+/**
+ * Change the lobby settings, host-validated by the caller (the DO knows who the host is, core does not).
+ *
+ * A capacity may not be cut below the members already seated: shrinking the room under them would leave
+ * seats that no longer exist (`US-CORE-012` AC4, `TC-ROOM-151`).
+ */
+export function setRoomSettings(
+  room: RoomState,
+  settings: Partial<RoomSettings>,
+): { readonly ok: true; readonly room: RoomState } | { readonly ok: false; readonly reason: "below-seated" } {
+  if (settings.maxPlayers !== undefined && settings.maxPlayers < room.members.length) {
+    return { ok: false, reason: "below-seated" };
+  }
+  return { ok: true, room: { ...room, settings: { ...room.settings, ...settings } } };
+}
+
 export function createRoom(options: CreateRoomOptions): RoomState {
   const maxPlayers = (options.settings?.maxPlayers ?? 4) as RoomSettings["maxPlayers"];
   return {

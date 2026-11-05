@@ -22,6 +22,7 @@ import {
   leaveRoom,
   markDisconnected,
   parseClientFrame,
+  setRoomSettings,
   type ErrorCode,
   type JoinRequest,
   type LoadoutEntry,
@@ -58,6 +59,8 @@ interface SocketMeta {
 
 /** `signaling.md` § 5: what one socket may send per second, per frame kind. */
 const BUDGETS = { ping: 10, signal: 20, chat: 2 } as const;
+/** How long a promoted host has to prove it is live before the next candidate is tried (`US-ROOM-005` AC3). */
+const HOST_MIGRATION_RECHECK_MS = 5_000;
 
 /** Core refusal → the code the client branches on (`docs/02-reference/api/README.md`). */
 const START_REJECTIONS: Record<NonNullable<ReturnType<typeof canStart>>, ErrorCode> = {
@@ -83,6 +86,11 @@ export class Room implements DurableObject {
   private origin: string | null = null;
   /** What was written to storage, so a reconnect does not rewrite an unchanging constant (`N8`). */
   private persistedOrigin: string | null = null;
+  /**
+   * Candidates already tried since the host vanished (`US-ROOM-005` AC3). Empty means "no migration in
+   * flight"; a non-empty list means the next alarm must check that the promoted host is actually live.
+   */
+  private hostCheck: readonly string[] = [];
   /** The `match_recorded` payload, kept so a host retry after a network blip can be answered, not refused. */
   private recorded: { matchId: string; winnerTeam: "A" | "B" | null; ranked: boolean; ratings: readonly { accountId: string; before: number; after: number; delta: number }[]; players: readonly { slot: number; result: "win" | "loss" | "abandon" }[] } | null = null;
 
@@ -98,15 +106,18 @@ export class Room implements DurableObject {
       const storedSnapshot = await this.ctx.storage.get<Snapshot>("snapshot");
       const storedStart = await this.ctx.storage.get<number>("matchStartedAt");
       const storedOrigin = await this.ctx.storage.get<string>("origin");
+      const storedHostCheck = await this.ctx.storage.get<string[]>("hostCheck");
       if (stored) this.room = storedSnapshot ? { ...stored, lastSnapshot: storedSnapshot } : stored;
       this.matchStartedAt = storedStart ?? null;
       this.origin = storedOrigin ?? null;
       this.persistedOrigin = storedOrigin ?? null;
+      this.hostCheck = storedHostCheck ?? [];
     });
   }
 
   private async persist(): Promise<void> {
     await this.ctx.storage.put("room", this.room);
+    await this.ctx.storage.put("hostCheck", this.hostCheck);
     if (this.room.lastSnapshot) await this.ctx.storage.put("snapshot", this.room.lastSnapshot);
   }
 
@@ -471,22 +482,18 @@ export class Room implements DurableObject {
       this.reject(ws, "bad-request", `${frame.mode} is not a mode`);
       return;
     }
-    // Shrinking a room below the people already in it would strand members with no team to sit on
-    // (`US-ROOM-007`): the seat count may only change when it still holds everyone.
-    if (frame.maxPlayers !== undefined && frame.maxPlayers < this.room.members.length) {
+    // The rule lives in core, next to `createRoom`, so a test can hold it without a Durable Object.
+    const outcome = setRoomSettings(this.room, {
+      mode: frame.mode,
+      mapId: frame.mapId,
+      ...(frame.maxPlayers === undefined ? {} : { maxPlayers: frame.maxPlayers }),
+      ...(frame.isPrivate === undefined ? {} : { isPrivate: frame.isPrivate }),
+    });
+    if (!outcome.ok) {
       this.reject(ws, "invalid-state", `${this.room.members.length} players are already seated`);
       return;
     }
-    this.room = this.withActivity({
-      ...this.room,
-      settings: {
-        ...this.room.settings,
-        mode: frame.mode,
-        mapId: frame.mapId,
-        ...(frame.maxPlayers === undefined ? {} : { maxPlayers: frame.maxPlayers }),
-        ...(frame.isPrivate === undefined ? {} : { isPrivate: frame.isPrivate }),
-      },
-    });
+    this.room = this.withActivity(outcome.room);
     await this.persist();
     this.broadcast({ t: "room_state", room: this.publicState() });
   }
@@ -763,10 +770,13 @@ export class Room implements DurableObject {
     await this.persist();
     this.broadcast({ t: "peer_left", playerId, reason: "grace" });
     this.broadcast({ t: "room_state", room: this.publicState() });
-    // No election here: `US-ROOM-004` gives the host its grace window to come back, and the alarm
-    // below decides at the end of it.
-    // Keep whichever alarm is sooner: this must not clobber the 24 h match cap set on `start_match`.
-    const at = Date.now() + TUNABLES.roomGraceMs;
+    // The seat keeps its grace window (`US-ROOM-004`), but the host *role* is authority over physics and it
+    // cannot wait 20 s (`US-ROOM-005` AC1, NFR-06). A returning host comes back as a plain peer (AC4).
+    const wasHost = playerId === this.room.hostPlayerId;
+    if (wasHost) await this.migrateHost();
+    // Keep whichever alarm is sooner: this must not clobber the 24 h match cap set on `start_match`. A host
+    // drop needs its 5 s recheck, a peer drop only the seat's grace window.
+    const at = Date.now() + (wasHost ? HOST_MIGRATION_RECHECK_MS : TUNABLES.roomGraceMs);
     const existing = await this.ctx.storage.getAlarm();
     if (existing === null || existing > at) await this.ctx.storage.setAlarm(at);
   }
@@ -805,6 +815,47 @@ export class Room implements DurableObject {
     this.broadcast({ t: "room_state", room: this.publicState() });
   }
 
+  /**
+   * Promotes the oldest connected peer and remembers who was tried (`US-ROOM-005` AC1/AC3). If the new host
+   * never comes online, the alarm retries once with the next candidate and then abandons the room.
+   */
+  private async migrateHost(): Promise<void> {
+    const promoted = this.nextHostCandidate();
+    const previousHostId = this.room.hostPlayerId ?? "";
+    if (!promoted) {
+      // Nobody left to promote. A lobby simply waits; a live match is over (`AC3`).
+      if (this.room.status === "playing") {
+        this.room = this.withActivity({ ...this.room, status: "abandoned" });
+        await this.persist();
+        this.broadcast({ t: "room_state", room: this.publicState() });
+      }
+      return;
+    }
+    this.hostCheck = [...this.hostCheck, promoted];
+    this.room = { ...this.room, hostPlayerId: promoted };
+    await this.announceHostChange(previousHostId);
+    // The recheck is what turns "promoted" into "playable" — five seconds is the NFR-06 budget.
+    const at = Date.now() + HOST_MIGRATION_RECHECK_MS;
+    const existing = await this.ctx.storage.getAlarm();
+    if (existing === null || existing > at) await this.ctx.storage.setAlarm(at);
+  }
+
+  /** The oldest member that is connected right now and has not already been tried (`AC1`, `AC3`). */
+  private nextHostCandidate(): string | null {
+    return (
+      this.room.members
+        .filter(
+          (member) =>
+            member.playerId !== undefined &&
+            member.playerId !== this.room.hostPlayerId &&
+            !this.hostCheck.includes(member.playerId) &&
+            this.sockets.has(member.playerId) &&
+            member.connectionState === "connected",
+        )
+        .sort((left, right) => left.joinedAt - right.joinedAt || left.slot - right.slot)[0]?.playerId ?? null
+    );
+  }
+
   async webSocketError(ws: WebSocket): Promise<void> {
     await this.webSocketClose(ws);
   }
@@ -813,6 +864,34 @@ export class Room implements DurableObject {
   async alarm(): Promise<void> {
     const now = Date.now();
     await this.sweepSilentSockets(now);
+
+    // `US-ROOM-005` AC3: a migration that did not produce a live host inside 5 s retries once with the next
+    // candidate and then gives the room up. This runs before the grace sweep so a dead host cannot be
+    // "re-elected" by the code below.
+    if (this.hostCheck.length > 0) {
+      const host = this.room.members.find((member) => member.playerId === this.room.hostPlayerId);
+      const hostLive = host?.connectionState === "connected" && this.sockets.has(host.playerId ?? "");
+      if (!hostLive) {
+        const next = this.nextHostCandidate();
+        if (next) {
+          this.room = { ...this.room, hostPlayerId: next };
+          this.hostCheck = [...this.hostCheck, next];
+          await this.announceHostChange(host?.playerId ?? "");
+          await this.persist();
+          const at = Date.now() + HOST_MIGRATION_RECHECK_MS;
+          const existing = await this.ctx.storage.getAlarm();
+          if (existing === null || existing > at) await this.ctx.storage.setAlarm(at);
+          return;
+        }
+        // Every candidate is exhausted: the match cannot continue (`AC3`).
+        if (this.room.status === "playing") {
+          this.room = { ...this.room, status: "abandoned" };
+          await this.persist();
+        }
+      }
+      this.hostCheck = [];
+      await this.persist();
+    }
 
     // A grace that ran out becomes `disconnected`, and every peer hears about it (`US-ROOM-004` AC3).
     const expired = this.room.members.filter((member) => member.connectionState === "grace");

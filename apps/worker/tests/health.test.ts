@@ -68,14 +68,16 @@ describe("GET /health", () => {
     expect(record["status"]).toBe(200);
   });
 
-  it("answers an unknown route with 400 rather than the probe body", async () => {
+  it("answers an unknown route with 404 rather than the probe body", async () => {
     const { env } = testEnv();
 
     const response = await health(env, "https://api.test/api/v1/readyz");
 
-    expect(response.status).toBe(400);
+    // A path that exists nowhere is a missing resource, not a malformed request (`FND-002` AC5).
+    expect(response.status).toBe(404);
     const problem = (await response.json()) as Record<string, unknown>;
-    expect(problem["type"]).toContain("bad-request");
+    expect(problem["type"]).toContain("not-found");
+    expect(problem["instance"]).toBe("/api/v1/readyz");
     expect(typeof problem["request_id"]).toBe("string");
   });
 });

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { acceptSnapshot, applySnapshot, encodeBytes, encodeSnapshot, decodeSnapshot, snapshotBytes, toSnapshot } from "../src/snapshot.js";
 import { createMatch, type Seat } from "../src/match.js";
+import type { MatchState } from "../src/types.js";
 import { TUNABLES } from "../src/tuning.js";
 
 const NOW = 1_700_000_000_000;
@@ -16,6 +17,34 @@ function fullMatch() {
 }
 
 describe("TC-CORE-040: snapshot round trip", () => {
+  it("AC5: the scores, the jewels and the ruleset version survive the wire", () => {
+    const state = createMatch({
+      matchId: "m-2",
+      roomCode: "ABC235",
+      seed: 12,
+      mode: "jewel",
+      mapId: "map-01",
+      seats: [seat(0, "A"), seat(1, "B")],
+      now: NOW,
+    });
+    const scored: MatchState = {
+      ...state,
+      rulesetVersion: "2026-11-06",
+      scores: {
+        score: { A: 3, B: 1 },
+        activeTeam: "B",
+        jewels: state.scores.jewels.map((jewel, index) => ({ ...jewel, carriedBy: index === 0 ? 1 : null })),
+      },
+    };
+    const applied = applySnapshot(scored, decodeSnapshot(encodeSnapshot(toSnapshot(scored, 1))));
+
+    expect(applied.scores.score).toEqual({ A: 3, B: 1 });
+    expect(applied.scores.activeTeam).toBe("B");
+    expect(applied.scores.jewels.filter((jewel) => jewel.carriedBy === 1)).toHaveLength(1);
+    // A peer needs the version to know whether its own ruleset may rank this match (`US-CORE-007` AC5).
+    expect(applied.rulesetVersion).toBe("2026-11-06");
+  });
+
   it("encodes and decodes back to the same state", () => {
     const state = fullMatch();
     const snapshot = toSnapshot(state, 3);

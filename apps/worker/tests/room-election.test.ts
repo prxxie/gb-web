@@ -48,10 +48,8 @@ describe("room host election", () => {
     harness.clearAll(sockets.values());
     const generationBefore = harness.state().hostGeneration;
 
-    // `US-ROOM-005`: the host keeps the role for its 20 s grace window; the alarm elects after it.
+    // `US-ROOM-005` AC1: authority cannot wait for the seat's grace window, so the promotion is immediate.
     await harness.close(host);
-    vi.setSystemTime(BASE + 20_000);
-    await harness.alarm();
 
     const frames = sockets.get("p1")!.frames();
     const kinds = frames.map((frame) => frame["t"]);
@@ -97,13 +95,9 @@ describe("room host election", () => {
     const { harness, sockets } = await playingRoom();
     const generationBefore = harness.state().hostGeneration;
     await harness.close(sockets.get("host")!);
-    vi.setSystemTime(BASE + 20_000);
-    await harness.alarm();
 
     harness.clearAll(sockets.values());
     await harness.close(sockets.get("p1")!);
-    vi.setSystemTime(BASE + 40_000);
-    await harness.alarm();
 
     const changed = sockets.get("p3")!.framesOf("host_changed");
     expect(changed).toHaveLength(1);
@@ -113,6 +107,28 @@ describe("room host election", () => {
     });
     expect(harness.state().hostPlayerId).toBe("p2");
     expect(harness.state().hostGeneration).toBe(generationBefore + 2);
+  });
+
+  it("TC-ROOM-048: the five-second recheck keeps a live host and never promotes twice", async () => {
+    const { harness, sockets } = await playingRoom();
+    const generationBefore = harness.state().hostGeneration;
+    harness.clearAll(sockets.values());
+    await harness.close(sockets.get("host")!);
+
+    // `p1` answered, so the recheck at 5 s finds a live host and stops (`AC3` ends here, not in a retry).
+    vi.setSystemTime(BASE + 10_000 + 5_000);
+    await harness.alarm();
+
+    expect(harness.state().hostPlayerId).toBe("p1");
+    expect(harness.state().hostGeneration).toBe(generationBefore + 1);
+    expect(sockets.get("p3")!.framesOf("host_changed")).toHaveLength(1);
+  });
+
+  it("TC-ROOM-169: when no connected peer is left the match is abandoned, not left hostless", async () => {
+    const { harness, sockets } = await playingRoom();
+    for (const socket of sockets.values()) await harness.close(socket);
+
+    expect(harness.state().status).toBe("abandoned");
   });
 
   it("TC-ROOM-127: a peer socket close reports peer_left grace and arms the 20 s alarm", async () => {

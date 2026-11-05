@@ -1,7 +1,7 @@
 import type { PlayerSnapshot, ProjectileSnapshot, Snapshot } from "./types.js";
 import { deserializeTerrain, serializeTerrain, type Terrain } from "./terrain.js";
 import { TUNABLES, roundTo } from "./tuning.js";
-import type { MatchState } from "./types.js";
+import type { MatchState, ScoreState } from "./types.js";
 
 /**
  * Compact wire snapshot.
@@ -20,6 +20,8 @@ export interface WireSnapshot {
   readonly st: string; // status
   readonly m?: string; // terrain RLE, only after a carve
   readonly wt: string | null; // winner team
+  readonly v?: string; // rulesetVersion, so a peer can refuse to rank across a version change
+  readonly at?: "A" | "B"; // the tag flag: which team is acting. Omitted when it is A
 }
 
 export interface SnapshotOptions {
@@ -50,7 +52,9 @@ export function toSnapshot(
         facing: player.facing,
         delay: player.delay,
         eliminated: player.eliminated,
-        weaponSlot: 0,
+        // The slot is the last one this seat fired with, not a property of the player: the host passes the
+        // map it tracks from accepted inputs (`options.weaponSlots`), and 0 is the honest default.
+        weaponSlot: options.weaponSlots?.[player.slot] ?? 0,
       }),
     ),
     projectiles: state.projectiles.map(
@@ -70,6 +74,7 @@ export function toSnapshot(
     },
     status: state.status,
     winnerTeam: state.winnerTeam,
+    rulesetVersion: state.rulesetVersion,
   };
 }
 
@@ -90,13 +95,15 @@ export function toWire(state: MatchState, hostGeneration: number, options: Snaps
       player.facing,
       player.delay,
       player.eliminated ? 1 : 0,
-      options.weaponSlots?.[player.slot] ?? 0,
+      options.weaponSlots?.[player.slot] ?? player.weaponSlot,
     ]),
     j: snapshot.scores.jewels.flatMap((jewel) => [jewel.x, jewel.y, jewel.carriedBy ?? -1]),
     sc: [snapshot.scores.score.A, snapshot.scores.score.B],
     st: snapshot.status,
     ...(snapshot.terrain === undefined ? {} : { m: snapshot.terrain }),
     wt: snapshot.winnerTeam,
+    ...(snapshot.scores.activeTeam === "A" ? {} : { at: snapshot.scores.activeTeam }),
+    ...(snapshot.rulesetVersion === undefined ? {} : { v: snapshot.rulesetVersion }),
   };
 }
 
@@ -120,13 +127,15 @@ export function encodeSnapshot(snapshot: Snapshot | WireSnapshot): string {
       player.facing,
       player.delay,
       player.eliminated ? 1 : 0,
-      0,
+      player.weaponSlot,
     ]),
     ...(state.terrain === undefined ? {} : { m: state.terrain }),
     j: state.scores.jewels.flatMap((jewel) => [jewel.x, jewel.y, jewel.carriedBy ?? -1]),
     sc: [state.scores.score.A, state.scores.score.B],
     st: state.status,
     wt: state.winnerTeam,
+    ...(state.scores.activeTeam === "A" ? {} : { at: state.scores.activeTeam }),
+    ...(state.rulesetVersion === undefined ? {} : { v: state.rulesetVersion }),
   };
   return JSON.stringify(wire);
 }
@@ -191,12 +200,13 @@ export function decodeSnapshot(text: string): Snapshot {
     projectiles: [],
     scores: {
       score: { A: wire.sc[0] ?? 0, B: wire.sc[1] ?? 0 },
-      activeTeam: "A",
+      activeTeam: wire.at === "B" ? "B" : "A",
       jewels: chunkJewels(wire.j ?? []),
     },
     status: (wire.st as Snapshot["status"]) ?? "playing",
     ...(wire.m === undefined ? {} : { terrain: wire.m }),
     winnerTeam: (wire.wt as Snapshot["winnerTeam"]) ?? null,
+    ...(wire.v === undefined ? {} : { rulesetVersion: wire.v }),
   };
 }
 
@@ -231,6 +241,10 @@ export interface ApplyResult {
   readonly players: MatchState["players"];
   readonly seq: number;
   readonly changed: boolean;
+  /** Team scores, the tag flag and the jewels, so a peer's result and jewel HUD match the host's. */
+  readonly scores: ScoreState;
+  /** The ruleset the host played under, when the snapshot carried one. */
+  readonly rulesetVersion?: string;
   /** The decoded mask as match state stores it (heights), present only when the snapshot carried one. */
   readonly terrain?: readonly number[];
 }
@@ -253,7 +267,14 @@ export function applySnapshot(state: MatchState, snapshot: Snapshot): ApplyResul
   });
   const terrain =
     snapshot.terrain === undefined ? undefined : Array.from(deserializeTerrain(state.mapId, snapshot.terrain).heights);
-  return { players, seq: snapshot.seq, changed: true, ...(terrain ? { terrain } : {}) };
+  return {
+    players,
+    seq: snapshot.seq,
+    changed: true,
+    scores: snapshot.scores,
+    ...(terrain ? { terrain } : {}),
+    ...(snapshot.rulesetVersion === undefined ? {} : { rulesetVersion: snapshot.rulesetVersion }),
+  };
 }
 
 /** Size of a snapshot for the current state, in bytes — used by tests and the budget check. */

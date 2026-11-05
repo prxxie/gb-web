@@ -1,0 +1,84 @@
+name: Deploy production
+
+# `US-FND-004` AC2: on a merge to `main`, migrations run against the production D1 **before** the worker
+# deploys, and the Pages deployment is last — so the site never points at a worker whose schema is older
+# than the database. `set -e` plus separate steps means the job stops at the first failing step.
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  deployments: write
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+env:
+  VITE_API_BASE: /api/v1
+  CF_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+  CF_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+jobs:
+  deploy:
+    name: migrations → worker → pages
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      - name: Apply production migrations
+        working-directory: apps/worker
+        run: pnpm exec wrangler d1 migrations apply GBW_DB --remote --env production
+
+      - name: Deploy the production worker
+        id: worker
+        working-directory: apps/worker
+        run: |
+          set -euo pipefail
+          pnpm exec wrangler deploy --env production | tee "$RUNNER_TEMP/deploy.log"
+
+      - name: Build the web app
+        env:
+          VITE_CLERK_PUBLISHABLE_KEY: ${{ secrets.VITE_CLERK_PUBLISHABLE_KEY }}
+        run: pnpm build
+
+      - name: Deploy the Pages production branch
+        run: |
+          set -euo pipefail
+          pnpm exec wrangler pages deploy apps/web/dist \
+            --project-name "${{ vars.CLOUDFLARE_PAGES_PROJECT }}" \
+            --branch main
+
+      # The health check is the release gate (`docs/08-ops/runbook.md` § Deploy): a worker that answers
+      # with the previous sha means the deploy silently rolled back, and that must fail the job loudly.
+      - name: Verify the deployed sha
+        env:
+          SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+          API: ${{ vars.PRODUCTION_API_URL }}
+        run: |
+          set -euo pipefail
+          for _ in $(seq 1 30); do
+            body=$(curl -fsS "$API/api/v1/health" || true)
+            if printf '%s' "$body" | grep -q "\"version\":\"${SHA:0:7}\""; then
+              echo "health reports ${SHA:0:7}"
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "::error::health never reported ${SHA:0:7}: $body"
+          exit 1

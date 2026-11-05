@@ -21,5 +21,44 @@
   "durable_objects": {
     "bindings": [{ "name": "ROOMS", "class_name": "Room" }]
   },
-  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Room"] }]
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Room"] }],
+  "env": {
+    "preview": {
+      "name": "gbw-api-preview",
+      "vars": {
+        "ENVIRONMENT": "development",
+        "CLERK_ISSUER": "https://heroic-bison-1878.clerk.accounts.dev",
+        "ALLOWED_ORIGINS": "https://pr-0.gbw-pages.pages.dev"
+      },
+      "d1_databases": [
+        {
+          "binding": "GBW_DB",
+          "database_name": "gbw-preview",
+          "database_id": "REPLACE_WITH_PREVIEW_D1_ID",
+          "migrations_dir": "migrations"
+        }
+      ],
+      "durable_objects": { "bindings": [{ "name": "ROOMS", "class_name": "Room" }] },
+      "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Room"] }]
+    },
+    "production": {
+      "name": "gbw-api",
+      "routes": [{ "pattern": "api.gbw.example", "custom_domain": true }],
+      "vars": {
+        "ENVIRONMENT": "production",
+        "CLERK_ISSUER": "https://heroic-bison-1878.clerk.accounts.dev",
+        "ALLOWED_ORIGINS": "https://gbw.example"
+      },
+      "d1_databases": [
+        {
+          "binding": "GBW_DB",
+          "database_name": "gbw",
+          "database_id": "1a3895e6-6912-4960-afe6-5d3838e2dffd",
+          "migrations_dir": "migrations"
+        }
+      ],
+      "durable_objects": { "bindings": [{ "name": "ROOMS", "class_name": "Room" }] },
+      "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Room"] }]
+    }
+  }
 }

@@ -56,6 +56,9 @@ The `covers` column names the requirement ([nonfunctional-requirements.md](../01
 | TC-ROOM-134 | US-ROOM-001 | Create vs join from the main menu | Host lands in the lobby with a copy control, peer joins the same room | e2e | FR-01 |
 | TC-ROOM-136 | US-ROOM-001 | Join a 404/410 code | Banner shown, stays on `/` | e2e | FR-01 |
 | TC-ROOM-150 | US-ROOM-001 | Copy-code control | Clipboard equals the code | e2e | `screens/lobby.md` |
+| TC-ROOM-168 | US-CORE-012 | `setRoomSettings` with a new map and mode, then a capacity below the seated members | The settings patch lands and keeps the other fields; the shrink is refused `below-seated` | unit | FR-05 |
+| TC-ROOM-169 | US-ROOM-005 | Election exhausts its candidates | Every socket gone: the room is `abandoned`, never hostless | worker | `apps/worker/src/room-do.ts` |
+| TC-ROOM-182 | US-ROOM-005 | Migration end to end on two sockets | Host socket killed mid-match: the survivor is promoted within 5 s with `hostGeneration` 2 and still pings | e2e | NFR-06 |
 | TC-ROOM-151 | US-ROOM-007 | Host selects mode, map and capacity; a non-host tries | Host writes, member is rejected, loadout caps at 11 items across two pages | e2e | `screens/lobby.md` |
 | TC-ROOM-153 | US-ROOM-007 | Two players pick the same mobile, then a guest picks one | Both are accepted in the same match, every mobile appears once in the grid, the choice survives reconnect | e2e | `data/mobiles.md` |
 | TC-ROOM-123 | US-ROOM-001 | Idle room for 10 minutes | Storage deleted, code reusable after 60 s | worker | `data/room-state.md` |
@@ -126,7 +129,7 @@ The `covers` column names the requirement ([nonfunctional-requirements.md](../01
 | TC-CORE-916 | US-CORE-010 | Tag mode, a team finishes its whole turn | `activeTeam` flips and the opposing team acts | unit | FR-02 |
 | TC-CORE-917 | US-CORE-010 | Jewel mode: walk over a jewel, then kill a carrier | Jewel carried, then transferred to the killer's team; all jewels ends the match | unit | FR-06 |
 | TC-CORE-918 | US-CORE-011 | Map with `force`, map with `gust` | Constant sideways push; 4× wind spike for one turn, announced and reverted | unit | FR-04 |
-| TC-CORE-919 | US-CORE-011 | Map with `electric`, `heal` and a tornado | Strike on every third turn for 15; heal zone +10 capped; tornado displaces 60 px without burying | unit | NFR-21 |
+| TC-CORE-919 | US-CORE-011 | Map with `electric`, `heal` and a tornado | Strike on every third turn for 150; heal zone (200 units around x 1000) restores 100 capped at `maxHp`, a unit outside it gains nothing; tornado displaces 60 px without burying | unit | NFR-21 |
 | TC-CORE-920 | US-CORE-012 | Load the eleven maps | Schema valid, spawns valid for 8 slots, terrain RLE expands | unit | FR-04 |
 | TC-CORE-921 | US-CORE-013 | Profile with +4 attack, another with +20 | First is ×1.04, second clamps at ×1.10; energy and delay caps hold | unit | FR-06 |
 | TC-CORE-922 | US-CORE-007 | Super shot used once | Slot 2 reports empty afterwards and cannot be selected | unit | FR-04 |
@@ -155,6 +158,7 @@ The `covers` column names the requirement ([nonfunctional-requirements.md](../01
 
 | ID | Story | Case | Expected | Level | Covers |
 |----|-------|------|----------|-------|--------|
+| TC-CORE-016 | US-CORE-010 | `room_settings` with mode `royale`, then with `mapId` `map-99` | Both refused `bad-request` naming the field, so an unknown mode never reaches `createMatch` | unit | FR-05 |
 | TC-MATCH-901 | US-MATCH-001 | Mount the scene with a state | Map, units and turn indicator drawn; no unit jumps backwards between snapshots | e2e | NFR-01 |
 | TC-MATCH-151 | US-MATCH-002 | Drag aim and release | One `fire`, angle/force within ±2° / ±3 of the drawn values | e2e | FR-03 |
 | TC-MATCH-902 | US-MATCH-002 | A second finger lands mid-pull | The pull is cancelled without firing and the camera gesture takes over | web | FR-03 |

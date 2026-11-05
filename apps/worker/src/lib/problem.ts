@@ -11,6 +11,7 @@ export type ProblemType =
   | "bad-request"
   | "unauthenticated"
   | "forbidden"
+  | "not-found"
   | "room-not-found"
   | "room-full"
   | "room-closed"
@@ -21,6 +22,7 @@ export type ProblemType =
   | "rate-limited"
   | "unsupported-message"
   | "snapshot-too-large"
+  | "unavailable"
   | "internal";
 
 const TITLES: Record<ProblemType, string> = {
@@ -28,6 +30,7 @@ const TITLES: Record<ProblemType, string> = {
   "bad-request": "Malformed request",
   unauthenticated: "Not signed in",
   forbidden: "Not allowed",
+  "not-found": "Not found",
   "room-not-found": "Room not found",
   "room-full": "Room is full",
   "room-closed": "Room is closed",
@@ -38,6 +41,7 @@ const TITLES: Record<ProblemType, string> = {
   "rate-limited": "Too many requests",
   "unsupported-message": "Unsupported message",
   "snapshot-too-large": "Snapshot too large",
+  unavailable: "Temporarily unavailable",
   internal: "Internal error",
 };
 
@@ -46,6 +50,7 @@ const STATUSES: Record<ProblemType, number> = {
   "bad-request": 400,
   unauthenticated: 401,
   forbidden: 403,
+  "not-found": 404,
   "room-not-found": 404,
   "room-full": 409,
   "room-closed": 410,
@@ -56,6 +61,8 @@ const STATUSES: Record<ProblemType, number> = {
   "rate-limited": 429,
   "unsupported-message": 422,
   "snapshot-too-large": 413,
+  // 503, not 500: the request was fine and retrying works — that is what the client does with `retryAfterSeconds`.
+  unavailable: 503,
   internal: 500,
 };
 
@@ -102,17 +109,20 @@ export interface ProblemBody {
   readonly status: number;
   readonly detail?: string;
   readonly request_id: string;
+  /** The request path the problem happened on, so a client can tell two failures apart (`RFC 9457`). */
+  readonly instance?: string;
   readonly errors?: readonly FieldError[];
   readonly retryAfterSeconds?: number;
 }
 
 /** The `type` is a stable, documented URI — clients switch on it, never on the message (`conventions.md`). */
-export function problemBody(error: ProblemError, requestId: string): ProblemBody {
+export function problemBody(error: ProblemError, requestId: string, instance?: string): ProblemBody {
   const body: ProblemBody = {
     type: `https://gbw.example/problems/${error.type}`,
     title: TITLES[error.type],
     status: error.status,
     request_id: requestId,
+    ...(instance === undefined ? {} : { instance }),
   };
   const withDetail = error.detail === undefined ? body : { ...body, detail: error.detail };
   const withRetry =
@@ -120,8 +130,13 @@ export function problemBody(error: ProblemError, requestId: string): ProblemBody
   return error.fields.length === 0 ? withRetry : { ...withRetry, errors: error.fields };
 }
 
-export function problemResponse(error: ProblemError, requestId: string, origin: string | null): Response {
-  return new Response(JSON.stringify(problemBody(error, requestId)), {
+export function problemResponse(
+  error: ProblemError,
+  requestId: string,
+  origin: string | null,
+  instance?: string,
+): Response {
+  return new Response(JSON.stringify(problemBody(error, requestId, instance)), {
     status: error.status,
     headers: {
       "content-type": "application/problem+json",

@@ -57,7 +57,9 @@ Rules: a guest token grants room create/join, TURN and WS only — every `/me` a
 
 ## Error catalogue
 
-`type` is the stable URI a client branches on. `title` is fixed per type; `detail` may change.
+`type` is the stable URI a client branches on. `title` is fixed per type; `detail` may change. Every body carries
+`request_id` (also in the `x-request-id` response header) and `instance` (the request path), so a report can be tied to
+one log line and one endpoint.
 
 | `type` (suffix of `https://gbw.app/problems/`) | Status | When | Retryable |
 |------------------------------------------------|--------|------|-----------|
@@ -65,15 +67,17 @@ Rules: a guest token grants room create/join, TURN and WS only — every `/me` a
 | `bad-request` | 400 | Malformed JSON, unparsable cursor, wrong content type | no |
 | `unauthenticated` | 401 | Missing/expired/invalid credential | after re-auth |
 | `forbidden` | 403 | Authenticated but not allowed (not the host, not a participant) | no |
+| `not-found` | 404 | A path no route serves | no |
 | `room-not-found` | 404 | Unknown `roomCode` | no |
 | `room-full` | 409 | Joining a room at `maxPlayers` | no |
 | `room-closed` | 410 | Room `ended`/`abandoned`/expired | no |
 | `not-host` | 403 | A host-only action from a peer | no |
 | `display-name-taken` | 409 | `display_name_key` collision | no |
 | `match-already-recorded` | 409 | Same `roomCode` + `startedAt` submitted twice | no |
+| `unavailable` | 503 | An upstream we depend on (Clerk's JWKS) is unreachable and nothing is cached; `Retry-After` in seconds | yes |
 | `rate-limited` | 429 | `NFR-25` limit hit; `Retry-After` in seconds | yes |
-| `unsupported-message` | 400 | WS message type unknown for the room state | no |
-| `snapshot-too-large` | 422 | WS snapshot over 8 KB | no |
+| `unsupported-message` | 422 | WS message type unknown for the room state | no |
+| `snapshot-too-large` | 413 | WS snapshot over 8 KB | no |
 | `payload-too-large` | 413 | A WS `signal` payload over its 8 KB budget | no |
 | `invalid-state` | 409 | A valid frame that the room's current `status` does not allow (e.g. `team_assign` while `playing`) | no |
 | `room-not-full` | 409 | `start_match` before every slot is filled | no |

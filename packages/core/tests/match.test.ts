@@ -209,7 +209,11 @@ describe("match", () => {
     expect(electric.events.some((event) => event.kind === "electric")).toBe(true);
 
     const wounded = match([seat(0, "A"), seat(1, "B")], { mapId: "map-02" });
-    const hurt = { ...wounded, players: wounded.players.map((player) => ({ ...player, hp: player.hp - 400 })) };
+    // The heal only reaches the marked zone at the map centre, so a wounded unit is moved into it.
+    const hurt = {
+      ...wounded,
+      players: wounded.players.map((player) => ({ ...player, x: 1000, hp: player.hp - 400 })),
+    };
     const heal = applyGimmicks(hurt, 2, getMap("map-02"));
     expect(heal.events.some((event) => event.kind === "heal")).toBe(true);
 

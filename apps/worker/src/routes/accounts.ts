@@ -42,6 +42,14 @@ export function isValidDisplayName(value: string): boolean {
 
 const AVATAR_PATTERN = /^avatar-(0[1-9]|1[0-2])$/;
 
+/** `ALLOWED_ORIGINS` is the one place the project's own origins are listed, so it is the `azp` allowlist. */
+function partiesOf(allowedOrigins: string): readonly string[] {
+  return allowedOrigins
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter((origin) => origin.length > 0);
+}
+
 export async function createSession(request: Request, env: Env): Promise<Response> {
   const limit = ipLimit(request, env, "sessions", RULES.sessionsPerIp);
   if (limit && !limit.allowed) {
@@ -76,7 +84,9 @@ export async function createSession(request: Request, env: Env): Promise<Respons
 
   const clerkToken = bearerOf(request) ?? (typeof body["clerkToken"] === "string" ? body["clerkToken"] : null);
   if (!clerkToken) throw new ProblemError("unauthenticated", "Sign in requires a Clerk token");
-  const identity = await verifyClerkJwt(clerkToken, env.CLERK_ISSUER);
+  const identity = await verifyClerkJwt(clerkToken, env.CLERK_ISSUER, {
+    authorizedParties: partiesOf(env.ALLOWED_ORIGINS),
+  });
 
   let account = await findAccountByClerkId(env.GBW_DB, identity.subject);
   if (!account) {

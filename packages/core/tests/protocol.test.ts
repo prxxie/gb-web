@@ -159,7 +159,24 @@ describe("TC-ROOM-163: the protocol is versioned and total", () => {
     expect(parseServerFrame("<html>").ok).toBe(false);
   });
 
-  it("TC-ROOM-025: a preset quick phrase and a free text both parse", () => {
+  it("TC-CORE-016: room_settings refuses an unknown mode or map", () => {
+  const fine = parseClientFrame(
+    JSON.stringify({ t: "room_settings", mode: "jewel", mapId: "map-03", maxPlayers: 6, isPrivate: true }),
+  );
+  expect(fine.ok).toBe(true);
+
+  // The room must not accept a mode the rules engine has never heard of (`US-CORE-010` AC7)…
+  const badMode = parseClientFrame(JSON.stringify({ t: "room_settings", mode: "royale", mapId: "map-03" }));
+  expect(badMode.ok).toBe(false);
+  if (!badMode.ok) expect(badMode.detail).toContain("mode");
+
+  // …nor a map id that no map carries, which would fail later inside `createMatch`.
+  const badMap = parseClientFrame(JSON.stringify({ t: "room_settings", mode: "solo", mapId: "map-99" }));
+  expect(badMap.ok).toBe(false);
+  if (!badMap.ok) expect(badMap.detail).toContain("map-99");
+});
+
+it("TC-ROOM-025: a preset quick phrase and a free text both parse", () => {
     // Arrange / Act
     const preset = parseClientFrame(JSON.stringify({ t: "chat", kind: "quick_phrase", id: "phrase-gg" }));
     const free = parseClientFrame(JSON.stringify({ t: "chat", text: "tốt lắm" }));

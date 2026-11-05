@@ -131,7 +131,7 @@ describe("errors", () => {
     const closing = testEnv({ rooms });
 
     const cases: [Response, number][] = [
-      [await call(harness, "GET", "/nope"), 400],
+      [await call(harness, "GET", "/nope"), 404],
       [await call(harness, "GET", "/me"), 401],
       [await call(harness, "GET", "/rooms/ABC23!"), 404],
       [await call(closing, "GET", "/rooms/ABC234"), 410],
@@ -145,6 +145,7 @@ describe("errors", () => {
       expect(typeof problem["title"]).toBe("string");
       expect(problem["status"]).toBe(status);
       expect(typeof problem["request_id"]).toBe("string");
+      expect(typeof problem["instance"]).toBe("string");
       expect(response.headers.get("x-request-id")).toBe(problem["request_id"]);
     }
     expect(authorization).toBeTruthy();

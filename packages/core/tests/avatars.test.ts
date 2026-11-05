@@ -71,11 +71,15 @@ function withTargetAt(state: MatchState, point: Vec2): MatchState {
   };
 }
 
-/** Health plus shield the second player loses to one identical shot. */
+/**
+ * Health plus shield the second player loses to one identical shot, read off the `shot` event rather than
+ * off the ending state: the turn that follows the shot regenerates the next player's shield
+ * (`US-CORE-003` AC3), which would otherwise shrink the measured damage by exactly `shieldRegen`.
+ */
 function loss(state: MatchState): number {
-  const before = state.players[1]!;
-  const after = fire(state, 0, 0, 15, 60).state.players[1]!;
-  return before.hp + before.shield - (after.hp + after.shield);
+  const shot = firstOf(fire(state, 0, 0, 15, 60).events, "shot");
+  const hit = shot.hits.find((entry) => entry.slot === 1);
+  return hit === undefined ? 0 : hit.damage;
 }
 
 describe("avatars", () => {

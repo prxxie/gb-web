@@ -39,7 +39,7 @@ If the repo still has no remote, `git init` first and commit the scaffold as des
 | `TURN_KEY_API_TOKEN` | yes (worker, secret) | `…` | Cloudflare TURN API token |
 | `VERSION` | no (worker) | `dev` | Reported by `/health`; matches the release tag in production |
 | `ENVIRONMENT` | no (worker, `wrangler.jsonc` var) | `development` \| `production` | Log verbosity and the loopback-origin allowance (`NFR-11`); only `development` widens CORS |
-| `ALLOWED_ORIGINS` | yes (worker, `wrangler.jsonc` var) | `http://localhost:5173` | Comma-separated CORS allowlist in production (`NFR-11`) |
+| `ALLOWED_ORIGINS` | yes (worker, `wrangler.jsonc` var) | `http://localhost:5173` | Comma-separated CORS allowlist in production (`NFR-11`); it doubles as the `azp` allowlist for Clerk tokens, so every origin a browser signs in from must be listed |
 | `GBW_DB`, `ROOMS` | bindings, not vars | `GBW_DB`, `ROOMS` | D1 and Durable Object bindings in `apps/worker/wrangler.jsonc` |
 
 The signaling WebSocket URL is not configured: both `apps/web/src/routes/LobbyPage.tsx:35` and

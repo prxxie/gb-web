@@ -308,6 +308,9 @@ export function MatchPage(): JSX.Element {
               seq: applied.seq,
               turn: snapshot.turn,
               weather: snapshot.weather,
+              // Scores and jewels decide who is winning and who carries what, so a peer that ignored them
+              // would show a different result screen than the host (`US-CORE-004` AC5).
+              scores: applied.scores,
               ...(applied.terrain ? { terrain: applied.terrain } : {}),
             },
             [],

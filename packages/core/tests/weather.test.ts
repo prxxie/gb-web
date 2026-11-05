@@ -6,7 +6,7 @@ import { createRng } from "../src/rng.js";
 import { decodeSnapshot, encodeSnapshot, snapshotBytes, toSnapshot } from "../src/snapshot.js";
 import { TUNABLES } from "../src/tuning.js";
 import type { Rng, Wind } from "../src/types.js";
-import { describeWind, isCalm, rollWeather, rollWind, weatherSequence } from "../src/weather.js";
+import { describeWind, isCalm, newerWeather, rollWeather, rollWind, weatherSequence } from "../src/weather.js";
 
 const NOW = 1_700_000_000_000;
 
@@ -162,7 +162,18 @@ describe("weather (US-CORE-015)", () => {
     expect(describeWind(calmRoll.wind)).toBe("calm");
   });
 
-  it("TC-CORE-023: drift equals ½·a_x·t² for the shot's own flight time", () => {
+  it("TC-CORE-926 / AC7: an out-of-order weather frame never wins", () => {
+  const fresh = rollWeather(7, 4);
+  const stale = rollWeather(7, 3);
+
+  // Equal or older round: the weather in hand stands, so a late frame cannot rewind the wind.
+  expect(newerWeather(fresh, stale)).toBe(fresh);
+  expect(newerWeather(fresh, fresh)).toBe(fresh);
+  // A later round is the only thing allowed to replace it.
+  expect(newerWeather(stale, fresh)).toBe(fresh);
+});
+
+it("TC-CORE-023: drift equals ½·a_x·t² for the shot's own flight time", () => {
     const calm = shoot(CALM);
     const east = shoot({ magnitude: 26, directionDeg: 0, sector: 0 });
     const west = shoot({ magnitude: 26, directionDeg: 180, sector: 6 });

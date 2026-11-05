@@ -22,7 +22,7 @@ import { launch, segmentImpact, stepProjectile } from "./ballistics.js";
 import { applyBlast, damageByTeam, mergeHits, teamStatus, type HitResult } from "./combat.js";
 import { addDelay, advanceTurn, createTurn, nextSlot } from "./turn.js";
 import { FORCE_FIELD, returnsOffMapShots } from "./gimmicks.js";
-import { rollWeather, rollWind } from "./weather.js";
+import { newerWeather, rollWeather, rollWind } from "./weather.js";
 import { applyGimmicks } from "./gimmicks.js";
 import { tryMove, teleportTo } from "./movement.js";
 import { createRng } from "./rng.js";
@@ -71,7 +71,13 @@ export type MatchEvent =
   | { readonly kind: "turn"; readonly turn: MatchState["turn"] }
   | { readonly kind: "weather"; readonly weather: Weather }
   | { readonly kind: "reject"; readonly slot: number; readonly reason: string }
-  | { readonly kind: "end"; readonly winner: Team | null; readonly scores: Readonly<Record<Team, number>> };
+  | {
+      readonly kind: "end";
+      readonly winner: Team | null;
+      readonly scores: Readonly<Record<Team, number>>;
+      readonly mode: ModeId;
+      readonly modeState: MatchState["scores"];
+    };
 
 export interface InputResult {
   readonly state: MatchState;
@@ -293,7 +299,13 @@ function checkEnd(state: MatchState): { state: MatchState; event: MatchEvent | n
   const ended: MatchState = { ...state, status: "ended", winnerTeam: winner, seq: state.seq + 1 };
   return {
     state: ended,
-    event: { kind: "end", winner, scores: { A: ended.scores.score.A, B: ended.scores.score.B } },
+    event: {
+      kind: "end",
+      winner,
+      scores: { A: ended.scores.score.A, B: ended.scores.score.B },
+      mode: ended.mode,
+      modeState: ended.scores,
+    },
   };
 }
 
@@ -329,6 +341,20 @@ function advance(state: MatchState, now: number, activeSlot: number | null): { s
       next = { ...next, scores: { ...next.scores, activeTeam: actingTeam } };
     }
   }
+  // Shield refills at the start of its owner's turn, capped at `maxShield` (`US-CORE-003` AC3,
+  // `mobiles.md`): a shield is a per-turn buffer, which is the only reading that makes `shieldRegen` a
+  // tunable rather than a one-off.
+  const starting = next.players.find((player) => player.slot === turn.activeSlot && !player.eliminated);
+  if (starting && starting.shield < getMobile(starting.mobileId as Parameters<typeof getMobile>[0]).maxShield) {
+    const cap = getMobile(starting.mobileId as Parameters<typeof getMobile>[0]).maxShield;
+    const regen = getMobile(starting.mobileId as Parameters<typeof getMobile>[0]).shieldRegen;
+    const shield = Math.min(cap, starting.shield + regen);
+    next = {
+      ...next,
+      players: next.players.map((player) => (player.slot === starting.slot ? { ...player, shield } : player)),
+      seq: next.seq + 1,
+    };
+  }
   const events: MatchEvent[] = [{ kind: "turn", turn }];
   if (!roundCompleted) {
     // A `gust` spike lasts exactly one turn: when it ends, the round's own roll comes back (`TC-CORE-918`).
@@ -346,7 +372,8 @@ function advance(state: MatchState, now: number, activeSlot: number | null): { s
     const map = getMap(next.mapId);
     if (map.gimmicks.length > 0) {
       const effect = applyGimmicks(next, turn.round, map);
-      const gimmicked: Weather = effect.weather ?? next.weather;
+      // A gimmick may only speak for the round it was applied to; anything older is a stale roll (`AC7`).
+      const gimmicked: Weather = effect.weather ? newerWeather(next.weather, effect.weather) : next.weather;
       next = { ...next, weather: gimmicked, players: effect.players, seq: next.seq + 1 };
       if (effect.weather) events.push({ kind: "weather", weather: gimmicked });
     }

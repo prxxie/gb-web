@@ -36,8 +36,8 @@ makes them gameplay-affecting, capped so a cosmetic gap never decides a ranked m
 | AC1 | a profile with a +4 attack part | a match starts | the damage multiplier is `×1.04`, capped at `×1.10` total (`TC-CORE-921`) |
 | AC2 | a profile with +8 energy | the match starts | the energy pool is `base + 8` and never above the cap (`TC-CORE-921`) |
 | AC3 | a guest | a match starts | bonuses are all zero and the match is still playable (`TC-CORE-929`) |
-| AC4 | an equipped part the account no longer owns | the loadout is validated | it is stripped server-side and the bonus is not applied (`TC-CORE-930`) |
-| AC5 | the bonus table | it is applied | totals are clamped to the caps and listed in the match record (`TC-RANK-110`) |
+| AC4 | a part id the avatar registry does not know (a retired part, or one another build removed) | the loadout is validated | it is stripped and contributes nothing; v1 holds no per-account parts inventory, so "no longer owns" is decidable only against the registry (`TC-CORE-930`, OQ-42) |
+| AC5 | the bonus table | it is applied | totals are clamped to the caps and reach the damage/energy/delay the host simulates; the match record keeps the resulting stats, not the multipliers, because `match_player` has no bonus column (OQ-42) |
 
 ## 4. Contract
 

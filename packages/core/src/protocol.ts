@@ -9,6 +9,8 @@
  * The parsers are pure: no DOM, no network, no Phaser (`NFR-22`), so the Worker, the browser and the
  * tests all run the same checks.
  */
+import { MAPS_BY_ID } from "./data/maps.js";
+import { isModeId } from "./data/modes.js";
 import type { LoadoutEntry, ModeId, RoomState, Snapshot, Team } from "./types.js";
 
 export const PROTOCOL_VERSION = 1;
@@ -364,8 +366,15 @@ export function parseClientFrame(raw: string): ParseResult<ClientFrame> {
     case "room_settings": {
       const extra = onlyKeys(parsed, ["t", "mode", "mapId", "maxPlayers", "isPrivate"], t);
       if (extra) return fail("bad-request", extra);
-      if (typeof parsed["mode"] !== "string" || parsed["mode"].length === 0) return fail("bad-request", "room_settings needs a mode");
-      if (typeof parsed["mapId"] !== "string" || parsed["mapId"].length === 0) return fail("bad-request", "room_settings needs a mapId");
+      const rawMode = parsed["mode"];
+      // An unknown mode must die here, not at `createMatch`: the room would otherwise cast a string into a
+      // mode the rules engine has never heard of (`US-CORE-010` AC7).
+      if (typeof rawMode !== "string" || !isModeId(rawMode)) {
+        return fail("bad-request", "room_settings.mode must be one of solo, score, tag, jewel");
+      }
+      if (typeof parsed["mapId"] !== "string" || !MAPS_BY_ID.has(parsed["mapId"])) {
+        return fail("bad-request", `room_settings.mapId is not a known map: ${String(parsed["mapId"])}`);
+      }
       const rawCapacity = parsed["maxPlayers"];
       if (rawCapacity !== undefined && rawCapacity !== 2 && rawCapacity !== 4 && rawCapacity !== 6 && rawCapacity !== 8) {
         return fail("bad-request", "room_settings.maxPlayers must be 2, 4, 6 or 8");
@@ -376,7 +385,7 @@ export function parseClientFrame(raw: string): ParseResult<ClientFrame> {
       }
       return ok({
         t: "room_settings",
-        mode: parsed["mode"] as ModeId,
+        mode: rawMode,
         mapId: parsed["mapId"] as string,
         ...(rawCapacity === undefined ? {} : { maxPlayers: rawCapacity as 2 | 4 | 6 | 8 }),
         ...(rawPrivate === undefined ? {} : { isPrivate: rawPrivate as boolean }),
