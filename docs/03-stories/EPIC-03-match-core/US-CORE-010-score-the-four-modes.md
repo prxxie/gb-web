@@ -65,7 +65,7 @@ Mode-specific maps, tournaments, ranked per mode (`OQ-28` keeps one Elo).
 ## 8. Test notes
 
 `TC-CORE-027`, `TC-CORE-915`, `TC-CORE-916`, `TC-CORE-917`, `TC-RANK-153`, `TC-RANK-155`.
-`Red first: tests/core/modes.test.ts::jewel_win_when_one_team_holds_all`.
+`Red first: packages/core/tests/modes.test.ts::jewel_win_when_one_team_holds_all`.
 
 <!-- delivery:2026-11-05 -->
 

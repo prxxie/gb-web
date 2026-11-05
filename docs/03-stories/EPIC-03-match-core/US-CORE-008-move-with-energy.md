@@ -68,7 +68,7 @@ Jumping/flying mobiles, mountables, movement animation timing (`US-MATCH-006`).
 ## 8. Test notes
 
 `TC-CORE-904`, `TC-CORE-914`, `TC-NET-067`.
-`Red first: tests/core/move.test.ts::energy_clamps_distance`.
+`Red first: packages/core/tests/move.test.ts::energy_clamps_distance`.
 
 <!-- delivery:2026-11-05 -->
 

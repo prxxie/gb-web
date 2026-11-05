@@ -80,7 +80,7 @@ lower than the current one.
 
 `TC-ROOM-048`, `TC-ROOM-049`, `TC-ROOM-124`, `TC-ROOM-149`, `TC-ROOM-182`; `TC-NET-044` covers the stale-host
 rejection. Worker test drives `electHost` as a pure function plus a socket-level test for the broadcast. Red first:
-`tests/worker/room.test.ts::host_election_on_close`.
+`apps/worker/tests/room.test.ts::host_election_on_close`.
 
 ## 9. Open questions
 

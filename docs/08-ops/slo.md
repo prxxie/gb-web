@@ -49,6 +49,6 @@ frequency is too low to compute a ratio in a 30-day window: TC-ROOM-049 measures
 | Contract | Checked by |
 |----------|-----------|
 | SLO-1/2 numbers match the dashboard for a sampled day | Monthly snapshot file cross-checked against the dashboard (manual, recorded in the snapshot) |
-| SLO-3 denominator uses rooms that reached `playing` | `tests/worker/metrics.test.ts` (TC-OPS-185) |
+| SLO-3 denominator uses rooms that reached `playing` | `apps/worker/tests/metrics.test.ts` (TC-OPS-185) |
 | SLO-4 numerator matches D1 billing counters within 5 % | Monthly snapshot note (manual) |
 | Budget policy is followed when exhausted | Incident/postmortem record references this file's § 3 |

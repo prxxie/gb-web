@@ -155,15 +155,16 @@ gb-web/
 │  └─ worker/
 │     ├─ src/index.ts      router + fetch handler
 │     ├─ src/routes/       sessions, rooms, me, matches, leaderboard, health
-│     ├─ src/room.ts       the Room Durable Object
+│     ├─ src/room-do.ts    the Room Durable Object
 │     ├─ src/db/           D1 queries
 │     └─ migrations/       NNNN_*.sql applied by wrangler
 ├─ packages/
 │  └─ core/src/            physics, turn, damage, snapshot, tunables.json
-├─ tests/
-│  ├─ core/                Vitest unit tests for the simulation
-│  ├─ worker/              Vitest + miniflare endpoint tests
-│  └─ e2e/                 Playwright two-browser tests
+├─ packages/core/tests/    Vitest unit tests for the simulation
+├─ apps/worker/tests/      Vitest + miniflare endpoint tests
+├─ apps/web/tests/         Vitest + RTL component tests
+├─ tests/e2e/              Playwright two-browser tests
+├─ tests/meta/             repo-wide checks (doc/traceability/secret scans)
 └─ docs/                   this doc set
 ```
 
@@ -171,9 +172,9 @@ gb-web/
 
 | Claim | Checked by |
 |-------|-----------|
-| `packages/core` has no DOM/Phaser/network imports | `tests/core/imports.test.ts` — static import scan of `packages/core/src` (TC-FND-018) |
-| Snapshot payload ≤ 800 B at 8 players | `tests/core/snapshot.test.ts` (TC-CORE-041) |
-| Signaling relays SDP without parsing and never persists it | `tests/worker/signaling.test.ts` (TC-ROOM-050) |
-| Host election picks the longest-connected member and bumps `hostGeneration` | `tests/worker/room.test.ts` (TC-ROOM-048) |
-| Match record + Elo written exactly once per match | `tests/worker/matches.test.ts` (TC-RANK-110) |
-| No token or display name in log lines | `tests/worker/logging.test.ts` (TC-OPS-118) |
+| `packages/core` has no DOM/Phaser/network imports | `packages/core/tests/imports.test.ts` — static import scan of `packages/core/src` (TC-FND-018) |
+| Snapshot payload ≤ 800 B at 8 players | `packages/core/tests/snapshot.test.ts` (TC-CORE-041) |
+| Signaling relays SDP without parsing and never persists it | `apps/worker/tests/signaling.test.ts` (TC-ROOM-050) |
+| Host election picks the longest-connected member and bumps `hostGeneration` | `apps/worker/tests/room.test.ts` (TC-ROOM-048) |
+| Match record + Elo written exactly once per match | `apps/worker/tests/matches.test.ts` (TC-RANK-110) |
+| No token or display name in log lines | `apps/worker/tests/logging.test.ts` (TC-OPS-118) |

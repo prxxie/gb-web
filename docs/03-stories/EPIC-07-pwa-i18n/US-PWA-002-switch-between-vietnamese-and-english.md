@@ -63,7 +63,7 @@ Error mapping: `errors.<type-suffix>` where the suffix is the part after the las
 
 ## 6. Implementation notes
 
-- `tests/web/i18n.test.ts` compares key sets and fails on an unused key in both files.
+- `apps/web/tests/i18n.test.ts` compares key sets and fails on an unused key in both files.
 - The Phaser scene draws no text, so no canvas i18n is needed — a deliberate simplification recorded in `conventions.md`.
 
 ## 7. Out of scope

@@ -46,7 +46,7 @@ v1 (`OQ-32`).
 ## 4. Contract
 
 `input` (peer → host, `control`, reliable): `{t:"input", turn:number, seq:number, kind:"fire"|"skip", angle?:number, force?:number, facing?:1|-1}`.
-`snapshot` (host → peers, `state`, unreliable): the `Snapshot` from `US-CORE-004` as JSON, plus `{t:"snapshot"}`.
+`snapshot_state` (host → peers, `state`, unreliable): `{t:"snapshot_state", snapshot}` where `snapshot` is the `Snapshot` from `US-CORE-004`. The DO also sends this frame to a returning client, so one shape covers both directions ([signaling.md](../../02-reference/api/signaling.md) §3).
 `host_heartbeat` (host → peers, `state`, 1 Hz): `{t:"host_heartbeat", seq, hostGeneration, turnNumber}`.
 
 Host loop: `requestAnimationFrame` at 60 Hz for simulation, a 100 ms interval for publishing, and an immediate publish

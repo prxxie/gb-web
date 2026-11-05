@@ -58,8 +58,8 @@ profanity lists (`OQ-29`). A collision returns `409 conflict` with problem type 
 
 | Contract | Checked by |
 |----------|-----------|
-| Schema matches this table | `tests/worker/migrations.test.ts` — applies all migrations to an empty D1 and compares `PRAGMA table_info` with the column list above (TC-FND-100) |
-| Sign-in creates exactly one account + profile | `tests/worker/auth.test.ts` — two requests with the same `sub` produce one row each (TC-AUTH-074) |
-| `display_name_key` uniqueness | `tests/worker/profile.test.ts` — `Nguyễn` then `nguyen` → `409` (TC-AUTH-101) |
-| `rating` is never client-written | `tests/worker/profile.test.ts` — a `PATCH /me` body containing `rating` is rejected or ignored, response rating unchanged (TC-AUTH-102) |
-| Leaderboard ordering and deleted-account exclusion | `tests/worker/leaderboard.test.ts` (TC-RANK-104) |
+| Schema matches this table | `apps/worker/tests/migrations.test.ts` — applies all migrations to an empty D1 and compares `PRAGMA table_info` with the column list above (TC-FND-100) |
+| Sign-in creates exactly one account + profile | `apps/worker/tests/auth.test.ts` — two requests with the same `sub` produce one row each (TC-AUTH-074) |
+| `display_name_key` uniqueness | `apps/worker/tests/profile.test.ts` — `Nguyễn` then `nguyen` → `409` (TC-AUTH-101) |
+| `rating` is never client-written | `apps/worker/tests/profile.test.ts` — a `PATCH /me` body containing `rating` is rejected or ignored, response rating unchanged (TC-AUTH-102) |
+| Leaderboard ordering and deleted-account exclusion | `apps/worker/tests/leaderboard.test.ts` (TC-RANK-104) |

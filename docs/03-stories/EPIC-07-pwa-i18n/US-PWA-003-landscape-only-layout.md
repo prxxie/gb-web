@@ -57,7 +57,7 @@ Detection: `matchMedia("(orientation: landscape)")` plus `window.innerHeight > w
 
 ## 6. Implementation notes
 
-- `apps/web/src/app/OrientationGate.tsx`, `tests/web/orientation.test.tsx` with a mocked `matchMedia`.
+- `apps/web/src/app/OrientationGate.tsx`, `apps/web/tests/orientation.test.tsx` with a mocked `matchMedia`.
 - `resize_page` in the Playwright suite covers AC6.
 
 ## 7. Out of scope

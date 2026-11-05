@@ -35,11 +35,11 @@ come from the architecture and conventions files.
 
 | # | Given | When | Then |
 |---|-------|------|------|
-| AC1 | A clean checkout with Node 24 and pnpm 10 | `pnpm install` runs | It exits 0 and creates `apps/web`, `apps/worker`, `packages/core`, `tests/` per the layout tree, with no dependency added beyond those already approved |
+| AC1 | A clean checkout with Node 22.12 or newer and pnpm 10 | `pnpm install` runs | It exits 0 and creates `apps/web`, `apps/worker`, `packages/core`, `tests/` per the layout tree, with no dependency added beyond those already approved |
 | AC2 | A clean checkout | `pnpm typecheck`, `pnpm lint` and `pnpm test` run in that order | All three exit 0; `pnpm test` reports at least one passing test per project (core, worker, web) |
 | AC3 | `packages/core` as written | A static scan of its imports runs | It contains no `phaser`, no DOM global reference and no network module (`TC-FND-018`) |
 | AC4 | A production build | The emitted web bundle is searched for `SESSION_TOKEN_SECRET` and `TURN_KEY_API_TOKEN` values | No match (`TC-FND-012`) |
-| AC5 | `.env.example` | Every environment key read anywhere in `apps/worker/src` is collected | The two sets are identical — names only, no values (`TC-FND-002`) |
+| AC5 | `apps/worker/.dev.vars.example` and `apps/web/.env.example` | Both are read | Every key the code reads is collected in one of them, and the two sets are identical — names only, no values (`TC-FND-002`) |
 | AC6 | The repository with CI configured | A pull request with a failing unit test is opened | CI fails on the test job and the merge is blocked |
 | AC7 | `AGENTS.md` and `docs/01-overview/environment-setup.md` | This story is `done` | No `(planned — …)` marker remains in either file and every documented command has been executed successfully |
 
@@ -69,7 +69,7 @@ and `types: ["vite/client"]`; `packages/core` uses `lib: ["ES2023"]` only — th
 - No new dependency without explicit approval naming version and licence (rule 06); the packs already approved cover everything here.
 - `engines.node: ">=24"` in the root `package.json`; `pnpm install` on Node 22 must fail loudly rather than half-work.
 - `packages/core` must not import from `apps/*` in either direction; the scan in AC3 fails the build if it does.
-- CI runs on Node 24 only; a local Node 22 developer is expected to see the documented error, not a green build.
+- `engines.node` is `>=22.12` and CI runs Node 24: a newer runtime is allowed, an older one fails at install time rather than halfway through a build. Verified on 22.22.2.
 - E2E tests may not require network access to Cloudflare — they run against `wrangler dev`.
 
 ## 6. Implementation notes
@@ -87,7 +87,7 @@ and `types: ["vite/client"]`; `packages/core` uses `lib: ["ES2023"]` only — th
 
 ## 8. Test notes
 
-Red first: `TC-FND-018` (`tests/core/imports.test.ts`) and `TC-FND-002` (`tests/worker/env.test.ts`) fail before the
+Red first: `TC-FND-018` (`packages/core/tests/imports.test.ts`) and `TC-FND-002` (`apps/worker/tests/env.test.ts`) fail before the
 scan and the `.env.example` exist. `TC-FND-012` is a build-output test. AC6 is verified in the pull request itself;
 AC7 is verified by `grep -c "planned —" AGENTS.md docs/01-overview/environment-setup.md` returning 0.
 

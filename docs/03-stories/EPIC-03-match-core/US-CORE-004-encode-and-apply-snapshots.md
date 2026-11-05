@@ -75,7 +75,7 @@ Delta compression (`OQ-32`), rollback netcode (`OQ-32`).
 ## 8. Test notes
 
 `TC-CORE-040`, `TC-CORE-041`, `TC-CORE-042`, `TC-CORE-903`, `TC-ROOM-124`.
-`Red first: tests/core/snapshot.test.ts::eight_players_with_jewels_stay_under_800_bytes`.
+`Red first: packages/core/tests/snapshot.test.ts::eight_players_with_jewels_stay_under_800_bytes`.
 
 <!-- delivery:2026-11-05 -->
 

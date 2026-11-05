@@ -29,6 +29,7 @@ Rules: a guest token grants room create/join, TURN and WS only — every `/me` a
 | GET | `/turn-credentials` | Short-lived TURN credentials | session token | 200 | 401, 429 | [rooms.md](rooms.md#get-turn-credentials) | US-ROOM-006 |
 | POST | `/rooms` | Create a room | session token | 201 | 401, 422, 429 | [rooms.md](rooms.md#post-rooms) | US-ROOM-001 |
 | GET | `/rooms/{code}` | Joinability preview | none | 200 | 404, 410 | [rooms.md](rooms.md#get-roomscode) | US-ROOM-001 |
+| POST | `/rooms/{code}/join` | Join a lobby that still has a free slot | session token | 200 | 401, 404, 409, 410 | [rooms.md](rooms.md#post-roomscodejoin) | US-ROOM-002 |
 | GET | `/rooms/{code}/ws` | WebSocket upgrade (signaling) | session token in first message | 101 | 401, 404, 409, 410, 429 | [signaling.md](signaling.md) | US-ROOM-002 |
 | GET | `/me` | Own profile, rating, stats | Clerk JWT | 200 | 401 | [accounts.md](accounts.md#get-me) | US-AUTH-003 |
 | PATCH | `/me` | Change display name or avatar | Clerk JWT | 200 | 401, 409, 422 | [accounts.md](accounts.md#patch-me) | US-AUTH-003 |
@@ -73,11 +74,17 @@ Rules: a guest token grants room create/join, TURN and WS only — every `/me` a
 | `rate-limited` | 429 | `NFR-25` limit hit; `Retry-After` in seconds | yes |
 | `unsupported-message` | 400 | WS message type unknown for the room state | no |
 | `snapshot-too-large` | 422 | WS snapshot over 8 KB | no |
+| `payload-too-large` | 413 | A WS `signal` payload over its 8 KB budget | no |
+| `invalid-state` | 409 | A valid frame that the room's current `status` does not allow (e.g. `team_assign` while `playing`) | no |
+| `room-not-full` | 409 | `start_match` before every slot is filled | no |
+| `not-enough-players` | 409 | `start_match` with fewer than the mode's minimum | no |
+| `teams-not-balanced` | 409 | `start_match` with an empty team or unequal sizes | no |
+| `peer-not-connected` | 409 | `signal` addressed to a member with no open socket | yes, once the peer is back |
 | `internal` | 500 | Unhandled; `detail` is generic, the cause is in the logs only | yes |
 
 ## Contract tests
 
-`tests/worker/api-contract.test.ts` asserts, for every row of the endpoint index: the success status, the error status
+`apps/worker/tests/api-contract.test.ts` asserts, for every row of the endpoint index: the success status, the error status
 for an unauthenticated call, the `application/problem+json` content type on every 4xx, and that no problem body contains a
 stack trace or SQL (TC-FND-070). OpenAPI is not kept in v1 — this table is the contract, and `cpt-review` diffs a change
 against it.

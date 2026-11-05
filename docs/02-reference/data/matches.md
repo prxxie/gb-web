@@ -89,9 +89,9 @@ newRating       = clamp(rating + delta, 0, 4000)
 
 | Contract | Checked by |
 |----------|-----------|
-| Schema matches this page | `tests/worker/migrations.test.ts` (TC-FND-100) |
-| One transaction: record + players + history | `tests/worker/matches.test.ts` — a forced failure mid-write leaves zero rows (TC-RANK-110) |
-| Validation table above | `tests/worker/matches.test.ts` — one case per rule, asserting the status and problem type (TC-RANK-115) |
-| Elo maths and clamping | `tests/core/rating.test.ts` — table-driven vectors incl. K-decay at 30 matches (TC-RANK-113) |
-| Unranked path writes no rating rows | `tests/worker/matches.test.ts` (TC-RANK-116) |
-| Duplicate submission is idempotent by `room_code` + `started_at` | `tests/worker/matches.test.ts` (TC-RANK-111) |
+| Schema matches this page | `apps/worker/tests/migrations.test.ts` (TC-FND-100) |
+| One transaction: record + players + history | `apps/worker/tests/matches.test.ts` — a forced failure mid-write leaves zero rows (TC-RANK-110) |
+| Validation table above | `apps/worker/tests/matches.test.ts` — one case per rule, asserting the status and problem type (TC-RANK-115) |
+| Elo maths and clamping | `packages/core/tests/rating.test.ts` — table-driven vectors incl. K-decay at 30 matches (TC-RANK-113) |
+| Unranked path writes no rating rows | `apps/worker/tests/matches.test.ts` (TC-RANK-116) |
+| Duplicate submission is idempotent by `room_code` + `started_at` | `apps/worker/tests/matches.test.ts` (TC-RANK-111) |

@@ -1,6 +1,20 @@
 # Copy to .dev.vars for local work. Never commit a real value (rule 06).
+#
+# Only secrets and per-machine values belong here. ENVIRONMENT, CLERK_ISSUER and
+# ALLOWED_ORIGINS are plain vars in wrangler.jsonc, so they are edited there, not here.
+
+# Signs the 60-minute session token. A throwaway value is fine locally; an empty one makes
+# every POST /sessions answer 500 instead of minting a token with a zero-length key.
 SESSION_TOKEN_SECRET=dev-only-change-me
+
+# Clerk instance that issued the JWTs this Worker accepts. Empty means only guest sessions
+# work — signed-in requests get 401 and the guest path keeps functioning.
 CLERK_ISSUER=
+
+# Cloudflare TURN. Empty means GET /turn-credentials answers turn:false with
+# STUN only, which is enough on one machine and not enough across NATs.
 TURN_KEY_ID=
 TURN_KEY_API_TOKEN=
+
+# Reported by /health; set to the release tag in production.
 VERSION=dev

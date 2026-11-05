@@ -48,13 +48,16 @@ Validation table (DO, before relay):
 
 | Message | Allowed sender | Allowed status | Rejection code |
 |---------|----------------|----------------|----------------|
-| `signal` | any connected member | `lobby`, `playing` | `bad-signal` |
+| `signal` | any connected member | `lobby`, `playing` | `peer-not-connected` |
 | `team_assign` | host | `lobby` | `not-host`, `invalid-state` |
-| `start_match` | host | `lobby` + guards | `not-host`, `teams-not-balanced` |
+| `start_match` | host | `lobby` + guards | `not-host`, `invalid-state`, `room-not-full`, `not-enough-players`, `teams-not-balanced` |
 | `input` | the active slot | `playing` | `unsupported-message` |
 | `chat` | any connected member | `playing`, `lobby` | `rate-limited` |
-| `snapshot_push` | host | `playing` | `not-host`, `invalid-state` |
+| `snapshot_push` | host | `playing` | `not-host`, `invalid-state`, `snapshot-too-large` |
 | `match_end` | host | `playing` | `not-host`, `invalid-state` |
+
+Every code in this table comes from the [error catalogue](../../02-reference/api/README.md#error-catalogue); a code
+invented here and absent there is a defect in this story, not in the catalogue.
 
 Identity: `playerId` is bound at `auth` to the socket; every later message is attributed to that identity regardless of
 any `playerId` field in the payload.
@@ -79,8 +82,8 @@ any `playerId` field in the payload.
 
 ## 8. Test notes
 
-`TC-NET-044`, `TC-NET-067`, plus the table as `tests/worker/room-validate.test.ts`. Red first:
-`tests/worker/room.test.ts::peer_cannot_push_snapshot`.
+`TC-NET-044`, `TC-NET-067`, plus the table as `apps/worker/tests/room-validate.test.ts`. Red first:
+`apps/worker/tests/room.test.ts::peer_cannot_push_snapshot`.
 
 ## 9. Open questions
 

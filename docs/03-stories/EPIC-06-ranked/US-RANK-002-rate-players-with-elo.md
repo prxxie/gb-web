@@ -75,8 +75,8 @@ Applied per player: `rating_after = clampRating(rating_before + delta)`, `profil
 
 ## 8. Test notes
 
-`TC-RANK-113`, `TC-RANK-114`, `TC-RANK-058`; table-driven unit tests in `tests/worker/elo.test.ts` including the clamp
-and the K switch at 30 matches. Red first: `tests/worker/elo.test.ts::equal_teams_gain_16`.
+`TC-RANK-113`, `TC-RANK-114`, `TC-RANK-058`; table-driven unit tests in `apps/worker/tests/elo.test.ts` including the clamp
+and the K switch at 30 matches. Red first: `apps/worker/tests/elo.test.ts::equal_teams_gain_16`.
 
 ## 9. Open questions
 

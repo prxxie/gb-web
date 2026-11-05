@@ -88,7 +88,7 @@ Slot assignment: lowest free slot in `0…maxPlayers-1`. `team` is `null` until 
 
 `TC-ROOM-121`, `TC-ROOM-126`, `TC-ROOM-122`, `TC-ROOM-147`, `TC-ROOM-128`, `TC-ROOM-127`, `TC-ROOM-123`. Worker tests
 use `miniflare`'s `SELF.fetch` for the upgrade and a raw `WebSocketPair` harness. Red first:
-`tests/worker/signaling.test.ts::auth_required_within_5s`.
+`apps/worker/tests/signaling.test.ts::auth_required_within_5s`.
 
 ## 9. Open questions
 

@@ -87,10 +87,10 @@ Ordered by `rating DESC, rated_matches DESC, account_id ASC`; only `account.stat
 
 | Contract | Checked by |
 |----------|-----------|
-| Request validation table (one case per row) | `tests/worker/matches.test.ts` (TC-RANK-115) |
-| Rating maths, K-decay, clamping | `tests/core/rating.test.ts` (TC-RANK-113) |
-| Transaction atomicity | `tests/worker/matches.test.ts` (TC-RANK-110) |
-| Unranked paths (guest, bot, stale ruleset) | `tests/worker/matches.test.ts` (TC-RANK-116) |
-| Idempotency and duplicate detection | `tests/worker/matches.test.ts` (TC-RANK-111) |
-| History ordering and cursor stability under inserts | `tests/worker/history.test.ts` (TC-RANK-141) |
-| Leaderboard ordering, exclusions, cache header | `tests/worker/leaderboard.test.ts` (TC-RANK-104) |
+| Request validation table (one case per row) | `apps/worker/tests/matches.test.ts` (TC-RANK-115) |
+| Rating maths, K-decay, clamping | `packages/core/tests/rating.test.ts` (TC-RANK-113) |
+| Transaction atomicity | `apps/worker/tests/matches.test.ts` (TC-RANK-110) |
+| Unranked paths (guest, bot, stale ruleset) | `apps/worker/tests/matches.test.ts` (TC-RANK-116) |
+| Idempotency and duplicate detection | `apps/worker/tests/matches.test.ts` (TC-RANK-111) |
+| History ordering and cursor stability under inserts | `apps/worker/tests/history.test.ts` (TC-RANK-141) |
+| Leaderboard ordering, exclusions, cache header | `apps/worker/tests/leaderboard.test.ts` (TC-RANK-104) |

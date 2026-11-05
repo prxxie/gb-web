@@ -90,7 +90,7 @@ export { Room } from "./room";
 ## 8. Test notes
 
 `TC-FND-001`, `TC-FND-070` (contract fixtures against `openapi.yaml`) and `TC-FND-100`
-(`tests/worker/migrations.test.ts`, miniflare D1). Red first: the health test fails against the empty worker.
+(`apps/worker/tests/migrations.test.ts`, miniflare D1). Red first: the health test fails against the empty worker.
 
 ## 9. Open questions
 

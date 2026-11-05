@@ -58,7 +58,7 @@ flowchart LR
 |-------|---------------------|
 | Token validity | `apps/worker/src/auth.ts` — Clerk JWKS for JWT, DO `secret` table lookup for session tokens |
 | Object ownership | Route guard per endpoint: `accountId === jwt.sub` for `/me*`; membership for rooms |
-| Host-only | `apps/worker/src/room.ts` — compare `playerId` with `hostPlayerId` before handling `start_match` / `team_assign` |
+| Host-only | `apps/worker/src/room-do.ts` — compare `playerId` with `hostPlayerId` before handling `start_match` / `team_assign` |
 | Active slot | Same file, compare `slot` with `turn.activeSlot`; the *client* also disables input, but that is courtesy only |
 | Ids are not exposed | Every response mapper strips `accountId`/`guestId` except to the owner (`accounts.md`) |
 
@@ -78,9 +78,9 @@ flowchart LR
 
 | Contract | Checked by |
 |----------|-----------|
-| Guest cannot start a match, assign teams, or reach `/me` | `tests/worker/authz.test.ts` (TC-AUTH-065) |
-| Non-host `start_match` → `error not-host`, room unaffected | `tests/worker/room.test.ts` (TC-ROOM-066) |
-| Fire from a non-active slot is ignored and produces an error | `tests/worker/room.test.ts` (TC-NET-067) |
-| Responses never contain another member's `accountId`/`guestId` | `tests/worker/privacy.test.ts` (TC-AUTH-075) |
-| Second socket from the same subject replaces the first | `tests/worker/room.test.ts` (TC-ROOM-068) |
-| Account deletion is refused while in an active room | `tests/worker/accounts.test.ts` (TC-AUTH-069) |
+| Guest cannot start a match, assign teams, or reach `/me` | `apps/worker/tests/authz.test.ts` (TC-AUTH-065) |
+| Non-host `start_match` → `error not-host`, room unaffected | `apps/worker/tests/room.test.ts` (TC-ROOM-066) |
+| Fire from a non-active slot is ignored and produces an error | `apps/worker/tests/room.test.ts` (TC-NET-067) |
+| Responses never contain another member's `accountId`/`guestId` | `apps/worker/tests/privacy.test.ts` (TC-AUTH-075) |
+| Second socket from the same subject replaces the first | `apps/worker/tests/room.test.ts` (TC-ROOM-068) |
+| Account deletion is refused while in an active room | `apps/worker/tests/accounts.test.ts` (TC-AUTH-069) |

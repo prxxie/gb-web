@@ -33,7 +33,7 @@ Open questions: **Open: 15 · Blocking: 0 · Answered: 25 · Withdrawn: 1**
 | Working on the game simulation, physics or netcode | [`02-reference/data/room-state.md`](02-reference/data/room-state.md), [`02-reference/api/signaling.md`](02-reference/api/signaling.md), [`01-overview/workflow-state-machine.md`](01-overview/workflow-state-machine.md) |
 | Working on the backend (Worker, DO, D1) | [`01-overview/architecture.md`](01-overview/architecture.md), [`02-reference/api/README.md`](02-reference/api/README.md), [`02-reference/data/README.md`](02-reference/data/README.md) |
 | Working on the frontend (routes, HUD, i18n) | [`02-reference/screens/README.md`](02-reference/screens/README.md), [`01-overview/conventions.md`](01-overview/conventions.md) |
-| Testing / QA | [`05-quality/test-cases.md`](05-quality/test-cases.md), [`01-overview/environment-setup.md`](01-overview/environment-setup.md) § 6–7 |
+| Testing / QA | [`05-quality/test-cases.md`](05-quality/test-cases.md), [`05-quality/test-plan-status.md`](05-quality/test-plan-status.md), [`01-overview/environment-setup.md`](01-overview/environment-setup.md) § 6–7 |
 | PM / BA / client-facing | [`01-overview/project-overview.md`](01-overview/project-overview.md), [`04-decisions/open-questions.md`](04-decisions/open-questions.md), [`05-quality/acceptance-signoff.md`](05-quality/acceptance-signoff.md) |
 | Shipping a release | [`07-release/README.md`](07-release/README.md), [`01-overview/deployment.md`](01-overview/deployment.md) |
 | On call / operations | [`08-ops/runbook.md`](08-ops/runbook.md), [`08-ops/slo.md`](08-ops/slo.md) |

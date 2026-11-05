@@ -123,15 +123,15 @@ a drag. All pad and button targets are ≥ 60 × 60 logical px (`NFR-17`).
 | Contract | Checked by |
 |----------|-----------|
 | Aim drag → angle/force within tolerance, release fires once | `tests/e2e/match.spec.ts` (TC-MATCH-151) |
-| Power ring shows 0.0–4.0 and maps to `force = power × 25` | `tests/web/power-ring.test.tsx` (TC-MATCH-915) |
-| Release below 0.3 cancels; two-finger gesture cancels without firing | `tests/web/gestures.test.ts` (TC-MATCH-916) |
-| Camera default window 1000 × 600, clamped pan, zoom bounds | `tests/web/camera.test.ts` (TC-MATCH-918, TC-MATCH-919) |
-| Ruler divisions 8 → 16 as the window widens | `tests/web/ruler.test.ts` (TC-MATCH-920) |
+| Power ring shows 0.0–4.0 and maps to `force = power × 25` | `apps/web/tests/power-ring.test.tsx` (TC-MATCH-915) |
+| Release below 0.3 cancels; two-finger gesture cancels without firing | `apps/web/tests/gestures.test.ts` (TC-MATCH-916) |
+| Camera default window 1000 × 600, clamped pan, zoom bounds | `apps/web/tests/camera.test.ts` (TC-MATCH-918, TC-MATCH-919) |
+| Ruler divisions 8 → 16 as the window widens | `apps/web/tests/ruler.test.ts` (TC-MATCH-920) |
 | Fullscreen requested on first tap; safe-area insets respected | `tests/e2e/fullscreen.spec.ts` (TC-MATCH-921) |
-| Turn clock starts at 20 s, skips on timeout, does not drift > 1 s | `tests/core/turn.test.ts` (TC-CORE-152) |
-| Wind re-rolled once per round, dial shows 12 sectors and 0–26 | `tests/core/weather.test.ts` (TC-CORE-926), `tests/web/wind-dial.test.ts` (TC-MATCH-923) |
-| Blast damage, friendly fire, elimination, team-loss detection | `tests/core/physics.test.ts` (TC-CORE-020…TC-CORE-028) |
-| Snapshot apply is idempotent and duck-types by `seq` | `tests/core/snapshot.test.ts` (TC-CORE-040) |
+| Turn clock starts at 20 s, skips on timeout, does not drift > 1 s | `packages/core/tests/turn.test.ts` (TC-CORE-152) |
+| Wind re-rolled once per round, dial shows 12 sectors and 0–26 | `packages/core/tests/weather.test.ts` (TC-CORE-926), `apps/web/tests/wind-dial.test.ts` (TC-MATCH-923) |
+| Blast damage, friendly fire, elimination, team-loss detection | `packages/core/tests/physics.test.ts` (TC-CORE-020…TC-CORE-028) |
+| Snapshot apply is idempotent and duck-types by `seq` | `packages/core/tests/snapshot.test.ts` (TC-CORE-040) |
 | Reconnect overlay countdown matches the 20 s grace | `tests/e2e/reconnect.spec.ts` (TC-ROOM-047) |
 | Host migration overlay ≤ 5 s end-to-end | `tests/e2e/migration.spec.ts` (TC-ROOM-049) |
 | Offline bot match needs no network at all | `tests/e2e/offline.spec.ts` (TC-PWA-064) |

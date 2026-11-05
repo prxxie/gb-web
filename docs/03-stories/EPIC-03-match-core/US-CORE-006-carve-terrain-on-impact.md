@@ -67,7 +67,7 @@ Destructible props, water, wind-blown terrain.
 ## 8. Test notes
 
 `TC-CORE-914`, `TC-CORE-040`, `TC-CORE-904`, `TC-CORE-913`.
-`Red first: tests/core/terrain.test.ts::blast_removes_circle_and_regrounds_unit`.
+`Red first: packages/core/tests/terrain.test.ts::blast_removes_circle_and_regrounds_unit`.
 
 <!-- delivery:2026-11-05 -->
 

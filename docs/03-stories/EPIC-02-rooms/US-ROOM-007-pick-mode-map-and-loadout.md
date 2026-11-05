@@ -71,7 +71,7 @@ Item purchasing, per-mode separate leaderboards (`OQ-28`), map voting.
 ## 8. Test notes
 
 `TC-ROOM-151`, `TC-ROOM-147`, `TC-ROOM-148`, `TC-MATCH-006`, `TC-AUTH-104`.
-`Red first: tests/web/lobby-settings.test.tsx::non_host_sees_read_only_mode_select`.
+`Red first: apps/web/tests/lobby-settings.test.tsx::non_host_sees_read_only_mode_select`.
 
 <!-- delivery:2026-11-05 -->
 

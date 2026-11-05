@@ -87,7 +87,7 @@ export function stepHold(heldMs: number, ratePerSecond: number, cap: number): nu
 `TC-MATCH-907` (pad visibility, steps, budget, turn end), `TC-MATCH-917` (angle stepping and band dimming),
 `TC-MATCH-922` (pad stays fixed while zooming), `TC-CORE-904` (energy, incline and action limits) — see
 [`05-quality/test-cases.md`](../../05-quality/test-cases.md).
-Red first: `tests/web/direction-pad.test.tsx::disabled_when_moves_exhausted`.
+Red first: `apps/web/tests/direction-pad.test.tsx::disabled_when_moves_exhausted`.
 
 ## 9. Open questions
 

@@ -96,9 +96,9 @@ docs/                ← WHAT to build (layout depends on tier; see docs/README.
 - **Stack**: Phaser 4.2 (canvas) inside React 19 + Vite 8 + TypeScript 5; Cloudflare Workers + Durable Objects + D1; Clerk (auth); Cloudflare TURN; Cloudflare Pages; pnpm workspaces
 - **Stack packs**: `react-vite`, `api`, `browser-verify` (skills `cpt-stack-<name>`; `docs/01-overview/conventions.md` overrides them)
 - **Build**: `pnpm build` (planned — verify after US-FND-001)
-- **Test**: `pnpm test` (`vitest run` over tests/core, tests/worker, tests/web); single test: `pnpm vitest run tests/core/physics.test.ts`; e2e: `pnpm e2e` (`playwright test`) (planned — verify after US-FND-001)
+- **Test**: `pnpm test` (`vitest run` over `packages/core/tests`, `apps/worker/tests`, `apps/web/tests`); single test: `pnpm vitest run packages/core/tests/match.test.ts`; e2e: `pnpm e2e` (`playwright test`, `E2E_WEB_PORT` to pick a free Vite port)
 - **Lint / typecheck**: `pnpm lint && pnpm typecheck` (planned — verify after US-FND-001)
 - **Run locally**: terminal 1 `pnpm dev:worker` (wrangler dev, :8787); terminal 2 `pnpm dev` (vite, :5173) (planned — verify after US-FND-001)
-- **Layout**: `apps/web` (routes, Phaser scenes, i18n), `apps/worker` (API routes, `room.ts` Durable Object, `migrations/`), `packages/core` (physics, turns, snapshot, `tunables.json`), `tests/{core,worker,web,e2e}`, `docs/`
-- **Conventions**: `docs/01-overview/conventions.md` — pnpm + TypeScript strict; `packages/core` imports no Phaser/DOM/network; wire keys `snake_case`, in-code `camelCase`; i18n vi (default) + en, no literal strings; landscape only; values from `tunables.json` only. Node **24+** required.
+- **Layout**: `apps/web` (routes, Phaser scenes, i18n), `apps/worker` (API routes, `room-do.ts` Durable Object, `migrations/`), `packages/core` (physics, turns, snapshot, `tunables.json`), `packages/core/tests`, `apps/worker/tests`, `apps/web/tests`, `tests/e2e`, `tests/meta`, `docs/`
+- **Conventions**: `docs/01-overview/conventions.md` — pnpm + TypeScript strict; `packages/core` imports no Phaser/DOM/network; wire frame `t` values `snake_case`, all other wire and in-code fields `camelCase`; i18n vi (default) + en, no literal strings; landscape only; values from `tunables.json` only. Node **22.12+** required (verified on 22.22.2; `package.json` `engines` is the authority).
 <!-- cpt:project:end -->
