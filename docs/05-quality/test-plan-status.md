@@ -12,15 +12,18 @@ does not generate it.
 
 ## Written
 
-12 Vitest files (102 cases) and 3 Playwright specs (6 cases), green on 2026-11-05:
+15 Vitest files (110 cases) and 3 Playwright specs (6 cases), green on 2026-11-05:
 
 | Area | Files |
 |------|-------|
 | Core simulation | `packages/core/tests/ballistics.test.ts`, `combat.test.ts`, `data.test.ts`, `match.test.ts`, `room.test.ts`, `rating.test.ts`, `snapshot.test.ts`, `camera.test.ts` |
-| Worker | `apps/worker/tests/lib.test.ts` (pure helpers: tokens, CORS, cursors, validation) |
+| Core boundary | `packages/core/tests/imports.test.ts` — no Phaser, network or `apps/` import; pins `lib: ["ES2023"]`, which is what makes a DOM global a type error |
+| Worker helpers | `apps/worker/tests/lib.test.ts` (pure helpers: tokens, CORS, cursors, validation) |
+| Worker environment | `apps/worker/tests/env.test.ts` — every name the code reads is declared in `wrangler.jsonc` or an example file, and no example row carries a secret |
 | Web UI | `apps/web/tests/hud.test.tsx`, `input.test.tsx` |
 | Browser flows | `tests/e2e/smoke.spec.ts`, `lobby.spec.ts`, `a11y.spec.ts` |
 | Repository | `tests/meta/traceability.test.ts` — checks that every TC id cited in a test exists in `test-cases.md`; it does **not** check that the cited case is the one being asserted, which is how the mis-citations in the 2026-11-05 report survived |
+| Repository | `tests/meta/bundle-secrets.test.ts` — builds the SPA into a temp dir and greps every asset for the Worker secret names and for real values from an untracked `apps/worker/.dev.vars` (7 s, the slowest case) |
 
 ## Planned
 
@@ -29,7 +32,6 @@ does not generate it.
 | File | Named by |
 |------|----------|
 | `apps/web/tests/aim.test.tsx` | `docs/03-stories/EPIC-05-match-ui/US-MATCH-002-aim-and-fire-by-touch.md` |
-| `apps/web/tests/bundle-secrets.test.tsx` | `docs/01-overview/deployment.md` |
 | `apps/web/tests/camera.test.tsx` | `docs/02-reference/screens/match.md` |
 | `apps/web/tests/direction-pad.test.tsx` | `docs/03-stories/EPIC-05-match-ui/US-MATCH-006-move-with-touch-controls.md` |
 | `apps/web/tests/gestures.test.tsx` | `docs/02-reference/screens/match.md` |
@@ -54,7 +56,6 @@ does not generate it.
 | `apps/worker/tests/deletion.test.ts` | `docs/02-reference/api/accounts.md` |
 | `apps/worker/tests/display-name.test.ts` | `docs/03-stories/EPIC-01-accounts/US-AUTH-003-edit-display-name-and-avatar.md` |
 | `apps/worker/tests/elo.test.ts` | `docs/03-stories/EPIC-06-ranked/US-RANK-002-rate-players-with-elo.md` |
-| `apps/worker/tests/env.test.ts` | `docs/01-overview/environment-setup.md`, `docs/03-stories/EPIC-00-foundation/US-FND-001-set-up-the-workspace.md` |
 | `apps/worker/tests/health.test.ts` | `docs/01-overview/environment-setup.md` |
 | `apps/worker/tests/history.test.ts` | `docs/02-reference/api/matches.md` |
 | `apps/worker/tests/leaderboard.test.ts` | `docs/02-reference/api/matches.md`, `docs/02-reference/data/README.md`, `docs/02-reference/data/accounts.md`, `docs/02-reference/screens/leaderboard.md` |
@@ -89,7 +90,6 @@ does not generate it.
 | `packages/core/tests/bot.test.ts` | `docs/03-stories/EPIC-03-match-core/US-CORE-005-play-against-a-bot.md` |
 | `packages/core/tests/gimmicks.test.ts` | `docs/03-stories/EPIC-03-match-core/US-CORE-011-apply-stage-gimmicks.md` |
 | `packages/core/tests/ice.test.ts` | `docs/02-reference/api/rooms.md` |
-| `packages/core/tests/imports.test.ts` | `docs/01-overview/architecture.md`, `docs/01-overview/conventions.md`, `docs/03-stories/EPIC-00-foundation/US-FND-001-set-up-the-workspace.md` |
 | `packages/core/tests/input.test.ts` | `docs/02-reference/api/signaling.md` |
 | `packages/core/tests/items.test.ts` | `docs/03-stories/EPIC-03-match-core/US-CORE-009-apply-item-effects.md` |
 | `packages/core/tests/maps.test.ts` | `docs/03-stories/EPIC-03-match-core/US-CORE-012-load-the-eleven-maps.md` |

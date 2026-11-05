@@ -19,7 +19,7 @@ No Docker, no database server, no local TLS certificates are required.
 ## 2. Get the code
 
 ```bash
-git clone <repo-url> gb-web    # (planned — the repository has no remote yet)
+git clone <repo-url> gb-web    # no remote configured yet — tracked by US-FND-004
 cd gb-web
 pnpm install
 ```
@@ -99,13 +99,13 @@ node .agents/scripts/verify-docs.mjs --fix
 Single test:
 
 ```bash
-pnpm vitest run packages/core/tests/physics.test.ts
+pnpm vitest run packages/core/tests/ballistics.test.ts
 pnpm exec playwright test tests/e2e/lobby.spec.ts
 ```
 
-All six commands are `(planned — verify after US-FND-001)`; they become runnable when the foundation story creates the
-workspace `package.json` scripts.
-
+All six commands were executed on 2026-11-05 on Node 22.22.2 and pass: `typecheck` and `lint` exit 0, `test` runs
+15 files / 110 cases, `e2e` runs 6 specs, `verify-docs` reports 0 errors. `pnpm build` produces the web bundle and the
+worker dry-run upload. Only `git clone` stays unavailable until `US-FND-004` adds a remote.
 ## 7. Test on a real phone
 
 1. Find the LAN address (`ipconfig getifaddr en0` / `hostname -I`).

@@ -11,6 +11,11 @@ import { defineConfig, devices } from "@playwright/test";
  */
 const WEB_PORT = Number(process.env.E2E_WEB_PORT ?? 5173);
 const BASE_URL = process.env.E2E_BASE_URL ?? `http://127.0.0.1:${WEB_PORT}`;
+/**
+ * `E2E_SERVERS_EXTERNAL=1` means someone already started both processes (CI does, so a server that fails to
+ * boot fails the workflow step with its own log instead of Playwright's bare "Timed out waiting 60000ms").
+ */
+const EXTERNAL_SERVERS = process.env.E2E_SERVERS_EXTERNAL === "1";
 export default defineConfig({
   testDir: "./tests/e2e",
   timeout: 90_000,
@@ -24,18 +29,20 @@ export default defineConfig({
     // The game is landscape-only (`NFR-19`), so every run uses a landscape phone profile.
     ...devices["Pixel 7 landscape"],
   },
-  webServer: [
-    {
-      command: "pnpm dev:worker",
-      url: "http://127.0.0.1:8787/api/v1/health",
-      reuseExistingServer: !process.env.CI,
-      timeout: 60_000,
-    },
-    {
-      command: `pnpm dev --port ${WEB_PORT} --strictPort`,
-      url: BASE_URL,
-      reuseExistingServer: !process.env.CI,
-      timeout: 60_000,
-    },
-  ],
+  webServer: EXTERNAL_SERVERS
+    ? undefined
+    : [
+        {
+          command: "pnpm dev:worker",
+          url: "http://127.0.0.1:8787/api/v1/health",
+          reuseExistingServer: !process.env.CI,
+          timeout: 60_000,
+        },
+        {
+          command: `pnpm dev --port ${WEB_PORT} --strictPort`,
+          url: BASE_URL,
+          reuseExistingServer: !process.env.CI,
+          timeout: 60_000,
+        },
+      ],
 });
