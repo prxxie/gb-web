@@ -158,4 +158,27 @@ describe("TC-ROOM-163: the protocol is versioned and total", () => {
     expect(unknown.ok).toBe(false);
     expect(parseServerFrame("<html>").ok).toBe(false);
   });
+
+  it("TC-ROOM-025: a preset quick phrase and a free text both parse", () => {
+    // Arrange / Act
+    const preset = parseClientFrame(JSON.stringify({ t: "chat", kind: "quick_phrase", id: "phrase-gg" }));
+    const free = parseClientFrame(JSON.stringify({ t: "chat", text: "tốt lắm" }));
+
+    // Assert
+    expect(preset.ok && preset.frame).toEqual({ t: "chat", kind: "quick_phrase", id: "phrase-gg" });
+    expect(free.ok && free.frame).toEqual({ t: "chat", text: "tốt lắm" });
+  });
+
+  it("TC-ROOM-025: a chat frame with neither kind nor text, an unknown kind, or text over 120 is refused", () => {
+    // Arrange / Act
+    const empty = parseClientFrame(JSON.stringify({ t: "chat" }));
+    const unknown = parseClientFrame(JSON.stringify({ t: "chat", kind: "shout", id: "x" }));
+    const long = parseClientFrame(JSON.stringify({ t: "chat", text: "a".repeat(121) }));
+
+    // Assert — every refusal names the field, so the client can point at it
+    expect(empty.ok).toBe(false);
+    expect(unknown.ok).toBe(false);
+    expect(long.ok).toBe(false);
+    expect(!long.ok && long.detail).toContain("120");
+  });
 });

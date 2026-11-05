@@ -97,7 +97,7 @@ Terrain collision and crater carving ([`US-CORE-006`](US-CORE-006-carve-terrain-
 ## 8. Test notes
 
 `TC-CORE-020`, `TC-CORE-021`, `TC-CORE-022`, `TC-CORE-023`, `TC-CORE-028`, `TC-CORE-029`, `TC-CORE-912`, `TC-CORE-913`.
-`Red first: packages/core/tests/physics.test.ts::step_gravity_accumulates`.
+`Red first: packages/core/tests/ballistics.test.ts::step_gravity_accumulates`.
 
 <!-- delivery:2026-11-05 -->
 

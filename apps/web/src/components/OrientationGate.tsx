@@ -22,14 +22,16 @@ export function OrientationGate({ children, message }: OrientationGateProps): JS
     return () => query.removeEventListener("change", listener);
   }, []);
 
+  // The gate itself stays visible in both orientations: only the battlefield is hidden in portrait,
+  // so the overlay is a sibling of the children rather than a child of the hidden element.
   return (
-    <div hidden={portrait} data-testid="orientation-gate">
+    <div className="orientation-gate" data-testid="orientation-gate">
+      <div hidden={portrait}>{children}</div>
       {portrait ? (
-        <div className="overlay" data-testid="orientation-hint">
+        <div className="overlay overlay--screen" data-testid="orientation-hint" role="alert">
           {message}
         </div>
       ) : null}
-      <div hidden={portrait}>{children}</div>
     </div>
   );
 }

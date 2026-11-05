@@ -224,15 +224,28 @@ td {
   right: calc(12px + var(--safe-right));
   bottom: calc(12px + var(--safe-bottom));
   display: grid;
-  grid-template-columns: repeat(3, 56px);
-  grid-template-rows: repeat(3, 56px);
+  grid-template-columns: repeat(3, 60px);
+  grid-template-rows: repeat(3, 60px);
   gap: 6px;
   opacity: 0.95;
 }
 
+.match__pad-budget {
+  grid-area: 1 / 1;
+  align-self: center;
+  justify-self: center;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.85rem;
+  color: var(--ink-dim);
+}
+
+.match__pad-budget--energy {
+  grid-area: 1 / 3;
+}
+
 .match__pad button {
-  min-width: 56px;
-  min-height: 56px;
+  min-width: 60px;
+  min-height: 60px;
   padding: 0;
   font-size: 1.2rem;
   border-radius: 12px;
@@ -367,19 +380,20 @@ td {
 
 .match__skip {
   min-width: 60px;
-  min-height: 44px;
+  min-height: 60px;
   border-radius: 12px;
   background: rgba(22, 33, 58, 0.92);
 }
 
 .match__phrases {
   display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(6, minmax(60px, 1fr));
   gap: 4px;
 }
 
 .match__phrases button {
-  min-height: 44px;
+  min-width: 60px;
+  min-height: 60px;
   padding: 4px 8px;
   font-size: 0.7rem;
   border-radius: 10px;
@@ -414,6 +428,19 @@ td {
   background: linear-gradient(180deg, rgba(11, 18, 32, 0), rgba(11, 18, 32, 0.85));
 }
 
+.ruler__tick {
+  font-variant-numeric: tabular-nums;
+  opacity: 0.7;
+}
+
+.ruler__tick--major {
+  opacity: 1;
+  color: var(--ink);
+  font-weight: 700;
+  min-width: 2.2em;
+  text-align: center;
+}
+
 .wind {
   display: flex;
   gap: 8px;
@@ -439,6 +466,111 @@ td {
   font-size: 1.1rem;
   text-align: center;
   padding: 24px;
+}
+
+/* The rotate gate (`US-PWA-003`): the hint must cover the whole screen, whatever the scroll offsets. */
+.orientation-gate {
+  min-height: 100%;
+}
+
+.overlay--screen {
+  position: fixed;
+  z-index: 50;
+}
+
+/* App shell (`US-FND-003`) ------------------------------------------------- */
+
+.shell {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.shell__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: calc(8px + var(--safe-top)) calc(12px + var(--safe-right)) 8px calc(12px + var(--safe-left));
+  border-bottom: 1px solid #1c2942;
+  background: rgba(16, 26, 46, 0.85);
+}
+
+.shell__title {
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.shell__locale {
+  min-width: 60px;
+  min-height: 60px;
+  padding: 0;
+  font-weight: 700;
+}
+
+.shell__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.shell__body > .screen {
+  flex: 1 1 auto;
+}
+
+/* Lobby settings + loadout (`US-ROOM-007`) --------------------------------- */
+
+.settings__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+}
+
+.settings__field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.loadout__pages {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.loadout__page {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-rows: repeat(3, auto);
+  gap: 8px;
+}
+
+.loadout__cell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  align-items: flex-start;
+  min-width: 60px;
+  min-height: 60px;
+  padding: 8px;
+  text-align: left;
+  border-radius: 12px;
+  background: rgba(22, 33, 58, 0.92);
+}
+
+.loadout__cell--picked {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent) inset;
+}
+
+.loadout__cell-name {
+  font-size: 0.8rem;
+}
+
+.loadout__cell-meta {
+  font-size: 0.7rem;
+  color: var(--ink-dim);
 }
 
 .banner {

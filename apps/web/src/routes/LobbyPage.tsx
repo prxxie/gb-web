@@ -6,8 +6,10 @@
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { MOBILES, canStart, defaultSettings, type RoomState } from "@gbw/core";
+import { MOBILES, canStart, defaultSettings, type ClientFrame, type LoadoutEntry, type RoomSettings, type RoomState } from "@gbw/core";
 import { useLocale, useSession } from "../app/providers";
+import { LoadoutPicker } from "../components/LoadoutPicker";
+import { SettingsPanel } from "../components/SettingsPanel";
 import { api } from "../lib/api";
 import { connectRoom, type RoomSocket, type ServerMessage } from "../net/signaling";
 import type { PlannedMatch } from "./MatchPage";
@@ -23,6 +25,7 @@ export function LobbyPage(): JSX.Element {
   const [mobileId, setMobileId] = useState<string>(MOBILES[0]?.mobileId ?? "mbl-01");
   const [status, setStatus] = useState<"connecting" | "live" | "closed">("connecting");
   const [grace, setGrace] = useState(0);
+  const [loadout, setLoadout] = useState<readonly LoadoutEntry[]>([]);
   const socket = useRef<RoomSocket | null>(null);
   const joined = useRef(false);
 
@@ -69,6 +72,9 @@ export function LobbyPage(): JSX.Element {
             setRoom(message.room);
             setStatus("live");
             if (message.you) setPlayerId(message.you.playerId);
+            // The server echoes the stored loadout, so a reconnecting member sees what it saved.
+            const mine = message.room.members.find((member) => member.playerId === (message.you?.playerId ?? selfId));
+            if (mine?.loadout) setLoadout(mine.loadout);
             return;
           }
           if (message.t === "peer_left") {
@@ -143,6 +149,29 @@ export function LobbyPage(): JSX.Element {
     socket.current?.send({ t: "start_match" });
   };
 
+  /**
+   * Room settings are host-only (`US-ROOM-007`). The frame carries `mode` and `mapId`; `maxPlayers` is
+   * part of `RoomSettings` so it rides along, and `@gbw/core`'s parser still has to grow the field before
+   * the server can honour it — the cast is confined to this one call site until it does.
+   */
+  const changeSettings = (patch: Partial<RoomSettings>): void => {
+    if (!room || !isHost) return;
+    const next = { ...room.settings, ...patch };
+    const frame = {
+      t: "room_settings",
+      mode: next.mode,
+      mapId: next.mapId,
+      maxPlayers: next.maxPlayers,
+    } as ClientFrame;
+    socket.current?.send(frame);
+  };
+
+  /** Every member picks its own loadout (`US-ROOM-007` AC4); the server enforces the eleven-item budget. */
+  const changeLoadout = (items: readonly LoadoutEntry[]): void => {
+    setLoadout(items);
+    socket.current?.send({ t: "loadout", items });
+  };
+
   if (!session) {
     return (
       <div className="screen screen--center">
@@ -199,6 +228,9 @@ export function LobbyPage(): JSX.Element {
           <p className="muted">{t("lobby.waiting")}</p>
         )}
       </section>
+
+      <SettingsPanel settings={settings} isHost={isHost} onChange={changeSettings} />
+      <LoadoutPicker items={loadout} onChange={changeLoadout} />
 
       <div className="row" style={{ alignItems: "flex-start" }}>
         {(["A", "B"] as const).map((team) => (

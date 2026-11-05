@@ -16,11 +16,20 @@ export function Ruler({ window, unitLabel }: RulerProps): JSX.Element {
   const layout = rulerLayout(window);
   return (
     <div className="ruler" data-testid="ruler" data-segments={layout.segments}>
-      {Array.from({ length: layout.segments + 1 }, (_, index) => (
-        <span key={index} title={`${index} ${unitLabel}`}>
-          {index}
-        </span>
-      ))}
+      {layout.labels.map((label, index) => {
+        // Every fourth tick reads as a major division, so a player can count 500-unit blocks at a glance.
+        const major = index % 4 === 0;
+        return (
+          <span
+            key={index}
+            className={major ? "ruler__tick ruler__tick--major" : "ruler__tick"}
+            data-major={major}
+            title={`${label} ${unitLabel}`}
+          >
+            {label}
+          </span>
+        );
+      })}
     </div>
   );
 }

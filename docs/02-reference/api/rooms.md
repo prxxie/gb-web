@@ -100,4 +100,4 @@ report to the player ("no relay available") instead of failing the connection ou
 | Rate limits and `Retry-After` | `apps/worker/tests/rooms.test.ts` (TC-ROOM-072) |
 | `GET /rooms/{code}` leaks no identity fields | `apps/worker/tests/rooms.test.ts` — schema whitelist assertion (TC-AUTH-075) |
 | TURN credential TTL and absence from logs | `apps/worker/tests/turn.test.ts` (TC-ROOM-051) |
-| Client rejects non-TLS ICE URLs | `packages/core/tests/ice.test.ts` (TC-ROOM-050) |
+| SDP is relayed byte-identical and never stored | `apps/worker/tests/room-relay.test.ts` (TC-ROOM-050) |

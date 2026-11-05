@@ -64,7 +64,7 @@ Buying parts, part rarity, visual composition of worn parts (`US-AUTH-003` cover
 ## 8. Test notes
 
 `TC-CORE-921`, `TC-AUTH-104`, `TC-RANK-110`, `TC-AUTH-074`.
-`Red first: packages/core/tests/avatar.test.ts::bonuses_clamp_at_ten_percent_attack`.
+`Red first: packages/core/tests/avatars.test.ts::bonuses_clamp_at_ten_percent_attack`.
 
 <!-- delivery:2026-11-05 -->
 

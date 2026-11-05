@@ -4,7 +4,7 @@
  * `move`/`item` are relayed to the host only — the Worker is not a gameplay authority (`ADR-0004`).
  */
 import { describe, expect, it } from "vitest";
-import { RoomHarness, type FakeSocket } from "./support/room-harness";
+import { RoomHarness, makeSnapshot, type FakeSocket } from "./support/room-harness";
 
 const IDS = ["host", "p1", "p2", "p3"] as const;
 
@@ -66,6 +66,8 @@ describe("room settings and input relay", () => {
       assignments: IDS.map((id, index) => ({ playerId: id, team: index % 2 === 0 ? "A" : "B" })),
     });
     await harness.message(host, { t: "start_match" });
+    // `US-NET-004` AC2: an input is only relayed for the slot the last snapshot says is active.
+    await harness.message(host, { t: "snapshot_push", snapshot: { ...makeSnapshot(1), turn: { ...makeSnapshot(1).turn, activeSlot: 1 } } });
     harness.clearAll(sockets.values());
 
     await harness.message(p1, { t: "move", direction: 1, run: true });

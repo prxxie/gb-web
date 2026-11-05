@@ -243,3 +243,38 @@ The `covers` column names the requirement ([nonfunctional-requirements.md](../01
 - A case that cannot run yet (missing environment, for example `TC-OPS-185` before M3) is marked in the release record,
   never deleted.
 - A test id must match `TC-[A-Z]{2,6}-\d{3}`; numbers are unique within an epic and are never reused.
+
+## Socket contract and lifecycle (hardening pass 2026-11-05)
+
+Cases added when the socket contract was written down once and the Durable Object was rebuilt against it. They
+exist because the same behaviour used to be cited under borrowed ids from other epics (`TC-CORE-914` carried three
+unrelated meanings), so every row below names the one thing it proves.
+
+| ID | Story | Case | Expected | Level | Covers |
+|----|-------|------|----------|-------|--------|
+| TC-FND-131 | US-FND-003 | A direct URL (`/lobby/ABC234`, `/match/ABC234`) renders the shell and the locale toggle | Shell renders without a 404 and the toggle switches VI↔EN | web | `US-FND-003` AC1, AC2, AC5 |
+| TC-MATCH-914 | US-MATCH-002 | Drag distance maps to the power ring radius | Radius grows with the pull and stops at the maximum | web | `US-MATCH-002` §4 |
+| TC-NET-045 | US-NET-004 | A peer sends `team_assign`; the host sends it after the start | `not-host` while a peer, `invalid-state` once playing; the roster is unchanged | worker | `US-NET-004` §2 roster |
+| TC-NET-066 | US-NET-004 | A socket signals itself, then signals a seated member with no socket | `bad-request`, then `peer-not-connected`; no frame is relayed | worker | `US-NET-004` §3 `signal` |
+| TC-PWA-152 | US-PWA-003 | The page is squeezed into portrait, then rotated to landscape | Portrait shows the rotate gate with the hint, landscape shows the match | web | `US-PWA-003` AC1, AC2 |
+| TC-ROOM-025 | US-MATCH-004 | A preset phrase and a free text are sent, then an empty, unknown-kind or 121-char frame | The two valid frames parse; the three invalid ones are refused with the limit in `detail` | unit | `US-MATCH-004` §4 `chat` |
+| TC-ROOM-053 | US-ROOM-001 | A room runs past 24 h from its creation but not from its match start | The cap is measured from the match start; the room survives until then | worker | `room-state.md` expiry |
+| TC-ROOM-054 | US-ROOM-002 | Two snapshots are pushed in a row | Only the newest is stored, under its own key, and the older `seq` is dropped | worker | `room-state.md` snapshot |
+| TC-ROOM-057 | US-ROOM-004 | Every member of one team loses its socket, then all but one | The team forfeits only when every member is disconnected | worker | `US-ROOM-004` AC3 |
+| TC-ROOM-058 | US-NET-002 | The host pushes a snapshot, then replays an older `seq` | Each other member receives it once; the stale push is dropped without an error | worker | `US-NET-002` AC1 |
+| TC-ROOM-061 | US-ROOM-005 | The host leaves and the election promotes a peer | `host_changed` hands over the newest snapshot and the bumped generation | worker | `US-ROOM-005` AC2 |
+| TC-ROOM-062 | US-ROOM-002 | A member sends `leave` | `peer_left` is announced and the roster shrinks | worker | `US-ROOM-002` §3 |
+| TC-ROOM-063 | US-ROOM-002 | A new socket authenticates into a lobby | The others get `peer_joined`; the newcomer gets `room_state` with its own slot | worker | `US-ROOM-002` AC2 |
+| TC-ROOM-064 | US-NET-001 | A client sends `ping {at}` | `pong` carries the client's `at` and the host's `now` | worker | `signaling.md` §2 heartbeat |
+| TC-ROOM-065 | US-NET-001 | Eleven pings, then twenty-one signals, in one second | The frame past the budget is refused once and the socket closes `4429` | worker | `signaling.md` § Budgets |
+| TC-ROOM-070 | US-ROOM-006 | TURN credentials are requested from a Worker with no TURN key | `200` with the public STUN entry and `turn: false` | worker | `US-ROOM-006` AC2 |
+| TC-ROOM-129 | US-ROOM-004 | A member reconnects, and a lobby slot is freed | The reconnecting member keeps its slot; the freed slot goes to the next joiner | worker | `US-ROOM-004` AC1 |
+| TC-ROOM-146 | US-ROOM-003 | A team is assigned more members than `maxPlayers / 2` | `bad-request`; the roster is unchanged | worker | `US-ROOM-003` §4 capacity |
+| TC-ROOM-155 | US-ROOM-001 | A room is created | It starts in the lobby and arms the ten-minute idle alarm | worker | `room-state.md` § Started |
+| TC-ROOM-156 | US-ROOM-003 | `team_assign` and `peer_joined` arrive in the lobby | The status stays `lobby` | worker | `workflow-state-machine.md` guard |
+| TC-ROOM-157 | US-ROOM-003 | `start_match` succeeds | Slots, teams and status satisfy the playing invariant | worker | `US-ROOM-003` AC4 |
+| TC-ROOM-158 | US-NET-002 | A snapshot arrives while playing | The room stays `playing` and exactly one snapshot is stored | worker | `US-NET-002` AC1 |
+| TC-ROOM-159 | US-ROOM-004 | Every member's grace window expires | The room becomes `abandoned` | worker | `workflow-state-machine.md` playing→abandoned |
+| TC-ROOM-160 | US-ROOM-004 | An abandoned room is left idle, and a second start is attempted | The room is deleted, refuses joins, and cannot be restarted | worker | `workflow-state-machine.md` abandoned |
+| TC-ROOM-161 | US-ROOM-003 | The lobby is re-entered once the match is playing | Refused; the room stays `playing` | worker | `workflow-state-machine.md` guards |
+| TC-ROOM-707 | US-ROOM-007 | The host picks mode, map, capacity and a loadout; a peer changes one | The host's choice reaches every member; the peer's frame is refused | web | `US-ROOM-007` AC1–AC4 |

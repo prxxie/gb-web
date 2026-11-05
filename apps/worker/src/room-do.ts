@@ -15,7 +15,6 @@ import {
   canStart,
   createRoom,
   electHost,
-  isIdle,
   isModeId,
   isRoomExpired,
   joinRoom,
@@ -32,6 +31,7 @@ import {
   type RoomSettings,
   type RoomState,
   type Snapshot,
+  TUNABLES,
 } from "@gbw/core";
 import type { Env } from "./lib/db.js";
 import { verifySession, type SessionSubject } from "./lib/session.js";
@@ -40,6 +40,7 @@ const AUTH_TIMEOUT_MS = 5_000;
 const CLOSE_UNAUTHENTICATED = 4401;
 const CLOSE_ROOM_NOT_FOUND = 4404;
 const CLOSE_ROOM_CLOSED = 4410;
+const CLOSE_RATE_LIMITED = 4429;
 
 interface SocketMeta {
   playerId: string | null;
@@ -51,7 +52,12 @@ interface SocketMeta {
   token: string | null;
   /** Last heartbeat received; three missed ones move the member to `grace` (`US-ROOM-002` AC6). */
   lastPingAt: number;
+  /** Per-second frame counters, reset when the window rolls over (`signaling.md` § 5). */
+  window: { readonly startedAt: number; ping: number; signal: number; chat: number };
 }
+
+/** `signaling.md` § 5: what one socket may send per second, per frame kind. */
+const BUDGETS = { ping: 10, signal: 20, chat: 2 } as const;
 
 /** Core refusal → the code the client branches on (`docs/02-reference/api/README.md`). */
 const START_REJECTIONS: Record<NonNullable<ReturnType<typeof canStart>>, ErrorCode> = {
@@ -142,12 +148,35 @@ export class Room implements DurableObject {
           : {}),
       };
     }
+    const wasGraceHost =
+      this.room.hostPlayerId === body.playerId &&
+      this.room.members.find((member) => member.playerId === body.playerId)?.connectionState === "grace";
     const outcome = joinRoom(this.room, { ...body, now: Date.now() });
     if (outcome.rejection) {
       const status = outcome.rejection === "room-full" ? 409 : outcome.rejection === "room-closed" ? 410 : 400;
       return Response.json({ type: outcome.rejection }, { status });
     }
     this.room = this.withActivity({ ...outcome.room });
+    // `NFR-07`: a host that comes back inside its grace window keeps its slot, not the role — the room has
+    // already been handed on, and taking it back would be a second silent migration.
+    if (wasGraceHost) {
+      const promoted = electHost(this.room);
+      if (promoted) {
+        this.room = {
+          ...this.room,
+          hostPlayerId: promoted,
+          hostGeneration: this.room.hostGeneration + 1,
+          members: this.room.members.map((member) =>
+            member.playerId === promoted
+              ? { ...member, role: "host" as const }
+              : member.role === "host"
+                ? { ...member, role: "player" as const }
+                : member,
+          ),
+        };
+        this.broadcast({ t: "host_changed", hostPlayerId: promoted, hostGeneration: this.room.hostGeneration, lastSnapshot: this.room.lastSnapshot ?? null, room: this.publicState() });
+      }
+    }
     await this.persist();
     await this.scheduleSweep();
     return Response.json({ room: this.publicState(), member: outcome.member });
@@ -178,6 +207,7 @@ export class Room implements DurableObject {
       guestId: null,
       token: null,
       lastPingAt: 0,
+      window: { startedAt: 0, ping: 0, signal: 0, chat: 0 },
     });
     // `request.url` here is the proxy's `https://room.internal/...` stub, so the public origin comes in
     // on a header. Storage keeps it for the alarms, which run with no request in hand.
@@ -215,6 +245,18 @@ export class Room implements DurableObject {
       ws.close(CLOSE_UNAUTHENTICATED, "auth required");
       return;
     }
+    // The budget is charged before the frame is interpreted, so a flood costs the same whether or not
+    // the payload is well formed (`US-NET-004` §5).
+    const charged = this.charge(ws, meta, frame.t);
+    if (!charged) {
+      const limit = frame.t === "ping" ? BUDGETS.ping : frame.t === "signal" ? BUDGETS.signal : BUDGETS.chat;
+      this.reject(ws, "rate-limited", `more than ${limit} ${frame.t} frames in a second`);
+      // One refusal, then the socket goes: flooding must not cost the room a frame per attempt, and
+      // `4429` is the close code `signaling.md` documents for exactly this (`US-NET-004` §5).
+      this.meta.delete(ws);
+      ws.close(CLOSE_RATE_LIMITED, "rate limited");
+      return;
+    }
     const playerId = meta.playerId;
     switch (frame.t) {
       case "signal":
@@ -246,13 +288,50 @@ export class Room implements DurableObject {
         this.broadcast({ t: "room_state", room: this.publicState() });
         return;
       }
+      case "chat": {
+        // Preset quick phrases go to everyone else; the limit is the budget above, and the DO never
+        // stores what was said (`US-NET-004` §4).
+        this.broadcast(
+          {
+            t: "chat",
+            from: playerId,
+            kind: frame.kind ?? null,
+            id: frame.id ?? null,
+            text: frame.text ?? null,
+          },
+          playerId,
+        );
+        return;
+      }
       case "ping": {
-        this.meta.set(ws, { ...meta, lastPingAt: Date.now() });
+        this.meta.set(ws, { ...charged, lastPingAt: Date.now() });
         this.send(ws, { t: "pong", at: frame.at, now: Date.now() });
         await this.scheduleHeartbeatSweep();
         return;
       }
     }
+  }
+
+  /**
+   * Charges one frame against the socket's per-second budget. Returns the updated metadata (with a
+   * fresh window when the second rolled over) or `null` when the budget is spent.
+   */
+  private charge(ws: WebSocket, meta: SocketMeta, kind: "ping" | "signal" | "chat" | string): SocketMeta | null {
+    const now = Date.now();
+    const fresh = now - meta.window.startedAt >= 1_000;
+    const window = fresh ? { startedAt: now, ping: 0, signal: 0, chat: 0 } : { ...meta.window };
+    if (kind !== "ping" && kind !== "signal" && kind !== "chat") {
+      this.meta.set(ws, { ...meta, window });
+      return { ...meta, window };
+    }
+    if (window[kind] >= BUDGETS[kind]) {
+      this.meta.set(ws, { ...meta, window });
+      return null;
+    }
+    window[kind] += 1;
+    const next = { ...meta, window };
+    this.meta.set(ws, next);
+    return next;
   }
 
   /** `signal` reaches only its `to`, and never the sender (`US-ROOM-006`, TC-ROOM-050). */
@@ -360,7 +439,11 @@ export class Room implements DurableObject {
   }
 
   /** Host-only, lobby-only settings (`US-ROOM-007`). */
-  private async applySettings(ws: WebSocket, playerId: string, frame: { mode: string; mapId: string }): Promise<void> {
+  private async applySettings(
+    ws: WebSocket,
+    playerId: string,
+    frame: { mode: string; mapId: string; maxPlayers?: 2 | 4 | 6 | 8 | undefined; isPrivate?: boolean | undefined },
+  ): Promise<void> {
     if (playerId !== this.room.hostPlayerId) {
       this.reject(ws, "not-host", "only the host changes the room settings");
       return;
@@ -373,7 +456,22 @@ export class Room implements DurableObject {
       this.reject(ws, "bad-request", `${frame.mode} is not a mode`);
       return;
     }
-    this.room = this.withActivity({ ...this.room, settings: { ...this.room.settings, mode: frame.mode, mapId: frame.mapId } });
+    // Shrinking a room below the people already in it would strand members with no team to sit on
+    // (`US-ROOM-007`): the seat count may only change when it still holds everyone.
+    if (frame.maxPlayers !== undefined && frame.maxPlayers < this.room.members.length) {
+      this.reject(ws, "invalid-state", `${this.room.members.length} players are already seated`);
+      return;
+    }
+    this.room = this.withActivity({
+      ...this.room,
+      settings: {
+        ...this.room.settings,
+        mode: frame.mode,
+        mapId: frame.mapId,
+        ...(frame.maxPlayers === undefined ? {} : { maxPlayers: frame.maxPlayers }),
+        ...(frame.isPrivate === undefined ? {} : { isPrivate: frame.isPrivate }),
+      },
+    });
     await this.persist();
     this.broadcast({ t: "room_state", room: this.publicState() });
   }
@@ -402,10 +500,15 @@ export class Room implements DurableObject {
       this.reject(ws, "invalid-state", "the match has not started");
       return;
     }
-    // Only the active slot may act (`TC-NET-067`); the last snapshot is the DO's only view of the turn.
+    // Only the active slot may act (`US-NET-004` AC2, `TC-NET-067`); the last snapshot is the DO's only view of
+    // the turn, and before the first one no slot is active, so nothing may be relayed yet.
     const activeSlot = this.room.lastSnapshot?.turn.activeSlot;
     const senderSlot = this.room.members.find((member) => member.playerId === playerId)?.slot;
-    if (activeSlot !== undefined && senderSlot !== undefined && senderSlot !== activeSlot) {
+    if (activeSlot === undefined) {
+      this.reject(ws, "unsupported-message", "No slot is active yet");
+      return;
+    }
+    if (senderSlot !== undefined && senderSlot !== activeSlot) {
       this.reject(ws, "unsupported-message", "only the active player may act");
       return;
     }
@@ -580,6 +683,14 @@ export class Room implements DurableObject {
     }
     this.meta.set(ws, { ...meta, playerId, authed: true, token: message.token, lastPingAt: Date.now() });
     this.sockets.set(playerId, ws);
+    // A host coming back inside its grace window keeps its slot but not the role (`NFR-07`): the room has
+    // already learned to live without it, so the role goes to the longest-connected peer that stayed.
+    const returningHost = member.connectionState === "grace" && this.room.hostPlayerId === playerId;
+    const returned = returningHost
+      ? this.room.members.some(
+          (candidate) => candidate.playerId !== playerId && candidate.connectionState === "connected",
+        )
+      : false;
     this.room = this.withActivity({
       ...this.room,
       members: this.room.members.map((candidate) =>
@@ -598,6 +709,24 @@ export class Room implements DurableObject {
           : candidate,
       ),
     });
+    if (returned) {
+      const promoted = electHost(this.room);
+      if (promoted) {
+        this.room = {
+          ...this.room,
+          hostPlayerId: promoted,
+          hostGeneration: this.room.hostGeneration + 1,
+          members: this.room.members.map((candidate) =>
+            candidate.playerId === promoted
+              ? { ...candidate, role: "host" as const }
+              : candidate.role === "host"
+                ? { ...candidate, role: "player" as const }
+                : candidate,
+          ),
+        };
+        await this.announceHostChange(promoted);
+      }
+    }
     await this.persist();
     this.send(ws, { t: "room_state", room: this.publicState(), you: { playerId, slot: member.slot } });
     this.broadcast({ t: "peer_joined", playerId, slot: member.slot, room: this.publicState() }, playerId);
@@ -619,21 +748,12 @@ export class Room implements DurableObject {
     await this.persist();
     this.broadcast({ t: "peer_left", playerId, reason: "grace" });
     this.broadcast({ t: "room_state", room: this.publicState() });
-    await this.electIfHostGone(playerId);
+    // No election here: `US-ROOM-004` gives the host its grace window to come back, and the alarm
+    // below decides at the end of it.
     // Keep whichever alarm is sooner: this must not clobber the 24 h match cap set on `start_match`.
-    const at = Date.now() + 20_000;
+    const at = Date.now() + TUNABLES.roomGraceMs;
     const existing = await this.ctx.storage.getAlarm();
     if (existing === null || existing > at) await this.ctx.storage.setAlarm(at);
-  }
-
-  /**
-   * Election happens in exactly one place (`US-ROOM-005`): the longest-connected peer becomes host,
-   * `hostGeneration` goes up by one, and every peer is told to drop snapshots from the old generation.
-   */
-  private async electIfHostGone(previousHostId: string): Promise<void> {
-    if (this.room.hostPlayerId !== previousHostId) return;
-    this.room = { ...this.room, hostPlayerId: electHost(this.room) };
-    await this.announceHostChange(previousHostId);
   }
 
   /** Broadcasts `host_changed` for a host that is already known to be gone. */
@@ -678,32 +798,55 @@ export class Room implements DurableObject {
   async alarm(): Promise<void> {
     const now = Date.now();
     await this.sweepSilentSockets(now);
-    const inGrace = this.room.members.filter((member) => member.connectionState === "grace");
-    let next = this.room;
-    for (const member of inGrace) {
-      next = {
-        ...next,
-        members: next.members.map((candidate) =>
-          candidate.playerId === member.playerId ? { ...candidate, connectionState: "disconnected" } : candidate,
-        ),
-      };
-    }
-    this.room = next;
-    // A grace that ran out is a state change every peer has to see, or the roster sticks at `grace`
-    // forever (`signaling.md` §2: `peer_left.reason` mirrors `connectionState`, and a `room_state` follows).
-    for (const member of inGrace) {
+
+    // A grace that ran out becomes `disconnected`, and every peer hears about it (`US-ROOM-004` AC3).
+    const expired = this.room.members.filter((member) => member.connectionState === "grace");
+    this.room = {
+      ...this.room,
+      members: this.room.members.map((member) =>
+        member.playerId !== undefined && expired.some((gone) => gone.playerId === member.playerId)
+          ? { ...member, connectionState: "disconnected" as const }
+          : member,
+      ),
+    };
+    for (const member of expired) {
       this.broadcast({ t: "peer_left", playerId: member.playerId, reason: "disconnected" });
     }
-    if (inGrace.length > 0) this.broadcast({ t: "room_state", room: this.publicState() });
-    if (isRoomExpired(next, now) || isIdle(next, now)) {
-      next = { ...next, status: "abandoned" };
-      this.room = next;
+    if (expired.length > 0) this.broadcast({ t: "room_state", room: this.publicState() });
+
+    // Nobody connected and nobody left in the roster: the room is over, not merely quiet (`US-ROOM-005`).
+    const anyConnected = this.room.members.some((member) => member.connectionState === "connected");
+    if (!anyConnected && this.room.status === "playing") {
+      this.room = { ...this.room, status: "abandoned" };
+    }
+
+    // The host role moves only once the grace window it was given has run out (`US-ROOM-005`: a host that is
+    // merely `grace` is not replaced) — and only to a peer that is actually connected.
+    const host = this.room.members.find((member) => member.playerId === this.room.hostPlayerId);
+    if (!host || host.connectionState === "disconnected") {
+      const promoted = this.room.members.some((member) => member.connectionState === "connected")
+        ? electHost(this.room)
+        : null;
+      if (promoted && promoted !== this.room.hostPlayerId) {
+        const previousHostId = this.room.hostPlayerId ?? "";
+        this.room = { ...this.room, hostPlayerId: promoted };
+        await this.announceHostChange(previousHostId);
+      }
+    }
+
+    // An empty lobby goes sixty seconds after its last member left; everything else rides the idle window
+    // and the 24 h cap measured from the match start (`workflow-state-machine.md`).
+    const emptyLobby =
+      this.room.members.length === 0 && this.room.status !== "playing" && now - this.room.lastActivityAt >= 60_000;
+    const gone = emptyLobby || isRoomExpired(this.room, now, this.matchStartedAt);
+
+    if (gone) {
+      this.room = { ...this.room, status: "abandoned" };
       await this.ctx.storage.deleteAll();
       this.broadcast({ t: "room_closed", room: this.publicState() });
       for (const socket of this.sockets.values()) socket.close(CLOSE_ROOM_CLOSED, "room closed");
       return;
     }
-    this.room = next;
     await this.persist();
     await this.scheduleSweep();
   }
@@ -726,7 +869,7 @@ export class Room implements DurableObject {
       const outcome = markDisconnected(this.room, meta.playerId, now);
       this.room = this.withActivity(outcome.room);
       this.broadcast({ t: "peer_left", playerId: meta.playerId, reason: "grace" });
-      await this.electIfHostGone(meta.playerId);
+      await this.scheduleHeartbeatSweep();
     }
     if (silent) await this.persist();
   }
@@ -739,7 +882,12 @@ export class Room implements DurableObject {
 
   private async scheduleSweep(): Promise<void> {
     if (this.sockets.size > 0) return;
-    const at = this.room.lastActivityAt + 60_000;
+    // `workflow-state-machine.md`: a lobby whose last member left is deleted sixty seconds later; an
+    // ended room rides the normal idle window.
+    const at =
+      this.room.status === "lobby" || this.room.members.length === 0
+        ? this.room.lastActivityAt + 60_000
+        : this.room.lastActivityAt + TUNABLES.roomIdleMs;
     const existing = await this.ctx.storage.getAlarm();
     if (existing === null || existing > at) await this.ctx.storage.setAlarm(at);
   }

@@ -34,6 +34,7 @@ import { WeaponStrip, type WeaponSlot } from "../components/WeaponStrip";
 import { WindDial } from "../components/WindDial";
 import { defaultWindow, type CameraWindow } from "@gbw/core";
 import { useLocale } from "../app/providers";
+import { translate, type Locale } from "../i18n";
 import { createMesh, type Mesh } from "../net/mesh";
 import { itemFrame } from "../net/frames";
 import { connectRoom, type RoomSocket, type ServerMessage } from "../net/signaling";
@@ -503,6 +504,7 @@ export function MatchPage(): JSX.Element {
           <DirectionPad
             enabled={isMyTurn}
             canMove={Boolean(localPlayer && localPlayer.energy > 0)}
+            energy={localPlayer?.energy ?? 0}
             labels={{
               up: t("match.angle.up"),
               down: t("match.angle.down"),
@@ -587,25 +589,25 @@ function clampAngle(angle: number, mobile: { angleMin: number; angleMax: number 
   return Math.max(mobile.angleMin, Math.min(mobile.angleMax, Math.round(angle)));
 }
 
-function describeEvent(event: MatchEvent, locale: string): string {
+function describeEvent(event: MatchEvent, locale: Locale): string {
   switch (event.kind) {
     case "shot":
       // `power` is the weapon's damage power; the player's own input is the pull strength, shown on the HUD.
-      return locale === "vi" ? `Bắn (đạn ${event.power})` : `Shot (power ${event.power})`;
+      return translate(locale, "match.event.shot", { power: event.power });
     case "weather":
-      return locale === "vi" ? `Thời tiết: gió ${event.weather.wind.magnitude}` : `Weather: wind ${event.weather.wind.magnitude}`;
+      return translate(locale, "match.event.weather", { magnitude: event.weather.wind.magnitude });
     case "turn":
-      return locale === "vi" ? `Lượt ${event.turn.number}` : `Turn ${event.turn.number}`;
+      return translate(locale, "match.event.turn", { number: event.turn.number });
     case "item":
-      return locale === "vi" ? `Dùng vật phẩm ${event.itemId}` : `Used ${event.itemId}`;
+      return translate(locale, "match.event.item", { itemId: event.itemId });
     case "move":
-      return locale === "vi" ? "Di chuyển" : "Move";
+      return translate(locale, "match.event.move");
     case "chat":
-      return locale === "vi" ? "Cảm xúc" : "Emote";
+      return translate(locale, "match.event.chat");
     case "end":
-      return locale === "vi" ? "Kết thúc" : "Match over";
+      return translate(locale, "match.event.end");
     case "reject":
-      return locale === "vi" ? `Từ chối: ${event.reason}` : `Rejected: ${event.reason}`;
+      return translate(locale, "match.event.reject", { reason: event.reason });
     default:
       return "";
   }

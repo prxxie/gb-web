@@ -73,7 +73,8 @@ Auth: Clerk JWT. Request body (at least one field):
 | `avatarId` | string | Must exist in the avatar allowlist | `422 validation` |
 
 Response `200`: the `GET /me` representation. `rating`, `ratedMatches` and `stats` are **not** writable — a body
-containing them is ignored, and the response proves it (TC-AUTH-102). Optimistic concurrency is not needed: the last write of
+containing them is ignored, and the response proves it (TC-AUTH-102). Any **other** field outside the table is
+rejected with `422 validation` naming it, so a typo or an attempt to set `clerkUserId` never looks like a save. Optimistic concurrency is not needed: the last write of
 one's own name wins (`conventions.md`).
 
 ## DELETE /me
@@ -81,8 +82,9 @@ one's own name wins (`conventions.md`).
 Auth: Clerk JWT. Deletes the Clerk user, sets `account.status = 'deleted'`, and schedules the D1 purge for
 `now + 30 days` (`NFR-13`). Response `204` with no body.
 
-Rules: a player with a match in progress gets `409 room-closed`-style refusal — concretely `409` with
-`type: .../forbidden` and detail "finish or leave the match first". Rating history rows are anonymised rather than
+Rules: a player with a match in progress gets `409 invalid-state` and a detail naming the room
+("A match is still in progress in room ABC234"). `room-closed` is `410` and means the match is already over,
+which is not this case: the account is refused because the room still needs it. Rating history rows are anonymised rather than
 deleted during the 30-day window so other players' deltas stay reconstructable.
 
 ## GET /me/matches
@@ -102,5 +104,5 @@ public handle (`displayName` + `accountId` only inside match history of one's ow
 | Guest and registered modes, token claims and TTL | `apps/worker/tests/sessions.test.ts` (TC-AUTH-074) |
 | First call creates exactly one account + profile | `apps/worker/tests/auth.test.ts` (TC-AUTH-074) |
 | `PATCH /me` rejects `rating`, `409` on duplicate names | `apps/worker/tests/profile.test.ts` (TC-AUTH-101, TC-AUTH-102) |
-| `DELETE /me` removes Clerk user and schedules the purge; refuses mid-match | `apps/worker/tests/deletion.test.ts` (TC-AUTH-103) |
+| `DELETE /me` removes Clerk user and schedules the purge; refuses mid-match | `apps/worker/tests/deletion.test.ts` (TC-AUTH-069, TC-AUTH-103) |
 | No identity leak in responses | `apps/worker/tests/schema-whitelist.test.ts` (TC-AUTH-075) |

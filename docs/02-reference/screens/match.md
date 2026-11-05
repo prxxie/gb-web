@@ -130,7 +130,7 @@ a drag. All pad and button targets are ≥ 60 × 60 logical px (`NFR-17`).
 | Fullscreen requested on first tap; safe-area insets respected | `tests/e2e/fullscreen.spec.ts` (TC-MATCH-921) |
 | Turn clock starts at 20 s, skips on timeout, does not drift > 1 s | `packages/core/tests/turn.test.ts` (TC-CORE-152) |
 | Wind re-rolled once per round, dial shows 12 sectors and 0–26 | `packages/core/tests/weather.test.ts` (TC-CORE-926), `apps/web/tests/wind-dial.test.ts` (TC-MATCH-923) |
-| Blast damage, friendly fire, elimination, team-loss detection | `packages/core/tests/physics.test.ts` (TC-CORE-020…TC-CORE-028) |
+| Blast damage, friendly fire, elimination, team-loss detection | `packages/core/tests/combat.test.ts`, `packages/core/tests/match.test.ts` (TC-CORE-020…TC-CORE-028) |
 | Snapshot apply is idempotent and duck-types by `seq` | `packages/core/tests/snapshot.test.ts` (TC-CORE-040) |
 | Reconnect overlay countdown matches the 20 s grace | `tests/e2e/reconnect.spec.ts` (TC-ROOM-047) |
 | Host migration overlay ≤ 5 s end-to-end | `tests/e2e/migration.spec.ts` (TC-ROOM-049) |

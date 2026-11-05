@@ -8,14 +8,19 @@
 
 export interface LogFields {
   readonly request_id: string;
+  /** Method plus the public path, e.g. `POST /api/v1/rooms` — the SLO queries filter on this shape. */
   readonly route: string;
   readonly method: string;
+  readonly cf_ray?: string;
+  readonly level?: "info" | "warn" | "error";
   readonly status: number;
   readonly duration_ms: number;
   readonly room_code?: string;
   readonly player_id?: string;
   readonly account_id?: string;
   readonly code?: string;
+  /** The rate-limit rule that refused, when the line is a 429 (`US-OPS-001` AC3). */
+  readonly limit?: string;
   readonly error?: string;
 }
 
@@ -28,7 +33,8 @@ export function createLogger(requestId: string, sink: (line: string) => void): L
   return {
     requestId,
     line(fields) {
-      sink(JSON.stringify({ level: "info", ...fields, request_id: requestId }));
+      const { level = "info", ...rest } = fields;
+      sink(JSON.stringify({ ...rest, request_id: requestId, level }));
     },
   };
 }

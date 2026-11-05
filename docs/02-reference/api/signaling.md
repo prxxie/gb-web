@@ -25,7 +25,8 @@ the budget (`NFR-04`), and readability is worth more at this stage.
 | `start_match` | — (no fields) | Host only; every slot filled, both teams non-empty and equal → `status: 'playing'`. The DO stamps `rulesetVersion` from the deployed build: a client cannot choose the version a match is ranked under |
 | `snapshot_push` | `snapshot` (a `Snapshot`, ≤ 8 KB) | Host only; replaces `lastSnapshot` in DO storage and is relayed as `snapshot_state`. `snapshot.seq` must increase — a push at or below the stored `seq` is dropped silently, because a retransmit is not an error. `snapshot.hostGeneration` lets a peer discard a push from a superseded host |
 | `match_end` | `winnerTeam`, `stats: [{ slot, damageDealt, shotsFired, hits, forfeited? }]` | Host only, `playing` only. The DO validates the shape, sets `status: 'ended'`, broadcasts `room_state`, then calls `POST /api/v1/matches` ([matches.md](matches.md), `US-RANK-001`) and broadcasts `match_recorded`. A failed write answers the host with `error internal` and leaves the room `ended`; the host may retry, and `409 match-already-recorded` on that retry is a success from the client's point of view |
-| `leave` | — | Removes the member; if it was the host, election follows |
+| `chat` | `kind` (`quick_phrase` \| `emote`) with `id`, or a free `text` (≤ 120 chars) | Any member, any status. Above **2/s** → `error rate-limited` and the socket closes `4429`; the DO keeps nothing of what was said |
+| `leave` | — | Removes the member; if it was the host, the 20 s grace window runs out first and then election follows |
 | `ping` | `at` (client clock, ms) | Any time; the client sends one every 15 s. `pong` echoes `at` and adds the server's `now`, so the client measures RTT without trusting either clock. Above 10/s → `rate-limited`. Three consecutive misses move the member to `grace` (`US-ROOM-002` AC6) |
 
 ## Room socket — DO → client
@@ -47,7 +48,7 @@ Close codes: `4401` unauthenticated, `4404` room not found, `4409` room full, `4
 
 ## Host election
 
-On the host's socket closing: mark it `grace`, start the 20 s grace alarm, and immediately elect the **longest-connected
+On the host's socket closing: mark it `grace` and arm the 20 s grace alarm. The election itself runs when that alarm fires — a host that is merely `grace` keeps the role, because a two-second tunnel must not hand the room over. The alarm elects the **longest-connected
 connected peer** (`joinedAt` ascending, `slot` ascending as tie-break). Increment `hostGeneration`, broadcast
 `host_changed` with the stored `lastSnapshot`, and promote that member to `role: 'host'`. Election is skipped when no
 peer is `connected` (room → `abandoned`) or when the room is in `lobby` (the room simply waits for a new host to join
@@ -79,7 +80,7 @@ against the same surface; it measures 2 256 B on `map-01` and 5 537 B on `map-06
 | `t` | Fields | Meaning |
 |-----|--------|---------|
 | `input` | `turnNumber`, `slot`, `kind` (`fire` \| `skip`), `angle`, `force` | ~24 B. Host rejects an input whose `turnNumber`/`slot` is not current, or a second input in the same turn |
-| `chat` | `kind` (`quick_phrase` \| `emote`), `id` | Preset ids only; host rate-limits to 1 per 2 s per player and drops excess silently |
+| `chat` | `from`, `kind` (`quick_phrase` \| `emote` \| null), `id`, `text` | The room socket's `chat`, relayed to every other member. The budget in § Budgets is what limits it — the room does not queue, store or reorder |
 | `turn_end` | `turnNumber`, `nextSlot` | Host → peers; keeps the HUD in step even if a snapshot is lost |
 
 Aliasing: the host applies all inputs for a turn at the last-received moment (no rollback netcode in v1); peers predict
@@ -89,7 +90,9 @@ their own projectile locally and reconcile to the next snapshot.
 
 | Path | Rate | Max size | Note |
 |------|------|----------|------|
-| `signal` | bursty, ≤ 20 frames per connection | 8 KB | ICE candidates are small; SDP can be ~2–4 KB |
+| `signal` | ≤ 20/s per socket | 8 KB | ICE candidates are small; SDP can be ~2–4 KB |
+| `ping` | ≤ 10/s per socket | 64 B | Above it the socket is closed `4429` |
+| `chat` | ≤ 2/s per socket | 256 B | Above it the socket is closed `4429` |
 | `snapshot_push` | ≤ 20/s | 8 KB | Only the latest is stored |
 | `state` (per peer) | 10–20/s | 800 B | Host → each peer; a mask-bearing snapshot (one per carve) is capped at 8 KB |
 | `control` | ≤ 5/s | 256 B | Input + chat |
@@ -105,7 +108,7 @@ their own projectile locally and reconcile to the next snapshot.
 | Host-only enforcement on `team_assign`, `start_match`, `snapshot_push`, `match_end` | `apps/worker/tests/room-host.test.ts` (TC-NET-044) |
 | Election order, grace window, `hostGeneration` monotonicity | `apps/worker/tests/room-election.test.ts` (TC-ROOM-048) |
 | Snapshot encoding ≤ 800 B at 8 players, no mask by default, mask-bearing frame ≤ 8 KB | `packages/core/tests/snapshot.test.ts` (TC-CORE-041) |
-| Input rejection rules (wrong turn, duplicate, out of range) | `packages/core/tests/input.test.ts` (TC-CORE-045) |
+| Input rejection rules (wrong turn, duplicate, out of range) | `packages/core/tests/turn-queue.test.ts` (TC-CORE-045), `packages/core/tests/protocol.test.ts` (frame shape) |
 
 Every oracle in this table is a file that must exist; § [Contract status](#contract-status-2026-11-05) says which
 of them are written today.
@@ -121,7 +124,7 @@ stays `1` because no deployed client exists yet.
 |---|---|---|---|---|
 | `move` | `{ t:'move', direction:0\|1, run:boolean }` | active player | server-side clamp against energy/incline is not possible (no physics on the Worker) — the host validates | `TC-CORE-904` |
 | `item` | `{ t:'item', id:string }` | active player | host validates ownership before applying | `TC-CORE-906` |
-| `room_settings` | `{ t:'room_settings', mode:ModeId, mapId:string }` | host only | rejected for members (`TC-NET-067`) | `TC-ROOM-151` |
+| `room_settings` | `{ t:'room_settings', mode:ModeId, mapId:string, maxPlayers?, isPrivate? }` | host only; lobby only; `maxPlayers` may not drop below the members already seated (`invalid-state`) | rejected for members (`TC-NET-067`) | `TC-ROOM-151` |
 | `loadout` | `{ t:'loadout', items:Array<{id:string,qty:number}> }` | any member, lobby only | total quantity ≤ 11 | `TC-MATCH-006` |
 
 `input` (`fire`) gains `weaponSlot: 0 | 1 | 2`; `skip`, `emote` and `quick_phrase` are unchanged.

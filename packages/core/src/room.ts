@@ -249,8 +249,18 @@ export function isIdle(room: RoomState, now: number): boolean {
   return now - room.lastActivityAt >= TUNABLES.roomIdleMs;
 }
 
-export function isRoomExpired(room: RoomState, now: number): boolean {
-  return isIdle(room, now) || now - room.createdAt >= TUNABLES.roomMatchCapMs;
+/**
+ * The 24 h cap runs from the match start, not from room creation: a room can sit in a lobby for hours
+ * and still get its full day of play (`workflow-state-machine.md`).
+ */
+export function isRoomExpired(room: RoomState, now: number, matchStartedAt: number | null = null): boolean {
+  const startedAt = matchStartedAt ?? room.createdAt;
+  return isIdle(room, now) || now - startedAt >= TUNABLES.roomMatchCapMs;
+}
+
+/** True once no member is connected and none can come back: the grace windows have all run out. */
+export function isAbandoned(room: RoomState): boolean {
+  return room.members.every((member) => member.connectionState === "disconnected");
 }
 
 export function defaultSettings(maxPlayers: RoomSettings["maxPlayers"]): RoomSettings {

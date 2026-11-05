@@ -48,8 +48,10 @@ describe("room host election", () => {
     harness.clearAll(sockets.values());
     const generationBefore = harness.state().hostGeneration;
 
-    vi.setSystemTime(BASE + 20_000);
+    // `US-ROOM-005`: the host keeps the role for its 20 s grace window; the alarm elects after it.
     await harness.close(host);
+    vi.setSystemTime(BASE + 20_000);
+    await harness.alarm();
 
     const frames = sockets.get("p1")!.frames();
     const kinds = frames.map((frame) => frame["t"]);
@@ -95,10 +97,13 @@ describe("room host election", () => {
     const { harness, sockets } = await playingRoom();
     const generationBefore = harness.state().hostGeneration;
     await harness.close(sockets.get("host")!);
+    vi.setSystemTime(BASE + 20_000);
+    await harness.alarm();
 
     harness.clearAll(sockets.values());
-    vi.setSystemTime(BASE + 30_000);
     await harness.close(sockets.get("p1")!);
+    vi.setSystemTime(BASE + 40_000);
+    await harness.alarm();
 
     const changed = sockets.get("p3")!.framesOf("host_changed");
     expect(changed).toHaveLength(1);

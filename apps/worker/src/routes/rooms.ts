@@ -29,6 +29,17 @@ function stubFor(env: Env, roomCode: string): DurableObjectStub {
   return env.ROOMS.get(id);
 }
 
+/** Reads a room's public state; an unwritten object still answers, so the caller decides what "empty" means. */
+async function roomState(
+  env: Env,
+  roomCode: string,
+): Promise<{ status: string; members: readonly unknown[]; roomCode?: string; settings?: RoomSettings }> {
+  return await callRoom<{ status: string; members: readonly unknown[]; roomCode?: string; settings?: RoomSettings }>(
+    stubFor(env, roomCode),
+    "state",
+  );
+}
+
 async function callRoom<T>(stub: DurableObjectStub, path: string, body?: unknown): Promise<T> {
   const response = await stub.fetch(`https://room.internal/${path}`, {
     method: body === undefined ? "GET" : "POST",
@@ -65,14 +76,17 @@ export async function createRoom(
   originBase: string,
 ): Promise<Response> {
   const limit = checkLimit(`rooms:${request.headers.get("cf-connecting-ip") ?? "local"}`, RULES.roomsPerIp);
-  if (!limit.allowed) throw new ProblemError("rate-limited", "Too many rooms created from this address");
+  if (!limit.allowed) {
+    throw new ProblemError("rate-limited", "Too many rooms created from this address", [], limit.retryAfterSeconds, "ip_rooms");
+  }
 
   const body = await readJson(request);
   const field = new Field([]);
   const displayName = field.string(body["displayName"] ?? "Player", "displayName", { min: 2, max: 16 });
   const mobileId = field.string(body["mobileId"] ?? "mbl-01", "mobileId");
   const avatarId = field.string(body["avatarId"] ?? "avatar-01", "avatarId");
-  const maxPlayers = field.oneOf(body["maxPlayers"] ?? 4, "maxPlayers", ALLOWED_CAPACITIES) as RoomSettings["maxPlayers"];
+  // `rooms.md` marks `maxPlayers` required: defaulting to 4 silently seats a room the host did not ask for.
+  const maxPlayers = field.oneOf(body["maxPlayers"], "maxPlayers", ALLOWED_CAPACITIES) as RoomSettings["maxPlayers"];
   const mode = field.oneOf(body["mode"] ?? "solo", "mode", ["solo", "score", "tag", "jewel"] as const);
   const mapId = field.string(body["mapId"] ?? "map-01", "mapId");
   const isPrivate = typeof body["isPrivate"] === "boolean" ? body["isPrivate"] : false;
@@ -97,6 +111,7 @@ export async function createRoom(
           roomCode,
           playerId: joined.member.playerId,
           wsUrl: `${originBase}/api/v1/rooms/${roomCode}/ws`,
+          joinUrl: `${originBase}/lobby/${roomCode}`,
           maxPlayers,
           settings: { maxPlayers, mode, mapId, isPrivate },
           expiresAt: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
@@ -121,6 +136,18 @@ export async function joinRoomByCode(
   originBase: string,
 ): Promise<Response> {
   if (!isValidRoomCode(roomCode)) throw new ProblemError("room-not-found", "Room codes are six characters");
+  // A code that names no room must not *create* one: the DO would seat the caller in a fresh object and the
+  // join would look like a success (`rooms.md` § POST /rooms/{code}/join → 404 room-not-found).
+  const existing = await roomState(env, roomCode);
+  // A finished room keeps answering `410 room-closed` even after everyone left, so status is checked first.
+  if (existing.status === "ended" || existing.status === "abandoned") {
+    throw new ProblemError("room-closed", "That match is already over");
+  }
+  // A room object always exists once its stub is created, so "the code names nothing" is told apart from
+  // "the room is empty" by an empty roster: only the host's first join seats somebody.
+  if (!existing.roomCode || existing.members.length === 0) {
+    throw new ProblemError("room-not-found", "No room answers to that code");
+  }
   const body = await readJson(request);
   const field = new Field([]);
   const displayName = field.string(body["displayName"] ?? "Player", "displayName", { min: 2, max: 16 });
@@ -141,6 +168,11 @@ export async function joinRoomByCode(
       roomCode,
     },
   );
+  // Remember where this player sits so `DELETE /me` can refuse mid-match (`TC-AUTH-069`).
+  await env.GBW_DB.prepare("UPDATE profile SET current_room_code = ?, updated_at = ? WHERE account_id = ?")
+    .bind(roomCode, new Date().toISOString(), session.sub.accountId)
+    .run()
+    .catch(() => undefined);
   return Response.json(
     {
       roomCode,
@@ -155,8 +187,15 @@ export async function joinRoomByCode(
 
 export async function roomPreview(env: Env, roomCode: string): Promise<Response> {
   if (!isValidRoomCode(roomCode)) throw new ProblemError("room-not-found", "Room codes are six characters");
-  const state = await callRoom<Record<string, unknown>>(stubFor(env, roomCode), "state");
+  const state = (await roomState(env, roomCode)) as unknown as Record<string, unknown>;
   const members = Array.isArray(state["members"]) ? (state["members"] as Record<string, unknown>[]) : [];
+  const maxPlayers = (state["settings"] as { maxPlayers?: number } | undefined)?.maxPlayers ?? members.length;
+  if (state["status"] === "ended" || state["status"] === "abandoned") {
+    throw new ProblemError("room-closed", "That match is already over");
+  }
+  // A preview is public and read-only: an empty roster still answers 200 with `joined: 0`, because telling a
+  // stranger whether a code was ever used is exactly what `US-ROOM-001` AC7 asks us not to do. Only `join`
+  // refuses an empty room (`404`), since that is where a ghost room would be created.
   return Response.json(
     {
       roomCode,
@@ -164,8 +203,9 @@ export async function roomPreview(env: Env, roomCode: string): Promise<Response>
       settings: state["settings"],
       joined: members.length,
       playerCount: members.length,
-      maxPlayers: (state["settings"] as { maxPlayers?: number } | undefined)?.maxPlayers ?? members.length,
-      joinable: state["status"] === "lobby",
+      maxPlayers,
+      // `rooms.md` § GET /rooms/{code}: joinable is the lobby *and* a free seat, not the lobby alone.
+      joinable: state["status"] === "lobby" && members.length < maxPlayers,
       hostDisplayName:
         (members.find((member) => member["playerId"] === state["hostPlayerId"])?.["displayName"] as string) ?? null,
       host: members.find((member) => member["role"] === "host") !== undefined,

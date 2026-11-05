@@ -76,12 +76,25 @@ export type ClientFrame =
   | { readonly t: "start_match" }
   | { readonly t: "snapshot_push"; readonly snapshot: Snapshot }
   | MatchEndFrame
-  | { readonly t: "room_settings"; readonly mode: ModeId; readonly mapId: string }
+  | {
+      readonly t: "room_settings";
+      readonly mode: ModeId;
+      readonly mapId: string;
+      readonly maxPlayers?: 2 | 4 | 6 | 8 | undefined;
+      readonly isPrivate?: boolean | undefined;
+    }
   | { readonly t: "loadout"; readonly items: readonly LoadoutEntry[] }
   | { readonly t: "move"; readonly direction: 0 | 1; readonly run: boolean }
   | { readonly t: "item"; readonly id: string }
   | { readonly t: "leave" }
-  | { readonly t: "ping"; readonly at: number };
+  | { readonly t: "ping"; readonly at: number }
+  | {
+      /** A preset quick phrase or emote; a free `text` is allowed too, bounded to 120 characters. */
+      readonly t: "chat";
+      readonly kind?: "quick_phrase" | "emote" | undefined;
+      readonly id?: string | undefined;
+      readonly text?: string | undefined;
+    };
 
 export interface PeerLeftFrame {
   readonly t: "peer_left";
@@ -348,11 +361,25 @@ export function parseClientFrame(raw: string): ParseResult<ClientFrame> {
       return parseMatchEnd(parsed);
     }
     case "room_settings": {
-      const extra = onlyKeys(parsed, ["t", "mode", "mapId"], t);
+      const extra = onlyKeys(parsed, ["t", "mode", "mapId", "maxPlayers", "isPrivate"], t);
       if (extra) return fail("bad-request", extra);
       if (typeof parsed["mode"] !== "string" || parsed["mode"].length === 0) return fail("bad-request", "room_settings needs a mode");
       if (typeof parsed["mapId"] !== "string" || parsed["mapId"].length === 0) return fail("bad-request", "room_settings needs a mapId");
-      return ok({ t: "room_settings", mode: parsed["mode"] as ModeId, mapId: parsed["mapId"] });
+      const rawCapacity = parsed["maxPlayers"];
+      if (rawCapacity !== undefined && rawCapacity !== 2 && rawCapacity !== 4 && rawCapacity !== 6 && rawCapacity !== 8) {
+        return fail("bad-request", "room_settings.maxPlayers must be 2, 4, 6 or 8");
+      }
+      const rawPrivate = parsed["isPrivate"];
+      if (rawPrivate !== undefined && typeof rawPrivate !== "boolean") {
+        return fail("bad-request", "room_settings.isPrivate must be a boolean");
+      }
+      return ok({
+        t: "room_settings",
+        mode: parsed["mode"] as ModeId,
+        mapId: parsed["mapId"] as string,
+        ...(rawCapacity === undefined ? {} : { maxPlayers: rawCapacity as 2 | 4 | 6 | 8 }),
+        ...(rawPrivate === undefined ? {} : { isPrivate: rawPrivate as boolean }),
+      });
     }
     case "loadout": {
       const extra = onlyKeys(parsed, ["t", "items"], t);
@@ -378,6 +405,30 @@ export function parseClientFrame(raw: string): ParseResult<ClientFrame> {
       const extra = onlyKeys(parsed, ["t"], t);
       if (extra) return fail("bad-request", extra);
       return ok({ t: "leave" });
+    }
+    case "chat": {
+      const extra = onlyKeys(parsed, ["t", "kind", "id", "text"], t);
+      if (extra) return fail("bad-request", extra);
+      const rawKind = parsed["kind"];
+      const rawId = parsed["id"];
+      const rawText = parsed["text"];
+      if (rawKind !== undefined && rawKind !== "quick_phrase" && rawKind !== "emote") {
+        return fail("bad-request", 'chat.kind must be "quick_phrase" or "emote"');
+      }
+      if (rawId !== undefined && typeof rawId !== "string") return fail("bad-request", "chat.id must be a string");
+      if (rawText !== undefined && (typeof rawText !== "string" || rawText.length > 120)) {
+        return fail("bad-request", "chat.text must be a string of at most 120 characters");
+      }
+      if (rawKind === undefined && rawText === undefined) return fail("bad-request", "chat needs a kind or a text");
+      const chatKind = rawKind as "quick_phrase" | "emote" | undefined;
+      const chatId = rawId as string | undefined;
+      const chatText = rawText as string | undefined;
+      return ok({
+        t: "chat",
+        ...(chatKind === undefined ? {} : { kind: chatKind }),
+        ...(chatId === undefined ? {} : { id: chatId }),
+        ...(chatText === undefined ? {} : { text: chatText }),
+      });
     }
     case "ping": {
       const extra = onlyKeys(parsed, ["t", "at"], t);
