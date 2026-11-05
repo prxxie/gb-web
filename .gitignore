@@ -7,5 +7,6 @@ playwright-report/
 test-results/
 *.tsbuildinfo
 .env
+.env.local
 .dev.vars
 .DS_Store
