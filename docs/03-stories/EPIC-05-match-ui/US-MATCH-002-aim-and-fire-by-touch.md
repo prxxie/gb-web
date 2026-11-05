@@ -94,7 +94,7 @@ when the camera zooms out.
 
 `TC-MATCH-915` (ring value and mapping), `TC-MATCH-916` (dead zone and gesture cancel), `TC-MATCH-151` (e2e drag →
 one `fire`), `TC-CORE-901` (eliminated). Red first:
-`tests/web/aim.test.ts::release_below_deadzone_sends_nothing`.
+`apps/web/tests/aim.test.ts::release_below_deadzone_sends_nothing`.
 
 ## 9. Open questions
 

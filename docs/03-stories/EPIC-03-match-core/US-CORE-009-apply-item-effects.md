@@ -70,7 +70,7 @@ Purchasing, inventory persistence across matches (`OQ-20`), item combos.
 ## 8. Test notes
 
 `TC-CORE-906`, `TC-CORE-907`, `TC-CORE-908`, `TC-CORE-909`, `TC-CORE-910`, `TC-CORE-911`, `TC-CORE-901`, `TC-NET-067`.
-`Red first: tests/core/items.test.ts::dual_allows_second_shot_in_same_turn`.
+`Red first: packages/core/tests/items.test.ts::dual_allows_second_shot_in_same_turn`.
 
 <!-- delivery:2026-11-05 -->
 

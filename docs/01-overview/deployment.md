@@ -31,8 +31,8 @@ request; a Pages deploy that references an endpoint the Worker does not serve ye
 | Setting | preview | production |
 |---------|---------|------------|
 | `ENVIRONMENT` | `preview` | `production` |
-| `VITE_API_BASE_URL` | preview Worker URL | `https://api.gbw.<domain>/api/v1` |
-| `VITE_WS_BASE_URL` | preview Worker WSS origin | `wss://api.gbw.<domain>` |
+| `VITE_API_BASE` | preview Worker URL | `https://api.gbw.<domain>/api/v1` |
+| `VITE_CLERK_PUBLISHABLE_KEY` | test instance key | production instance key |
 | Clerk instance | test | production |
 | `SESSION_TOKEN_SECRET` | preview secret | production secret (rotated quarterly) |
 | TURN key | test | production |
@@ -108,4 +108,4 @@ release.
 | Pipeline order (migrate → worker → pages) | `.github/workflows/deploy-production.yml` review + `tests/e2e/prod-smoke.spec.ts` (TC-FND-901) |
 | Smoke checks all pass on production | Release record `docs/07-release/REL-…` evidence line |
 | Rollback returns the previous version serving 200 | `tests/e2e/prod-smoke.spec.ts` re-run after `wrangler rollback` (TC-FND-902) |
-| No secret in `wrangler.jsonc` or the web build | `tests/web/bundle-secrets.test.ts` greps the built assets for the secret names (TC-FND-012) |
+| No secret in `wrangler.jsonc` or the web build | `apps/web/tests/bundle-secrets.test.ts` greps the built assets for the secret names (TC-FND-012) |

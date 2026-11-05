@@ -1,5 +1,8 @@
 # Test cases
 
+Which of these cases has a test file today, and which file each planned one lands in:
+[`test-plan-status.md`](test-plan-status.md).
+
 One table per epic. Every case has an id `TC-<epic code>-<nnn>`, the story that owns it, the criterion it proves, a
 level, and the file that runs it. `unit` = Vitest on `packages/core`; `worker` = Vitest with miniflare; `web` = Vitest +
 RTL; `e2e` = Playwright (two contexts where two players are needed); `manual` = the two-phone matrix, evidenced in the
@@ -13,7 +16,7 @@ The `covers` column names the requirement ([nonfunctional-requirements.md](../01
 | ID | Story | Case | Expected | Level | Covers |
 |----|-------|------|----------|-------|--------|
 | TC-FND-001 | US-FND-002 | `GET /api/v1/health` on a fresh worker | `200 {"status":"ok","version":"<sha>"}` | worker | operational — see `08-ops/slo.md` |
-| TC-FND-002 | US-FND-001 | Every env var the code reads appears in `.env.example` with no value | Exact set match | worker | NFR-12 |
+| TC-FND-002 | US-FND-001 | Every env var the code reads has a row in `apps/worker/.dev.vars.example` or `apps/web/.env.example`, and no row holds a secret | Names match the code; the only values allowed are public defaults (`VITE_API_BASE=/api/v1`) | worker | NFR-12 |
 | TC-FND-012 | US-FND-001 | Built web assets scanned for secret values | No match for `SESSION_TOKEN_SECRET`, `TURN_KEY_API_TOKEN` | web | NFR-12 |
 | TC-FND-018 | US-FND-001 | `packages/core` imports no DOM, Phaser or network module | Static import scan is empty | unit | NFR-22 |
 | TC-FND-070 | US-FND-002 | Response shapes for all endpoints | Match `openapi.yaml` (schemathesis or explicit fixtures) | worker | `api/README.md` |

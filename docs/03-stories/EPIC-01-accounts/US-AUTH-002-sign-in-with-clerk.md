@@ -88,7 +88,7 @@ cached in module scope for 10 minutes; claims checked: `exp`, `nbf`, `azp` ∈ a
 
 `TC-AUTH-137`, `TC-AUTH-138`; worker tests use a locally generated RSA key pair plus a stubbed JWKS endpoint.
 `TC-AUTH-074` (owned by [US-AUTH-001](US-AUTH-001-continue-as-a-guest.md)) also covers the registered branch of
-`/sessions`. Red first: `tests/worker/sessions.test.ts::registered_session_creates_profile`.
+`/sessions`. Red first: `apps/worker/tests/sessions.test.ts::registered_session_creates_profile`.
 
 ## 9. Open questions
 

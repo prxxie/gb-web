@@ -95,8 +95,8 @@ erDiagram
 
 | Contract | Checked by |
 |----------|-----------|
-| Migrations produce exactly these tables, columns, constraints and indexes | `tests/worker/migrations.test.ts` (TC-FND-100) |
-| `account` / `profile` write paths and the unique display-name key | `tests/worker/accounts.test.ts` (TC-AUTH-101…TC-AUTH-103) |
-| `match_record` / `match_player` / `rating_history` written in one batch, once per match | `tests/worker/matches.test.ts` (TC-RANK-110, TC-RANK-111) |
-| Leaderboard index serves the keyset page without a table scan | `tests/worker/leaderboard.test.ts` (`EXPLAIN QUERY PLAN` assertion, TC-RANK-104) |
-| `RoomState` / `Member` shape and persistence via `ctx.storage` | `tests/worker/room.test.ts` (TC-ROOM-147…TC-ROOM-073) |
+| Migrations produce exactly these tables, columns, constraints and indexes | `apps/worker/tests/migrations.test.ts` (TC-FND-100) |
+| `account` / `profile` write paths and the unique display-name key | `apps/worker/tests/accounts.test.ts` (TC-AUTH-101…TC-AUTH-103) |
+| `match_record` / `match_player` / `rating_history` written in one batch, once per match | `apps/worker/tests/matches.test.ts` (TC-RANK-110, TC-RANK-111) |
+| Leaderboard index serves the keyset page without a table scan | `apps/worker/tests/leaderboard.test.ts` (`EXPLAIN QUERY PLAN` assertion, TC-RANK-104) |
+| `RoomState` / `Member` shape and persistence via `ctx.storage` | `apps/worker/tests/room.test.ts` (TC-ROOM-147…TC-ROOM-073) |

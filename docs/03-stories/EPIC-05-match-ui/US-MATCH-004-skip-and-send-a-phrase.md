@@ -76,7 +76,7 @@ Renderer: phrase text from `match.phrase.<id>` in the receiver's locale; an unkn
 
 ## 8. Test notes
 
-`TC-MATCH-905` (skip and the phrase rate limit), plus `tests/web/phrases.test.ts` for id→string translation in both
+`TC-MATCH-905` (skip and the phrase rate limit), plus `apps/web/tests/phrases.test.ts` for id→string translation in both
 locales.
 
 ## 9. Open questions

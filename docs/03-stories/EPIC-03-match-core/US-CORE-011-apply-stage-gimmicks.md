@@ -65,7 +65,7 @@ New gimmicks, per-mode gimmick rules, animated weather visuals (`US-MATCH-001`).
 ## 8. Test notes
 
 `TC-CORE-918`, `TC-CORE-919`, `TC-CORE-913`, `TC-CORE-023`, `TC-MATCH-901`.
-`Red first: tests/core/gimmicks.test.ts::electric_strikes_on_every_third_turn`.
+`Red first: packages/core/tests/gimmicks.test.ts::electric_strikes_on_every_third_turn`.
 
 <!-- delivery:2026-11-05 -->
 

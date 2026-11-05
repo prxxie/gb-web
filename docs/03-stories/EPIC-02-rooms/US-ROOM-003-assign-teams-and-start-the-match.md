@@ -44,8 +44,11 @@ never HTTP, because they must be ordered with roster changes.
 
 ## 4. Contract
 
-`team_assign` (host only): `{"t":"team_assign","playerId":"<id>","team":"A"|"B"|null}`.
-`start_match` (host only): `{"t":"start_match"}` → broadcast `{"t":"match_started","startedAt":"<iso>","turnOrder":[playerIds],"seed":"<hex>"}`.
+`team_assign` (host only): `{"t":"team_assign","assignments":[{"playerId":"<id>","team":"A"|"B"|null}, …]}` — the
+whole roster in one frame, so the room can never be seen half-assigned.
+`start_match` (host only): `{"t":"start_match"}` → every member receives `match_started` as specified in
+[signaling.md](../../02-reference/api/signaling.md) (§ Room socket — DO → client):
+`{"t":"match_started","startedAt":<epoch ms>,"seed":<uint32>,"hostPlayerId":…,"hostGeneration":…,"rulesetVersion":…,"assignments":[…],"room":…}`.
 
 Guards: `status == "lobby"`, `members.length >= 2`, `members.length == maxPlayers` (every slot filled), teams equal in
 size and non-empty. The UI mirrors exactly these guards; the DO is the authority.
@@ -56,14 +59,17 @@ size and non-empty. The UI mirrors exactly these guards; the DO is the authority
   ([US-ROOM-001](US-ROOM-001-create-a-room-with-a-shareable-code.md)), so this is a choice, not a surprise.
 - `team: null` means "unassigned" and blocks the start.
 - A member who leaves during `lobby` leaves a hole that must be refilled before starting.
-- `turnOrder` is computed by the DO from the roster (alternating teams, sorted by slot) and sent once — it is part of
-  the snapshot state, so every peer and the host share it.
-- `seed` is a 16-byte hex string from the DO's CSPRNG; the core simulation is deterministic on it (`NFR-22`).
+- `turnOrder` is never transmitted: the order is the roster's `assignments` sorted by `slot`, and the turn engine
+  advances by the mode's rules (`nextSlotForMode` in `packages/core/src/turn.ts`) reading the snapshot's `turn`. One
+  source of order, so a peer cannot disagree with the host about whose turn it is. `StartOutcome.turnOrder`
+  (`packages/core/src/room.ts:203`) is the last copy of the concept and is deleted with the dead `action=start` path.
+- `seed` is a `uint32` from the DO's CSPRNG; the core simulation is deterministic on it (`NFR-22`), and every client
+  derives weather and spawns from it rather than being told them separately.
 
 ## 6. Implementation notes
 
-- Guard function `canStart(state): {ok: true} | {ok: false, code}` in `apps/worker/src/room/rules.ts`, unit-tested
-  without a socket.
+- Guard function `canStart` lives in `packages/core/src/room.ts:191` (`StartRejection` at `:189`) and is unit-tested
+  without a socket; the DO only maps its verdict to the catalogue codes.
 - `start_match` sets `matchStartedAt`, freezes team assignment for the remainder of the match, and starts the turn clock
   alarm.
 
@@ -74,9 +80,9 @@ size and non-empty. The UI mirrors exactly these guards; the DO is the authority
 
 ## 8. Test notes
 
-`TC-ROOM-148`, `TC-ROOM-066`, `TC-ROOM-162`. `tests/worker/room-rules.test.ts` covers the guard matrix directly;
+`TC-ROOM-148`, `TC-ROOM-066`, `TC-ROOM-162`. `apps/worker/tests/room-rules.test.ts` covers the guard matrix directly;
 `tests/e2e/lobby.spec.ts::start_disabled_until_balanced` covers the UI. Red first:
-`tests/worker/room-rules.test.ts::unbalanced_teams_rejected`.
+`apps/worker/tests/room-rules.test.ts::unbalanced_teams_rejected`.
 
 ## 9. Open questions
 

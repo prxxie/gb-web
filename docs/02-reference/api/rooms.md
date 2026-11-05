@@ -69,15 +69,18 @@ This response carries no account ids, no IPs and no guest ids.
 ## GET /turn-credentials
 
 Mints short-lived TURN credentials for this session. Called right before the first peer connection is established.
+The Worker returns Cloudflare's own `iceServers` entries: a browser needs `urls` + `username` + `credential` already
+assembled as `RTCIceServer`, and re-shaping them on the Worker was duplication the client then had to undo. It always
+prepends its own STUN entry (`apps/worker/src/routes/rooms.ts:202`) and appends whatever Cloudflare returns, so a
+response that already contains `stun:` yields a duplicate entry the client must tolerate.
 
 Response `200`:
 
 | Field | Type | Meaning |
 |-------|------|---------|
-| `urls` | string[] | `stun:`, `turn:` and `turns:` URLs, in that order |
-| `username` | string | Ephemeral username (`<expiryEpoch>:<sessionId>`) |
-| `credential` | string | HMAC of `username` with the TURN secret |
+| `iceServers` | `RTCIceServer[]` | Always at least the STUN entry `stun:stun.cloudflare.com:3478`; `turn:`/`turns:` entries follow when a TURN key is configured |
 | `ttlSeconds` | integer | `3600` (`NFR-10`) |
+| `turn` | boolean | `false` when no `TURN_KEY_ID`/`TURN_KEY_API_TOKEN` is set: the response is then STUN-only and still `200`, so a one-machine session keeps working and only NAT traversal degrades |
 
 Rules: never cached beyond the session, never persisted, never logged (`NFR-10`, `NFR-12`); the TURN secret is a Worker
 secret, never in the bundle. Errors: `401 unauthenticated`, `429 rate-limited` (20/min per session).
@@ -86,13 +89,15 @@ secret, never in the bundle. Errors: `401 unauthenticated`, `429 rate-limited` (
 
 The client builds `RTCConfiguration.iceServers` from exactly this response and rejects any `url` that is not
 `stun:`/`turn:`/`turns:` — `ws://`, `http://` or a bare host is a configuration error (`NFR-09`, TC-ROOM-052).
+Neither the TURN username nor the credential is ever logged, and `turn: false` is the one condition a client may
+report to the player ("no relay available") instead of failing the connection outright.
 
 ## Oracle
 
 | Contract | Checked by |
 |----------|-----------|
-| `POST /rooms` accepts only `2,4,6,8`; returns a code matching the alphabet | `tests/worker/rooms.test.ts` (TC-ROOM-071) |
-| Rate limits and `Retry-After` | `tests/worker/rooms.test.ts` (TC-ROOM-072) |
-| `GET /rooms/{code}` leaks no identity fields | `tests/worker/rooms.test.ts` — schema whitelist assertion (TC-AUTH-075) |
-| TURN credential TTL and absence from logs | `tests/worker/turn.test.ts` (TC-ROOM-051) |
-| Client rejects non-TLS ICE URLs | `tests/core/ice.test.ts` (TC-ROOM-050) |
+| `POST /rooms` accepts only `2,4,6,8`; returns a code matching the alphabet | `apps/worker/tests/rooms.test.ts` (TC-ROOM-071) |
+| Rate limits and `Retry-After` | `apps/worker/tests/rooms.test.ts` (TC-ROOM-072) |
+| `GET /rooms/{code}` leaks no identity fields | `apps/worker/tests/rooms.test.ts` — schema whitelist assertion (TC-AUTH-075) |
+| TURN credential TTL and absence from logs | `apps/worker/tests/turn.test.ts` (TC-ROOM-051) |
+| Client rejects non-TLS ICE URLs | `packages/core/tests/ice.test.ts` (TC-ROOM-050) |

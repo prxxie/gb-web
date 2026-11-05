@@ -22,12 +22,12 @@ Project decisions and deviations only. Everything the installed packs already de
 | Code, file names, comments, commits | English |
 | UI copy, docs the client reads, status reports | Vietnamese (`docs/06-reports/`) |
 | TypeScript | `strict: true`, no `any`, no non-null `!` outside tests; `type` over `interface` unless augmentation is needed |
-| Files | `kebab-case.ts` for modules, `PascalCase.tsx` for components, `*.test.ts` beside the unit under test in `tests/` mirrors |
+| Files | `kebab-case.ts` for modules, `PascalCase.tsx` for components, `*.test.ts` in the owning package's `tests/` (`packages/core/tests`, `apps/worker/tests`, `apps/web/tests`), browser flows in `tests/e2e`, repo-wide checks in `tests/meta` |
 | Hooks | `useThing` in `apps/web/src/**/hooks/`; no hook may import from `src/game/` |
-| Wire format | `snake_case` keys inside JSON messages (`room_code`, `host_generation`), matching `signaling.md` |
-| In-code model | `camelCase` (`roomCode`, `hostGeneration`), mapped at the boundary in `src/net/` |
+| Wire format | Frame `t` discriminator is `snake_case` (`room_state`, `peer_joined`); every other field is `camelCase` (`playerId`, `hostGeneration`), matching `signaling.md` |
+| In-code model | `camelCase` everywhere (`roomCode`, `hostGeneration`), the same as the wire — only SQL crosses into `snake_case`, in `apps/worker/src/db/` |
 | Database | `snake_case` columns, plural-free table names (`account`, `match_record`) |
-| Events / channels | Channel names `control` and `state`; message `t` values are `snake_case` (`peer_joined`, `match_end`) |
+| Events / channels | Channel names `control` and `state`; message `t` values are `snake_case` (`peer_joined`, `match_end`) — the one place a wire name is not `camelCase` |
 | i18n keys | `screen.element.state` (`lobby.startHint`, `results.ratings.reasonBot`); never concatenated at runtime |
 
 ## 3. Module boundaries
@@ -40,7 +40,7 @@ packages/core/**       → imports nothing but itself and tunables.json
 apps/worker/**         → may import packages/core types; never DOM, never Phaser
 ```
 
-An import that crosses these arrows backwards is a review blocker, not a style nit (`NFR-22`). `tests/core/imports.test.ts`
+An import that crosses these arrows backwards is a review blocker, not a style nit (`NFR-22`). `packages/core/tests/imports.test.ts`
 enforces the `core` half.
 
 ## 4. Game code
@@ -91,9 +91,9 @@ enforces the `core` half.
 
 | Layer | Tool | Location | Rule |
 |-------|------|----------|------|
-| Simulation | Vitest | `tests/core/` | Pure functions, no DOM; seeded RNG, table-driven damage cases |
-| Worker + DO | Vitest + `@cloudflare/vitest-pool-workers` (miniflare) | `tests/worker/` | Real D1 migrations applied per test file; one DO per test via `runInDurableObject` |
-| UI components | Vitest + RTL | `tests/web/` | Behaviour, not snapshots; i18n rendered through the real `t()` with `vi` |
+| Simulation | Vitest | `packages/core/tests/` | Pure functions, no DOM; seeded RNG, table-driven damage cases |
+| Worker + DO | Vitest + `@cloudflare/vitest-pool-workers` (miniflare) | `apps/worker/tests/` | Real D1 migrations applied per test file; one DO per test via `runInDurableObject` |
+| UI components | Vitest + RTL | `apps/web/tests/` | Behaviour, not snapshots; i18n rendered through the real `t()` with `vi` |
 | End-to-end | Playwright | `tests/e2e/` | Two-browser-context tests for anything with two players; phone viewport 844 × 390 |
 | Accessibility | Playwright + `@axe-core/playwright` | `tests/e2e/a11y.spec.ts` | Zero critical/serious violations on every route |
 | Docs | `verify-docs.mjs` | CI | `--fix` in CI, `--strict` on PRs |

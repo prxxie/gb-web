@@ -84,7 +84,7 @@ Uniqueness: `CREATE UNIQUE INDEX idx_match_unique ON match_record(room_code, sta
 
 `TC-RANK-110`, `TC-RANK-111`, `TC-RANK-112`, `TC-RANK-115`, `TC-RANK-116`. Worker tests with miniflare D1; the
 concurrency test fires two `SELF.fetch` calls with `Promise.all`. Red first:
-`tests/worker/matches.test.ts::duplicate_submission_conflicts`.
+`apps/worker/tests/matches.test.ts::duplicate_submission_conflicts`.
 
 ## 9. Open questions
 

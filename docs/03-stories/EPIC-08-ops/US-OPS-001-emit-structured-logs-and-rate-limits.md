@@ -81,7 +81,7 @@ Rate limits (from `NFR-25`): `/sessions` 60/min per IP; `POST /rooms` 10/min per
 
 ## 8. Test notes
 
-`TC-OPS-118` (line per request), `TC-OPS-173` (no PII), plus `tests/worker/ratelimit.test.ts` for the thresholds and the
+`TC-OPS-118` (line per request), `TC-OPS-173` (no PII), plus `apps/worker/tests/ratelimit.test.ts` for the thresholds and the
 fail-open path.
 
 ## 9. Open questions

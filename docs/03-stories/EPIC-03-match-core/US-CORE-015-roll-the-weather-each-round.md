@@ -82,7 +82,7 @@ export function weatherFor(seed: number, round: number): Weather; // determinist
 
 `TC-CORE-926` (roll, round boundary, replay determinism, `m = 0`), `TC-CORE-023` (drift and vertical term),
 `TC-MATCH-923` (dial rendering), `TC-CORE-041` (snapshot budget with `weather`).
-Red first: `tests/core/weather.test.ts::rolls_once_per_round`.
+Red first: `packages/core/tests/weather.test.ts::rolls_once_per_round`.
 
 ## 9. Open questions
 

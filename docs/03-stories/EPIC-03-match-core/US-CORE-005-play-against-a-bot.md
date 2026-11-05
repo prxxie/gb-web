@@ -66,7 +66,7 @@ Networked bots, bot-vs-bot spectating, difficulty selection UI (`OQ-20` keeps on
 ## 8. Test notes
 
 `TC-CORE-902`, `TC-CORE-906`, `TC-PWA-064`, `TC-RANK-116`.
-`Red first: tests/core/bot.test.ts::seeded_bot_is_deterministic`.
+`Red first: packages/core/tests/bot.test.ts::seeded_bot_is_deterministic`.
 
 <!-- delivery:2026-11-05 -->
 

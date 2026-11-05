@@ -23,12 +23,12 @@ stateDiagram-v2
 |------|----|---------|-------|-------|--------------|
 | — | `lobby` | `POST /rooms` | `maxPlayers ∈ {2,4,6,8}` | `room_state` | Room storage initialised; 10 min idle alarm set |
 | `lobby` | `lobby` | `peer_joined` | slot available, room not full | `peer_joined` → others, `room_state` → all | `lastActivityAt` updated |
-| `lobby` | `lobby` | `team_assign` | sender is host, destination team not full | `room_state` | — |
-| `lobby` | `playing` | `start_match` | host only; both teams non-empty and equal; no unassigned member | `match_started` | `matchStartedAt` set; 24 h hard cap alarm armed |
+| `lobby` | `lobby` | `team_assign` | sender is host, whole roster in one frame, result balanced | `room_state` | — |
+| `lobby` | `playing` | `start_match` | host only; every slot filled; both teams non-empty and equal; no unassigned member | `match_started` | `matchStartedAt` set; 24 h hard cap alarm armed |
 | `lobby` | `closed` | last member left | members empty | — | 60 s timer, then storage delete |
 | `playing` | `playing` | `snapshot_push` | sender is current host, ≤ 8 KB | — | `lastSnapshot` replaced (never appended) |
 | `playing` | `playing` | `host_changed` | host election ran | `host_changed` | `hostGeneration++` |
-| `playing` | `ended` | `match_end` | sender is current host; `winnerTeam ∈ {A,B}` | `match_recorded` after API accept | `endedAt`, result frozen |
+| `playing` | `ended` | `match_end` | sender is current host; `winnerTeam ∈ {A,B}` | `room_state`, then `match_recorded` after the API accepts | `endedAt`, result frozen |
 | `playing` | `abandoned` | all members `disconnected` | grace expired for every member | — | Room marked unranked; no rating change |
 | `ended`/`abandoned` | `closed` | 10 min idle | — | — | Storage delete |
 
@@ -104,9 +104,9 @@ An `abandoned` room records `result: 'abandon'` for the members who left and wri
 
 | Contract | Checked by |
 |----------|-----------|
-| Legal transitions only; illegal ones rejected without side effects | `tests/worker/state-machine.test.ts` (TC-ROOM-162), property test over random event sequences |
+| Legal transitions only; illegal ones rejected without side effects | `apps/worker/tests/state-machine.test.ts` (TC-ROOM-162), property test over random event sequences |
 | `start_match` guards (equal, non-empty, assigned) | `tests/e2e/lobby.spec.ts` (TC-ROOM-148) |
-| Turn timeout, disconnect-skip, elimination skip | `tests/core/turn.test.ts` (TC-CORE-152), `tests/worker/room.test.ts` (TC-NET-067) |
+| Turn timeout, disconnect-skip, elimination skip | `packages/core/tests/turn.test.ts` (TC-CORE-152), `apps/worker/tests/room.test.ts` (TC-NET-067) |
 | Grace 20 s boundaries and reconnect restore | `tests/e2e/reconnect.spec.ts` (TC-ROOM-046, TC-ROOM-047) |
-| Forfeit only when a whole team is gone | `tests/worker/room.test.ts` (TC-ROOM-070) |
-| `match_recorded` exactly once per match | `tests/worker/matches.test.ts` (TC-RANK-111) |
+| Forfeit only when a whole team is gone | `apps/worker/tests/room.test.ts` (TC-ROOM-070) |
+| `match_recorded` exactly once per match | `apps/worker/tests/matches.test.ts` (TC-RANK-111) |

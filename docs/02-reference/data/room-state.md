@@ -61,11 +61,11 @@ the room ends. It is never written to D1 — only the finished `match_record` is
 
 | Contract | Checked by |
 |----------|-----------|
-| `RoomState`/`Member` field names and enums | `packages/core/src/protocol.ts` + `tests/core/protocol.test.ts` type-level assertions (TC-ROOM-147) |
-| Slot assignment, reuse, reconnect | `tests/worker/room.test.ts` with two DO instances (TC-ROOM-128) |
-| Grace timer and disconnect transitions | `tests/worker/room.test.ts` with fake alarms (TC-ROOM-127) |
-| Idle sweep and 24 h cap | `tests/worker/room.test.ts` (TC-ROOM-123) |
-| `lastSnapshot` size cap and replacement | `tests/worker/room.test.ts` (TC-ROOM-073) |
+| `RoomState`/`Member` field names and enums | `packages/core/src/protocol.ts` + `packages/core/tests/protocol.test.ts` type-level assertions (TC-ROOM-147) |
+| Slot assignment, reuse, reconnect | `apps/worker/tests/room.test.ts` with two DO instances (TC-ROOM-128) |
+| Grace timer and disconnect transitions | `apps/worker/tests/room.test.ts` with fake alarms (TC-ROOM-127) |
+| Idle sweep and 24 h cap | `apps/worker/tests/room.test.ts` (TC-ROOM-123) |
+| `lastSnapshot` size cap and replacement | `apps/worker/tests/room.test.ts` (TC-ROOM-073) |
 
 ## Genre rule-set extensions
 

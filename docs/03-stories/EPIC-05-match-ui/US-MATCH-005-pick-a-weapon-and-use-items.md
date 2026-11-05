@@ -64,7 +64,7 @@ Inventory browsing, purchasing, item descriptions page.
 ## 8. Test notes
 
 `TC-MATCH-006`, `TC-MATCH-906`, `TC-CORE-906`, `TC-CORE-922`, `TC-PWA-158`.
-`Red first: tests/web/weapon-strip.test.tsx::selecting_weapon_two_updates_active_slot`.
+`Red first: apps/web/tests/weapon-strip.test.tsx::selecting_weapon_two_updates_active_slot`.
 
 <!-- delivery:2026-11-05 -->
 

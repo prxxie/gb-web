@@ -62,6 +62,6 @@ Public ranking by Elo. No auth, cached for 30 s, cursor-paginated.
 | Contract | Checked by |
 |----------|-----------|
 | Ordering, `Mới` badge threshold, own-row highlight | `tests/e2e/leaderboard.spec.ts` (TC-RANK-144, TC-RANK-145) |
-| Cursor pagination has no duplicates and no gaps after a concurrent rating change | `tests/worker/leaderboard.test.ts` (TC-RANK-104) |
+| Cursor pagination has no duplicates and no gaps after a concurrent rating change | `apps/worker/tests/leaderboard.test.ts` (TC-RANK-104) |
 | A name containing `<script>` renders as text | `tests/e2e/leaderboard.spec.ts` (TC-RANK-146) |
 | Public access — no auth, no redirect | `tests/e2e/leaderboard.spec.ts` (TC-RANK-147) |

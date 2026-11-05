@@ -74,7 +74,7 @@ Movement cost ([`US-CORE-008`](US-CORE-008-move-with-energy.md)), item effects
 ## 8. Test notes
 
 `TC-CORE-901`, `TC-CORE-152`, `TC-CORE-045`, `TC-CORE-027`, `TC-RANK-110`.
-`Red first: tests/core/turn-queue.test.ts::next_slot_picks_lowest_delay`.
+`Red first: packages/core/tests/turn-queue.test.ts::next_slot_picks_lowest_delay`.
 
 <!-- delivery:2026-11-05 -->
 

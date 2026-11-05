@@ -87,7 +87,7 @@ Code alphabet: `ABCDEFGHJKLMNPQRSTUVWXYZ23456789` (31 symbols, no `I`, `O`, `0`,
 
 `TC-ROOM-120`, `TC-ROOM-071`, `TC-ROOM-072`, `TC-ROOM-073`, `TC-ROOM-133`, `TC-ROOM-134`, `TC-ROOM-136`,
 `TC-ROOM-123`. Miniflare runs the DO; the collision test stubs the code generator to return the same code twice. Red
-first: `tests/worker/rooms.test.ts::create_returns_valid_code`.
+first: `apps/worker/tests/rooms.test.ts::create_returns_valid_code`.
 
 ## 9. Open questions
 

@@ -36,8 +36,8 @@ one-hour TTL and are never cached or logged (`NFR-10`).
 | # | Given | When | Then |
 |---|-------|------|------|
 | AC1 | Two members of one room | A sends `signal {to, payload}` with an SDP offer | B receives the payload byte-identical, and the DO stores nothing (`TC-ROOM-050`) |
-| AC2 | A payload larger than 8 KB, or a `to` that is not a member | `signal` is sent | `error` with `code: "bad-signal"`, nothing is relayed (`TC-ROOM-125`) |
-| AC3 | A member of the room | `GET /api/v1/turn-credentials` is called | `200` with two `urls` (`turn:` + `turns:`), a `username`, a `credential` and `ttlSeconds: 3600`; no credential appears in the response of any other endpoint (`TC-ROOM-051`) |
+| AC2 | A payload larger than 8 KB, or a `to` that is not a member | `signal` is sent | `error` `payload-too-large` (over budget) or `peer-not-connected` (no socket for `to`), nothing is relayed (`TC-ROOM-125`) |
+| AC3 | A member of the room | `GET /api/v1/turn-credentials` is called | `200` with `iceServers` (STUN always, TURN when a key is configured), `ttlSeconds: 3600` and `turn`; no credential appears in the response of any other endpoint (`TC-ROOM-051`) |
 | AC4 | The client's storage after a match | It is inspected | No ICE credential, TURN username or token is in `localStorage`, `sessionStorage` or a cookie (`TC-ROOM-052`) |
 | AC5 | Signaling for a room in `playing` | A new peer joins the socket | The peers exchange offers only after `match_started`, and the host answers each peer once |
 | AC6 | A `signal` addressed to a member that left | It is sent | `error` `peer-not-found`; the sender is not disconnected |
@@ -51,10 +51,9 @@ The `payload` is JSON ≤ 8 KB and is relayed with `to` rewritten to the sender'
 
 | Field | Type | Notes |
 |-------|------|-------|
-| `urls` | string[] | `["turn:turn.cloudflare.com:3478?transport=udp","turns:turn.cloudflare.com:5349?transport=tcp"]` |
-| `username` | string | `<expiryUnix>-<generated>` from Cloudflare's TURN key API |
-| `credential` | string | Base64 HMAC — never logged |
+| `iceServers` | `RTCIceServer[]` | Cloudflare's array, passed through: `stun:` always, `turn:`/`turns:` with a `username` and `credential` when a TURN key is configured |
 | `ttlSeconds` | integer | `3600` |
+| `turn` | boolean | `false` when no TURN key is configured — STUN-only, still `200` |
 
 ## 5. Rules and edge cases
 
@@ -62,8 +61,9 @@ The `payload` is JSON ≤ 8 KB and is relayed with `to` rewritten to the sender'
   route records only `request_id`, `room_code` and `ttlSeconds`.
 - Credentials are fetched per call from the TURN key API; no cache, no reuse across players.
 - `iceServers` on the client is built from this response only; no hardcoded STUN server.
-- A `signal` may not target the sender itself (`bad-signal`).
-- Relay only happens between members of the same room; a `playerId` from another room is `peer-not-found`.
+- A `signal` may not target the sender itself (`bad-request`).
+- Relay only happens between members of the same room; a `playerId` from another room is `peer-not-connected`, the
+  same answer as for a member with no open socket, so a probe cannot tell a stranger from an offline peer.
 
 ## 6. Implementation notes
 

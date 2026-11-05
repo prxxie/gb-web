@@ -79,7 +79,7 @@ Response `201`:
 ## 8. Test notes
 
 `TC-AUTH-074`, `TC-AUTH-057`, `TC-AUTH-065`, `TC-AUTH-135`. Worker tests use miniflare with a fake `SESSION_TOKEN_SECRET`;
-the expiry test moves the clock with `vi.setSystemTime`. Red first: `tests/worker/sessions.test.ts::guest_session_shape`.
+the expiry test moves the clock with `vi.setSystemTime`. Red first: `apps/worker/tests/sessions.test.ts::guest_session_shape`.
 
 ## 9. Open questions
 

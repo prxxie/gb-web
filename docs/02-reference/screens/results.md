@@ -23,7 +23,7 @@ reloadable for 10 minutes from the `match_recorded` payload kept in `sessionStor
 
 | Field | Type | Source | Notes |
 |-------|------|--------|-------|
-| Winner | `ĐỘI A` / `ĐỘI B` / `HÒA` | `match_recorded.winnerTeam` | `HÒA` is only possible if both teams are eliminated in the same resolution |
+| Winner | `ĐỘI A` / `ĐỘI B` / `HÒA` | `match_recorded.winnerTeam` (echoed from the host's `match_end`) | `HÒA` is only possible if both teams are eliminated in the same resolution |
 | Per-player result | `Thắng` / `Thua` / `Bỏ cuộc` | `players[].result` | Abandon is shown for a player who left before the end |
 | Rating before → after | integers | `ratingBefore`, `ratingAfter` | Only for ranked matches; guests and bot matches show `—` |
 | Delta | signed integer | computed | `+12` in `primary`, `−12` in `danger` |

@@ -63,7 +63,7 @@ Map editor UI, user-generated maps, seasonal rotation.
 ## 8. Test notes
 
 `TC-CORE-920`, `TC-CORE-918`, `TC-ROOM-151`, `TC-FND-002`, `TC-CORE-040`.
-`Red first: tests/core/maps.test.ts::eleven_maps_load_with_valid_spawns`.
+`Red first: packages/core/tests/maps.test.ts::eleven_maps_load_with_valid_spawns`.
 
 <!-- delivery:2026-11-05 -->
 

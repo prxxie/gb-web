@@ -92,8 +92,8 @@ public handle (`displayName` + `accountId` only inside match history of one's ow
 
 | Contract | Checked by |
 |----------|-----------|
-| Guest and registered modes, token claims and TTL | `tests/worker/sessions.test.ts` (TC-AUTH-074) |
-| First call creates exactly one account + profile | `tests/worker/auth.test.ts` (TC-AUTH-074) |
-| `PATCH /me` rejects `rating`, `409` on duplicate names | `tests/worker/profile.test.ts` (TC-AUTH-101, TC-AUTH-102) |
-| `DELETE /me` removes Clerk user and schedules the purge; refuses mid-match | `tests/worker/deletion.test.ts` (TC-AUTH-103) |
-| No identity leak in responses | `tests/worker/schema-whitelist.test.ts` (TC-AUTH-075) |
+| Guest and registered modes, token claims and TTL | `apps/worker/tests/sessions.test.ts` (TC-AUTH-074) |
+| First call creates exactly one account + profile | `apps/worker/tests/auth.test.ts` (TC-AUTH-074) |
+| `PATCH /me` rejects `rating`, `409` on duplicate names | `apps/worker/tests/profile.test.ts` (TC-AUTH-101, TC-AUTH-102) |
+| `DELETE /me` removes Clerk user and schedules the purge; refuses mid-match | `apps/worker/tests/deletion.test.ts` (TC-AUTH-103) |
+| No identity leak in responses | `apps/worker/tests/schema-whitelist.test.ts` (TC-AUTH-075) |

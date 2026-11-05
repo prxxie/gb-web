@@ -91,7 +91,7 @@ zoom.
 
 `TC-MATCH-918` (default window and pan clamp), `TC-MATCH-919` (zoom bounds and midpoint), `TC-MATCH-920` (ruler 8 → 16),
 `TC-MATCH-921` (fullscreen and safe areas), `TC-MATCH-922` (HUD scale independence).
-Red first: `tests/web/ruler.test.ts::segments_go_from_eight_to_sixteen`.
+Red first: `apps/web/tests/ruler.test.ts::segments_go_from_eight_to_sixteen`.
 
 ## 9. Open questions
 

@@ -80,7 +80,7 @@ Purge job: a Cloudflare cron trigger on the worker (`*/1 * * * *`, batch of 100)
 
 `TC-AUTH-103`, `TC-AUTH-069`, `TC-AUTH-142`, `TC-AUTH-075`. The purge is tested by inserting a row with
 `deleted_at = now - 31 days` and invoking the scheduled handler directly. Red first:
-`tests/worker/accounts.test.ts::delete_purges_after_30_days`.
+`apps/worker/tests/accounts.test.ts::delete_purges_after_30_days`.
 
 ## 9. Open questions
 

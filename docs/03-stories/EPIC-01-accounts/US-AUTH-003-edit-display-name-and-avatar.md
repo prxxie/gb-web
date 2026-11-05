@@ -78,7 +78,7 @@ collapse internal whitespace to a single space.
 ## 8. Test notes
 
 `TC-AUTH-101`, `TC-AUTH-102`, `TC-AUTH-140`. The normalisation cases are a table-driven unit test
-(`tests/worker/display-name.test.ts`). Red first: `tests/worker/accounts.test.ts::duplicate_key_conflicts`.
+(`apps/worker/tests/display-name.test.ts`). Red first: `apps/worker/tests/accounts.test.ts::duplicate_key_conflicts`.
 
 ## 9. Open questions
 
