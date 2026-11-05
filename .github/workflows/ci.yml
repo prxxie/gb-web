@@ -75,7 +75,9 @@ jobs:
           pnpm dev:worker > "$RUNNER_TEMP/worker.log" 2>&1 &
           wait_for http://127.0.0.1:8787/api/v1/health || { tail -60 "$RUNNER_TEMP/worker.log"; exit 1; }
 
-          pnpm dev --port 5173 --strictPort > "$RUNNER_TEMP/web.log" 2>&1 &
+          # `pnpm dev --port …` hands the flag to pnpm itself, which ignores it and leaves Vite on its default
+          # port, so the runner reaches Vite directly through the workspace filter.
+          pnpm --filter @gbw/web exec vite --port 5173 --strictPort > "$RUNNER_TEMP/web.log" 2>&1 &
           wait_for http://127.0.0.1:5173/ || { tail -60 "$RUNNER_TEMP/web.log"; exit 1; }
 
           pnpm e2e
