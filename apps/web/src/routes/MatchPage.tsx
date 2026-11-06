@@ -28,6 +28,7 @@ import { DirectionPad, type PadAction } from "../components/DirectionPad";
 import { PhrasePicker, type ChatKind } from "../components/PhrasePicker";
 import { Ruler } from "../components/Ruler";
 import { ItemTray } from "../components/ItemTray";
+import { Roster } from "../components/Roster";
 import { WeaponStrip, type WeaponSlot } from "../components/WeaponStrip";
 import { WindDial } from "../components/WindDial";
 import { defaultWindow, type CameraWindow } from "@gbw/core";
@@ -506,21 +507,7 @@ export function MatchPage(): JSX.Element {
       <div className="match__canvas" ref={container} aria-hidden="true" />
       <div className="match__hud">
         <div className="match__top">
-          <div className="match__roster">
-            {state.players.map((player) => (
-              <div
-                key={player.slot}
-                className={`match__player${player.slot === state.turn.activeSlot ? " match__player--active" : ""}`}
-                data-testid={`roster-${player.slot}`}
-              >
-                <div>{player.displayName}</div>
-                <div className="muted">
-                  {player.eliminated ? t("match.eliminated") : `${player.hp}/${getMobile(player.mobileId).maxHp}`}
-                  {player.shield > 0 ? ` +${player.shield}` : ""}
-                </div>
-              </div>
-            ))}
-          </div>
+          <Roster players={state.players} activeSlot={state.turn.activeSlot} eliminatedLabel={t("match.eliminated")} />
           <div className="row">
             <WindDial weather={state.weather} label={t("match.wind")} />
             <div className="match__clock" data-testid="turn-clock">

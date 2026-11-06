@@ -216,6 +216,9 @@ The `covers` column names the requirement ([nonfunctional-requirements.md](../01
 | TC-MATCH-921 | US-MATCH-007 | First tap on a device with and without the Fullscreen API | `requestFullscreen()` called where available; otherwise the page fills the viewport with safe-area insets and no `apple-mobile-web-app-capable` meta | e2e | FR-03 |
 | TC-MATCH-922 | US-MATCH-007 | Zoom to `zoomMax` and to `zoomMin` with the pad and ring visible | Pad ring stays 96 px, buttons 60 px, ring radius 64 px, roster unchanged at both zooms | web | NFR-17 |
 | TC-MATCH-923 | US-MATCH-003 | Apply `weather` at `m = 0`, `m = 26` and a sector change | Dial draws 12 ticks with long cardinals, arrow at `directionDeg`, numeric 0–26, `0` renders the hollow grey dial, banner appears once per round and dismisses on tap | web | FR-04 |
+| TC-MATCH-924 | US-MATCH-001 | AC2 — two snapshots 100 ms apart, read at 0, ¼, ½, ¾ and 1 of the blend | A unit sits halfway at half the interval, never moves backwards or off its segment, `hp`/`facing`/`eliminated` come from the newest snapshot, an eliminated unit snaps to where it died, and the first frame after a mount starts where the state says | web | FR-01, NFR-01 |
+| TC-MATCH-925 | US-MATCH-001 | AC6 — one mobile at HP 0 in a three-mobile roster | It keeps its cell and its order, is labelled `match.eliminated` instead of printing its hp, and only the active slot carries `match__player--active` | web | NFR-17 |
+| TC-MATCH-926 | US-MATCH-001 | AC7 — play a bot match until one side is eliminated, on a phone in landscape | The clock and the bot stop on the final turn, the results screen replaces the match without a page reload and the canvas is released (no second WebGL context in a heap snapshot) | manual | FR-01 |
 
 ## Ranked (RANK)
 

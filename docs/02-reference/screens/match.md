@@ -122,19 +122,21 @@ a drag. All pad and button targets are ≥ 60 × 60 logical px (`NFR-17`).
 
 | Contract | Checked by |
 |----------|-----------|
-| Aim drag → angle/force within tolerance, release fires once | `tests/e2e/match.spec.ts` (TC-MATCH-151) |
+| Aim drag → angle/force within tolerance, a pull under the deadzone sends nothing | `apps/web/tests/aim.test.tsx` (TC-MATCH-914, TC-MATCH-916) |
 | Power ring shows 0.0–4.0 and maps to `force = power × 25` | `apps/web/tests/power-ring.test.tsx` (TC-MATCH-915) |
-| Release below 0.3 cancels; two-finger gesture cancels without firing | `apps/web/tests/gestures.test.ts` (TC-MATCH-916) |
-| Camera default window 1000 × 600, clamped pan, zoom bounds | `apps/web/tests/camera.test.ts` (TC-MATCH-918, TC-MATCH-919) |
-| Ruler divisions 8 → 16 as the window widens | `apps/web/tests/ruler.test.ts` (TC-MATCH-920) |
-| Fullscreen requested on first tap; safe-area insets respected | `tests/e2e/fullscreen.spec.ts` (TC-MATCH-921) |
+| Release below 0.3 cancels; two-finger gesture cancels without firing | `apps/web/tests/gestures.test.tsx` (TC-MATCH-916) |
+| Camera default window 1000 × 600, clamped pan, zoom bounds | `apps/web/tests/camera.test.tsx` (TC-MATCH-918, TC-MATCH-919) |
+| Ruler divisions 8 → 16 as the window widens | `apps/web/tests/ruler.test.tsx` (TC-MATCH-920) |
+| Units blend between two snapshots 100 ms apart; positions only, `hp`/`facing`/`eliminated` snap | `apps/web/tests/interpolate.test.tsx` (TC-MATCH-924) |
+| An eliminated mobile is drawn as a faded wreck in place and keeps its roster cell, ordered by slot | `apps/web/tests/interpolate.test.tsx` (TC-MATCH-924, the wreck) and `apps/web/tests/roster.test.tsx` (TC-MATCH-925, the strip) |
+| Landscape launch, safe-area insets respected, no fullscreen launch flag | `tests/e2e/smoke.spec.ts` (TC-PWA-063) |
 | Turn clock starts at 20 s, skips on timeout, does not drift > 1 s | `packages/core/tests/turn.test.ts` (TC-CORE-152) |
-| Wind re-rolled once per round, dial shows 12 sectors and 0–26 | `packages/core/tests/weather.test.ts` (TC-CORE-926), `apps/web/tests/wind-dial.test.ts` (TC-MATCH-923) |
+| Wind re-rolled once per round, dial shows 12 sectors and 0–26 | `packages/core/tests/weather.test.ts` (TC-CORE-926), `apps/web/tests/wind-dial.test.tsx` (TC-MATCH-923) |
 | Blast damage, friendly fire, elimination, team-loss detection | `packages/core/tests/combat.test.ts`, `packages/core/tests/match.test.ts` (TC-CORE-020…TC-CORE-028) |
 | Snapshot apply is idempotent and duck-types by `seq` | `packages/core/tests/snapshot.test.ts` (TC-CORE-040) |
-| Reconnect overlay countdown matches the 20 s grace | `tests/e2e/reconnect.spec.ts` (TC-ROOM-047) |
-| Host migration overlay ≤ 5 s end-to-end | `tests/e2e/migration.spec.ts` (TC-ROOM-049) |
-| Offline bot match needs no network at all | `tests/e2e/offline.spec.ts` (TC-PWA-064) |
+| Reconnect overlay countdown matches the 20 s grace | `apps/web/tests/reconnect.test.tsx` (TC-ROOM-174…TC-ROOM-177) |
+| Host migration overlay ≤ 5 s end-to-end | `tests/e2e/migration.spec.ts` (TC-ROOM-149, TC-ROOM-182) |
+| Offline bot match needs no network at all | `tests/e2e/pwa-offline.spec.ts` (TC-PWA-064) |
 
 ## GunBound rule-set extensions
 

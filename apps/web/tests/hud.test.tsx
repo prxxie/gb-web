@@ -22,7 +22,7 @@ describe("TC-MATCH-923: wind dial", () => {
   });
 });
 
-describe("TC-MATCH-921: ruler", () => {
+describe("TC-MATCH-920: ruler", () => {
   it("shows eight divisions at the default window and sixteen zoomed out", () => {
     const { rerender } = render(<Ruler window={defaultWindow(5 / 3)} unitLabel="ô" />);
     expect(screen.getByTestId("ruler").getAttribute("data-segments")).toBe("8");
