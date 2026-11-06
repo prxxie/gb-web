@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 /**
  * TC-PWA-130: locale loading and completeness (`US-FND-003` AC2–AC3, `US-PWA-002` AC1–AC3).
+ * `TC-FND-134` is the same suite read for `US-FND-003` AC3 alone: the stored choice survives a reload.
  *
  * Nothing here asserts a fixture: the strings checked are the real tables, and the "no leak" case
  * compares what the provider renders against every value in the other table.

@@ -22,3 +22,29 @@ test("TC-PWA-158: every button on the menu has an accessible name and a 44 px ta
     }
   }
 });
+
+test("TC-FND-133: the shell never scrolls sideways and keeps a 44 px touch floor", async ({ page }) => {
+  for (const viewport of [
+    { width: 844, height: 390 },
+    { width: 1024, height: 768 },
+  ]) {
+    await page.setViewportSize(viewport);
+    await page.goto("/");
+
+    const measured = await page.evaluate(() => ({
+      documentWidth: document.documentElement.scrollWidth,
+      windowWidth: window.innerWidth,
+      tooSmall: Array.from(document.querySelectorAll("button, a"))
+        .filter((element) => element.getClientRects().length > 0)
+        .map((element) => ({ text: (element.textContent ?? "").trim().slice(0, 24), box: element.getBoundingClientRect() }))
+        .filter((entry) => entry.box.width < 44 || entry.box.height < 44)
+        .map((entry) => entry.text),
+    }));
+
+    // One pixel of slack: `scrollWidth` is an integer rounded up from the layout, not a real overflow.
+    expect(measured.documentWidth, `horizontal scroll at ${viewport.width}`).toBeLessThanOrEqual(
+      measured.windowWidth + 1,
+    );
+    expect(measured.tooSmall, `controls under 44 px at ${viewport.width}`).toEqual([]);
+  }
+});

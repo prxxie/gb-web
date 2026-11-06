@@ -70,13 +70,14 @@ export class ApiError extends Error {
 }
 
 /**
- * The line a screen shows for a failed request (`US-PWA-002` AC6): the dictionary entry for the problem
- * type, plus the server's own `title` when the client has no entry for that type.
+ * The one line a screen shows when a call fails (`US-FND-003` AC4, `US-PWA-002` AC6): the translated message, the
+ * server's own `title` when the client has no entry for that type, and the `request_id` so support can find the log
+ * line — never the body and never a stack.
  */
-export function errorMessage(caught: unknown, t: (key: string) => string): string {
+export function errorMessage(caught: unknown, t: (key: string, values?: Record<string, string | number>) => string): string {
   if (!(caught instanceof ApiError)) return t("common.retry");
-  const subtitle = caught.subtitle;
-  return subtitle ? `${t(caught.messageKey)} ${subtitle}` : t(caught.messageKey);
+  const message = caught.subtitle ? `${t(caught.messageKey)} ${caught.subtitle}` : t(caught.messageKey);
+  return caught.requestId ? `${message} · ${t("errors.reference", { id: caught.requestId })}` : message;
 }
 
 const BASE = (import.meta.env.VITE_API_BASE ?? "/api/v1").replace(/\/$/, "");

@@ -2,7 +2,7 @@
 id: US-FND-001
 title: Set up the pnpm workspace so the documented commands run
 epic: EPIC-00-foundation
-status: in-progress
+status: done
 priority: P0
 size: M
 depends_on: []
@@ -85,9 +85,14 @@ and `types: ["vite/client"]`; `packages/core` uses `lib: ["ES2023"]` only — th
 
 ## 8. Test notes
 
-Red first: `TC-FND-018` (`packages/core/tests/imports.test.ts`) and `TC-FND-002` (`apps/worker/tests/env.test.ts`) fail before the
-scan and the `.env.example` exist. `TC-FND-012` is a build-output test. AC6 is verified in the pull request itself;
-AC7 is verified by `grep -c "planned —" AGENTS.md docs/01-overview/environment-setup.md` returning 0.
+`TC-FND-074`…`TC-FND-078` (`tests/meta/workspace.test.ts`), `TC-FND-002` (`apps/worker/tests/env.test.ts`),
+`TC-FND-012` (`tests/meta/bundle-secrets.test.ts`), `TC-FND-018` (`packages/core/tests/imports.test.ts`).
+- **Red:** `TC-FND-076` in `tests/meta/workspace.test.ts` failed while `AGENTS.md` still marked `pnpm build`,
+  `pnpm test` and `pnpm dev:worker` as "(planned — …)".
+- AC2 is the CI job `typecheck · lint · test · build · docs`; AC6 was proven by pushing a deliberately failing test on
+  branch `ci-check-fails` (PR #2): the required check went red and the pull request reported
+  `mergeStateStatus: BLOCKED` — recorded in `docs/05-quality/evidence/US-FND-001/ci-block.txt`. Branch protection on
+  `main` requires both CI jobs (`strict: true`).
 
 ## 9. Open questions
 

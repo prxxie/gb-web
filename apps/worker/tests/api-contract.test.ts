@@ -12,7 +12,7 @@ import { RULESET_VERSION } from "@gbw/core";
 import { handleFetch } from "../src/index";
 import { mintSession } from "../src/lib/session";
 import { resetLimits } from "../src/lib/ratelimit";
-import { fakeRooms, TEST_SECRET, testEnv, type TestEnv } from "./support/fake-worker";
+import { captureLog, fakeRooms, TEST_SECRET, testEnv, type TestEnv } from "./support/fake-worker";
 
 /** The endpoint index, verbatim from `docs/02-reference/api/README.md`. */
 const INDEX: readonly (readonly [string, string])[] = [
@@ -124,7 +124,18 @@ describe("response envelope", () => {
 });
 
 describe("errors", () => {
-  it("returns every problem as an RFC 9457 body", async () => {
+  it("TC-FND-073: an unknown route is a 404 problem, printed like every other error", async () => {
+    const { harness } = await signedIn();
+
+    const response = await call(harness, "GET", "/nope");
+
+    expect(response.status).toBe(404);
+    const problem = (await response.json()) as Record<string, unknown>;
+    expect(String(problem["type"])).toMatch(/\/problems\/not-found$/);
+    expect(problem["instance"]).toBe("/api/v1/nope");
+  });
+
+  it("TC-FND-071: returns every problem as an RFC 9457 body", async () => {
     const { harness, authorization } = await signedIn();
     const rooms = fakeRooms({
       stateResponse: () =>
@@ -151,6 +162,24 @@ describe("errors", () => {
       expect(response.headers.get("x-request-id")).toBe(problem["request_id"]);
     }
     expect(authorization).toBeTruthy();
+  });
+
+  it("TC-FND-072: an unexpected failure is a 500 internal with no SQL and the logged request id", async () => {
+    const { harness, authorization } = await signedIn();
+    // `FakeD1.failWhen` makes one statement throw exactly what a broken schema throws in production.
+    harness.db.failWhen = (sql) => sql.includes("FROM profile");
+    const log = captureLog();
+
+    const response = await call(harness, "GET", "/me", authorization);
+
+    expect(response.status).toBe(500);
+    const problem = (await response.json()) as Record<string, unknown>;
+    expect(String(problem["type"])).toMatch(/\/problems\/internal$/);
+    expect(JSON.stringify(problem)).not.toMatch(/SELECT|FROM profile|at Object/);
+    const logged = log.lines.join("\n");
+    log.restore();
+    expect(logged).toContain(String(problem["request_id"]));
+    harness.db.failWhen = null;
   });
 
   it("answers 400 for a cursor it cannot read", async () => {

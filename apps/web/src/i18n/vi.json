@@ -167,5 +167,6 @@
   "errors.internal": "Máy chủ gặp sự cố.",
   "errors.network": "Không kết nối được máy chủ.",
   "errors.generic": "Không xử lý được phản hồi của máy chủ.",
-  "match.disconnected": "Mất kết nối với phòng."
+  "match.disconnected": "Mất kết nối với phòng.",
+  "errors.reference": "Mã lỗi: {id}"
 }

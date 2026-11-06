@@ -87,3 +87,39 @@ describe("errorMessage", () => {
     expect(errorMessage(new Error("boom"), vi)).toBe(vi("common.retry"));
   });
 });
+
+describe("TC-FND-132: the banner names the request (US-FND-003 AC4)", () => {
+  it("shows the translated line and the request id, and nothing else", async () => {
+    // Arrange — a 500 whose body carries the id the worker logged
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        new Response(
+          JSON.stringify({
+            type: "https://api.gbw.example/problems/internal",
+            title: "Internal error",
+            status: 500,
+            detail: "D1_ERROR: no such table: profile",
+            request_id: "req_7f3a",
+          }),
+          { status: 500, headers: { "content-type": "application/problem+json" } },
+        ),
+      ),
+    );
+
+    // Act
+    const caught = await request("/me").catch((error: unknown) => error);
+    const line = errorMessage(caught, translator("vi"));
+
+    // Assert — the dictionary line plus the reference; the detail stays out of the screen
+    expect(line).toContain("Mã lỗi: req_7f3a");
+    expect(line).not.toContain("D1_ERROR");
+    expect(line).not.toContain("{");
+    expect(line).not.toMatch(/\bat .+\(.+:\d+:\d+\)/);
+  });
+
+  it("leaves the reference out when the response carried no id", () => {
+    const caught = new ApiError("internal", 500, "Boom", undefined, []);
+    expect(errorMessage(caught, translator("vi"))).not.toContain("Mã lỗi");
+  });
+});

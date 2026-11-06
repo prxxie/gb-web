@@ -23,9 +23,9 @@ Generated from story frontmatter — run `node .agents/scripts/verify-docs.mjs -
 <!-- cpt:epic-stories -->
 | Id | Title | Priority | Size | Status | Depends on |
 |---|---|---|---|---|---|
-| [US-FND-001](US-FND-001-set-up-the-workspace.md) | Set up the pnpm workspace so the documented commands run | P0 | M | in-progress | — |
-| [US-FND-002](US-FND-002-worker-skeleton-and-health.md) | Serve /health from the worker with the D1 binding and the error envelope | P0 | M | ready | US-FND-001 |
-| [US-FND-003](US-FND-003-web-shell.md) | Render the app shell with routing, locale loading and an error boundary | P0 | M | ready | US-FND-001 |
+| [US-FND-001](US-FND-001-set-up-the-workspace.md) | Set up the pnpm workspace so the documented commands run | P0 | M | done | — |
+| [US-FND-002](US-FND-002-worker-skeleton-and-health.md) | Serve /health from the worker with the D1 binding and the error envelope | P0 | M | done | US-FND-001 |
+| [US-FND-003](US-FND-003-web-shell.md) | Render the app shell with routing, locale loading and an error boundary | P0 | M | done | US-FND-001 |
 | [US-FND-004](US-FND-004-deploy-preview-and-production.md) | Deploy a preview per pull request and production from main | P0 | M | ready | US-FND-002, US-FND-003 |
 <!-- /cpt:epic-stories -->
 

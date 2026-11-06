@@ -16,6 +16,11 @@ The `covers` column names the requirement ([nonfunctional-requirements.md](../01
 | ID | Story | Case | Expected | Level | Covers |
 |----|-------|------|----------|-------|--------|
 | TC-FND-001 | US-FND-002 | AC1 — `GET /api/v1/health` on a fresh worker | `200 {"status":"ok","version":"<sha>"}` | worker | operational — see `08-ops/slo.md` |
+| TC-FND-074 | US-FND-001 | AC1 — the layout the docs name exists | `apps/*`, `packages/core`, the three test roots, `tests/e2e`, `tests/meta`, `scripts`; the workspace globs match | unit | `AGENTS.md` § Layout |
+| TC-FND-075 | US-FND-001 | AC1 — one Node floor for the whole workspace | Root `engines.node` is `>=22.12` and no package contradicts it | unit | `AGENTS.md` § PROJECT |
+| TC-FND-076 | US-FND-001 | AC7 — no planned marker survives | No `(planned — …)` in `AGENTS.md` or `environment-setup.md` | unit | AC7 |
+| TC-FND-077 | US-FND-001 | AC2 — typecheck, lint and the suite | `pnpm typecheck`, `pnpm lint`, `pnpm test` each exit 0; every project reports at least one passing test | manual | CI `typecheck · lint · test · build · docs` |
+| TC-FND-078 | US-FND-001 | AC6 — a failing test stops a merge | The required check goes red and the pull request reports `mergeStateStatus: BLOCKED` | manual | `evidence/US-FND-001/ci-block.txt` |
 | TC-FND-002 | US-FND-001 | AC5 — every env var the code reads has a row in `apps/worker/.dev.vars.example` or `apps/web/.env.example`, and no row holds a secret | Names match the code; the only values allowed are public defaults (`VITE_API_BASE=/api/v1`) | worker | NFR-12 |
 | TC-FND-012 | US-FND-001 | AC4 — built web assets scanned for secret values | No match for `SESSION_TOKEN_SECRET`, `TURN_KEY_API_TOKEN` | web | NFR-12 |
 | TC-FND-018 | US-FND-001 | AC3 — `packages/core` imports no DOM, Phaser or network module | Static import scan is empty | unit | NFR-22 |
@@ -285,6 +290,9 @@ unrelated meanings), so every row below names the one thing it proves.
 
 | ID | Story | Case | Expected | Level | Covers |
 |----|-------|------|----------|-------|--------|
+| TC-FND-132 | US-FND-003 | AC4 — a `500` with a `request_id` | The banner shows the translated line and `Mã lỗi: <id>`, with no body, SQL or stack | web | NFR-24 |
+| TC-FND-134 | US-FND-003 | AC3 — `en` survives a reload | The stored `gbw.locale` wins on the next start and the choice is written back under the same key | web | AC3 |
+| TC-FND-133 | US-FND-003 | AC6 — 844×390 and 1024×768 | No horizontal scroll and every control at least 44 px outside the canvas | e2e | NFR-17 |
 | TC-FND-131 | US-FND-003 | AC1, AC2, AC5 — a direct URL (`/lobby/ABC234`, `/match/ABC234`) renders the shell and the locale toggle | Shell renders without a 404 and the toggle switches VI↔EN | web | `US-FND-003` AC1, AC2, AC5 |
 | TC-MATCH-914 | US-MATCH-002 | Drag distance maps to the power ring radius | Radius grows with the pull and stops at the maximum | web | `US-MATCH-002` §4 |
 | TC-NET-045 | US-NET-004 | A peer sends `team_assign`; the host sends it after the start | `not-host` while a peer, `invalid-state` once playing; the roster is unchanged | worker | `US-NET-004` §2 roster |
