@@ -316,3 +316,56 @@ describe("POST /matches — ranking rules", () => {
     rig.db.close();
   });
 });
+
+describe("POST /matches — the delay table (US-CORE-002 AC7)", () => {
+  it("TC-CORE-939: the table that produced the turn order is stored on the record", async () => {
+    // Arrange
+    const { rig, token } = await rigWithProfiles();
+
+    // Act
+    const response = await rig.request("POST", "/matches", {
+      body: submission({ delayTable: [0, 120, 40, 0] }),
+      token,
+    });
+
+    // Assert — stored as JSON in slot order, so a disputed result can be replayed
+    expect(response.status).toBe(201);
+    const row = rig.db.rows("match_record")[0];
+    expect(JSON.parse(String(row?.["delay_table"]))).toEqual([0, 120, 40, 0]);
+    rig.db.close();
+  });
+
+  it("TC-CORE-939: a submission without a table records an empty one", async () => {
+    // Arrange — an older client that does not track the queue
+    const { rig, token } = await rigWithProfiles();
+
+    // Act
+    const response = await rig.request("POST", "/matches", { body: submission(), token });
+
+    // Assert
+    expect(response.status).toBe(201);
+    expect(rig.db.rows("match_record")[0]?.["delay_table"]).toBe("[]");
+    rig.db.close();
+  });
+
+  it("TC-CORE-939: a fractional or negative delay is 422 and nothing is written", async () => {
+    // Arrange
+    const { rig, token } = await rigWithProfiles();
+
+    // Act
+    const fractional = await rig.request("POST", "/matches", {
+      body: submission({ matchId: "match-0002", delayTable: [0, 1.5, 2] }),
+      token,
+    });
+    const negative = await rig.request("POST", "/matches", {
+      body: submission({ matchId: "match-0003", delayTable: [0, -1] }),
+      token,
+    });
+
+    // Assert
+    expect(fractional.status).toBe(422);
+    expect(negative.status).toBe(422);
+    expect(rig.db.rows("match_record")).toHaveLength(0);
+    rig.db.close();
+  });
+});

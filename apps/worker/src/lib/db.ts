@@ -57,6 +57,8 @@ export interface MatchRecordRow {
   readonly started_at: string;
   readonly ended_at: string;
   readonly submitted_by: string;
+  /** JSON array of the accumulated delay of each slot at the end (`US-CORE-002` AC7). */
+  readonly delay_table: string;
   readonly created_at: string;
 }
 

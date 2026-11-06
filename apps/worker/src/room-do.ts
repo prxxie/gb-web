@@ -627,6 +627,7 @@ export class Room implements DurableObject {
         winnerTeam: frame.winnerTeam,
         abandoned: options.abandoned ?? false,
         players,
+        delayTable: frame.delayTable ?? [],
       }),
     });
     if (response.status === 409) return { ok: true, value: unranked };

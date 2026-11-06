@@ -44,6 +44,11 @@ export interface MatchSubmission {
   readonly endedAt: string;
   readonly winnerTeam: "A" | "B" | null;
   readonly abandoned: boolean;
+  /**
+   * The accumulated delay of each slot at the end, in slot order (`US-CORE-002` AC7). Optional: an older
+   * client that does not track the queue still records its match, the column simply stays `[]`.
+   */
+  readonly delayTable: readonly number[];
   readonly players: readonly SubmittedPlayer[];
 }
 
@@ -141,8 +146,24 @@ function parseSubmission(body: Record<string, unknown>): MatchSubmission {
     }
   }
 
+  // The delay table is validated with the rest: a `field.fail` after `field.done()` would never reach the
+  // 422 body, and a match would be stored with a table nobody can replay (`US-CORE-002` AC7).
+  const rawDelays = body["delayTable"] ?? [];
+  const delayTable: number[] = [];
+  if (!Array.isArray(rawDelays) || rawDelays.length > MAX_PLAYERS) {
+    field.fail("delayTable", "must be an array of up to eight delays");
+  } else {
+    for (const [index, delay] of rawDelays.entries()) {
+      if (!Number.isInteger(delay) || (delay as number) < 0) {
+        field.fail(`delayTable[${index}]`, "must be whole milliseconds");
+      } else {
+        delayTable.push(delay as number);
+      }
+    }
+  }
+
   field.done();
-  return { matchId, roomCode, rulesetVersion, startedAt, endedAt, winnerTeam, abandoned, players };
+  return { matchId, roomCode, rulesetVersion, startedAt, endedAt, winnerTeam, abandoned, delayTable, players };
 }
 
 interface RatingChange {
@@ -303,8 +324,8 @@ export async function submitMatch(request: Request, env: Env, session: SessionTo
     env.GBW_DB.prepare(
       `INSERT INTO match_record (match_id, room_code, player_count, team_a_slots, team_b_slots, winner_team, ranked,
                                  ranked_reason, ruleset_version, duration_ms, started_at, ended_at, submitted_by,
-                                 created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                                 delay_table, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     ).bind(
       matchId,
       submission.roomCode,
@@ -319,6 +340,7 @@ export async function submitMatch(request: Request, env: Env, session: SessionTo
       submission.startedAt,
       submission.endedAt,
       accountId,
+      JSON.stringify(submission.delayTable ?? []),
       createdAt,
     ),
   ];

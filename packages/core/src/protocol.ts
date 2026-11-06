@@ -68,6 +68,11 @@ export interface MatchEndFrame {
   readonly t: "match_end";
   readonly winnerTeam: Team | null;
   readonly stats: readonly MatchStat[];
+  /**
+   * The accumulated delay of each slot at the end, in slot order — "the delay table that produced the order"
+   * (`US-CORE-002` AC7). Optional because a peer that lost track of the queue can still end the match.
+   */
+  readonly delayTable?: readonly number[] | undefined;
 }
 
 /** Client → Durable Object. § 2 and § 9 of the signalling reference. */
@@ -305,7 +310,21 @@ function parseMatchEnd(frame: Record<string, unknown>): ParseResult<MatchEndFram
       ...(entry["forfeited"] === true ? { forfeited: true } : {}),
     });
   }
-  return ok({ t: "match_end", winnerTeam: (winner ?? null) as Team | null, stats });
+  const rawDelays = frame["delayTable"];
+  if (rawDelays !== undefined) {
+    if (!Array.isArray(rawDelays) || rawDelays.length > 8) {
+      return fail("bad-request", "match_end.delayTable must be an array of up to eight delays");
+    }
+    for (const delay of rawDelays) {
+      if (!isInteger(delay) || delay < 0) return fail("bad-request", "match_end.delayTable values must be whole milliseconds");
+    }
+  }
+  return ok({
+    t: "match_end",
+    winnerTeam: (winner ?? null) as Team | null,
+    stats,
+    ...(rawDelays === undefined ? {} : { delayTable: rawDelays as number[] }),
+  });
 }
 
 /** Parse one inbound frame. `raw` is the decoded text of a single WebSocket message. */
@@ -359,7 +378,7 @@ export function parseClientFrame(raw: string): ParseResult<ClientFrame> {
       return snapshot.ok ? ok({ t: "snapshot_push", snapshot: snapshot.frame }) : fail(snapshot.code, snapshot.detail);
     }
     case "match_end": {
-      const extra = onlyKeys(parsed, ["t", "winnerTeam", "stats"], t);
+      const extra = onlyKeys(parsed, ["t", "winnerTeam", "stats", "delayTable"], t);
       if (extra) return fail("bad-request", extra);
       return parseMatchEnd(parsed);
     }

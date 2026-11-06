@@ -199,3 +199,38 @@ it("TC-ROOM-025: a preset quick phrase and a free text both parse", () => {
     expect(!long.ok && long.detail).toContain("120");
   });
 });
+
+describe("TC-CORE-937: match_end carries the delay table that produced the order (US-CORE-002 AC7)", () => {
+  const stats = [{ slot: 0, damageDealt: 120, shotsFired: 4, hits: 3 }];
+
+  it("TC-CORE-937: a delay table rides along on match_end unchanged", () => {
+    // Arrange / Act
+    const frame = accepted({ t: "match_end", winnerTeam: "A", stats, delayTable: [0, 120, 40] });
+
+    // Assert — the table is the record of *why* the turn order came out that way
+    expect(frame).toEqual({ t: "match_end", winnerTeam: "A", stats, delayTable: [0, 120, 40] });
+  });
+
+  it("TC-CORE-937: a match_end without the table still parses, so a peer that lost the queue can report", () => {
+    // Arrange / Act
+    const frame = accepted({ t: "match_end", winnerTeam: null, stats: [] });
+
+    // Assert — absent, not an empty array: the difference is "unknown" vs "everyone on zero"
+    expect(frame).toEqual({ t: "match_end", winnerTeam: null, stats: [] });
+    expect("delayTable" in frame).toBe(false);
+  });
+
+  it("TC-CORE-937: a fractional, negative or over-long table is bad-request", () => {
+    // Arrange / Act
+    const fractional = rejected({ t: "match_end", winnerTeam: "A", stats, delayTable: [0, 1.5] });
+    const negative = rejected({ t: "match_end", winnerTeam: "A", stats, delayTable: [0, -1] });
+    const overlong = rejected({ t: "match_end", winnerTeam: "A", stats, delayTable: [0, 0, 0, 0, 0, 0, 0, 0, 0] });
+    const wrongType = rejected({ t: "match_end", winnerTeam: "A", stats, delayTable: 12 });
+
+    // Assert — each refusal names delayTable so the client can point at the frame field
+    for (const refusal of [fractional, negative, overlong, wrongType]) {
+      expect(refusal.code).toBe("bad-request");
+      expect(refusal.detail).toContain("delayTable");
+    }
+  });
+});

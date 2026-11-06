@@ -45,6 +45,9 @@ CREATE TABLE match_record (
   started_at      TEXT NOT NULL,
   ended_at        TEXT NOT NULL,
   submitted_by    TEXT NOT NULL,
+  -- The accumulated delay of each slot at the end, in slot order: the table that produced the turn order
+  -- (`US-CORE-002` AC7). Stored so a leaderboard dispute can be replayed instead of argued about.
+  delay_table     TEXT NOT NULL DEFAULT '[]',
   created_at      TEXT NOT NULL
 ) STRICT;
 

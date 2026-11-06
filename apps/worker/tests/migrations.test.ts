@@ -126,6 +126,7 @@ describe("TC-FND-100 : migrations produce the documented tables", () => {
       ["started_at", "TEXT", true],
       ["ended_at", "TEXT", true],
       ["submitted_by", "TEXT", true],
+      ["delay_table", "TEXT", true],
       ["created_at", "TEXT", true],
     ];
 

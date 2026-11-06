@@ -54,6 +54,7 @@ erDiagram
         TEXT started_at
         TEXT ended_at
         TEXT submitted_by
+        TEXT delay_table
     }
     match_player {
         TEXT match_id PK
