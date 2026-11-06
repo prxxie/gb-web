@@ -13,7 +13,7 @@ function state(mode: string, killed: readonly ("A" | "B")[] = [], perTeam = 2): 
       players.push({ team, eliminated: killed.includes(team) });
     }
   }
-  return { mode, players };
+  return { mode, winnerTeam: "A", players };
 }
 
 describe("TC-CORE-962: the result screen names the mode and the win condition (US-CORE-010 AC6)", () => {
@@ -30,12 +30,18 @@ describe("TC-CORE-962: the result screen names the mode and the win condition (U
     expect(winConditionOf(state("jewel"))).toBe("all-jewels");
   });
 
+  it("does not invent a win condition for a match nobody won", () => {
+    expect(winConditionOf({ ...state("score"), winnerTeam: null })).toBe("draw");
+    expect(winConditionOf({ ...state("jewel"), winnerTeam: null })).toBe("draw");
+  });
+
   it("prints the mode and the condition, not the key names", () => {
     expect(outcomeText(vi, "score", "score-cap")).toBe(
       "Chế độ Điểm số — thắng bằng: nhiều sát thương hơn khi hết số lượt",
     );
     expect(outcomeText(en, "jewel", "all-jewels")).toBe("Jewel match — won by: holding every jewel");
-    expect(outcomeText(vi, "solo", null)).toContain("bỏ trận");
+    expect(outcomeText(vi, "solo", null)).toContain("không xác định được");
+    expect(outcomeText(vi, "score", "draw")).toContain("hoà hoặc bỏ trận");
   });
 
   it("never throws on a mode the client does not know", () => {

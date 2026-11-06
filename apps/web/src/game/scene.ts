@@ -81,8 +81,9 @@ class BattleScene extends Phaser.Scene {
     this.state = state;
     this.localSlot = localSlot;
     this.callbacks = callbacks;
-    // The camera is framed in `create()`: Phaser has no `scale` until the scene is booted.
-    this.window = defaultWindow(16 / 9);
+    // A placeholder only: `create()` frames the window on the real canvas, because Phaser has no `scale`
+    // until the scene is booted (`this.scale` in the constructor throws).
+    this.window = defaultWindow(TUNABLES.viewDefaultWidth / TUNABLES.viewDefaultHeight);
   }
 
   setState(state: MatchState, localSlot: number): void {
@@ -98,7 +99,7 @@ class BattleScene extends Phaser.Scene {
     if (state.turn.activeSlot !== previousActiveSlot) this.frameOn(state.turn.activeSlot, state);
   }
 
-  /** Clamped monotonic clock: a wall clock that is corrected backwards would draw a unit moving back. */
+  /** Segment progress in [0, 1] once `clampProgress` reads it; `now()` is monotonic for the reason on line 47. */
   private progress(): number {
     return (now() - this.fromAt) / INTERPOLATION_MS;
   }

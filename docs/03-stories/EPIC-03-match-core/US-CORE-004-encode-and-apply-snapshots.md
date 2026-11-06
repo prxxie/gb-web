@@ -75,7 +75,7 @@ Delta compression (`OQ-32`), rollback netcode (`OQ-32`).
 ## 8. Test notes
 
 `TC-CORE-040`, `TC-CORE-041`, `TC-CORE-042`, `TC-CORE-940`, `TC-CORE-941`, `TC-CORE-942`, `TC-ROOM-124`.
-Red: `tests/core/snapshot.test.ts` — `TC-CORE-940` first failed on `expect(twice.turn.activeSlot)` because
+Red: `packages/core/tests/snapshot.test.ts` — `TC-CORE-940` first failed on `expect(twice.turn.activeSlot)` because
 `applySnapshot` patches only the mutable half of the state and the turn rides in the snapshot itself; the case now asserts
 that split.
 

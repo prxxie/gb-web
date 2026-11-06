@@ -134,6 +134,8 @@
   "results.condition.elimination": "wiping out the other team",
   "results.condition.score-cap": "more damage when the turns ran out",
   "results.condition.all-jewels": "holding every jewel",
+  "results.condition.draw": "nobody won (a draw or an abandoned match)",
+  "results.condition.unknown": "not recorded",
   "results.condition.abandon": "abandonment",
   "profile.displayName": "Display name",
   "profile.avatar": "Avatar",

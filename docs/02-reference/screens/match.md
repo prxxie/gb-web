@@ -125,7 +125,7 @@ a drag. All pad and button targets are ≥ 60 × 60 logical px (`NFR-17`).
 | Aim drag → angle/force within tolerance, a pull under the deadzone sends nothing | `apps/web/tests/aim.test.tsx` (TC-MATCH-914, TC-MATCH-916) |
 | Power ring shows 0.0–4.0 and maps to `force = power × 25` | `apps/web/tests/power-ring.test.tsx` (TC-MATCH-915) |
 | Release below 0.3 cancels; two-finger gesture cancels without firing | `apps/web/tests/gestures.test.tsx` (TC-MATCH-916) |
-| Camera default window 1000 × 600, clamped pan, zoom bounds | `apps/web/tests/camera.test.tsx` (TC-MATCH-918, TC-MATCH-919) |
+| Camera default window 1000 × 600, clamped pan, zoom bounds | `packages/core/tests/camera.test.ts` + `apps/web/tests/camera.test.tsx` (TC-MATCH-918, TC-MATCH-919) |
 | Ruler divisions 8 → 16 as the window widens | `apps/web/tests/ruler.test.tsx` (TC-MATCH-920) |
 | Units blend between two snapshots 100 ms apart; positions only, `hp`/`facing`/`eliminated` snap | `apps/web/tests/interpolate.test.tsx` (TC-MATCH-924) |
 | An eliminated mobile is drawn as a faded wreck in place and keeps its roster cell, ordered by slot | `apps/web/tests/interpolate.test.tsx` (TC-MATCH-924, the wreck) and `apps/web/tests/roster.test.tsx` (TC-MATCH-925, the strip) |

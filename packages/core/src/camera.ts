@@ -30,11 +30,16 @@ export interface RulerLayout {
  * Centring vertically would frame empty sky and cut the terrain off — the ground band sits at the
  * bottom of the map, so the window sits on the bottom edge (`docs/02-reference/gameplay/tunables.md` § 9).
  */
+/** A window is drawn from an aspect the canvas reports; a canvas that reports nothing must not make it `NaN`. */
+function safeAspect(aspect: number): number {
+  return Number.isFinite(aspect) ? Math.max(0.1, aspect) : TUNABLES.viewDefaultWidth / TUNABLES.viewDefaultHeight;
+}
+
 export function defaultWindow(aspect: number): CameraWindow {
   // Height is the floor, width the consequence: a screen wider than 5:3 keeps its 600 units of height and
   // gains margin on both sides (`docs/02-reference/screens/match.md` § 5), it never loses the sky.
   const height = Math.min(TUNABLES.mapHeight, TUNABLES.viewDefaultHeight);
-  const width = Math.min(TUNABLES.mapWidth, Math.max(TUNABLES.viewDefaultWidth, height * aspect));
+  const width = Math.min(TUNABLES.mapWidth, Math.max(TUNABLES.viewDefaultWidth, height * safeAspect(aspect)));
   return { x: (TUNABLES.mapWidth - width) / 2, y: TUNABLES.mapHeight - height, width, height };
 }
 
@@ -52,7 +57,7 @@ export function windowOn(
   groundY: number = TUNABLES.mapHeight,
 ): CameraWindow {
   const height = Math.min(TUNABLES.mapHeight, TUNABLES.viewDefaultHeight);
-  const width = Math.min(TUNABLES.mapWidth, Math.max(TUNABLES.viewDefaultWidth, height * Math.max(0.1, aspect)));
+  const width = Math.min(TUNABLES.mapWidth, Math.max(TUNABLES.viewDefaultWidth, height * safeAspect(aspect)));
   // Anchor the frame just under the target's feet, so the mobile sits in the lower third with room to
   // lob upward, and the frame never scrolls past the map's ground line.
   const bottom = Math.min(TUNABLES.mapHeight, groundY + height * GROUND_MARGIN);

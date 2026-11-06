@@ -4,7 +4,7 @@ import { launch, simulateFlight } from "../src/ballistics.js";
 import { getMap } from "../src/data/maps.js";
 import { getMobile, MOBILES } from "../src/data/mobiles.js";
 import { ITEMS } from "../src/data/items.js";
-import { createMatch, passTurn, type Seat } from "../src/match.js";
+import { applyInput, createMatch, passTurn, type Seat } from "../src/match.js";
 import { createRng } from "../src/rng.js";
 import { createTerrain } from "../src/terrain.js";
 import { TUNABLES } from "../src/tuning.js";
@@ -205,9 +205,9 @@ describe("bot (US-CORE-005)", () => {
 });
 
 describe("TC-CORE-946: a bot keeps playing when the human's clock runs out (US-CORE-005 AC5)", () => {
-  it("skips the silent human's turn and fires on the bot's own turn", () => {
+  it("skips the silent human's turn, fires on its own, and the match still reaches an end", () => {
     // The offline bot match is local: nothing here waits on the human's socket, only on the turn clock.
-    const state = openField();
+    let state = openField();
     const rng = createRng(7);
     const next = passTurn(state, NOW + 60_000).state;
     expect(next.turn.activeSlot).toBe(1);
@@ -219,5 +219,23 @@ describe("TC-CORE-946: a bot keeps playing when the human's clock runs out (US-C
       expect(shot.angle).toBeGreaterThanOrEqual(bot.angleMin);
       expect(shot.angle).toBeLessThanOrEqual(bot.angleMax);
     }
+
+    // Keep skipping the absent human and letting the bot shoot: a match with nobody at the controls must
+    // still finish rather than hang on a turn the human will never take.
+    state = next;
+    let turns = 0;
+    while (state.status !== "ended" && turns < 240) {
+      turns += 1;
+      const skipped = passTurn(state, NOW + 60_000 * (turns + 1)).state;
+      if (skipped.status === "ended") {
+        state = skipped;
+        break;
+      }
+      const answer = botTurn(skipped, createRng(7 + turns), PERFECT);
+      const applied = answer ? applyInput(skipped, { ...answer, seq: skipped.seq + 1 }, NOW + 60_000 * (turns + 1)) : null;
+      state = applied ? applied.state : skipped;
+    }
+    expect(state.status).toBe("ended");
+    expect(state.winnerTeam === "A" || state.winnerTeam === "B").toBe(true);
   });
 });

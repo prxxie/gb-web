@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { applyBlast, damageAt, mergeHits, teamStatus, tierOf, tierMultiplier } from "../src/combat.js";
 import { getMobile } from "../src/data/mobiles.js";
+import { createMatch } from "../src/match.js";
+import { toSnapshot } from "../src/snapshot.js";
 import type { PlayerState } from "../src/types.js";
 
 function player(overrides: Partial<PlayerState> = {}): PlayerState {
@@ -98,8 +100,9 @@ describe("combat", () => {
     expect(tierOf(56, 80)).toBe("mid");
   });
 
-  it("TC-CORE-944: an electric mobile deals the same damage and carries its effect into the snapshot", () => {
-    // The effect is a drawing hint, never a damage modifier (`US-CORE-003` AC7).
+  it("TC-CORE-944: an electric mobile's effect never touches the damage formula or the snapshot", () => {
+    // `US-CORE-003` AC7: the effect is a drawing hint. It rides in the seat's `mobileId`, and the snapshot
+    // deliberately carries no effect field (`docs/02-reference/api/signaling.md` § "Snapshot payload").
     const electric = getMobile("mbl-19");
     expect(electric.effect).toBe("electric");
     const plain = getMobile("mbl-01");
@@ -108,6 +111,24 @@ describe("combat", () => {
     // Same defense would give the same number; the point is that the effect is not part of the formula.
     expect(withElectric).toBe(Math.round(400 / electric.defense));
     expect(withPlain).toBe(Math.round(400 / plain.defense));
+
+    const state = createMatch({
+      matchId: "m-effect",
+      roomCode: "AAAAAA",
+      seed: 11,
+      mode: "solo",
+      mapId: "map-01",
+      seats: [
+        { slot: 0, team: "A", accountId: null, displayName: "electric", mobileId: "mbl-19" },
+        { slot: 1, team: "B", accountId: null, displayName: "plain", mobileId: "mbl-01" },
+      ],
+      now: 1_000,
+    });
+    const snapshot = toSnapshot(state, 0);
+    expect(snapshot.players).toHaveLength(2);
+    expect(Object.keys(snapshot.players[0]!)).not.toContain("effect");
+    // And the seat that carries it is the one the room hands out, not the snapshot.
+    expect(state.players[0]!.mobileId).toBe("mbl-19");
   });
 
   it("credits damage to the owner only", () => {

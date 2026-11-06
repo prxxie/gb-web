@@ -51,6 +51,14 @@ describe("TC-MATCH-925: the roster keeps an eliminated mobile in place (US-MATCH
     expect(screen.getByTestId("roster-0").textContent).toContain(`/${getMobile("mbl-01").maxHp}`);
   });
 
+  it("never prints a shield on a wreck", () => {
+    // The dead player keeps its last shield in the state; a `+150` next to "Đã bị hạ" reads as a bug.
+    const wrecked = players().map((player) => (player.slot === 2 ? { ...player, shield: 150 } : player));
+    render(<Roster players={wrecked} activeSlot={0} eliminatedLabel="Đã bị hạ" />);
+    expect(screen.getByTestId("roster-2").textContent).not.toContain("+150");
+    expect(screen.getByTestId("roster-0").textContent).toContain(`+${wrecked[0]!.shield}`);
+  });
+
   it("marks only the slot whose turn it is", () => {
     render(<Roster players={players()} activeSlot={1} eliminatedLabel="Đã bị hạ" />);
     expect(screen.getByTestId("roster-1").className).toContain("match__player--active");

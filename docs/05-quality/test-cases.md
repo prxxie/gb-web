@@ -151,10 +151,10 @@ The `covers` column names the requirement ([nonfunctional-requirements.md](../01
 | TC-CORE-936 | US-CORE-002 | AC6 — an eliminated slot is skipped but keeps its accumulated delay | Four players, slot 2 eliminated, turn ends | The queue skips slot 2 and its delay is untouched | unit | FR-04 |
 | TC-CORE-937 | US-CORE-002 | AC7 — the delay table that produced the order rides on `match_end` | A table parses and comes back unchanged; a fractional, negative or over-long one is `bad-request` naming `delayTable`; a frame without one still parses | unit | FR-02 |
 | TC-CORE-939 | US-CORE-002 | AC7 — the table is stored with the record it explains | `POST /matches` writes `delay_table` in slot order, stores `[]` when the client sent none, and answers 422 for a fractional or negative delay without writing a row | worker | FR-02 |
-| TC-CORE-902 | US-CORE-005 | AC1, AC2, AC3 — Bot's turn starts with three weapons | Fires within 3 s, picks the best simulated weapon, deterministic per seed | unit | NFR-21 |  |
+| TC-CORE-902 | US-CORE-005 | AC1, AC2, AC3 — Bot's turn starts with three weapons | Fires within 3 s, picks the best simulated weapon, deterministic per seed | unit | NFR-21 |
 | TC-RANK-116 | US-RANK-001 | Match containing a guest slot | `ranked: false`, no `rating_history` rows | worker | roles |
 | TC-CORE-903 | US-CORE-003 | AC2 — target with shield 300, hp 1,200, defense 1.15 takes an Inner hit of 500 | Total 435: shield absorbs 300, HP loses 135, shield never goes negative | unit | FR-06  |
-| TC-CORE-904 | US-CORE-008 | AC1, AC2, AC3, AC4, AC7, AC8 — `mbl-01` walks once then tries twice; `mbl-13` walks twice and runs; one climbs too steep a slope | Energy debited by `moveEnergy` (double for a run), queue by `moveDelay`, distance is the mobile's own `moveDistance`, action count capped at `maxMovesPerTurn`, movement stops at `maxIncline` and at the map bound | unit | FR-03 |  |
+| TC-CORE-904 | US-CORE-008 | AC1, AC2, AC3, AC4, AC7, AC8 — `mbl-01` walks once then tries twice; `mbl-13` walks twice and runs; one climbs too steep a slope | Energy debited by `moveEnergy` (double for a run), queue by `moveDelay`, distance is the mobile's own `moveDistance`, action count capped at `maxMovesPerTurn`, movement stops at `maxIncline` and at the map bound | unit | FR-03 |
 | TC-CORE-914 | US-CORE-006 | AC1, AC2, AC3 — blast radius 80 on the mask | Crater of 0.6x80 carved, units regrounded, mask identical on host and peer | unit | FR-06 |
 | TC-CORE-948 | US-CORE-006 | AC4 — the same blast on host and peer | Two independently carved masks serialise byte-identical and the RLE round-trips | unit | FR-06 |
 | TC-CORE-949 | US-CORE-006 | AC5 — a unit fully buried by terrain | It can still fire but cannot move until the terrain is opened | unit | FR-06 |
@@ -162,7 +162,7 @@ The `covers` column names the requirement ([nonfunctional-requirements.md](../01
 | TC-CORE-951 | US-CORE-008 | AC5 — a crater opens under the walking unit | It falls to the new ground instead of floating | unit | FR-03 |
 | TC-ROOM-206 | US-CORE-008 | AC6 — a `move` from a peer the host did not make active | Nothing is relayed; the active player's move still reaches the host | worker | FR-03 |
 | TC-CORE-905 | US-CORE-007 | AC1, AC8 — the twenty records load inside the documented clamps, `1000`-scale values are kept as-is | Schema valid (`gravity 84–128`, `mass 118–169`, `maxHp 900–1200`, `maxShield 0–300`, `power 180–580`, no `density` on a weapon, `trajectory` one of five profiles, `angleMin < angleMax` inside its profile band, `maxMovesPerTurn` 1–2, `moveDistance` 60–110, `moveEnergy` 8–14, `moveDelay` 8–14, `runMultiplier` 1.5–1.9), regen capped at `maxShield`, an out-of-band value rejected | unit | FR-06 |
-| TC-CORE-906 | US-CORE-009 | AC1, AC2 — Dual, Blood and Power up | Dual allows a second shot, Blood adds 25 % for one shot, Power up raises the force cap | unit | FR-06 |  |
+| TC-CORE-906 | US-CORE-009 | AC1, AC2 — Dual, Blood and Power up | Dual allows a second shot, Blood adds 25 % for one shot, Power up raises the force cap | unit | FR-06 |
 | TC-CORE-907 | US-CORE-009 | AC3 — Energy up 1 and Energy up 2 | Budget +30 / +60 for the turn, delay charged | unit | FR-03  |
 | TC-CORE-908 | US-CORE-009 | AC4 — Change Wind | Wind re-rolled, announced, present in the next snapshot | unit | FR-04  |
 | TC-CORE-909 | US-CORE-009 | AC5 — Teleport and Team Teleport | Caster or whole living team moves; never into terrain | unit | FR-03  |
@@ -175,32 +175,31 @@ The `covers` column names the requirement ([nonfunctional-requirements.md](../01
 | TC-CORE-943 | US-CORE-003 | AC3 — a `mbl-01` slot starts its turn at shield 10, and again at 145 | Shield rises by its own `shieldRegen` (20) to 30, and is capped at `maxShield` (150); a slot that is not starting keeps its shield | unit | FR-06  |
 | TC-CORE-944 | US-CORE-003 | AC7 — `mbl-19` (electric) and `mbl-01` (explosion) fire the same shot | The effect never enters the damage formula, and the mobile's `effect` travels with it (`electric`) | unit | FR-06  |
 | TC-CORE-027 | US-CORE-003 | Blast hits a teammate; last player of a team reaches 0 | Friendly fire damages; match ends with the other team as winner | unit | OQ-02 |
-| TC-CORE-915 | US-CORE-010 | AC2 — Score mode reaches the 12-turn cap | Higher damage total wins | unit | FR-06 |  |
-| TC-CORE-916 | US-CORE-010 | AC3 — Tag mode, a team finishes its whole turn | `activeTeam` flips and the opposing team acts | unit | FR-02 |  |
-| TC-CORE-917 | US-CORE-010 | AC4, AC5 — Jewel mode: walk over a jewel, then kill a carrier | Jewel carried, then transferred to the killer's team; all jewels ends the match | unit | FR-06 |  |
-| TC-CORE-918 | US-CORE-011 | AC1, AC2, AC4 — Map with `force`, map with `gust` | Constant sideways push; 4× wind spike for one turn, announced and reverted | unit | FR-04 |  |
-| TC-CORE-931 | US-CORE-011 | AC7 — a map with `fog` | The aim arc shortens and blast markers hide; unit positions stay visible | unit | `tunables.md` § 6 |
-| TC-CORE-919 | US-CORE-011 | AC3, AC6, AC8 — Map with `electric`, `heal` and a tornado | Strike on every third turn for 150; heal zone (200 units around x 1000) restores 100 capped at `maxHp`, a unit outside it gains nothing; tornado displaces 60 px without burying | unit | NFR-21 |  |
-| TC-CORE-920 | US-CORE-012 | AC1, AC2 — Load the eleven maps | Schema valid, spawns valid for 8 slots, terrain RLE expands | unit | FR-04 |  |
+| TC-CORE-915 | US-CORE-010 | AC2 — Score mode reaches the 12-turn cap | Higher damage total wins | unit | FR-06 |
+| TC-CORE-916 | US-CORE-010 | AC3 — Tag mode, a team finishes its whole turn | `activeTeam` flips and the opposing team acts | unit | FR-02 |
+| TC-CORE-917 | US-CORE-010 | AC4, AC5 — Jewel mode: walk over a jewel, then kill a carrier | Jewel carried, then transferred to the killer's team; all jewels ends the match | unit | FR-06 |
+| TC-CORE-918 | US-CORE-011 | AC1, AC2, AC4 — Map with `force`, map with `gust` | Constant sideways push; 4× wind spike for one turn, announced and reverted | unit | FR-04 |
+| TC-CORE-919 | US-CORE-011 | AC3, AC6, AC8 — Map with `electric`, `heal` and a tornado | Strike on every third turn for 150; heal zone (200 units around x 1000) restores 100 capped at `maxHp`, a unit outside it gains nothing; tornado displaces 60 px without burying | unit | NFR-21 |
+| TC-CORE-920 | US-CORE-012 | AC1, AC2 — Load the eleven maps | Schema valid, spawns valid for 8 slots, terrain RLE expands | unit | FR-04 |
 | TC-CORE-957 | US-CORE-012 | AC3 — a map with gimmicks | The listed gimmick runs in the match and the lobby reads the same list | unit | FR-04 |
 | TC-CORE-958 | US-CORE-012 | AC6 — the same map and seed twice | Terrain, opening wind and the gimmick schedule match | unit | FR-04 |
 | TC-ROOM-207 | US-CORE-012 | AC4 — the host changes the map and mode | The settings land on the room and `match_started` carries them to every peer | worker | FR-04 |
-| TC-CORE-921 | US-CORE-013 | AC1, AC2, AC5 — Profile with +4 attack, another with +20 | First is ×1.04, second clamps at ×1.10; energy and delay caps hold | unit | FR-06 |  |
+| TC-CORE-921 | US-CORE-013 | AC1, AC2, AC5 — Profile with +4 attack, another with +20 | First is ×1.04, second clamps at ×1.10; energy and delay caps hold | unit | FR-06 |
 | TC-CORE-922 | US-CORE-007 | AC3 — the super shot fires once and the slot then reports empty | Slot 2 reports empty afterwards and cannot be selected | unit | FR-04 |
 | TC-CORE-923 | US-CORE-007 | AC4 — a balance report over the twenty records; the loader refuses an out-of-range value | Every archetype has exactly two mobiles, the two sit within ±10 % of each other on damage per delay, the roster spread is printed, report regenerates from the CSV | unit | `data/mobiles.md` § 5 |
 | TC-CORE-924 | US-CORE-007 | AC6, AC7 — two players may share a mobile; every mobile lands where the flat-probe table says | Every mobile fires at its `maxPower` on a flat probe map | Landing distance and hang time match `data/mobiles.md` § 4 within ±1 unit (`mbl-14` 2,058 vs `mbl-03` 1,433, first ground contact), each mobile keeps its own arc at identical power, and a heavier mobile drifts less under wind | unit | FR-04 |
 | TC-CORE-935 | US-CORE-001 | AC6 — lower gravity means a flatter, longer arc | `mbl-13` (`g 84`) lands past `mbl-03` (`g 118`) at the same angle and force: 2,024 vs 1,433 units | unit | FR-04 |
 | TC-CORE-925 | US-CORE-007 | AC7 — `mass` and `gravity` separate the flights, so the mobile record is what decides | The light/weak-gravity mobile lands further and drifts more under identical wind; swapping their `mass` values swaps the behaviour, proving `mass` is the only wind term | unit | FR-04 |
 | TC-CORE-938 | US-CORE-007 | AC5 — the `rulesetVersion` rides in `match_started` and survives the snapshot | `match_started` carries the version to every member and a snapshot applies the same one | unit | FR-04 |
-| TC-CORE-926 | US-CORE-015 | AC1, AC2, AC3, AC4, AC7 — Roll the weather across four rounds with a fixed seed | `turn.round` increments on queue wrap; `magnitude` 0–26 and `sector` 0–11 each roll; wind constant inside a round; same seed replays the same sequence | unit | FR-04 |  |
+| TC-CORE-926 | US-CORE-015 | AC1, AC2, AC3, AC4, AC7 — Roll the weather across four rounds with a fixed seed | `turn.round` increments on queue wrap; `magnitude` 0–26 and `sector` 0–11 each roll; wind constant inside a round; same seed replays the same sequence | unit | FR-04 |
 | TC-CORE-927 | US-CORE-005 | AC4 — A bot holding Power up, its best raw shot landing more than the item can fix | It sends the `item` input before the shot, one item only, and pays the item's `delayCost` | unit | NFR-21  |
 | TC-CORE-947 | US-CORE-005 | AC6 — a finished bot match | `isRanked` refuses a bot seat, so the match never reaches the leaderboard | unit | FR-07 |
-| TC-CORE-928 | US-CORE-015 | AC8 — An eight-player mid-round snapshot after a wind roll | The weather rides in the snapshot (`magnitude`, `sector`, `rolledAtRound`), decodes identically, and the state snapshot stays ≤ 800 bytes | unit | FR-04 |  |
+| TC-CORE-928 | US-CORE-015 | AC8 — An eight-player mid-round snapshot after a wind roll | The weather rides in the snapshot (`magnitude`, `sector`, `rolledAtRound`), decodes identically, and the state snapshot stays ≤ 800 bytes | unit | FR-04 |
 | TC-CORE-959 | US-CORE-015 | AC5 — `magnitude = 0` | A legal calm roll: `isCalm` true, the dial reads `calm`, no wind term | unit | FR-02 |
 | TC-CORE-960 | US-CORE-015 | AC6 — `magnitude 26`, `sector 0`, a full-force shot | The landing point moves 100-160 units downwind (about one ruler division) | unit | FR-02 |
 | TC-CORE-929 | US-CORE-013 | AC3 — A guest with no avatar equipped | No bonus is applied and the match is still playable | unit | FR-06  |
 | TC-CORE-930 | US-CORE-013 | AC4 — An avatar part the profile does not own, or a retired one | It contributes no bonus, and the rest of the profile still applies | unit | NFR-11  |
-| TC-CORE-931 | US-CORE-011 | The fog gimmick on a flat map | The visible window halves and the battle state is untouched | unit | `tunables.md` § 6 |
+| TC-CORE-931 | US-CORE-011 | AC7 — the fog gimmick on a flat map | The visible window halves and the battle state is untouched | unit | `tunables.md` § 6 |
 | TC-CORE-955 | US-CORE-011 | AC5 — a map with `return` | An off-map shot comes back instead of despawning | unit | `tunables.md` § 6 |
 | TC-CORE-932 | US-CORE-009 | AC8 — An item the player does not own | Rejected without charging the item's delay | unit | `data/items.md`  |
 | TC-CORE-953 | US-CORE-009 | AC9 — any item | Its `delayCost` is charged and the queue stays on the user until they fire or skip | unit | FR-03 |

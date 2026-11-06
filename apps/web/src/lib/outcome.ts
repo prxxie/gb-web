@@ -9,11 +9,13 @@
  */
 import type { Translator } from "../i18n";
 
-export type WinCondition = "elimination" | "score-cap" | "all-jewels" | "abandon";
+export type WinCondition = "elimination" | "score-cap" | "all-jewels" | "draw";
 
 /** The slice of `MatchState` this module reads, so a test does not have to build a whole match. */
 export interface OutcomeInput {
   readonly mode: string;
+  /** `null` means nobody won: a draw at the score cap, or a match that was abandoned. */
+  readonly winnerTeam: "A" | "B" | null;
   readonly players: readonly { readonly team: "A" | "B"; readonly eliminated: boolean }[];
 }
 
@@ -26,17 +28,20 @@ function teamWiped(state: OutcomeInput, team: "A" | "B"): boolean {
 
 /** Which condition ended the match. */
 export function winConditionOf(state: OutcomeInput): WinCondition {
+  // No winner is not a win condition: the match was abandoned, or the cap ended it level.
+  if (state.winnerTeam === null) return "draw";
   if (teamWiped(state, "A") || teamWiped(state, "B")) return "elimination";
   if (state.mode === "score") return "score-cap";
   if (state.mode === "jewel") return "all-jewels";
-  // `solo` and `tag` end only by a wipe; anything else reaching here left early.
-  return "abandon";
+  // `solo` and `tag` end only by a wipe, so reaching here means the state was ended by hand.
+  return "elimination";
 }
 
 /** The line the result screen prints: the mode name and the condition, in the player's language. */
 export function outcomeText(t: Translator, mode: string, condition: WinCondition | null): string {
   const known = (MODE_KEYS as readonly string[]).includes(mode) ? mode : "unknown";
-  const reason = condition ?? "abandon";
+  // A payload written before this field existed carries no condition; say so rather than invent one.
+  const reason = condition ?? "unknown";
   return t("results.outcome", {
     mode: t(`results.mode.${known}`),
     condition: t(`results.condition.${reason}`),

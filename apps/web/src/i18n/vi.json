@@ -134,6 +134,8 @@
   "results.condition.elimination": "hạ hết đội đối phương",
   "results.condition.score-cap": "nhiều sát thương hơn khi hết số lượt",
   "results.condition.all-jewels": "giữ trọn bộ ngọc",
+  "results.condition.draw": "không bên nào thắng (hoà hoặc bỏ trận)",
+  "results.condition.unknown": "không xác định được",
   "results.condition.abandon": "bỏ trận",
   "profile.displayName": "Tên hiển thị",
   "profile.avatar": "Ảnh đại diện",

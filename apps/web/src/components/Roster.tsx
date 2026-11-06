@@ -27,7 +27,8 @@ export function Roster({ players, activeSlot, eliminatedLabel }: RosterProps): J
           <div>{player.displayName}</div>
           <div className="muted">
             {player.eliminated ? eliminatedLabel : `${player.hp}/${getMobile(player.mobileId).maxHp}`}
-            {player.shield > 0 ? ` +${player.shield}` : ""}
+            {/* A wreck keeps its last shield value in the state; printing it on a dead hull reads as a bug. */}
+            {player.shield > 0 && !player.eliminated ? ` +${player.shield}` : ""}
           </div>
         </div>
       ))}

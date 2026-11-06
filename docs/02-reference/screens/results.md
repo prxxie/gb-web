@@ -69,9 +69,9 @@ reloadable for 10 minutes from the `match_recorded` payload kept in `sessionStor
 
 | Contract | Checked by |
 |----------|-----------|
-| All fields render for a ranked match, deltas match the server's values | `tests/e2e/results.spec.ts` (TC-RANK-153) |
+| All fields render for a ranked match, deltas match the server's values | not covered — `tests/e2e/results.spec.ts` does not exist (`US-RANK-005` records the gap) |
 | The mode and the win condition are named, in the player's language | `apps/web/tests/outcome.test.tsx` (TC-CORE-962) |
-| Guest/bot matches show `unranked` and no delta | `tests/e2e/results.spec.ts` (TC-RANK-154) |
-| `409` shows the stored record rather than retrying | `tests/e2e/results.spec.ts` (TC-RANK-155) |
-| Reload without `sessionStorage` recovers from `GET /me/matches` | `tests/e2e/results.spec.ts` (TC-RANK-156) |
-| Back navigation does not return into the finished match | `tests/e2e/results.spec.ts` (TC-RANK-157) |
+| Guest/bot matches show `unranked` and no delta | not covered (`US-RANK-005`) |
+| `409` shows the stored record rather than retrying | not covered (`US-RANK-005`) |
+| Reload without `sessionStorage` recovers from `GET /me/matches` | not covered (`US-RANK-005`) |
+| Back navigation does not return into the finished match | not covered (`US-RANK-005`) |
