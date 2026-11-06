@@ -37,7 +37,7 @@ requested on the first tap.
 | # | Given | When | Then |
 |---|---|---|---|
 | AC1 | the match scene mounts | the first tap lands anywhere on the canvas | `requestFullscreen()` is called where the API exists; on iPhone Safari the page fills the viewport with safe-area insets and no `apple-mobile-web-app-capable` meta (`TC-MATCH-921`) |
-| AC2 | the scene has just loaded | nothing has been touched | The camera window is **1000 × 600 units ±1 %**, centred on the player's own mobile and clamped inside the map bounds (`TC-MATCH-918`) |
+| AC2 | the scene has just loaded | nothing has been touched | The camera window is **1000 × 600 units ±1 %** on a 5:3 screen and keeps its 600 units of height on a wider one, taking the screen's aspect for its width, centred on the player's own mobile and clamped inside the map bounds (`TC-MATCH-918`) |
 | AC3 | two fingers on the canvas | their separation changes by more than 12 px | The camera zooms about the pinch midpoint, never past `zoomMin` (whole map) or `zoomMax` (250 × 150 units) (`TC-MATCH-919`) |
 | AC4 | two fingers on the canvas | they move together | The camera pans 1:1 with the finger centroid and stops at the map edges; the window never shows void (`TC-MATCH-918`) |
 | AC5 | any zoom level | the bottom strip is drawn | Divisions are `clamp(round(8 × visibleWidth / 1000), 8, 16)` — **8** at the default window, **16** at whole-map zoom, each labelled with its world width and every fourth a major tick (`TC-MATCH-920`) |
@@ -97,8 +97,26 @@ Red first: `apps/web/tests/ruler.test.ts::segments_go_from_eight_to_sixteen`.
 
 - **OQ-39** (answered) — `requestFullscreen()` where available, viewport-filling fallback on iPhone Safari.
 
-<!-- delivery:2026-11-05 -->
+<!-- delivery:2026-11-06 -->
 
-## Delivery status — 2026-11-05
+## Delivery status — 2026-11-06
 
-**in-progress.** camera window, zoom clamp, pan, pinch and the 8→16 division ruler are fully unit-tested in `packages/core/tests/camera.test.ts`; only the on-device smoothness is unverified.
+**in-progress.** The window, zoom clamps, pinch, pan clamp and the 8→16 ruler are unit-tested in
+`packages/core/tests/camera.test.ts` and rendered by `apps/web/src/game/scene.ts` +
+`apps/web/src/components/Ruler.tsx`; `tests/e2e/smoke.spec.ts` TC-MATCH-901 reads the ruler's division count off a
+running match and checks it against `clamp(round(8 × visibleWidth / 1000), 8, 16)` with one ~125-unit division each.
+
+Fixed on 2026-11-06: the framing used to fix the window's *width* at 1000 units, so on a 2.7:1 phone (844 × 313 above the
+HUD) only ~371 of the 600 units of height were visible and the shooter's feet fell off the bottom of the canvas. The
+window now takes the screen's aspect — 600 units of height, width `max(1000, 600 × aspect)` — so the whole window fits and
+the feet land 70 % down it. Frame: `docs/05-quality/evidence/US-MATCH-007/framing-844x390.png` (window 1617 × 600,
+ruler 13 × ~124.5 units).
+
+Still open, and the reason this story is not `done`:
+
+- **AC2/AC7 on a device** — pinch, wheel zoom and the no-snap-back rule are asserted in jsdom and by the core camera
+  tests, not with two real fingers; the pinch thresholds need a touch device (`US-OPS-004` matrix, at UAT).
+- **Not this story, but found while here:** the four-way pad and the weapon strip are fixed bottom-left clusters, while
+  `docs/02-reference/screens/match.md` draws the pad *around the mobile*. When the active mobile stands near the map's
+  left edge the window clamp keeps it on screen but under the pad. Recorded against `US-MATCH-003` (HUD layout), not
+  reworded away here.

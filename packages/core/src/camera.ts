@@ -38,15 +38,21 @@ export function defaultWindow(aspect: number): CameraWindow {
   return { x: (TUNABLES.mapWidth - width) / 2, y: TUNABLES.mapHeight - height, width, height };
 }
 
-/** Follow a player: centre horizontally, keep the ground anchored (clamped inside the map). */
+/**
+ * Follow a player: centre horizontally, keep the ground anchored (clamped inside the map).
+ *
+ * The window takes the screen's aspect: the height stays the documented 600 units and a screen wider than
+ * 5:3 gains width. Fixing the width instead would crop the height on a landscape phone (844 × 313 is 2.7:1,
+ * so 1,000 units of width show only ~371 of the 600) and push the shooter's feet off the canvas and under
+ * the HUD — `TC-MATCH-918`.
+ */
 export function windowOn(
   targetX: number,
   aspect: number,
   groundY: number = TUNABLES.mapHeight,
-  width = TUNABLES.viewDefaultWidth,
 ): CameraWindow {
-  void aspect;
-  const height = TUNABLES.viewDefaultHeight;
+  const height = Math.min(TUNABLES.mapHeight, TUNABLES.viewDefaultHeight);
+  const width = Math.min(TUNABLES.mapWidth, Math.max(TUNABLES.viewDefaultWidth, height * Math.max(0.1, aspect)));
   // Anchor the frame just under the target's feet, so the mobile sits in the lower third with room to
   // lob upward, and the frame never scrolls past the map's ground line.
   const bottom = Math.min(TUNABLES.mapHeight, groundY + height * GROUND_MARGIN);

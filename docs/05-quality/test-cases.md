@@ -198,7 +198,7 @@ The `covers` column names the requirement ([nonfunctional-requirements.md](../01
 | ID | Story | Case | Expected | Level | Covers |
 |----|-------|------|----------|-------|--------|
 | TC-CORE-016 | US-CORE-010 | `room_settings` with mode `royale`, then with `mapId` `map-99` | Both refused `bad-request` naming the field, so an unknown mode never reaches `createMatch` | unit | FR-05 |
-| TC-MATCH-901 | US-MATCH-001 | Mount the scene with a state | Map, units and turn indicator drawn; no unit jumps backwards between snapshots | e2e | NFR-01 |
+| TC-MATCH-901 | US-MATCH-001 | Mount the scene with a state | Map, units and turn indicator drawn; the ruler's division count matches `clamp(round(8 × visibleWidth / 1000), 8, 16)` with one ~125-unit division each | e2e | NFR-01 |
 | TC-MATCH-151 | US-MATCH-002 | Drag aim and release | One `fire`, angle/force within ±2° / ±3 of the drawn values | e2e | FR-03 |
 | TC-MATCH-902 | US-MATCH-002 | A second finger lands mid-pull | The pull is cancelled without firing and the camera gesture takes over | web | FR-03 |
 | TC-MATCH-903 | US-MATCH-003 | Snapshot applied | HUD HP, wind and active slot equal the snapshot within 100 ms | web | NFR-02 |
@@ -210,7 +210,7 @@ The `covers` column names the requirement ([nonfunctional-requirements.md](../01
 | TC-MATCH-915 | US-MATCH-002 | Pull `powerDragFull`, then half of it | Ring reads `4.0` and `2.0` ±0.1, `force = power × 25` = 100 and 50, gradient runs clockwise from −90° | web | FR-03 |
 | TC-MATCH-916 | US-MATCH-002 | Release at `power 0.2`, `pointercancel` mid-pull, two-finger pan mid-pull | Nothing is sent in any of the three cases, the ring animates back to zero, one hint per case | web | FR-03 |
 | TC-MATCH-917 | US-MATCH-006 | Tap ▲ three times, hold ▼ for 1 s, hold ▲ at `angleMax` | Angle rises 3°, falls ~10° while held, stops at the band edge with the control dimmed, chip matches | web | FR-03 |
-| TC-MATCH-918 | US-MATCH-007 | Load the scene, pan to each map edge | Window starts 1000 × 600 ±1 % centred on the player; panning stops at the bounds and never shows void | web | FR-03 |
+| TC-MATCH-918 | US-MATCH-007 | Load the scene on a 5:3 screen and on a 2.7:1 phone, pan to each map edge | Window is 1000 × 600 ±1 % on 5:3 and keeps its 600 units of height with the width following the aspect on a wider screen (so nothing is cropped and the shooter's feet sit 70 % down the frame); panning stops at the bounds and never shows void | web | FR-03 |
 | TC-MATCH-919 | US-MATCH-007 | Pinch in and out past both limits, then release | Zoom stays within `zoomMax` (250 × 150) and `zoomMin` (whole map), scales about the midpoint, keeps the final window | web | FR-03 |
 | TC-MATCH-920 | US-MATCH-007 | Zoom from default to whole map and back, reading the ruler each step | Segments go 8 → 16 and back, each labelled with `visibleWidth / segments`, 125 units at both ends | web | FR-03 |
 | TC-MATCH-921 | US-MATCH-007 | First tap on a device with and without the Fullscreen API | `requestFullscreen()` called where available; otherwise the page fills the viewport with safe-area insets and no `apple-mobile-web-app-capable` meta | e2e | FR-03 |

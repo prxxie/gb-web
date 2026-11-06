@@ -53,6 +53,18 @@ describe("TC-MATCH-918: the window", () => {
     expect(feetFromTop).toBeLessThan(0.8);
   });
 
+  it("gives a 2.7:1 phone the same 600 units of height and the extra width, never a crop", () => {
+    // A phone in landscape is 2.7:1 (844 × 313 above the HUD). A window that keeps 1,000 units of width there
+    // shows only ~371 of its 600 units of height, which pushes the shooter's feet under the HUD.
+    const phone = windowOn(MAP_BOUNDS.width * 0.3, 2.7, MAP_BOUNDS.height * 0.55);
+    expect(phone.height).toBeCloseTo(600, 0);
+    expect(phone.width).toBeCloseTo(600 * 2.7, 0);
+    // The window now matches the screen, so the whole window is visible and the feet land 70 % down.
+    expect(phone.width / phone.height).toBeCloseTo(2.7, 1);
+    const feetFromTop = (MAP_BOUNDS.height * 0.55 - phone.y) / phone.height;
+    expect(feetFromTop).toBeCloseTo(0.7, 1);
+  });
+
   it("never leaves the map", () => {
     const outside = clampWindow({ x: -400, y: -200, width: 1000, height: 600 });
     expect(outside.x).toBe(0);

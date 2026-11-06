@@ -29,7 +29,7 @@ The camera shows a **window** onto the 2000 × 1200-unit map, not the whole map.
 
 | Property | Value | Notes |
 |---|---|---|
-| Default window | **1000 × 600 units** — half the map each way | `zoomDefault` = fit of that box; on a wider phone the extra width comes as margin, never as a smaller box |
+| Default window | **1000 × 600 units** — half the map each way | the height is fixed at 600 units and the width follows the screen: 1000 on a 5:3 screen, wider on a landscape phone (844 × 313 is 2.7:1, so ~1617 units), so the box is never cropped and the extra width comes as more battlefield, never as a smaller box |
 | Zoom out limit | whole map (2000 × 1200) | `zoomMin` |
 | Zoom in limit | 4 × default (250 × 150 units) | `zoomMax`, enough to aim at a 44-unit-wide crater |
 | Pan | two-finger drag, 1:1 with the finger centroid | clamped so the window never leaves the map bounds |
