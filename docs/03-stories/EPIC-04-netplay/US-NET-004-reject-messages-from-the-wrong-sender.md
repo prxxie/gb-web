@@ -35,7 +35,7 @@ the current `hostGeneration`.
 
 | # | Given | When | Then |
 |---|-------|------|------|
-| AC1 | A member with `role: "peer"` | It sends `snapshot_push` | `error` with `code: "not-host"`, the DO's `lastSnapshot` is unchanged (`TC-NET-044`) |
+| AC1 | A member with `role: "player"` | It sends `snapshot_push` | `error` with `code: "not-host"`, the DO's `lastSnapshot` is unchanged (`TC-NET-044`) |
 | AC2 | A member | It sends `input` for a slot that is not its own, or while not active | `error unsupported-message`, no relay, no state change (`TC-NET-067`) |
 | AC3 | A member | It sends any message before `auth`, or after `4409` (room full) | The socket is closed with the documented code and no member exists |
 | AC4 | A peer | It receives a snapshot whose sender is not the current host | The snapshot is dropped and counted in a `rejected_snapshot` counter |

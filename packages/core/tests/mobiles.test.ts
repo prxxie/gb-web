@@ -259,6 +259,13 @@ describe("mobiles", () => {
     }
   });
 
+  it("TC-CORE-935: lower gravity means a flatter, longer arc (US-CORE-001 AC6)", () => {
+    // `mbl-13` carries `g 84` and `mbl-03` `g 118`; the same angle and force must separate them on distance.
+    const light = shoot("mbl-13", 45, 90, CALM);
+    const heavy = shoot("mbl-03", 45, 90, CALM);
+    expect(light.landingX).toBeGreaterThan(heavy.landingX + 100);
+  });
+
   it("TC-CORE-925: a lighter mobile is pushed further by the same wind", () => {
     const calm = shoot("mbl-13", 30, 90, CALM);
     const windy = shoot("mbl-13", 30, 90, { magnitude: 10, directionDeg: 0, sector: 0 });

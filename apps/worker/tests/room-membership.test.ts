@@ -4,7 +4,8 @@
  * never holds the same player or the same slot twice.
  */
 import { describe, expect, it } from "vitest";
-import { RoomHarness } from "./support/room-harness";
+import type { RoomState } from "@gbw/core";
+import { RoomHarness, type FakeSocket } from "./support/room-harness";
 
 describe("room membership", () => {
   it("TC-ROOM-128: a member that leaves the lobby frees its slot for the next joiner without a duplicate", async () => {
@@ -37,5 +38,39 @@ describe("room membership", () => {
     expect(new Set(members.map((member) => member.playerId)).size).toBe(members.length);
     expect(new Set(members.map((member) => member.slot)).size).toBe(members.length);
     expect([...members.map((member) => member.slot)].sort((left, right) => left - right)).toEqual([0, 1, 2]);
+  });
+
+  it("TC-ROOM-195: two clients in the same room are handed the same roster, slots and teams", async () => {
+    // `US-ROOM-002` AC4: two independent contexts must render one room, so every socket is sent the
+    // same `members` array rather than a per-viewer copy.
+    const harness = new RoomHarness();
+    await harness.ready();
+    await harness.join({ playerId: "p1", accountId: "acct-p1" });
+    await harness.join({ playerId: "p2", accountId: "acct-p2" });
+    const one: FakeSocket = await harness.connect("p1");
+    const two: FakeSocket = await harness.connect("p2");
+    await harness.message(one, {
+      t: "team_assign",
+      assignments: [
+        { playerId: "p1", team: "A" },
+        { playerId: "p2", team: "B" },
+      ],
+    });
+
+    // Act — read the newest roster each socket was handed
+    const rosterOf = (socket: FakeSocket): string[] => {
+      const frames = socket.framesOf("room_state");
+      const latest = frames[frames.length - 1]?.["room"] as RoomState | undefined;
+      return (latest?.members ?? []).map((member) => `${member.playerId}:${member.slot}:${member.team}`);
+    };
+
+    // Assert — byte-for-byte the same seats, and the server holds that same roster
+    expect(rosterOf(one)).toEqual(["p1:0:A", "p2:1:B"]);
+    expect(rosterOf(two)).toEqual(rosterOf(one));
+    expect(
+      harness
+        .state()
+        .members.map((member) => `${member.playerId}:${member.slot}:${member.team}`),
+    ).toEqual(rosterOf(one));
   });
 });

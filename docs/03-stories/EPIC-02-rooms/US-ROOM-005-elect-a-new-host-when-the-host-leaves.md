@@ -38,7 +38,7 @@ everyone with the last snapshot. Migration must complete inside 5 s (`NFR-06`).
 | AC1 | A host in `playing` | Its socket closes | The DO picks the connected member with the oldest `joinedAt` (excluding the host) and bumps `hostGeneration` by 1 (`TC-ROOM-048`) |
 | AC2 | The promotion | It happens | Every member receives `host_changed {hostPlayerId, hostGeneration, lastSnapshot: <payload>}` and the new host starts sending snapshots with the bumped generation |
 | AC3 | A failed migration | 5 s pass without a new host live | The DO retries with the next candidate once, then marks the room `abandoned` (`TC-ROOM-049`) |
-| AC4 | The old host | It reconnects after migration | It returns as a plain peer with `role: "peer"`; it may not send `snapshot_push` and gets `error not-host` (`TC-NET-044`) |
+| AC4 | The old host | It reconnects after migration | It returns as a plain peer with `role: "player"`; it may not send `snapshot_push` and gets `error not-host` (`TC-NET-044`) |
 | AC5 | The room in `lobby` | The host leaves | The earliest joiner is promoted and the lobby shows the new host badge; no match is interrupted (`TC-ROOM-149`) |
 | AC6 | A migration end to end on two phones | The host app is force-quit mid-match | The remaining player is playable again within 5 s and the match reaches a winner (`TC-ROOM-182`) |
 | AC7 | Two promotions in a row | The second host also drops | Election continues down the roster; `hostGeneration` increases once per promotion and never repeats |

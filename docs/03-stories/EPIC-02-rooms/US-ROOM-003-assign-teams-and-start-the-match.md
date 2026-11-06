@@ -2,7 +2,7 @@
 id: US-ROOM-003
 title: Assign teams and start the match only when they are balanced
 epic: EPIC-02-rooms
-status: ready
+status: done
 priority: P0
 size: S
 depends_on: [US-ROOM-002]
@@ -83,6 +83,9 @@ size and non-empty. The UI mirrors exactly these guards; the DO is the authority
 `TC-ROOM-148`, `TC-ROOM-066`, `TC-ROOM-162`. `apps/worker/tests/room-rules.test.ts` covers the guard matrix directly;
 `tests/e2e/lobby.spec.ts::start_disabled_until_balanced` covers the UI. Red first:
 `apps/worker/tests/room-rules.test.ts::unbalanced_teams_rejected`.
+
+- **Red:** none — no production code changed in this pass; the sweep added TC-ROOM-193 in apps/web/tests/lobby-gating.test.tsx
+  (the start button's gate) and left every existing case in place.
 
 ## 9. Open questions
 

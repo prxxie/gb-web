@@ -2,7 +2,7 @@
 id: US-ROOM-002
 title: Join a room by code and see the live roster
 epic: EPIC-02-rooms
-status: ready
+status: done
 priority: P0
 size: M
 depends_on: [US-ROOM-001]
@@ -89,6 +89,9 @@ Slot assignment: lowest free slot in `0…maxPlayers-1`. `team` is `null` until 
 `TC-ROOM-121`, `TC-ROOM-126`, `TC-ROOM-122`, `TC-ROOM-147`, `TC-ROOM-128`, `TC-ROOM-127`, `TC-ROOM-123`. Worker tests
 use `miniflare`'s `SELF.fetch` for the upgrade and a raw `WebSocketPair` harness. Red first:
 `apps/worker/tests/signaling.test.ts::auth_required_within_5s`.
+
+- **Red:** none — no production code changed in this pass; the sweep added TC-ROOM-195 and TC-ROOM-199 to the worker
+  room suite (two sockets share one roster; the sixty-second close deletes the record) and left every existing case in place.
 
 ## 9. Open questions
 

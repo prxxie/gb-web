@@ -7,7 +7,8 @@
  */
 import { describe, expect, it } from "vitest";
 import { isForfeited, type RoomState } from "@gbw/core";
-import { RoomHarness, makeSnapshot, type FakeSocket } from "./support/room-harness";
+import { Room } from "../src/room-do";
+import { HARNESS_SECRET, ROOM_ORIGIN, RoomHarness, makeSnapshot, type FakeSocket } from "./support/room-harness";
 
 /** The one cast the harness already performs for reads; writes are limited to the two clock fields. */
 type Mutable = { room: RoomState };
@@ -188,8 +189,10 @@ describe("lifecycle sweeps (workflow-state-machine.md)", () => {
     expect(statusOf(harness)).toBe("abandoned");
   });
 
-  it("TC-ROOM-052: a lobby that lost its last member is deleted sixty seconds later", async () => {
+  it("TC-ROOM-052 / TC-ROOM-199: a lobby that lost its last member is deleted sixty seconds later", async () => {
     // Arrange — workflow-state-machine.md: "lobby → closed: the last member left (60 s later the record is deleted)"
+    // The same run is `US-ROOM-002` AC7: everyone gone, the sixty-second alarm closes the room and the
+    // record goes with it, so nothing of the dead lobby is left for the next player to inherit.
     const harness = new RoomHarness();
     await harness.ready();
     await harness.join({ playerId: "solo" });
@@ -208,6 +211,46 @@ describe("lifecycle sweeps (workflow-state-machine.md)", () => {
 
     // Assert
     expect(harness.storageKeys()).toEqual([]);
+  });
+
+  it("TC-ROOM-190: the ten-minute idle sweep deletes the record so the code can be issued again", async () => {
+    // Arrange — a created room nobody touched for eleven minutes (`US-ROOM-001` AC8)
+    const harness = new RoomHarness();
+    await harness.ready();
+    await harness.join({ playerId: "solo" });
+    const code = harness.state().roomCode;
+    expect(harness.storageKeys()).toContain("room");
+    moveClock(harness, { lastActivityAt: Date.now() - 11 * 60_000 });
+
+    // Act
+    await harness.alarm();
+
+    // Assert — `room-state.md`: the record is deleted, so the six characters are free again
+    expect(harness.storageKeys()).toEqual([]);
+    // A fresh object over the emptied storage is what the Worker meets after the object is evicted: it knows
+    // no room under that code and takes the next join that claims it, which is the code being reissued.
+    const cold = new Room(
+      harness.ctx as unknown as ConstructorParameters<typeof Room>[0],
+      { SESSION_TOKEN_SECRET: HARNESS_SECRET } as unknown as ConstructorParameters<typeof Room>[1],
+    );
+    await harness.ctx.ready();
+    const state = (await (await cold.fetch(new Request(`${ROOM_ORIGIN}/rooms/${code}/state`))).json()) as RoomState;
+    expect(state.roomCode).toBe("");
+    const joined = await cold.fetch(
+      new Request(`${ROOM_ORIGIN}/rooms/${code}/join`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          playerId: "next",
+          guestId: "guest-next",
+          displayName: "Next",
+          avatarId: "av-01",
+          mobileId: "mbl-01",
+          roomCode: code,
+        }),
+      }),
+    );
+    expect(joined.status).toBe(200);
   });
 
   it("TC-ROOM-053: the 24 h cap is measured from the match start, not from room creation", async () => {

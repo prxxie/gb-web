@@ -8,7 +8,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
-import type { RoomMember, RoomState } from "@gbw/core";
+import { ITEMS, type RoomMember, type RoomState } from "@gbw/core";
 import { LocaleProvider, SessionProvider } from "../src/app/providers";
 import { LobbyPage } from "../src/routes/LobbyPage";
 
@@ -178,5 +178,61 @@ describe("TC-ROOM-707: loadout (AC3, AC4)", () => {
     expect(screen.getByTestId("loadout-picker")).toBeInTheDocument();
     expect(screen.getAllByTestId(/^loadout-page-/)).toHaveLength(2);
     expect(screen.getByText(/11/)).toBeInTheDocument();
+  });
+
+  it("pages nine cells at a time and each cell shows its quantity and delay cost (AC3)", async () => {
+    await enterLobby(room());
+    const pageOne = screen.getByTestId("loadout-page-0");
+    expect(pageOne.querySelectorAll("[data-testid^='loadout-item-']")).toHaveLength(9);
+    expect(pageOne.textContent).toMatch(/SL 0 · Độ trễ \+\d+/);
+
+    await act(async () => {
+      screen.getByRole("button", { name: /Sau/ }).click();
+    });
+
+    const pageTwo = screen.getByTestId("loadout-page-1");
+    expect(pageTwo.querySelectorAll("[data-testid^='loadout-item-']")).toHaveLength(ITEMS.length - 9);
+    expect(pageTwo.textContent).toMatch(/SL 0 · Độ trễ \+\d+/);
+  });
+
+  it("a full loadout refuses the twelfth item with a visible message (AC4)", async () => {
+    sessionStorage.setItem("gbw.room.ABCD", GUEST_ID);
+    await enterLobby(
+      room({
+        members: [
+          member({ playerId: HOST_ID, displayName: "Chủ phòng", slot: 0, team: "A", role: "host" }),
+          member({
+            playerId: GUEST_ID,
+            displayName: "Khách",
+            slot: 1,
+            team: "B",
+            loadout: [{ id: "itm-grenade", qty: 11 }],
+          }),
+        ],
+      }),
+    );
+
+    expect(screen.getByText("Đã chọn 11/11")).toBeInTheDocument();
+    expect(screen.getByText("Chỉ mang được tối đa 11 vật phẩm.")).toBeInTheDocument();
+    for (const button of screen.getAllByRole("button", { name: /^Thêm / })) {
+      expect(button).toBeDisabled();
+    }
+  });
+
+  it("a guest is offered the same eleven items as the host (AC6)", async () => {
+    sessionStorage.setItem("gbw.room.ABCD", GUEST_ID);
+    await enterLobby(room());
+
+    const cells = [...document.querySelectorAll("[data-testid^='loadout-item-']")].map((cell) =>
+      cell.getAttribute("data-testid"),
+    );
+    expect(cells).toHaveLength(9);
+    const picked = screen.getAllByRole("button", { name: /^Thêm / });
+    expect(picked).toHaveLength(9);
+    for (const button of picked) expect(button).toBeEnabled();
+    await act(async () => {
+      screen.getByRole("button", { name: /Sau/ }).click();
+    });
+    expect(document.querySelectorAll("[data-testid^='loadout-item-']")).toHaveLength(ITEMS.length - 9);
   });
 });

@@ -68,6 +68,28 @@ describe("room signalling relay", () => {
     expect(carol.frames()).toEqual([]);
   });
 
+  it("TC-ROOM-192: a signal to a member that left is peer-not-connected and the sender keeps its socket", async () => {
+    // `US-ROOM-006` AC6 (the code is `peer-not-connected`, `signaling.md` §2, not `peer-not-found`).
+    const { harness, sockets } = await lobby();
+    const alice = sockets.get("alice")!;
+    const bob = sockets.get("bob")!;
+    harness.clearAll(sockets.values());
+
+    await harness.message(bob, { t: "leave" });
+    expect(harness.state().members.map((member) => member.playerId)).toEqual(["alice", "carol"]);
+
+    await harness.message(alice, { t: "signal", to: "bob", payload: OFFER });
+
+    expect(alice.errors()).toEqual([
+      { t: "error", code: "peer-not-connected", detail: "the peer has no open socket" },
+    ]);
+    // The sender is not disconnected by the rejection: the same socket still answers a ping.
+    await harness.message(alice, { t: "ping", at: 7 });
+    expect(alice.framesOf("pong")).toHaveLength(1);
+    expect(alice.readyState).toBe(1);
+    expect(sockets.get("carol")!.framesOf("signal")).toEqual([]);
+  });
+
   it("TC-ROOM-125: a signal to yourself is bad-request and is not relayed", async () => {
     const { harness, sockets } = await lobby();
     const alice = sockets.get("alice")!;

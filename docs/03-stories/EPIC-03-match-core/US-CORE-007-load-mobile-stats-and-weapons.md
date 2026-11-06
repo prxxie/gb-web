@@ -2,7 +2,7 @@
 id: US-CORE-007
 title: Load mobile stats and resolve the three weapon slots
 epic: EPIC-03-match-core
-status: ready
+status: done
 priority: P0
 size: M
 depends_on: [US-FND-001]

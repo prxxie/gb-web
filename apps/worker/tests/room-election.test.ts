@@ -243,4 +243,64 @@ describe("room host election", () => {
     expect(delivered?.["snapshot"]).toMatchObject({ seq: 2, hostGeneration: 2 });
     expect(harness.state().lastSnapshot?.seq).toBe(2);
   });
+
+  it("TC-ROOM-194: the host that was replaced comes back inside grace as a plain player that cannot push", async () => {
+    // `US-ROOM-005` AC4: after a promotion the old host may return, but it is a peer now.
+    const { harness, sockets } = await playingRoom();
+    const host = sockets.get("host")!;
+    await harness.message(host, { t: "snapshot_push", snapshot: makeSnapshot(1, 1) });
+    await harness.close(host);
+    const latest = harness.state().lastSnapshot?.seq;
+    expect(harness.state().hostPlayerId).toBe("p1");
+
+    // Act — the old host reconnects inside the 20 s grace window, then pushes a snapshot
+    const returned = await harness.connect("host");
+    const roster = harness.state().members.find((member) => member.playerId === "host");
+    await harness.message(returned, { t: "snapshot_push", snapshot: makeSnapshot(9, 1) });
+
+    // Assert — it is seated again as a player, and the push is refused without touching the snapshot
+    expect(harness.state().hostPlayerId).toBe("p1");
+    expect(roster?.connectionState).toBe("connected");
+    expect(roster?.role).toBe("player");
+    expect(returned.errors()).toEqual([
+      { t: "error", code: "not-host", detail: "only the host pushes snapshots" },
+    ]);
+    expect(harness.state().lastSnapshot?.seq).toBe(latest);
+  });
+
+  it("TC-ROOM-191: a promoted host that never becomes live is retried once with the next candidate, then the room is abandoned", async () => {
+    // `US-ROOM-005` AC3: five seconds after a promotion the object checks that the new host is live.
+    // A force-quit leaves the socket dead in the map the check reads, without a reconnect.
+    const { harness, sockets } = await playingRoom();
+    const host = sockets.get("host")!;
+    const p2 = sockets.get("p2")!;
+    const p3 = sockets.get("p3")!;
+    harness.clearAll(sockets.values());
+    const live = harness.do as unknown as { sockets: Map<string, unknown> };
+
+    await harness.close(host);
+    expect(harness.state().hostPlayerId).toBe("p1");
+    expect(harness.state().hostGeneration).toBe(2);
+
+    // Act 1 — `p1` was promoted but its socket is gone, so the recheck moves on to the next candidate.
+    live.sockets.delete("p1");
+    vi.setSystemTime(BASE + 16_000);
+    await harness.alarm();
+
+    // Assert — exactly one retry, and it is the next candidate in join order.
+    expect(harness.state().hostPlayerId).toBe("p2");
+    expect(harness.state().hostGeneration).toBe(3);
+
+    // Act 2 — the single retry is spent: no candidate is left, so the object gives the match up.
+    live.sockets.delete("p2");
+    live.sockets.delete("p3");
+    vi.setSystemTime(BASE + 21_000);
+    await harness.alarm();
+
+    // Assert — abandoned, never hostless and never a third promotion.
+    expect(harness.state().status).toBe("abandoned");
+    expect(harness.state().hostPlayerId).toBe("p2");
+    expect(p3.framesOf("host_changed").map((frame) => frame["hostPlayerId"])).toEqual(["p1", "p2"]);
+    expect(p2.framesOf("host_changed").map((frame) => frame["hostPlayerId"])).toEqual(["p1", "p2"]);
+  });
 });

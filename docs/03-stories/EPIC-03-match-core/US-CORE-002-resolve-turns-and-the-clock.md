@@ -2,7 +2,7 @@
 id: US-CORE-002
 title: Resolve turns with the delay queue
 epic: EPIC-03-match-core
-status: ready
+status: done
 priority: P0
 size: M
 depends_on: [US-FND-001]
