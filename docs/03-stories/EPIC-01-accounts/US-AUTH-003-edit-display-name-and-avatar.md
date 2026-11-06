@@ -2,7 +2,7 @@
 id: US-AUTH-003
 title: Edit the display name and pick an avatar
 epic: EPIC-01-accounts
-status: ready
+status: done
 priority: P2
 size: S
 depends_on: [US-AUTH-002]
@@ -91,9 +91,11 @@ collapse internal whitespace to a single space.
 
 `TC-AUTH-101`, `TC-AUTH-102`, `TC-AUTH-140`, `TC-AUTH-144`, `TC-AUTH-145`, `TC-AUTH-146`, `TC-AUTH-147`,
 `TC-AUTH-148`, `TC-AUTH-149`.
-The normalisation cases are a table-driven unit test
-(`apps/worker/tests/display-name.test.ts`). - **Red:** `apps/web/tests/profile.test.tsx` and `apps/web/tests/lobby-rename.test.tsx` — the profile screen had no
-  inline error branch and no avatar persistence, and the lobby never re-sent `auth`, so AC4, AC5 and AC7 failed.
+The normalisation cases are a table-driven unit test (`apps/worker/tests/display-name.test.ts`).
+- **Red:** `TC-AUTH-144`…`TC-AUTH-149` in `tests/web/profile.test.tsx`, `tests/web/lobby-rename.test.tsx` and
+  `tests/worker/profile.test.ts` — the profile screen had no inline error branch and no avatar persistence, the
+  picker offered `@gbw/core` loadout ids that `PATCH /me` refused with `422`, the lobby never re-sent `auth`, and the
+  room roster showed no avatar, so AC4, AC5 and AC7 failed.
 
 ## 9. Open questions
 

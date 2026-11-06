@@ -41,7 +41,7 @@ const deleteMe = (harness: TestEnv, authorization: string): Promise<Response> =>
   handleFetch(new Request("https://api.test/api/v1/me", { method: "DELETE", headers: { authorization } }), harness.env);
 
 describe("DELETE /me — success path", () => {
-  it("answers 204 with no body", async () => {
+  it("TC-AUTH-160: answers 204 with no body", async () => {
     const { harness, authorization } = await signIn();
 
     const response = await deleteMe(harness, authorization);
@@ -110,7 +110,7 @@ describe("TC-AUTH-069 : deletion is refused while a match is in progress", () =>
 });
 
 describe("a deleted account has no access", () => {
-  it("refuses /me with 401 once deletion is scheduled", async () => {
+  it("TC-AUTH-161: refuses /me with 401 once deletion is scheduled", async () => {
     const { harness, authorization } = await signIn();
     await deleteMe(harness, authorization);
 

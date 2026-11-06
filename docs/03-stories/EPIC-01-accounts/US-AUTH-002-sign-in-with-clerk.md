@@ -2,7 +2,7 @@
 id: US-AUTH-002
 title: Sign in with Google or an email link and get a profile
 epic: EPIC-01-accounts
-status: ready
+status: done
 priority: P1
 size: M
 depends_on: [US-FND-002, US-FND-003]

@@ -24,7 +24,10 @@ export function MainPage(): JSX.Element {
   const [busy, setBusy] = useState(false);
   // A lobby that could not be entered hands its reason back here (`LobbyPage`), so the menu can say it.
   const handedOver = (useLocation().state as { error?: string } | null)?.error ?? null;
-  const [error, setError] = useState<string | null>(handedOver ? t(handedOver) : null);
+  // A screen that finished its job (deleting the account) leaves its confirmation here, not in the session it
+  // just cleared (`US-AUTH-004` AC5).
+  const noticed = (useLocation().state as { notice?: string } | null)?.notice ?? null;
+  const [error, setError] = useState<string | null>(handedOver ? t(handedOver) : noticed);
   // Ordinary connectivity, not a session: the menu is usable before any account exists (`TC-AUTH-135`).
   const online = useOnline();
 

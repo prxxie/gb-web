@@ -134,7 +134,7 @@
   "profile.history": "Lịch sử đấu",
   "profile.loadMore": "Tải thêm",
   "profile.delete": "Xoá tài khoản",
-  "profile.deleteConfirm": "Nhập DELETE để xác nhận",
+  "profile.deleteConfirm": "Nhập tên hiển thị để xác nhận",
   "leaderboard.rank": "Hạng",
   "leaderboard.player": "Người chơi",
   "leaderboard.rating": "Điểm",
@@ -168,5 +168,6 @@
   "errors.network": "Không kết nối được máy chủ.",
   "errors.generic": "Không xử lý được phản hồi của máy chủ.",
   "match.disconnected": "Mất kết nối với phòng.",
-  "errors.reference": "Mã lỗi: {id}"
+  "errors.reference": "Mã lỗi: {id}",
+  "profile.deleted": "Đã xoá tài khoản."
 }

@@ -134,7 +134,7 @@
   "profile.history": "Match history",
   "profile.loadMore": "Load more",
   "profile.delete": "Delete account",
-  "profile.deleteConfirm": "Type DELETE to confirm",
+  "profile.deleteConfirm": "Type your display name to confirm",
   "leaderboard.rank": "Rank",
   "leaderboard.player": "Player",
   "leaderboard.rating": "Rating",
@@ -168,5 +168,6 @@
   "errors.network": "Could not reach the server.",
   "errors.generic": "The server response could not be handled.",
   "match.disconnected": "Lost the room connection.",
-  "errors.reference": "Error reference: {id}"
+  "errors.reference": "Error reference: {id}",
+  "profile.deleted": "Your account has been deleted."
 }

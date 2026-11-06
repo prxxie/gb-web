@@ -2,7 +2,7 @@
  * Profile (`US-AUTH-003`, `US-AUTH-004`, `US-RANK-003`).
  */
 import { useCallback, useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useLocale, useSession } from "../app/providers";
 import { ApiError, api, type HistoryItem, type ProfileResponse } from "../lib/api";
 import { clearSession, updateSubject } from "../lib/session";
@@ -38,7 +38,8 @@ function generalError(caught: unknown): string {
 
 export function ProfilePage(): JSX.Element {
   const { t } = useLocale();
-  const { session, adopt, refresh } = useSession();
+  const { session, adopt } = useSession();
+  const navigate = useNavigate();
   const [profile, setProfile] = useState<ProfileResponse | null>(null);
   const [history, setHistory] = useState<readonly HistoryItem[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
@@ -158,8 +159,8 @@ export function ProfilePage(): JSX.Element {
     await api.deleteMe(session.token);
     clearSession();
     setProfile(null);
-    setMessage(t("profile.deleteConfirm"));
-    await refresh();
+    // The session is gone, so the confirmation has to travel with the navigation (`screens/profile.md` § Delete).
+    navigate("/", { state: { notice: t("profile.deleted") } });
   };
 
   return (

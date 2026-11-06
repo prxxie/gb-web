@@ -2,7 +2,7 @@
 id: US-AUTH-001
 title: Continue as a guest without creating an account
 epic: EPIC-01-accounts
-status: ready
+status: done
 priority: P0
 size: S
 depends_on: [US-FND-002]
@@ -78,8 +78,12 @@ Response `201`:
 
 ## 8. Test notes
 
-`TC-AUTH-074`, `TC-AUTH-057`, `TC-AUTH-065`, `TC-AUTH-135`. Worker tests use miniflare with a fake `SESSION_TOKEN_SECRET`;
-the expiry test moves the clock with `vi.setSystemTime`. Red first: `apps/worker/tests/sessions.test.ts::guest_session_shape`.
+`TC-AUTH-074`, `TC-AUTH-057`, `TC-AUTH-065`, `TC-AUTH-135`, `TC-AUTH-162` (the token never reaches `localStorage`,
+`apps/web/tests/session-storage.test.tsx`) and `TC-AUTH-163` (a guest body names no account, `apps/worker/tests/sessions.test.ts`).
+Worker tests build the Worker with `testEnv()` and a fake `SESSION_TOKEN_SECRET`; the expiry test moves the clock.
+- **Red:** `TC-AUTH-162` in `apps/web/tests/session-storage.test.tsx` failed while `store()` also wrote `localStorage`,
+  and `TC-AUTH-163` in `apps/worker/tests/sessions.test.ts` failed while the guest subject carried `accountId: null`
+  as a key, which reads as "this guest has an account" to any client that trusts the field's presence.
 
 ## 9. Open questions
 

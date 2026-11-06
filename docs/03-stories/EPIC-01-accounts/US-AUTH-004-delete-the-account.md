@@ -2,7 +2,7 @@
 id: US-AUTH-004
 title: Delete the account and purge personal data within 30 days
 epic: EPIC-01-accounts
-status: ready
+status: done
 priority: P2
 size: S
 depends_on: [US-AUTH-002]
@@ -78,9 +78,10 @@ Purge job: a Cloudflare cron trigger on the worker (`*/1 * * * *`, batch of 100)
 
 ## 8. Test notes
 
-`TC-AUTH-103`, `TC-AUTH-069`, `TC-AUTH-142`, `TC-AUTH-075`. The purge is tested by inserting a row with
-`deleted_at = now - 31 days` and invoking the scheduled handler directly. Red first:
-`apps/worker/tests/accounts.test.ts::delete_purges_after_30_days`.
+`TC-AUTH-160`, `TC-AUTH-161`, `TC-AUTH-103`, `TC-AUTH-069`, `TC-AUTH-142`, `TC-AUTH-075`.
+- **Red:** `TC-AUTH-103` in `apps/worker/tests/purge.test.ts` had no implementation at all — there was no
+  `scheduled` handler and no cron in `wrangler.jsonc`, so a deleted account kept publishing its name forever; the
+  sentinel name also had to be shortened to fit the 2–16 character rule the column already carries.
 
 ## 9. Open questions
 

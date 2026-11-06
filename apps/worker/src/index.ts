@@ -7,6 +7,7 @@
  */
 import { decideCors, preflight, withCors } from "./lib/cors.js";
 import type { Env } from "./lib/db.js";
+import { purgeDeletedAccounts } from "./lib/deletion.js";
 import { createLogger, newRequestId } from "./lib/logging.js";
 import { isProblemError, ProblemError, problemResponse } from "./lib/problem.js";
 import { match } from "./lib/router.js";
@@ -197,4 +198,20 @@ function rest_safe(path: string, prefix: string): string {
 
 export default {
   fetch: handleFetch,
+  /**
+   * The daily cron (`wrangler.jsonc` § triggers). One job for now: the 30-day purge of deleted accounts
+   * (`US-AUTH-004` AC4). A failure is logged and rethrown so the Cron dashboard shows it, rather than a quiet morning
+   * where the job did nothing and nobody noticed.
+   */
+  async scheduled(event: ScheduledController, env: Env, _ctx: ExecutionContext): Promise<void> {
+    const logger = createLogger(newRequestId(), (line) => console.info(line));
+    try {
+      const { purged } = await purgeDeletedAccounts(env, new Date(event.scheduledTime));
+      // The count is the only signal that the job did anything at all: zero rows is a normal morning.
+      logger.line({ method: "CRON", route: `purge-deleted-accounts(${purged})`, status: 200, duration_ms: 0 });
+    } catch (error) {
+      logger.line({ level: "error", method: "CRON", route: "purge-deleted-accounts", status: 500, duration_ms: 0, error: String(error) });
+      throw error;
+    }
+  },
 };

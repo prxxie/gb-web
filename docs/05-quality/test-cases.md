@@ -36,10 +36,10 @@ The `covers` column names the requirement ([nonfunctional-requirements.md](../01
 
 | ID | Story | Case | Expected | Level | Covers |
 |----|-------|------|----------|-------|--------|
-| TC-AUTH-057 | US-AUTH-001 | Session token used after 60 min | `401 unauthenticated`; client refreshes at 55 min | worker | OQ-27 |
-| TC-AUTH-065 | US-AUTH-001 | Guest calls `/me`, `start_match`, `team_assign` | `401`/`403`, room state unaffected | worker | NFR-11 |
-| TC-AUTH-074 | US-AUTH-001 | `POST /sessions` as guest and as registered | Correct `subject.kind`, 60-min expiry, `wsUrl` present | worker | FR-01 |
-| TC-AUTH-135 | US-AUTH-001 | Guest path from the main menu | No sign-in prompt, room created | e2e | roles |
+| TC-AUTH-057 | US-AUTH-001 | AC2 — session token used after 60 min | Session token used after 60 min | `401 unauthenticated`; client refreshes at 55 min | worker | OQ-27 |
+| TC-AUTH-065 | US-AUTH-001 | AC3 — guest is refused the account surface | Guest calls `/me`, `start_match`, `team_assign` | `401`/`403`, room state unaffected | worker | NFR-11 |
+| TC-AUTH-074 | US-AUTH-001 | AC1 — guest and account minting | `POST /sessions` as guest and as registered | Correct `subject.kind`, 60-min expiry, `wsUrl` present | worker | FR-01 |
+| TC-AUTH-135 | US-AUTH-001 | AC4 — guest path from the main menu | Guest path from the main menu | No sign-in prompt, room created | e2e | roles |
 | TC-AUTH-151 | US-AUTH-002 | AC1 — an account session is minted from a Clerk JWT | `201`, `subject.kind` is `account`, the session `sub` is the internal `accountId`, never Clerk's `sub` | worker | `api/accounts.md` |
 | TC-AUTH-152 | US-AUTH-002 | AC2 — a first-ever sign-in | Exactly one `account` and one `profile` row, `rating` 1200, `rated_matches` 0, generated `display_name` | worker | `data/accounts.md` |
 | TC-AUTH-153 | US-AUTH-002 | AC3 — a JWT signed by an unknown key, expired, or with a foreign `azp` | `401 unauthenticated` and nothing written | worker | NFR-11 |
@@ -59,11 +59,15 @@ The `covers` column names the requirement ([nonfunctional-requirements.md](../01
 | TC-AUTH-147 | US-AUTH-003 | AC5/AC7 — the edited identity lands in the stored session | `PATCH /me` `200` → `gbw.session` subject updated; `409` → unchanged | web | AC5/AC7 |
 | TC-AUTH-140 | US-AUTH-003 | AC4 — profile name saved, then a `409` | Optimistic value reverts with an inline field error | web | `data/accounts.md` |
 | TC-AUTH-143 | US-AUTH-003 | Guest opens `/profile` | Redirect to `/sign-in` | e2e | roles |
-| TC-AUTH-069 | US-AUTH-004 | `DELETE /me` during a live room | `409`, nothing deleted | worker | NFR-13 |
-| TC-AUTH-075 | US-AUTH-004 | Any response for another account | Contains no `accountId`/`guestId`/email | worker | NFR-13 |
-| TC-AUTH-103 | US-AUTH-004 | Delete an account, then run the purge | Rows anonymised, Clerk user deleted, `rating_history` kept | worker | NFR-13 |
+| TC-AUTH-069 | US-AUTH-004 | AC2 — `DELETE /me` during a live room | `DELETE /me` during a live room | `409`, nothing deleted | worker | NFR-13 |
+| TC-AUTH-075 | US-AUTH-004 | AC6 — any response for another account | Any response for another account | Contains no `accountId`/`guestId`/email | worker | NFR-13 |
+| TC-AUTH-103 | US-AUTH-004 | AC4 — the purge after thirty days | Delete an account, then run the purge | Rows anonymised, Clerk user deleted, `rating_history` kept | worker | NFR-13 |
 | TC-AUTH-104 | US-CORE-013 | Equipped avatar part the account no longer owns | Stripped server-side at loadout validation, bonus not applied | worker | NFR-11 |
-| TC-AUTH-142 | US-AUTH-004 | Delete flow on the profile screen | Typed confirmation → signed out, redirect, no further access | e2e | NFR-13 |
+| TC-AUTH-160 | US-AUTH-004 | AC1 — `DELETE /me` on an account outside a room | `204` with no body; the Clerk user is deleted before the row is marked | worker | `accounts.md` § DELETE /me |
+| TC-AUTH-161 | US-AUTH-004 | AC3 — a still-valid JWT for a deleted account | `401 unauthenticated` on every route, and a second `DELETE` does nothing | worker | `accounts.md` |
+| TC-AUTH-162 | US-AUTH-001 | AC6 — a guest session after the tab closes | The token is in `sessionStorage` only; `localStorage` stays empty | web | NFR-12 |
+| TC-AUTH-163 | US-AUTH-001 | AC5 — a guest response body | No email, no `accountId`, no Clerk id anywhere in the JSON | worker | NFR-13 |
+| TC-AUTH-142 | US-AUTH-004 | AC5 — delete flow on the profile screen | Delete flow on the profile screen | Typed confirmation → signed out, redirect, no further access | e2e | NFR-13 |
 
 ## Rooms (ROOM)
 

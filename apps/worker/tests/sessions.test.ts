@@ -118,3 +118,24 @@ describe("session token — subject.kind decides what the token may do", () => {
     expect(((await asGuest.json()) as Record<string, unknown>)["detail"]).toMatch(/signed-in account/i);
   });
 });
+
+describe("TC-AUTH-163: a guest body carries no account identity (US-AUTH-001 AC5)", () => {
+  it("has no email, accountId or Clerk identifier anywhere in the response", async () => {
+    // Arrange
+    const { env } = testEnv();
+
+    // Act
+    const response = await handleFetch(jsonRequest(SESSIONS, { kind: "guest" }), env);
+    const body = (await response.json()) as Record<string, unknown>;
+    const text = JSON.stringify(body);
+
+    // Assert — the guest subject names a guest id and nothing else
+    expect(response.status).toBe(201);
+    const subject = body["subject"] as Record<string, unknown>;
+    expect(subject["kind"]).toBe("guest");
+    expect(Object.keys(subject)).not.toContain("accountId");
+    expect(text).not.toMatch(/@/);
+    expect(text).not.toMatch(/clerk/i);
+    expect(text).not.toMatch(/user_[A-Za-z0-9]/);
+  });
+});

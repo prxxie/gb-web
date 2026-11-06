@@ -480,6 +480,14 @@ function redTestIds(line) {
 function resolveTestFile(root, pathPart) {
     const direct = path.join(root, pathPart);
     if (isFile(direct)) return direct;
+    // `tests/<pkg>/x` is the id the docs use for a suite that a workspace keeps next to its package:
+    // `tests/core` → `packages/core/tests`, `tests/web` → `apps/web/tests` (`conventions.md` § Layout).
+    const mapped = /^tests\/(core|web|worker)\//.exec(pathPart);
+    if (mapped) {
+        const base = mapped[1] === "core" ? "packages/core" : `apps/${mapped[1]}`;
+        const candidate = path.join(root, base, "tests", pathPart.slice(mapped[0].length));
+        if (isFile(candidate)) return candidate;
+    }
     const wanted = `/${pathPart}`;
     const stack = [path.join(root, "apps"), path.join(root, "packages"), path.join(root, "tests")];
     while (stack.length > 0) {

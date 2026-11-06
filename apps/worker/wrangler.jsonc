@@ -5,6 +5,9 @@
   "compatibility_date": "2026-10-01",
   "compatibility_flags": ["nodejs_compat"],
   "observability": { "enabled": true },
+  // One cron: the 30-day purge of deleted accounts (`US-AUTH-004` AC4). 03:17 UTC keeps it clear of the
+  // SLO snapshot job at 00:10, so a slow purge never delays the report.
+  "triggers": { "crons": ["17 3 * * *"] },
   "vars": {
     "ENVIRONMENT": "development",
     "CLERK_ISSUER": "https://heroic-bison-1878.clerk.accounts.dev",

@@ -76,9 +76,14 @@ function parseExample(path: string): ExampleFile {
 const devVars = (): ExampleFile => parseExample(join(ROOT, "apps/worker/.dev.vars.example"));
 const webEnv = (): ExampleFile => parseExample(join(ROOT, "apps/web/.env.example"));
 
+/** `wrangler.jsonc` is JSONC: the file carries comments, `JSON.parse` does not accept them. */
+function stripJsonComments(text: string): string {
+  return text.replace(/^\s*\/\/.*$/gm, "").replace(/\/\*[\s\S]*?\*\//g, "");
+}
+
 /** Names `wrangler.jsonc` declares: plain vars plus the two bindings. */
 function wranglerNames(): Set<string> {
-  const config = JSON.parse(readFileSync(join(ROOT, "apps/worker/wrangler.jsonc"), "utf8")) as {
+  const config = JSON.parse(stripJsonComments(readFileSync(join(ROOT, "apps/worker/wrangler.jsonc"), "utf8"))) as {
     vars?: Record<string, string>;
     d1_databases?: { binding: string }[];
     durable_objects?: { bindings: { name: string }[] };
