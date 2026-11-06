@@ -144,7 +144,7 @@ describe("weather (US-CORE-015)", () => {
     expect(rollWind(createRng(99))).not.toEqual(rollWind(createRng(100)));
   });
 
-  it("TC-MATCH-923: magnitude 0 is a legal calm roll and the integrator adds no wind term", () => {
+  it("TC-CORE-959: magnitude 0 is a legal calm roll and the integrator adds no wind term", () => {
     const calmWeather = { wind: CALM, rolledAtRound: 1 };
     expect(isCalm(calmWeather)).toBe(true);
     expect(describeWind(CALM)).toBe("calm");
@@ -216,5 +216,18 @@ it("TC-CORE-023: drift equals ½·a_x·t² for the shot's own flight time", () =
     expect(decoded.weather).toEqual(state.weather);
     expect(decoded.turn.round).toBe(state.turn.round);
     expect(decoded.weather.rolledAtRound).toBe(state.turn.round);
+  });
+});
+
+describe("TC-CORE-960: a full-force shot moves about one ruler division in a 26/0 wind (US-CORE-015 AC6)", () => {
+  it("lands ~129 units downwind, in the sector's direction", () => {
+    const calm = shoot(CALM);
+    const pushed = shoot({ magnitude: 26, directionDeg: 0, sector: 0 });
+    const drift = pushed.landingX - calm.landingX;
+
+    // One ruler division is 125 units on a 1000-unit window; the documented figure is ~129, and the
+    // integrator's 0.1 position quantum costs a few units either way.
+    expect(drift).toBeGreaterThan(100);
+    expect(drift).toBeLessThan(160);
   });
 });

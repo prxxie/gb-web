@@ -79,7 +79,7 @@ Requirements: `NFR-28`, `NFR-29`.
 
 - Beam weapons do not integrate: they resolve as a segment on the frame they are fired (`TC-CORE-912`).
 - Cluster splits at apex into three sub-projectiles with `±8` angle offsets (`TC-CORE-912`).
-- Piercing ignores terrain until it hits a unit or leaves the map (`TC-CORE-913`).
+- Piercing ignores terrain until it hits a unit or leaves the map (`TC-CORE-913` in `apps/core/tests/ballistics.test.ts`, `TC-CORE-950` in `terrain.test.ts`).
 - `maxFlightMs` ends a shot that never lands; the turn passes (`TC-CORE-029`).
 - Determinism forbids `Math.random()` in `core`; variance comes from seeded state (`01-overview/conventions.md` § 4).
 

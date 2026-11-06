@@ -170,3 +170,13 @@ describe("modes", () => {
     expect(split.winnerTeam).toBe(null);
   });
 });
+
+describe("TC-CORE-961: solo ends when one team is wiped (US-CORE-010 AC1)", () => {
+  it("ends the match and gives it to the surviving team", () => {
+    const ended = skip(eliminate(match(), 1));
+    expect(ended.status).toBe("ended");
+    expect(ended.winnerTeam).toBe("A");
+    // Nothing else about the mode changes: the score panel is still the solo one.
+    expect(ended.scores.score).toEqual({ A: 0, B: 0 });
+  });
+});

@@ -47,6 +47,35 @@ function skip(state: MatchState, seq = state.seq): MatchState {
   return applyInput(state, { kind: "skip", slot: state.turn.activeSlot, seq }, NOW + 1).state;
 }
 
+describe("TC-CORE-943: the shield refills on its owner's turn (US-CORE-003 AC3)", () => {
+  const shieldOf = (state: MatchState, slot: number): number => {
+    const player = state.players.find((candidate) => candidate.slot === slot);
+    if (!player) throw new Error(`no slot ${slot}`);
+    return player.shield;
+  };
+  const withShield = (state: MatchState, slot: number, shield: number): MatchState => ({
+    ...state,
+    players: state.players.map((player) => (player.slot === slot ? { ...player, shield } : player)),
+  });
+
+  it("adds shieldRegen at the start of the turn, capped at maxShield", () => {
+    // mbl-01 is Stone Sentinel: shieldRegen 20, maxShield 150 (`mobiles.md`).
+    const state = withShield(four(), 1, 10);
+    const next = skip(state);
+    expect(next.turn.activeSlot).toBe(1);
+    expect(shieldOf(next, 1)).toBe(30);
+
+    const nearlyFull = skip(withShield(state, 1, 145));
+    expect(shieldOf(nearlyFull, 1)).toBe(150);
+  });
+
+  it("never regenerates a slot that is not starting its turn", () => {
+    const state = withShield(four(), 2, 10);
+    const next = skip(state);
+    expect(shieldOf(next, 2)).toBe(10);
+  });
+});
+
 describe("turn queue (US-CORE-002)", () => {
   it("TC-CORE-901: the lowest accumulated delay acts first and ties keep slot order", () => {
     const state = four();

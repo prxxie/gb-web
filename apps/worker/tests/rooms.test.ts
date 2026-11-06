@@ -66,6 +66,21 @@ describe("POST /rooms", () => {
     expect(String(body["joinUrl"] ?? "")).toContain("/lobby/");
   });
 
+  it("TC-ROOM-205: a mode outside the four is a 422 naming mode", async () => {
+    // Arrange
+    const rig = createRig();
+    const token = await rig.token(accountSubject(HOST));
+
+    // Act / Assert — US-CORE-010 AC7
+    for (const mode of ["deathmatch", "", "SOLO", "0"]) {
+      const response = await rig.request("POST", "/rooms", { token, body: { maxPlayers: 4, mode } });
+      const body = (await response.json()) as { type: string; errors?: { field: string }[] };
+      expect(response.status, `mode=${mode}`).toBe(422);
+      expect(body.type).toContain("validation");
+      expect(body.errors?.map((entry) => entry.field)).toContain("mode");
+    }
+  });
+
   it("TC-ROOM-120: every capacity outside {2,4,6,8} is a 422 naming maxPlayers", async () => {
     // Arrange
     const rig = createRig();

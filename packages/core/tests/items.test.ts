@@ -327,3 +327,20 @@ describe("items", () => {
     expect(unknown.state.players[0]!.delay).toBe(before.delay);
   });
 });
+
+describe("TC-CORE-953: an item's delay cost is charged before the next player is chosen (US-CORE-009 AC9)", () => {
+  it("adds the item's own cost and keeps the queue on the same slot", () => {
+    const item = ITEMS.find((candidate) => candidate.delayCost > 0);
+    expect(item).toBeDefined();
+    const state = match([seat(0, "A", "mbl-01", { [item!.itemId]: 1 }), seat(1, "B")]);
+    const before = state.players[0]!;
+
+    const used = use(state, 0, item!.itemId);
+    const after = used.state.players[0]!;
+
+    expect(after.delay).toBe(before.delay + item!.delayCost);
+    expect(used.state.turn.activeSlot).toBe(0);
+    // The queue only moves on when the player fires or skips, and then the delay is what decides the order.
+    expect(advanceTurn(used.state.turn, used.state.players, { now: NOW, activeSlot: null }).turn.activeSlot).toBe(1);
+  });
+});

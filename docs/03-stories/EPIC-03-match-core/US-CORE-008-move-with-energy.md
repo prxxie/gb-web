@@ -2,7 +2,7 @@
 id: US-CORE-008
 title: Move with energy, distance and incline limits
 epic: EPIC-03-match-core
-status: ready
+status: done
 priority: P1
 size: M
 depends_on: [US-CORE-006, US-CORE-007]
@@ -67,11 +67,17 @@ Jumping/flying mobiles, mountables, movement animation timing (`US-MATCH-006`).
 
 ## 8. Test notes
 
-`TC-CORE-904`, `TC-CORE-914`, `TC-NET-067`.
-`Red first: packages/core/tests/move.test.ts::energy_clamps_distance`.
+`TC-CORE-904`, `TC-CORE-951`, `TC-ROOM-206`.
+Red: none — the rule was already implemented and green; this pass added the cases the ACs cited and corrected the citations that pointed at another story's case (see the delivery note at the end of this file).
 
-<!-- delivery:2026-11-05 -->
+<!-- delivery:2026-11-06 -->
 
-## Delivery status — 2026-11-05
+## Delivery status — 2026-11-06
 
-**done.** the engine rule is implemented in `packages/core/src` and covered by `packages/core/tests/` (ballistics, combat, match, snapshot, data, room, rating, camera)
+**done.** `packages/core/tests/movement.test.ts` — `TC-CORE-904` (a walk debits its own `moveEnergy` and `moveDelay`, the
+per-turn budget is enforced, `not-enough-energy` and `too-steep` refuse without paying, an outward run stops at the bound,
+`mbl-13` walks twice and runs once, and two mobiles never share a global distance), `TC-CORE-951` (a crater under a
+walking unit re-grounds it), `apps/worker/tests/room-settings.test.ts` `TC-ROOM-206` (only the active player's input is
+relayed, so a `move` from any other slot never reaches the host).
+
+This pass added `TC-CORE-951` (a crater re-grounds the walker) and `TC-ROOM-206` (only the active player's input is relayed).

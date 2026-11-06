@@ -163,3 +163,53 @@ describe("room settings and input relay", () => {
     expect(harness.state().status).toBe("playing");
   });
 });
+
+describe("TC-ROOM-206: only the active player's input is relayed (US-CORE-008 AC6)", () => {
+  it("drops a move from a peer whose slot the host did not make active", async () => {
+    const { harness, sockets } = await lobby();
+    const host = sockets.get("host")!;
+    const p1 = sockets.get("p1")!;
+    const p2 = sockets.get("p2")!;
+    await harness.message(host, {
+      t: "team_assign",
+      assignments: IDS.map((id, index) => ({ playerId: id, team: index % 2 === 0 ? "A" : "B" })),
+    });
+    await harness.message(host, { t: "start_match" });
+    // The host is authoritative: it names slot 1 as active, so p1 may act and p2 may not.
+    const active = { ...makeSnapshot(1), turn: { ...makeSnapshot(1).turn, activeSlot: 1 } };
+    await harness.message(host, { t: "snapshot_push", snapshot: active });
+    harness.clearAll(sockets.values());
+
+    await harness.message(p2, { t: "move", direction: 1, run: true });
+
+    expect(host.frames()).toEqual([]);
+    expect(p1.frames()).toEqual([]);
+
+    await harness.message(p1, { t: "move", direction: 1, run: true });
+    expect(host.frames()).toEqual([{ t: "move", from: "p1", direction: 1, run: true }]);
+  });
+});
+
+describe("TC-ROOM-207: the host's settings reach the match (US-CORE-012 AC4)", () => {
+  it("keeps mode and map on the room and announces them in `match_started`", async () => {
+    const { harness, sockets } = await lobby();
+    const host = sockets.get("host")!;
+    await harness.message(host, { t: "room_settings", mode: "jewel", mapId: "map-06" });
+    expect(harness.state().settings).toMatchObject({ mode: "jewel", mapId: "map-06" });
+
+    await harness.message(host, {
+      t: "team_assign",
+      assignments: IDS.map((id, index) => ({ playerId: id, team: index % 2 === 0 ? "A" : "B" })),
+    });
+    harness.clearAll(sockets.values());
+    await harness.message(host, { t: "start_match" });
+
+    // Every peer learns the map and mode from the frame, not from its own memory of the lobby.
+    for (const id of IDS) {
+      if (id === "host") continue;
+      const [started] = sockets.get(id)!.framesOf("match_started");
+      expect(started?.["room"]).toMatchObject({ settings: { mode: "jewel", mapId: "map-06" } });
+    }
+  });
+});
+

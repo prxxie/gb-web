@@ -14,7 +14,7 @@ test.describe("solo demo path", () => {
     await expect(page.getByTestId("turn-clock")).toBeVisible();
     await expect(page.getByTestId("wind-dial")).toBeVisible();
     // The ruler count is `clamp(round(8 × visibleWidth / 1000), 8, 16)`, so it is 8 on a 5:3 screen and more on a
-    // landscape phone — where the window keeps its 600 units of height and gains width (`TC-MATCH-918`).
+    // landscape phone, where the camera window keeps its 600 units of height and gains width (`US-MATCH-007`).
     const segments = Number(await page.getByTestId("ruler").getAttribute("data-segments"));
     expect(segments).toBeGreaterThanOrEqual(8);
     expect(segments).toBeLessThanOrEqual(16);

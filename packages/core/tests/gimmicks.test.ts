@@ -235,7 +235,7 @@ describe("gimmicks", () => {
     expect(moved.y).toBeLessThan(groundY(terrainOf(placed), moved.x));
   });
 
-  it("TC-CORE-913: on a return map an off-map shot comes back instead of despawning", () => {
+  it("TC-CORE-955: on a return map an off-map shot comes back instead of despawning", () => {
     expect(returnsOffMapShots(getMap("map-09"))).toBe(true);
     expect(returnsOffMapShots(getMap("map-01"))).toBe(false);
 

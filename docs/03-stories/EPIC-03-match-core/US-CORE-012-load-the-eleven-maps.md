@@ -2,7 +2,7 @@
 id: US-CORE-012
 title: Load the eleven maps
 epic: EPIC-03-match-core
-status: ready
+status: done
 priority: P1
 size: M
 depends_on: [US-CORE-006, US-CORE-011]
@@ -34,8 +34,8 @@ GunBound ships up to eleven maps per mode and the room card's icon is `((mode) *
 | AC1 | the map bundle | it is loaded | eleven records validate: `mapId`, `gravityModifier`, `windRange`, `gimmicks`, terrain RLE (`TC-CORE-920`) |
 | AC2 | any map | a match starts | spawn points are valid ground positions for up to eight slots (`TC-CORE-920`) |
 | AC3 | a map with gimmicks | the match starts | its gimmicks are active and listed in the lobby preview (`TC-CORE-918`) |
-| AC4 | the host changes the map in the lobby | start is pressed | every peer receives the new `mapId` before the first snapshot (`TC-ROOM-151`) |
-| AC5 | a map whose terrain is malformed | it is loaded | the loader throws at build time (`TC-FND-002`) |
+| AC4 | the host changes the map in the lobby | start is pressed | every peer receives the new `mapId` before the first snapshot (`TC-NET-067`, `TC-ROOM-166`) |
+| AC5 | a map whose terrain is malformed | it is loaded | the loader throws at build time (`TC-CORE-945`) |
 | AC6 | two matches on the same map and seed | they are compared | terrain, wind rolls and gimmick schedule match (`TC-CORE-040`) |
 
 ## 4. Contract
@@ -76,10 +76,19 @@ Map editor UI, user-generated maps, seasonal rotation.
 ## 8. Test notes
 
 `TC-CORE-920`, `TC-CORE-918`, `TC-ROOM-151`, `TC-FND-002`, `TC-CORE-040`.
-`Red first: packages/core/tests/maps.test.ts::eleven_maps_load_with_valid_spawns`.
+Red: none — the rule was already implemented and green; this pass added the cases the ACs cited and corrected the citations that pointed at another story's case (see the delivery note at the end of this file).
 
-<!-- delivery:2026-11-05 -->
+<!-- delivery:2026-11-06 -->
 
-## Delivery status — 2026-11-05
+## Delivery status — 2026-11-06
 
-**done.** the engine rule is implemented in `packages/core/src` and covered by `packages/core/tests/` (ballistics, combat, match, snapshot, data, room, rating, camera)
+**done.** `packages/core/tests/maps.test.ts` / `data.test.ts` — `TC-CORE-920` (eleven map records validate: id, gravity
+modifier, wind range, gimmicks, RLE), `TC-CORE-918` (gimmicks active and listed), `TC-CORE-945` (a corrupt RLE token and
+a wrong-length mask both throw), `TC-CORE-040` (the same map and seed reproduce terrain, wind and the gimmick schedule);
+`apps/worker/tests/room-settings.test.ts` `TC-NET-067` (the host's `room_settings` applies mode and map and broadcasts
+`room_state` to every peer) and `TC-ROOM-166` (`match_started` carries the chosen mode and map).
+
+AC4 cited `TC-ROOM-151`, whose only case is "`room_settings` from a peer is not-host" — the broadcast half it meant is
+`TC-NET-067`. AC5 cited `TC-FND-002`, a CORS/env case; the terrain guard it meant is now `TC-CORE-945`.
+
+This pass added `TC-CORE-957` (the listed gimmick runs and the lobby reads the same list), `TC-CORE-958` (a map and seed replay identically) and `TC-ROOM-207` (the host's mode and map reach `match_started`).

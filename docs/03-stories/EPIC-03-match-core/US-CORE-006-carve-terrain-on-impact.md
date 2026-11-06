@@ -2,7 +2,7 @@
 id: US-CORE-006
 title: Carve terrain and collide with it
 epic: EPIC-03-match-core
-status: ready
+status: done
 priority: P0
 size: M
 depends_on: [US-CORE-001]
@@ -66,11 +66,16 @@ Destructible props, water, wind-blown terrain.
 
 ## 8. Test notes
 
-`TC-CORE-914`, `TC-CORE-040`, `TC-CORE-904`, `TC-CORE-913`.
-`Red first: packages/core/tests/terrain.test.ts::blast_removes_circle_and_regrounds_unit`.
+`TC-CORE-914`, `TC-CORE-948`, `TC-CORE-949`, `TC-CORE-950`.
+Red: none — the rule was already implemented and green; this pass added the cases the ACs cited and corrected the citations that pointed at another story's case (see the delivery note at the end of this file).
 
-<!-- delivery:2026-11-05 -->
+<!-- delivery:2026-11-06 -->
 
-## Delivery status — 2026-11-05
+## Delivery status — 2026-11-06
 
-**done.** the engine rule is implemented in `packages/core/src` and covered by `packages/core/tests/` (ballistics, combat, match, snapshot, data, room, rating, camera)
+**done.** `packages/core/tests/terrain.test.ts` — `TC-CORE-914` (a projectile detonates at first contact, the radius-80
+crater is carved and carved again idempotently, a buried unit re-grounds), `TC-CORE-040` (host and peer carve
+byte-identical masks and the RLE survives a round trip), `TC-CORE-904` (a fully buried unit cannot move until the terrain
+is opened), `TC-CORE-950` (a piercing shot crosses the mask instead of detonating on it).
+
+This pass added `TC-CORE-948` (the same blast on host and peer), `TC-CORE-949` (a buried unit cannot move) and `TC-CORE-950` (a piercing shell crosses the ridge).

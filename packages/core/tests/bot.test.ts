@@ -4,7 +4,7 @@ import { launch, simulateFlight } from "../src/ballistics.js";
 import { getMap } from "../src/data/maps.js";
 import { getMobile, MOBILES } from "../src/data/mobiles.js";
 import { ITEMS } from "../src/data/items.js";
-import { createMatch, type Seat } from "../src/match.js";
+import { createMatch, passTurn, type Seat } from "../src/match.js";
 import { createRng } from "../src/rng.js";
 import { createTerrain } from "../src/terrain.js";
 import { TUNABLES } from "../src/tuning.js";
@@ -201,5 +201,23 @@ describe("bot (US-CORE-005)", () => {
     // With nothing in the bag, or with the coin flip against it, the bot just fires.
     expect(botTurnPlan(openField("mbl-02", 100, 1_900), createRng(5), { ...PERFECT, itemUseChance: 1 })).toHaveLength(1);
     expect(botTurnPlan(active, createRng(5), { ...PERFECT, itemUseChance: 0 })).toHaveLength(1);
+  });
+});
+
+describe("TC-CORE-946: a bot keeps playing when the human's clock runs out (US-CORE-005 AC5)", () => {
+  it("skips the silent human's turn and fires on the bot's own turn", () => {
+    // The offline bot match is local: nothing here waits on the human's socket, only on the turn clock.
+    const state = openField();
+    const rng = createRng(7);
+    const next = passTurn(state, NOW + 60_000).state;
+    expect(next.turn.activeSlot).toBe(1);
+    const shot = botTurn(next, rng, PERFECT);
+    expect(shot?.kind).toBe("fire");
+    if (shot?.kind === "fire") {
+      expect(Number.isInteger(shot.force)).toBe(true);
+      const bot = getMobile(next.players[1]!.mobileId);
+      expect(shot.angle).toBeGreaterThanOrEqual(bot.angleMin);
+      expect(shot.angle).toBeLessThanOrEqual(bot.angleMax);
+    }
   });
 });

@@ -28,6 +28,19 @@ function seat(slot: number, team: "A" | "B", mobileId: string): Seat {
   return { slot, team, accountId: `acc-${slot}`, displayName: `P${slot}`, mobileId, loadout: {} };
 }
 
+describe("TC-CORE-945: a malformed terrain never loads (US-CORE-012 AC5)", () => {
+  it("throws on a corrupt RLE token and on a mask of the wrong length", () => {
+    // A peer's mask arrives inside a snapshot, so a bad one must fail loudly instead of drawing a broken map.
+    expect(() => deserializeTerrain("map-01", "not-a-run")).toThrow(/corrupt terrain RLE/);
+    expect(() => deserializeTerrain("map-01", "100x0")).toThrow(/corrupt terrain RLE/);
+    expect(() => deserializeTerrain("map-01", "100x1")).toThrow(/terrain length mismatch/);
+    // The same map round-trips, so the guard rejects only what it should.
+    const terrain = createTerrain("map-01");
+    const back = deserializeTerrain("map-01", serializeTerrain(terrain));
+    expect(back.heights[0]).toBeCloseTo(terrain.heights[0] ?? 0, 2);
+  });
+});
+
 describe("terrain carving", () => {
   it("TC-CORE-914: blast radius 80 removes a 0.6 × 80 crater and leaves the rest of the mask alone", () => {
     const mobile = getMobile("mbl-01");
@@ -105,7 +118,7 @@ describe("terrain carving", () => {
     expect(flight.impact.y - heightAt(terrain, flight.impact.x)).toBeLessThanOrEqual(terrain.step);
   });
 
-  it("TC-CORE-913: a piercing shot crosses a ridge that stops an arc shot", () => {
+  it("TC-CORE-950: a piercing shot crosses a ridge that stops an arc shot", () => {
     const mobile = getMobile("mbl-01");
     const ridge = flat();
     for (let i = 200; i < 260; i += 1) ridge.heights[i] = 700;
@@ -203,5 +216,22 @@ describe("terrain carving", () => {
     // The blast dug the ground under the target, so the unit must fall with it.
     expect(groundY(carvedTerrain, target.x)).toBeGreaterThan(groundY(terrain, target.x));
     expect(targetAfter.y).toBeCloseTo(groundY(carvedTerrain, targetAfter.x) - 8, 6);
+  });
+});
+
+describe("TC-CORE-948: the same blast leaves the same mask on host and peer (US-CORE-006 AC4)", () => {
+  it("carves two independently created terrains into byte-identical RLE", () => {
+    const carveInto = (): Terrain => {
+      const terrain = flat();
+      carve(terrain, 1_000, 700, 48);
+      return terrain;
+    };
+
+    const host = carveInto();
+    const peer = carveInto();
+
+    expect(serializeTerrain(peer)).toBe(serializeTerrain(host));
+    // The peer rebuilds its mask from the bytes the host sent, so the wire form must be lossless.
+    expect(deserializeTerrain("map-01", serializeTerrain(host)).heights).toEqual(host.heights);
   });
 });

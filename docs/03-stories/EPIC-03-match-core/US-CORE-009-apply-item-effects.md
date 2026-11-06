@@ -2,7 +2,7 @@
 id: US-CORE-009
 title: Apply the eleven item effects
 epic: EPIC-03-match-core
-status: ready
+status: done
 priority: P1
 size: L
 depends_on: [US-CORE-003, US-CORE-008]
@@ -70,10 +70,19 @@ Purchasing, inventory persistence across matches (`OQ-20`), item combos.
 ## 8. Test notes
 
 `TC-CORE-906`, `TC-CORE-907`, `TC-CORE-908`, `TC-CORE-909`, `TC-CORE-910`, `TC-CORE-911`, `TC-CORE-901`, `TC-NET-067`.
-`Red first: packages/core/tests/items.test.ts::dual_allows_second_shot_in_same_turn`.
+Red: none — the rule was already implemented and green; this pass added the cases the ACs cited and corrected the citations that pointed at another story's case (see the delivery note at the end of this file).
 
-<!-- delivery:2026-11-05 -->
+<!-- delivery:2026-11-06 -->
 
-## Delivery status — 2026-11-05
+## Delivery status — 2026-11-06
 
-**done.** the engine rule is implemented in `packages/core/src` and covered by `packages/core/tests/` (ballistics, combat, match, snapshot, data, room, rating, camera)
+**done.** `packages/core/tests/items.test.ts` — `TC-CORE-906` (Dual keeps the turn and fires twice on the same weapon, a
+second item between the pair is refused, Blood adds 25 % for one shot, Power up lifts the force cap by 20),
+`TC-CORE-907` (Energy up 1/2 add 30/60 and charge 5/10 delay), `TC-CORE-908` (Change Wind re-rolls and announces),
+`TC-CORE-909` (Teleport moves 150 px inside the map, Team Teleport gathers the team within 40 px, neither touches the
+turn), `TC-CORE-910` (Bunge returns the shell to the caster), `TC-CORE-911` (Thunder strikes the band at the aim and
+spares the rest), `TC-CORE-932` (an item the player does not own is refused without charging delay), and
+`packages/core/tests/turn-queue.test.ts` `TC-CORE-901` (the delay cost lands in the queue before the next player is
+chosen).
+
+This pass added `TC-CORE-953` (an item's delay cost is charged before the next player is chosen).

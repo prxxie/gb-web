@@ -108,7 +108,6 @@ The `covers` column names the requirement ([nonfunctional-requirements.md](../01
 | TC-ROOM-162 | US-ROOM-003 | AC5 — illegal state transitions in `playing`/`ended` | Rejected with no side effects | worker | `workflow-state-machine.md` |
 | TC-ROOM-164 | US-ROOM-003 | AC4 — `start_match` in a lobby that is not full | `room-not-full` | worker | `workflow-state-machine.md` |
 | TC-ROOM-165 | US-ROOM-003 | AC4 — `start_match` with unbalanced teams | `teams-not-balanced` | worker | `workflow-state-machine.md` |
-| TC-ROOM-166 | US-ROOM-003 | AC3 — `match_started` after a host start | Carries the chosen mode, map and each assignment's loadout | worker | `api/signaling.md` § 3 |
 | TC-ROOM-163 | US-NET-004 | Every documented client frame, and one field the frame does not document | Each documented frame parses; an unknown `t` is `unsupported-message`; an undocumented field is `bad-request` naming it; an 8 KB sdp is `payload-too-large` | unit | `api/signaling.md` § 2 |
 | TC-ROOM-167 | US-ROOM-007 | AC4 — a lobby loadout of eleven items, then a twelfth | Eleven are kept and the twelfth is refused | worker | `data/items.md` |
 | TC-ROOM-046 | US-ROOM-004 | Reconnect within the 20 s grace | Slot, team and HP restored from `lastSnapshot` | e2e | NFR-07 |
@@ -119,6 +118,7 @@ The `covers` column names the requirement ([nonfunctional-requirements.md](../01
 | TC-ROOM-048 | US-ROOM-005 | AC1, AC7 — host socket dies in `playing`, and again after the first promotion | Longest-connected peer becomes host, `hostGeneration` +1 | worker | NFR-06 |
 | TC-ROOM-049 | US-ROOM-005 | AC6 — migration end to end | Playable again ≤ 5 s from the failure | e2e | NFR-06 |
 | TC-ROOM-124 | US-ROOM-005 | `snapshot_push` above 8 KB | Rejected, previous snapshot kept | worker | NFR-04 |
+| TC-ROOM-205 | US-CORE-010 | AC7 — `POST /rooms` with a mode outside `solo` / `score` / `tag` / `jewel` | 422 `validation`, `errors[].field` names `mode` | worker | FR-04  |
 | TC-ROOM-149 | US-ROOM-005 | AC5 — host leaves the lobby | Banner shown, earliest joiner promoted | e2e | NFR-06 |
 | TC-ROOM-050 | US-ROOM-006 | AC1 — signaling relay | SDP passed through byte-identical, never stored | worker | NFR-09 |
 | TC-ROOM-051 | US-ROOM-006 | AC3 — `GET /turn-credentials` | Two servers, `ttlSeconds: 3600`, nothing logged | worker | NFR-10 |
@@ -134,54 +134,76 @@ The `covers` column names the requirement ([nonfunctional-requirements.md](../01
 | TC-CORE-021 | US-CORE-001 | AC4b — a sector (not just a magnitude) changes the arc | Wind +max pushes the projectile downwind | Δx increases monotonically with wind | unit | FR-04 |
 | TC-CORE-022 | US-CORE-001 | AC5 — an angle outside the window is clamped, never rejected | Force and angle out of the mobile's own window (`mbl-05` 25°, `mbl-15` 50°, `mbl-13` −18°) | Clamped to that mobile's `angleMin…angleMax` and `0…maxPower`, never `NaN`, and two mobiles with the same profile clamp differently | unit | FR-03 |
 | TC-CORE-023 | US-CORE-001 | AC4 — drift scales with `wind/mass` and follows `½·a·t²` | Same shot in calm, in wind +26 and in wind −26, on `mbl-01` (`mass 168`) | Landing drift equals `½ · (windCoefficient × magnitude / mass) · t²` with `windCoefficient = 42` (`tunables.md` § 1.3) within 5 % (the bound the 0.1 position quantum puts on a 6.3 s flight), is linear in `magnitude`, reverses sign with the wind, and a vertical component changes effective gravity (`a_y = −g + 42 × wind.y / mass`) | unit | FR-04 |
-| TC-CORE-024 | US-CORE-003 | Blast at Inner, Mid and Outer radii | Three distinct damage tiers, 0 beyond the radius | unit | FR-06 |
-| TC-CORE-025 | US-CORE-003 | HP would go below zero | HP floored at 0, player marked `eliminated` | unit | FR-06 |
+| TC-CORE-024 | US-CORE-003 | AC1, AC5, AC6 — power 400 at 20 / 50 / 79 / 81 units inside a radius-80 blast, and the tier table | Inner 400, Mid 240, Outer 120, nothing beyond the radius; tiers at 0.4 R and 0.7 R | unit | FR-06  |
+| TC-CORE-025 | US-CORE-003 | AC4 — a unit at hp 100 takes 435 | HP floored at 0, player marked `eliminated` | unit | FR-06  |
 | TC-CORE-026 | US-CORE-003 | Target with `defense 1.15` takes an Inner hit of 500 | Damage is divided by `defense` and rounded: 435 | unit | FR-06 |
-| TC-CORE-027 | US-CORE-003 | Blast hits a teammate; last player of a team reaches 0 | Friendly fire damages; match ends with the other team as winner | unit | OQ-02 |
 | TC-CORE-028 | US-CORE-001 | Same seed and inputs twice | Identical state hash after 200 steps | unit | NFR-22 |
 | TC-CORE-029 | US-CORE-001 | AC3 — force 0 drops the shell inside the flight budget | Projectile leaves `mapBounds` and never lands | Turn resolves as a miss after `maxFlightMs`, no error | unit | FR-04 |
+| TC-CORE-041 | US-CORE-004 | AC1 — encode 8 players in Jewel mode with 6 jewels, then the same match with `includeTerrain` | ≤ 800 bytes and no mask by default, decodes identically; the mask-bearing frame is larger but stays under the 8 KB socket cap and decodes to the host's heights | unit | FR-05  |
+| TC-CORE-042 | US-CORE-004 | AC6 — a snapshot payload above `snapshotHardLimitBytes` | refused at the hard limit (the socket-level `snapshot-too-large` rejection is `TC-ROOM-124`) | unit | FR-05  |
+| TC-CORE-940 | US-CORE-004 | AC2 — encode the same state twice, then apply it twice | byte-identical, so key order and rounding are stable; a second apply is a no-op | unit | FR-05  |
+| TC-CORE-941 | US-CORE-004 | AC3, AC4 — take `seq 41` after `39`, then `39` after `41`, then a snapshot from an older `hostGeneration` | a newer sequence wins without needing `40`; an older sequence and an older generation are refused | unit | FR-05  |
+| TC-CORE-942 | US-CORE-004 | AC5 — apply a decoded snapshot onto the host's state | shields, energy, delay queue, weapon slot, scores and mode state match the host; the turn and weather ride in the snapshot itself | unit | FR-05  |
 | TC-CORE-040 | US-CORE-004 | Apply the same snapshot twice | Second apply is a no-op; key order and rounding stable | unit | FR-05 |
-| TC-CORE-041 | US-CORE-004 | Encode 8 players in Jewel mode with 6 jewels; then the same match with `includeTerrain` | ≤ 800 bytes and no mask by default, decodes identically; the mask-bearing frame is larger but ≤ 8 KB and its heights decode to a tenth of a unit | unit | NFR-04 |
-| TC-CORE-042 | US-CORE-004 | Snapshot with an older `seq` or a stale `hostGeneration` | Ignored, state unchanged | unit | FR-05 |
 | TC-CORE-045 | US-CORE-002 | AC5 — out-of-order `seq` means only the higher one counts | Last `seq` wins, one shot simulated | unit | FR-05 |
 | TC-CORE-152 | US-CORE-002 | AC4 — the clock expires and the queue advances exactly once | 20 s, skips on timeout, drift ≤ 1 s | unit | OQ-03 |
 | TC-CORE-901 | US-CORE-002 | AC1, AC2, AC3 — equal delays tie on slot, the super shot costs +200 and an item's cost counts before sorting | Order follows accumulated delay, ties by slot, super shot pushes the shooter back; item and move costs included | unit | FR-02 |
 | TC-CORE-936 | US-CORE-002 | AC6 — an eliminated slot is skipped but keeps its accumulated delay | Four players, slot 2 eliminated, turn ends | The queue skips slot 2 and its delay is untouched | unit | FR-04 |
 | TC-CORE-937 | US-CORE-002 | AC7 — the delay table that produced the order rides on `match_end` | A table parses and comes back unchanged; a fractional, negative or over-long one is `bad-request` naming `delayTable`; a frame without one still parses | unit | FR-02 |
 | TC-CORE-939 | US-CORE-002 | AC7 — the table is stored with the record it explains | `POST /matches` writes `delay_table` in slot order, stores `[]` when the client sent none, and answers 422 for a fractional or negative delay without writing a row | worker | FR-02 |
-| TC-CORE-902 | US-CORE-005 | Bot's turn starts with three weapons | Fires within 3 s, picks the best simulated weapon, deterministic per seed | unit | NFR-21 |
-| TC-CORE-903 | US-CORE-003 | Target with shield 300, hp 1,200, defense 1.15 takes an Inner hit of 500 | Total 435: shield absorbs 300, HP loses 135, shield never goes negative | unit | FR-06 |
-| TC-CORE-904 | US-CORE-008 | `mbl-01` walks once then tries twice; `mbl-13` walks twice and runs; one climbs too steep a slope | Energy debited by `moveEnergy` (double for a run), queue by `moveDelay`, distance is the mobile's own `moveDistance`, action count capped at `maxMovesPerTurn`, movement stops at `maxIncline` and at the map bound | unit | FR-03 |
+| TC-CORE-902 | US-CORE-005 | AC1, AC2, AC3 — Bot's turn starts with three weapons | Fires within 3 s, picks the best simulated weapon, deterministic per seed | unit | NFR-21 |  |
+| TC-RANK-116 | US-RANK-001 | Match containing a guest slot | `ranked: false`, no `rating_history` rows | worker | roles |
+| TC-CORE-903 | US-CORE-003 | AC2 — target with shield 300, hp 1,200, defense 1.15 takes an Inner hit of 500 | Total 435: shield absorbs 300, HP loses 135, shield never goes negative | unit | FR-06  |
+| TC-CORE-904 | US-CORE-008 | AC1, AC2, AC3, AC4, AC7, AC8 — `mbl-01` walks once then tries twice; `mbl-13` walks twice and runs; one climbs too steep a slope | Energy debited by `moveEnergy` (double for a run), queue by `moveDelay`, distance is the mobile's own `moveDistance`, action count capped at `maxMovesPerTurn`, movement stops at `maxIncline` and at the map bound | unit | FR-03 |  |
+| TC-CORE-914 | US-CORE-006 | AC1, AC2, AC3 — blast radius 80 on the mask | Crater of 0.6x80 carved, units regrounded, mask identical on host and peer | unit | FR-06 |
+| TC-CORE-948 | US-CORE-006 | AC4 — the same blast on host and peer | Two independently carved masks serialise byte-identical and the RLE round-trips | unit | FR-06 |
+| TC-CORE-949 | US-CORE-006 | AC5 — a unit fully buried by terrain | It can still fire but cannot move until the terrain is opened | unit | FR-06 |
+| TC-CORE-950 | US-CORE-006 | AC6 — a `piercing` shot meets a ridge | It crosses the ridge that stops an arc shot | unit | FR-06 |
+| TC-CORE-951 | US-CORE-008 | AC5 — a crater opens under the walking unit | It falls to the new ground instead of floating | unit | FR-03 |
+| TC-ROOM-206 | US-CORE-008 | AC6 — a `move` from a peer the host did not make active | Nothing is relayed; the active player's move still reaches the host | worker | FR-03 |
 | TC-CORE-905 | US-CORE-007 | AC1, AC8 — the twenty records load inside the documented clamps, `1000`-scale values are kept as-is | Schema valid (`gravity 84–128`, `mass 118–169`, `maxHp 900–1200`, `maxShield 0–300`, `power 180–580`, no `density` on a weapon, `trajectory` one of five profiles, `angleMin < angleMax` inside its profile band, `maxMovesPerTurn` 1–2, `moveDistance` 60–110, `moveEnergy` 8–14, `moveDelay` 8–14, `runMultiplier` 1.5–1.9), regen capped at `maxShield`, an out-of-band value rejected | unit | FR-06 |
-| TC-CORE-906 | US-CORE-009 | Dual, Blood and Power up | Dual allows a second shot, Blood adds 25 % for one shot, Power up raises the force cap | unit | FR-06 |
-| TC-CORE-907 | US-CORE-009 | Energy up 1 and Energy up 2 | Budget +30 / +60 for the turn, delay charged | unit | FR-03 |
-| TC-CORE-908 | US-CORE-009 | Change Wind | Wind re-rolled, announced, present in the next snapshot | unit | FR-04 |
-| TC-CORE-909 | US-CORE-009 | Teleport and Team Teleport | Caster or whole living team moves; never into terrain | unit | FR-03 |
-| TC-CORE-910 | US-CORE-009 | Bunge shot | Projectile returns toward the caster and detonates on the way back | unit | FR-04 |
-| TC-CORE-911 | US-CORE-009 | Thunder | A horizontal band at the aim point is struck for the listed damage | unit | FR-06 |
+| TC-CORE-906 | US-CORE-009 | AC1, AC2 — Dual, Blood and Power up | Dual allows a second shot, Blood adds 25 % for one shot, Power up raises the force cap | unit | FR-06 |  |
+| TC-CORE-907 | US-CORE-009 | AC3 — Energy up 1 and Energy up 2 | Budget +30 / +60 for the turn, delay charged | unit | FR-03  |
+| TC-CORE-908 | US-CORE-009 | AC4 — Change Wind | Wind re-rolled, announced, present in the next snapshot | unit | FR-04  |
+| TC-CORE-909 | US-CORE-009 | AC5 — Teleport and Team Teleport | Caster or whole living team moves; never into terrain | unit | FR-03  |
+| TC-CORE-910 | US-CORE-009 | AC6 — Bunge shot | Projectile returns toward the caster and detonates on the way back | unit | FR-04  |
+| TC-CORE-911 | US-CORE-009 | AC7 — Thunder | A horizontal band at the aim point is struck for the listed damage | unit | FR-06  |
 | TC-CORE-912 | US-CORE-007 | AC2 — the chosen `weaponSlot` flies its own class, power and radius | Each class shows its documented shape; beam resolves instantly; cluster splits into 3 | unit | FR-04 |
 | TC-CORE-913 | US-CORE-001 | AC7 — a bounce detonates no later than the third bounce | `bounce` on flat terrain, `piercing` through a hill, `return` off the map | Bounce detonates within 3 bounces at 0.6 restitution; piercing ignores terrain; return comes back once | unit | FR-04 |
-| TC-CORE-914 | US-CORE-006 | Blast radius 80 on the mask | Crater of 0.6×80 carved, units regrounded, mask identical on host and peer | unit | FR-06 |
-| TC-CORE-915 | US-CORE-010 | Score mode reaches the 12-turn cap | Higher damage total wins | unit | FR-06 |
-| TC-CORE-916 | US-CORE-010 | Tag mode, a team finishes its whole turn | `activeTeam` flips and the opposing team acts | unit | FR-02 |
-| TC-CORE-917 | US-CORE-010 | Jewel mode: walk over a jewel, then kill a carrier | Jewel carried, then transferred to the killer's team; all jewels ends the match | unit | FR-06 |
-| TC-CORE-918 | US-CORE-011 | Map with `force`, map with `gust` | Constant sideways push; 4× wind spike for one turn, announced and reverted | unit | FR-04 |
-| TC-CORE-919 | US-CORE-011 | Map with `electric`, `heal` and a tornado | Strike on every third turn for 150; heal zone (200 units around x 1000) restores 100 capped at `maxHp`, a unit outside it gains nothing; tornado displaces 60 px without burying | unit | NFR-21 |
-| TC-CORE-920 | US-CORE-012 | Load the eleven maps | Schema valid, spawns valid for 8 slots, terrain RLE expands | unit | FR-04 |
-| TC-CORE-921 | US-CORE-013 | Profile with +4 attack, another with +20 | First is ×1.04, second clamps at ×1.10; energy and delay caps hold | unit | FR-06 |
+| TC-CORE-945 | US-CORE-012 | AC5 — a corrupt terrain RLE token and a mask of the wrong length | Both throw (`corrupt terrain RLE`, `terrain length mismatch`); a sound mask still round-trips | unit | FR-06  |
+| TC-CORE-946 | US-CORE-005 | AC5 — the human's 20 s clock runs out in a bot match | The turn passes to the bot, which fires a legal shot inside its own envelope without the human's socket | unit | FR-07  |
+| TC-CORE-943 | US-CORE-003 | AC3 — a `mbl-01` slot starts its turn at shield 10, and again at 145 | Shield rises by its own `shieldRegen` (20) to 30, and is capped at `maxShield` (150); a slot that is not starting keeps its shield | unit | FR-06  |
+| TC-CORE-944 | US-CORE-003 | AC7 — `mbl-19` (electric) and `mbl-01` (explosion) fire the same shot | The effect never enters the damage formula, and the mobile's `effect` travels with it (`electric`) | unit | FR-06  |
+| TC-CORE-027 | US-CORE-003 | Blast hits a teammate; last player of a team reaches 0 | Friendly fire damages; match ends with the other team as winner | unit | OQ-02 |
+| TC-CORE-915 | US-CORE-010 | AC2 — Score mode reaches the 12-turn cap | Higher damage total wins | unit | FR-06 |  |
+| TC-CORE-916 | US-CORE-010 | AC3 — Tag mode, a team finishes its whole turn | `activeTeam` flips and the opposing team acts | unit | FR-02 |  |
+| TC-CORE-917 | US-CORE-010 | AC4, AC5 — Jewel mode: walk over a jewel, then kill a carrier | Jewel carried, then transferred to the killer's team; all jewels ends the match | unit | FR-06 |  |
+| TC-CORE-918 | US-CORE-011 | AC1, AC2, AC4 — Map with `force`, map with `gust` | Constant sideways push; 4× wind spike for one turn, announced and reverted | unit | FR-04 |  |
+| TC-CORE-931 | US-CORE-011 | AC7 — a map with `fog` | The aim arc shortens and blast markers hide; unit positions stay visible | unit | `tunables.md` § 6 |
+| TC-CORE-919 | US-CORE-011 | AC3, AC6, AC8 — Map with `electric`, `heal` and a tornado | Strike on every third turn for 150; heal zone (200 units around x 1000) restores 100 capped at `maxHp`, a unit outside it gains nothing; tornado displaces 60 px without burying | unit | NFR-21 |  |
+| TC-CORE-920 | US-CORE-012 | AC1, AC2 — Load the eleven maps | Schema valid, spawns valid for 8 slots, terrain RLE expands | unit | FR-04 |  |
+| TC-CORE-957 | US-CORE-012 | AC3 — a map with gimmicks | The listed gimmick runs in the match and the lobby reads the same list | unit | FR-04 |
+| TC-CORE-958 | US-CORE-012 | AC6 — the same map and seed twice | Terrain, opening wind and the gimmick schedule match | unit | FR-04 |
+| TC-ROOM-207 | US-CORE-012 | AC4 — the host changes the map and mode | The settings land on the room and `match_started` carries them to every peer | worker | FR-04 |
+| TC-CORE-921 | US-CORE-013 | AC1, AC2, AC5 — Profile with +4 attack, another with +20 | First is ×1.04, second clamps at ×1.10; energy and delay caps hold | unit | FR-06 |  |
 | TC-CORE-922 | US-CORE-007 | AC3 — the super shot fires once and the slot then reports empty | Slot 2 reports empty afterwards and cannot be selected | unit | FR-04 |
 | TC-CORE-923 | US-CORE-007 | AC4 — a balance report over the twenty records; the loader refuses an out-of-range value | Every archetype has exactly two mobiles, the two sit within ±10 % of each other on damage per delay, the roster spread is printed, report regenerates from the CSV | unit | `data/mobiles.md` § 5 |
 | TC-CORE-924 | US-CORE-007 | AC6, AC7 — two players may share a mobile; every mobile lands where the flat-probe table says | Every mobile fires at its `maxPower` on a flat probe map | Landing distance and hang time match `data/mobiles.md` § 4 within ±1 unit (`mbl-14` 2,058 vs `mbl-03` 1,433, first ground contact), each mobile keeps its own arc at identical power, and a heavier mobile drifts less under wind | unit | FR-04 |
 | TC-CORE-935 | US-CORE-001 | AC6 — lower gravity means a flatter, longer arc | `mbl-13` (`g 84`) lands past `mbl-03` (`g 118`) at the same angle and force: 2,024 vs 1,433 units | unit | FR-04 |
 | TC-CORE-925 | US-CORE-007 | AC7 — `mass` and `gravity` separate the flights, so the mobile record is what decides | The light/weak-gravity mobile lands further and drifts more under identical wind; swapping their `mass` values swaps the behaviour, proving `mass` is the only wind term | unit | FR-04 |
 | TC-CORE-938 | US-CORE-007 | AC5 — the `rulesetVersion` rides in `match_started` and survives the snapshot | `match_started` carries the version to every member and a snapshot applies the same one | unit | FR-04 |
-| TC-CORE-926 | US-CORE-015 | Roll the weather across four rounds with a fixed seed | `turn.round` increments on queue wrap; `magnitude` 0–26 and `sector` 0–11 each roll; wind constant inside a round; same seed replays the same sequence | unit | FR-04 |
-| TC-CORE-927 | US-CORE-005 | A bot holding Power up, its best raw shot landing more than the item can fix | It sends the `item` input before the shot, one item only, and pays the item's `delayCost` | unit | NFR-21 |
-| TC-CORE-928 | US-CORE-015 | An eight-player mid-round snapshot after a wind roll | The weather rides in the snapshot (`magnitude`, `sector`, `rolledAtRound`), decodes identically, and the state snapshot stays ≤ 800 bytes | unit | FR-04 |
-| TC-CORE-929 | US-CORE-013 | A guest with no avatar equipped | No bonus is applied and the match is still playable | unit | FR-06 |
-| TC-CORE-930 | US-CORE-013 | An avatar part the profile does not own, or a retired one | It contributes no bonus, and the rest of the profile still applies | unit | NFR-11 |
+| TC-CORE-926 | US-CORE-015 | AC1, AC2, AC3, AC4, AC7 — Roll the weather across four rounds with a fixed seed | `turn.round` increments on queue wrap; `magnitude` 0–26 and `sector` 0–11 each roll; wind constant inside a round; same seed replays the same sequence | unit | FR-04 |  |
+| TC-CORE-927 | US-CORE-005 | AC4 — A bot holding Power up, its best raw shot landing more than the item can fix | It sends the `item` input before the shot, one item only, and pays the item's `delayCost` | unit | NFR-21  |
+| TC-CORE-947 | US-CORE-005 | AC6 — a finished bot match | `isRanked` refuses a bot seat, so the match never reaches the leaderboard | unit | FR-07 |
+| TC-CORE-928 | US-CORE-015 | AC8 — An eight-player mid-round snapshot after a wind roll | The weather rides in the snapshot (`magnitude`, `sector`, `rolledAtRound`), decodes identically, and the state snapshot stays ≤ 800 bytes | unit | FR-04 |  |
+| TC-CORE-959 | US-CORE-015 | AC5 — `magnitude = 0` | A legal calm roll: `isCalm` true, the dial reads `calm`, no wind term | unit | FR-02 |
+| TC-CORE-960 | US-CORE-015 | AC6 — `magnitude 26`, `sector 0`, a full-force shot | The landing point moves 100-160 units downwind (about one ruler division) | unit | FR-02 |
+| TC-CORE-929 | US-CORE-013 | AC3 — A guest with no avatar equipped | No bonus is applied and the match is still playable | unit | FR-06  |
+| TC-CORE-930 | US-CORE-013 | AC4 — An avatar part the profile does not own, or a retired one | It contributes no bonus, and the rest of the profile still applies | unit | NFR-11  |
 | TC-CORE-931 | US-CORE-011 | The fog gimmick on a flat map | The visible window halves and the battle state is untouched | unit | `tunables.md` § 6 |
-| TC-CORE-932 | US-CORE-009 | An item the player does not own | Rejected without charging the item's delay | unit | `data/items.md` |
+| TC-CORE-955 | US-CORE-011 | AC5 — a map with `return` | An off-map shot comes back instead of despawning | unit | `tunables.md` § 6 |
+| TC-CORE-932 | US-CORE-009 | AC8 — An item the player does not own | Rejected without charging the item's delay | unit | `data/items.md`  |
+| TC-CORE-953 | US-CORE-009 | AC9 — any item | Its `delayCost` is charged and the queue stays on the user until they fire or skip | unit | FR-03 |
 
 ## Netplay (NET)
 
@@ -191,18 +213,19 @@ The `covers` column names the requirement ([nonfunctional-requirements.md](../01
 | TC-NET-902 | US-NET-002 | Host streams state for one round | A snapshot every 100 ms while a turn is live and every 500 ms when idle; a peer buffering more than 64 KB is skipped; a silent peer for 2 s is reported | e2e | FR-05 |
 | TC-NET-903 | US-NET-003 | New host adopts the previous snapshot | `acceptSnapshot` refuses an older `hostGeneration` and a stale `seq`; an accepted snapshot restores players, weather and the turn clock; a snapshot that no longer fits the budget is rejected, not truncated | unit | FR-06 |
 | TC-NET-044 | US-NET-004 | Peer sends `snapshot_push` while not host | `error not-host`, `lastSnapshot` unchanged | worker | ADR-0004 |
-| TC-NET-067 | US-NET-004 | Fire from a non-active slot | Ignored + `error unsupported-message` | worker | FR-02 |
 
 ## Match UI (MATCH)
 
 | ID | Story | Case | Expected | Level | Covers |
 |----|-------|------|----------|-------|--------|
 | TC-CORE-016 | US-CORE-010 | `room_settings` with mode `royale`, then with `mapId` `map-99` | Both refused `bad-request` naming the field, so an unknown mode never reaches `createMatch` | unit | FR-05 |
+| TC-CORE-961 | US-CORE-010 | AC1 — mode `solo`, one team wiped | The match ends and the surviving team wins | unit | FR-06 |
 | TC-MATCH-901 | US-MATCH-001 | Mount the scene with a state | Map, units and turn indicator drawn; the ruler's division count matches `clamp(round(8 × visibleWidth / 1000), 8, 16)` with one ~125-unit division each | e2e | NFR-01 |
 | TC-MATCH-151 | US-MATCH-002 | Drag aim and release | One `fire`, angle/force within ±2° / ±3 of the drawn values | e2e | FR-03 |
 | TC-MATCH-902 | US-MATCH-002 | A second finger lands mid-pull | The pull is cancelled without firing and the camera gesture takes over | web | FR-03 |
 | TC-MATCH-903 | US-MATCH-003 | Snapshot applied | HUD HP, wind and active slot equal the snapshot within 100 ms | web | NFR-02 |
 | TC-MATCH-904 | US-MATCH-003 | Active slot changes | Announced once through the polite live region in the active locale | e2e | NFR-16 |
+| TC-MATCH-923 | US-MATCH-003 | Apply `weather` at `m = 0`, `m = 26` and a sector change | Dial draws 12 ticks with long cardinals, arrow at `directionDeg`, numeric 0–26, `0` renders the hollow grey dial, banner appears once per round and dismisses on tap | web | FR-04 |
 | TC-MATCH-905 | US-MATCH-004 | Skip, and six phrases in one second | Skip resolves the turn; the third phrase onward is dropped locally | e2e | FR-07 |
 | TC-MATCH-006 | US-MATCH-005 | Item tray with no items, and a loadout of 12 | Empty state with no dead buttons; the 12th item is refused | e2e | `data/items.md` |
 | TC-MATCH-906 | US-MATCH-005 | Select weapon 2, spend the super shot | Active slot changes and the arc redraws by class; the super shot then disables | e2e | FR-03 |
@@ -215,7 +238,6 @@ The `covers` column names the requirement ([nonfunctional-requirements.md](../01
 | TC-MATCH-920 | US-MATCH-007 | Zoom from default to whole map and back, reading the ruler each step | Segments go 8 → 16 and back, each labelled with `visibleWidth / segments`, 125 units at both ends | web | FR-03 |
 | TC-MATCH-921 | US-MATCH-007 | First tap on a device with and without the Fullscreen API | `requestFullscreen()` called where available; otherwise the page fills the viewport with safe-area insets and no `apple-mobile-web-app-capable` meta | e2e | FR-03 |
 | TC-MATCH-922 | US-MATCH-007 | Zoom to `zoomMax` and to `zoomMin` with the pad and ring visible | Pad ring stays 96 px, buttons 60 px, ring radius 64 px, roster unchanged at both zooms | web | NFR-17 |
-| TC-MATCH-923 | US-MATCH-003 | Apply `weather` at `m = 0`, `m = 26` and a sector change | Dial draws 12 ticks with long cardinals, arrow at `directionDeg`, numeric 0–26, `0` renders the hollow grey dial, banner appears once per round and dismisses on tap | web | FR-04 |
 | TC-MATCH-924 | US-MATCH-001 | AC2 — two snapshots 100 ms apart, read at 0, ¼, ½, ¾ and 1 of the blend | A unit sits halfway at half the interval, never moves backwards or off its segment, `hp`/`facing`/`eliminated` come from the newest snapshot, an eliminated unit snaps to where it died, and the first frame after a mount starts where the state says | web | FR-01, NFR-01 |
 | TC-MATCH-925 | US-MATCH-001 | AC6 — one mobile at HP 0 in a three-mobile roster | It keeps its cell and its order, is labelled `match.eliminated` instead of printing its hp, and only the active slot carries `match__player--active` | web | NFR-17 |
 | TC-MATCH-926 | US-MATCH-001 | AC7 — play a bot match until one side is eliminated, on a phone in landscape | The clock and the bot stop on the final turn, the results screen replaces the match without a page reload and the canvas is released (no second WebGL context in a heap snapshot) | manual | FR-01 |
@@ -228,7 +250,6 @@ The `covers` column names the requirement ([nonfunctional-requirements.md](../01
 | TC-RANK-111 | US-RANK-001 | Submit the same match twice | Second `409 match-already-recorded`, no second rating change | worker | `data/matches.md` |
 | TC-RANK-112 | US-RANK-001 | Submit as a non-host or non-participant | `403 forbidden`, nothing written | worker | NFR-11 |
 | TC-RANK-115 | US-RANK-001 | Payload with two winners or a bad duration | `422 validation_failed` naming the field | worker | `data/matches.md` |
-| TC-RANK-116 | US-RANK-001 | Match containing a guest slot | `ranked: false`, no `rating_history` rows | worker | roles |
 | TC-RANK-058 | US-RANK-002 | Rated match with four players | Exactly four `rating_history` rows, before/after/delta consistent | worker | NFR-14 |
 | TC-RANK-113 | US-RANK-002 | Elo with equal ratings | Δ = ±16 at K = 32 | unit | OQ-28 |
 | TC-RANK-114 | US-RANK-002 | K switch at 30 rated matches | K = 16 from the 31st match | unit | OQ-28 |
@@ -309,6 +330,7 @@ unrelated meanings), so every row below names the one thing it proves.
 | TC-MATCH-914 | US-MATCH-002 | Drag distance maps to the power ring radius | Radius grows with the pull and stops at the maximum | web | `US-MATCH-002` §4 |
 | TC-NET-045 | US-NET-004 | A peer sends `team_assign`; the host sends it after the start | `not-host` while a peer, `invalid-state` once playing; the roster is unchanged | worker | `US-NET-004` §2 roster |
 | TC-NET-066 | US-NET-004 | A socket signals itself, then signals a seated member with no socket | `bad-request`, then `peer-not-connected`; no frame is relayed | worker | `US-NET-004` §3 `signal` |
+| TC-NET-067 | US-NET-004 | Fire from a non-active slot | Ignored + `error unsupported-message` | worker | FR-02 |
 | TC-PWA-152 | US-PWA-003 | AC1, AC2 — the page is squeezed into portrait, then rotated to landscape | Portrait shows the rotate gate with the hint, landscape shows the match | web | `US-PWA-003` AC1, AC2 |
 | TC-ROOM-025 | US-MATCH-004 | A preset phrase and a free text are sent, then an empty, unknown-kind or 121-char frame | The two valid frames parse; the three invalid ones are refused with the limit in `detail` | unit | `US-MATCH-004` §4 `chat` |
 | TC-ROOM-053 | US-ROOM-001 | A room runs past 24 h from its creation but not from its match start | The cap is measured from the match start; the room survives until then | worker | `room-state.md` expiry |
@@ -334,6 +356,7 @@ unrelated meanings), so every row below names the one thing it proves.
 | TC-ROOM-191 | US-ROOM-005 | AC3 — the promoted host never becomes live | One retry with the next candidate, then `abandoned`; never hostless | worker | `US-ROOM-005` AC3 |
 | TC-ROOM-192 | US-ROOM-006 | AC6 — a signal to a member that left | `peer-not-connected`; the sender stays connected and still pings | worker | `signaling.md` §2 `signal` |
 | TC-ROOM-193 | US-ROOM-003 | AC4 — the start button as the roster changes | Disabled until every slot is filled and the teams are equal; enabled on 2A/2B | web | `US-ROOM-003` AC4 |
+| TC-ROOM-166 | US-ROOM-003 | AC3 — `match_started` after a host start | Carries the chosen mode, map and each assignment's loadout | worker | `api/signaling.md` § 3 |
 | TC-ROOM-194 | US-ROOM-005 | AC4 — the replaced host returns inside grace | Seated as a plain player; its `snapshot_push` is `not-host` and stores nothing | worker | `US-ROOM-005` AC4 |
 | TC-ROOM-195 | US-ROOM-002 | AC4 — two clients in one room | Both are handed the same roster, slots and teams | worker | `US-ROOM-002` AC4 |
 | TC-ROOM-196 | US-ROOM-006 | AC4 — a full mesh handshake and traffic | No ICE credential, TURN username or token in `localStorage`, `sessionStorage` or cookies | web | NFR-10 |

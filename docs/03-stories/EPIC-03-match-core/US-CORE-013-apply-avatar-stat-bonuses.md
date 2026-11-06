@@ -2,7 +2,7 @@
 id: US-CORE-013
 title: Apply avatar stat bonuses
 epic: EPIC-03-match-core
-status: ready
+status: done
 priority: P2
 size: S
 depends_on: [US-CORE-007, US-AUTH-003]
@@ -64,10 +64,15 @@ Buying parts, part rarity, visual composition of worn parts (`US-AUTH-003` cover
 ## 8. Test notes
 
 `TC-CORE-921`, `TC-AUTH-104`, `TC-RANK-110`, `TC-AUTH-074`.
-`Red first: packages/core/tests/avatars.test.ts::bonuses_clamp_at_ten_percent_attack`.
+Red: none — the rule was already implemented and green; this pass added the cases the ACs cited and corrected the citations that pointed at another story's case (see the delivery note at the end of this file).
 
-<!-- delivery:2026-11-05 -->
+<!-- delivery:2026-11-06 -->
 
-## Delivery status — 2026-11-05
+## Delivery status — 2026-11-06
 
-**done.** the engine rule is implemented in `packages/core/src` and covered by `packages/core/tests/` (ballistics, combat, match, snapshot, data, room, rating, camera)
+**done.** `packages/core/tests/avatars.test.ts` — `TC-CORE-921` (a +4 attack part is ×1.04 and reaches the damage a shot
+deals, the attack total caps at ×1.10, the defense/energy/delay caps hold, +8 energy adds exactly eight and never exceeds
+the cap, the total is frozen into the opening snapshot), `TC-CORE-929` (a guest gets no bonus and the match still plays),
+`TC-CORE-930` (an unknown or retired part contributes nothing).
+
+The four cases (`TC-AUTH-104`, `TC-CORE-921`, `TC-CORE-929`, `TC-CORE-930`) already matched their ACs; this pass only named them in the case table.

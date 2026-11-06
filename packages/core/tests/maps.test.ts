@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createMatch, type Seat } from "../src/match.js";
+import { createMatch, terrainOf, type Seat } from "../src/match.js";
 import { DEFAULT_MAP_ID, MAPS, MAP_BOUNDS, getMap } from "../src/data/maps.js";
 import { applyGimmicks, GIMMICK_IDS } from "../src/gimmicks.js";
 import { createTerrain, deserializeTerrain, heightAt, serializeTerrain } from "../src/terrain.js";
@@ -134,5 +134,31 @@ describe("maps", () => {
         expect(a.events, `${mapId} round ${round} events`).toEqual(b.events);
       }
     }
+  });
+});
+
+describe("TC-CORE-957: a map's gimmicks are active in the match and listed for the lobby (US-CORE-012 AC3)", () => {
+  it("runs the listed gimmick and exposes the same list on the map record", () => {
+    const map = getMap("map-05");
+    // The lobby reads `map.gimmicks`; the match applies exactly that list (no hidden gimmick).
+    expect(map.gimmicks).toContain("wind");
+    const state = match("map-05");
+    const after = applyGimmicks(state, 2, map);
+    expect(after.weather ?? state.weather).not.toEqual(state.weather);
+    for (const gimmick of map.gimmicks) expect(GIMMICK_IDS).toContain(gimmick);
+  });
+});
+
+describe("TC-CORE-958: the same map and seed replay identically (US-CORE-012 AC6)", () => {
+  it("rebuilds the terrain, the opening wind and the gimmick schedule", () => {
+    const first = match("map-06");
+    const second = match("map-06");
+    expect(serializeTerrain(terrainOf(second))).toBe(serializeTerrain(terrainOf(first)));
+    expect(second.weather).toEqual(first.weather);
+    // The gimmick schedule is a function of the map and the round, so the fourth round matches too.
+    const laterSecond = applyGimmicks(second, 4, getMap("map-06"));
+    const laterFirst = applyGimmicks(first, 4, getMap("map-06"));
+    expect(laterSecond.events).toEqual(laterFirst.events);
+    expect(laterSecond.weather).toEqual(laterFirst.weather);
   });
 });

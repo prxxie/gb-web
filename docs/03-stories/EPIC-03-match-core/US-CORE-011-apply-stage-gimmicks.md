@@ -2,7 +2,7 @@
 id: US-CORE-011
 title: Apply the per-map stage gimmicks
 epic: EPIC-03-match-core
-status: ready
+status: done
 priority: P1
 size: L
 depends_on: [US-CORE-001, US-CORE-006]
@@ -70,11 +70,17 @@ New gimmicks, per-mode gimmick rules, animated weather visuals (`US-MATCH-001`).
 
 ## 8. Test notes
 
-`TC-CORE-918`, `TC-CORE-919`, `TC-CORE-913`, `TC-CORE-023`, `TC-MATCH-901`.
-`Red first: packages/core/tests/gimmicks.test.ts::electric_strikes_on_every_third_turn`.
+`TC-CORE-918`, `TC-CORE-919`, `TC-CORE-955`, `TC-CORE-023`, `TC-MATCH-901`.
+Red: none — the rule was already implemented and green; this pass added the cases the ACs cited and corrected the citations that pointed at another story's case (see the delivery note at the end of this file).
 
-<!-- delivery:2026-11-05 -->
+<!-- delivery:2026-11-06 -->
 
-## Delivery status — 2026-11-05
+## Delivery status — 2026-11-06
 
-**done.** the engine rule is implemented in `packages/core/src` and covered by `packages/core/tests/` (ballistics, combat, match, snapshot, data, room, rating, camera)
+**done.** `packages/core/tests/gimmicks.test.ts` — `TC-CORE-918` (a force map pushes shells and announces the field; the
+gust spike lasts exactly one turn and is reverted; a wind map rolls twice and plays the second roll), `TC-CORE-919`
+(electric strikes every third turn for 150, the heal zone restores 100 capped at `maxHp`, a tornado displaces its units by
+60 px without burying them), `TC-CORE-023` (the per-round wind roll), `TC-CORE-913` (a return map sends an off-map shot
+back), `TC-CORE-931` (fog shortens the aim arc and hides the blast markers without hiding units).
+
+This pass added `TC-CORE-955` (a `return` map brings the shell back); `TC-CORE-918` now also carries AC4 and `TC-CORE-919` AC8.

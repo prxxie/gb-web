@@ -73,3 +73,12 @@ describe("TC-RANK-116: what makes a match ranked", () => {
     expect(isRanked({ hasBot: false, abandoned: false, rulesetMismatch: true })).toBe(false);
   });
 });
+
+describe("TC-CORE-947: a bot match never enters the leaderboard (US-CORE-005 AC6)", () => {
+  it("refuses the bot seat, and only the bot seat, on a clean finished match", () => {
+    // The story's AC6: a match played against the bot is practice and leaves no rating behind. The rule is
+    // the `hasBot` arm of `isRanked`; the other two arms are covered by `US-RANK-001`.
+    expect(isRanked({ hasBot: true, abandoned: false, rulesetMismatch: false })).toBe(false);
+    expect(isRanked({ hasBot: false, abandoned: false, rulesetMismatch: false })).toBe(true);
+  });
+});

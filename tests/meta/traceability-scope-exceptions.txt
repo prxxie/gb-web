@@ -17,7 +17,6 @@ TC-MATCH-919 packages/core/tests/camera.test.ts
 TC-MATCH-920 packages/core/tests/camera.test.ts
 TC-MATCH-921 packages/core/tests/camera.test.ts
 TC-MATCH-922 packages/core/tests/camera.test.ts
-TC-MATCH-923 packages/core/tests/weather.test.ts
 TC-NET-067 packages/core/tests/movement.test.ts
 TC-PWA-130 apps/web/tests/hud.test.tsx
 TC-PWA-130 apps/web/tests/input.test.tsx

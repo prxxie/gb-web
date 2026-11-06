@@ -2,7 +2,7 @@
 id: US-CORE-015
 title: Re-roll the weather every round
 epic: EPIC-03-match-core
-status: ready
+status: done
 priority: P0
 size: S
 depends_on: [US-CORE-002]
@@ -42,8 +42,8 @@ constant a player can compute against. The dial has 12 ticks of 30°, which is t
 | AC4 | the same match `seed` and round number | the roll is repeated in a replay | the same `magnitude` and `sector` are produced — no `Math.random()` in `core` (`NFR-28`, `TC-CORE-926`) |
 | AC5 | `magnitude = 0` | the round starts | it is a legal roll: the dial shows a hollow arrow, the integrator applies no wind term at all (`TC-MATCH-923`) |
 | AC6 | `magnitude = 26`, `sector = 0` | a `mbl-01` shot is fired at 45°, force 98 | the landing point moves ~129 units — one ruler division — and the sign follows the sector (`TC-CORE-023`) |
-| AC7 | a `weather` message arrives out of order (older `rolledAtRound`) | it is received | it is dropped; the newer `rolledAtRound` always wins (`TC-NET-004`) |
-| AC8 | an 8-player snapshot taken mid-round | it is encoded | it carries `weather` and `turn.round` and still fits 800 B (`TC-CORE-041`) |
+| AC7 | a `weather` message arrives out of order (older `rolledAtRound`) | it is received | it is dropped; the newer `rolledAtRound` always wins (`TC-CORE-926`) |
+| AC8 | an 8-player snapshot taken mid-round | it is encoded | it carries `weather` and `turn.round` and still fits 800 B (`TC-CORE-041`, `TC-CORE-942`) |
 
 ## 4. Contract
 
@@ -82,14 +82,24 @@ export function weatherFor(seed: number, round: number): Weather; // determinist
 
 `TC-CORE-926` (roll, round boundary, replay determinism, `m = 0`), `TC-CORE-023` (drift and vertical term),
 `TC-MATCH-923` (dial rendering), `TC-CORE-041` (snapshot budget with `weather`).
-Red first: `packages/core/tests/weather.test.ts::rolls_once_per_round`.
+Red: none — the rule was already implemented and green; this pass added the cases the ACs cited and corrected the citations that pointed at another story's case (see the delivery note at the end of this file).
 
 ## 9. Open questions
 
 - **OQ-41** (answered) — magnitude 0–26, 12 sectors of 30°, re-rolled once per round.
 
-<!-- delivery:2026-11-05 -->
+<!-- delivery:2026-11-06 -->
 
-## Delivery status — 2026-11-05
+## Delivery status — 2026-11-06
 
-**done.** the engine rule is implemented in `packages/core/src` and covered by `packages/core/tests/` (ballistics, combat, match, snapshot, data, room, rating, camera)
+**done.** `packages/core/tests/weather.test.ts` — `TC-CORE-926` (a fresh match rolls once inside the documented ranges,
+the wind is constant inside a round, the queue wrap re-rolls exactly once, the same seed replays the same sequence, and an
+out-of-order `weather` frame never wins), `TC-CORE-023` (the 26-sector wind term moves a `mbl-01` 45°/98 shot by one
+ruler division), `TC-MATCH-923` (magnitude 0 is a legal calm roll and adds no wind term), `TC-CORE-041` (the mask-less
+800-byte budget the weather rides in).
+
+AC7 cited `TC-NET-004`, which does not exist anywhere in the tree — the assertion it meant is the out-of-order
+`weather` case inside `TC-CORE-926`. AC8 cited `TC-CORE-041`, which is the size budget: the snapshot carries `weather`
+and `turn.round`, asserted by `TC-CORE-942`.
+
+This pass added `TC-CORE-960` (a 26/0 wind moves the landing point about one ruler division); `TC-CORE-926` and `TC-CORE-928` cover the rest.

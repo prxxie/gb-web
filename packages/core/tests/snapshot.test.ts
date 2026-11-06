@@ -90,6 +90,56 @@ describe("TC-CORE-041: the size budget", () => {
   });
 });
 
+describe("TC-CORE-940: the same state encodes to the same bytes", () => {
+  it("is byte-identical across two encodes, and applying it twice changes nothing", () => {
+    // A peer compares and stores snapshots by their bytes, and a duplicated one must not cost a re-render.
+    const state = fullMatch();
+    const first = encodeBytes(encodeSnapshot(toSnapshot(state, 1)));
+    const second = encodeBytes(encodeSnapshot(toSnapshot(state, 1)));
+    expect(second).toBe(first);
+
+    const once = applySnapshot(state, toSnapshot(state, 1));
+    const twice = applySnapshot(once, toSnapshot(state, 1));
+    expect(twice.seq).toBe(once.seq);
+    expect(twice.players.map((player) => player.hp)).toEqual(once.players.map((player) => player.hp));
+    expect(twice.changed).toBe(once.changed);
+  });
+});
+
+describe("TC-CORE-941: a stale or foreign snapshot never wins", () => {
+  it("takes 41 after 39, refuses 39 after 41, and refuses an older host generation", () => {
+    const snapshot = toSnapshot(fullMatch(), 4);
+    const newer = { ...snapshot, seq: 41 };
+    const older = { ...snapshot, seq: 39 };
+    // 40 is not required: a peer accepts any sequence above the last one it saw.
+    expect(acceptSnapshot(4, older.seq, newer)).toBe(true);
+    expect(acceptSnapshot(4, newer.seq, older)).toBe(false);
+    expect(acceptSnapshot(5, 0, snapshot)).toBe(false);
+  });
+});
+
+describe("TC-CORE-942: an applied snapshot matches the host", () => {
+  it("restores shields, energy, the delay queue, the weapon slot and the mode state", () => {
+    const host = fullMatch();
+    // `applySnapshot` patches the mutable half (players, seq, scores, terrain); the turn and weather ride in
+    // the snapshot itself, which is what the resync composes with — `packages/core/src/snapshot.ts:252`.
+    const snapshot = decodeSnapshot(encodeSnapshot(toSnapshot(host, 2)));
+    const applied = applySnapshot(host, snapshot);
+    const first = applied.players[0];
+    const hostFirst = host.players[0];
+    if (!first || !hostFirst) throw new Error("the fixture has eight players");
+    expect(first.shield).toBe(hostFirst.shield);
+    expect(first.energy).toBe(hostFirst.energy);
+    expect(snapshot.turn).toEqual(host.turn);
+    expect(snapshot.weather).toEqual(host.weather);
+    expect(first.weaponSlot).toBe(hostFirst.weaponSlot);
+    expect(applied.scores.score).toEqual(host.scores.score);
+    expect(snapshot.status).toBe(host.status);
+    // The delay queue is what decides the next turn, so a peer that missed it would desync silently.
+    expect(applied.players.map((player) => player.delay)).toEqual(host.players.map((player) => player.delay));
+  });
+});
+
 describe("TC-CORE-042: refusing a hostile snapshot", () => {
   it("rejects a payload above the hard limit", () => {
     const padding = "x".repeat(TUNABLES.snapshotHardLimitBytes + 1);

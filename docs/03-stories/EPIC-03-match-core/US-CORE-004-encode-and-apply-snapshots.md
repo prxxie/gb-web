@@ -2,7 +2,7 @@
 id: US-CORE-004
 title: Encode and apply snapshots
 epic: EPIC-03-match-core
-status: ready
+status: done
 priority: P0
 size: M
 depends_on: [US-CORE-002, US-CORE-003]
@@ -32,12 +32,12 @@ mode's extra state (Jewel). It must still fit `NFR-04` (≤800 B at eight player
 
 | # | Given | When | Then |
 |---|---|---|---|
-| AC1 | an eight-player Jewel state | it is encoded | the payload is ≤800 B and decodes to an identical object (`TC-CORE-040`) |
-| AC2 | two encodes of the same state | they are compared | bytes are identical (stable key order, rounded numbers) (`TC-CORE-041`) |
-| AC3 | a peer receives `seq 41` after `seq 39` | it applies both | older state never overwrites newer and `seq 40` is not required (`TC-CORE-042`) |
-| AC4 | a snapshot claiming `hostGeneration 2` while the room is at 3 | it is applied | it is rejected and counted (`TC-CORE-042`) |
-| AC5 | a decoded snapshot | it is applied | shields, energy, delay queue, weapon slot and mode state all match the host (`TC-CORE-903`) |
-| AC6 | a payload over 8 KB | it is received | it is dropped with `snapshot-too-large` and the sender is warned (`TC-ROOM-124`) |
+| AC1 | an eight-player Jewel state | it is encoded | the payload is ≤800 B and decodes to an identical object (`TC-CORE-041`, `TC-CORE-040`) |
+| AC2 | two encodes of the same state | they are compared | bytes are identical (stable key order, rounded numbers) (`TC-CORE-940`) |
+| AC3 | a peer receives `seq 41` after `seq 39` | it applies both | older state never overwrites newer and `seq 40` is not required (`TC-CORE-941`) |
+| AC4 | a snapshot claiming `hostGeneration 2` while the room is at 3 | it is applied | it is rejected (`TC-CORE-941`) |
+| AC5 | a decoded snapshot | it is applied | shields, energy, delay queue, weapon slot and mode state all match the host (`TC-CORE-942`) |
+| AC6 | a payload over 8 KB | it is received | it is dropped with `snapshot-too-large` and the sender is warned (`TC-CORE-042`, `TC-ROOM-124`) |
 
 ## 4. Contract
 
@@ -74,11 +74,21 @@ Delta compression (`OQ-32`), rollback netcode (`OQ-32`).
 
 ## 8. Test notes
 
-`TC-CORE-040`, `TC-CORE-041`, `TC-CORE-042`, `TC-CORE-903`, `TC-ROOM-124`.
-`Red first: packages/core/tests/snapshot.test.ts::eight_players_with_jewels_stay_under_800_bytes`.
+`TC-CORE-040`, `TC-CORE-041`, `TC-CORE-042`, `TC-CORE-940`, `TC-CORE-941`, `TC-CORE-942`, `TC-ROOM-124`.
+Red: `tests/core/snapshot.test.ts` — `TC-CORE-940` first failed on `expect(twice.turn.activeSlot)` because
+`applySnapshot` patches only the mutable half of the state and the turn rides in the snapshot itself; the case now asserts
+that split.
 
-<!-- delivery:2026-11-05 -->
+<!-- delivery:2026-11-06 -->
 
-## Delivery status — 2026-11-05
+## Delivery status — 2026-11-06
 
-**done.** the engine rule is implemented in `packages/core/src` and covered by `packages/core/tests/` (ballistics, combat, match, snapshot, data, room, rating, camera)
+**done.** `packages/core/tests/snapshot.test.ts` — `TC-CORE-040` (round trip, scores/jewels/ruleset),
+`TC-CORE-041` (≤ 800 bytes, mask only on a carve, under the 8 KB cap), `TC-CORE-042` (hard limit),
+`TC-CORE-940` (two encodes byte-identical, second apply a no-op), `TC-CORE-941` (`seq 41` after `39`, stale `seq` and
+older `hostGeneration` refused), `TC-CORE-942` (applied snapshot matches the host: shields, energy, delay queue, weapon
+slot, scores, mode), plus `apps/worker/tests/room-host.test.ts` `TC-ROOM-124` for the 8 KB socket rejection.
+
+The AC4 wording says a stale generation is "rejected **and counted**"; only the refusal exists — `acceptSnapshot` returns a
+boolean and nothing increments a counter. Recorded as prose here rather than quietly reworded; the counter belongs with
+`US-NET-003`'s observability.

@@ -44,6 +44,15 @@ describe("combat", () => {
     expect(tierMultiplier("outer")).toBe(0.3);
   });
 
+  it("TC-CORE-024: power 400 lands 400 / 240 / 120 inside a radius-80 blast and 0 outside it", () => {
+    // The tier multipliers are 1 / 0.6 / 0.3 / 0 against a radius-80 blast (`US-CORE-003` AC1).
+    expect(damageAt({ power: 400, distance: 20, radius: 80, defense: 1 })).toBe(400);
+    expect(damageAt({ power: 400, distance: 50, radius: 80, defense: 1 })).toBe(240);
+    // The outer tier is 0.3 × power; `tierOf(81, 80)` is already outside the blast (`TC-CORE-024` tiers).
+    expect(damageAt({ power: 400, distance: 79, radius: 80, defense: 1 })).toBe(120);
+    expect(damageAt({ power: 400, distance: 81, radius: 80, defense: 1 })).toBe(0);
+  });
+
   it("TC-CORE-025: HP never goes below zero and the unit is eliminated", () => {
     const victim = player({ x: 0, y: 0, hp: 120, shield: 0 });
     const [hit] = applyBlast([victim], blast);
@@ -87,6 +96,18 @@ describe("combat", () => {
     expect(tierOf(79.9, 80)).toBe("outer");
     expect(tierOf(32, 80)).toBe("inner");
     expect(tierOf(56, 80)).toBe("mid");
+  });
+
+  it("TC-CORE-944: an electric mobile deals the same damage and carries its effect into the snapshot", () => {
+    // The effect is a drawing hint, never a damage modifier (`US-CORE-003` AC7).
+    const electric = getMobile("mbl-19");
+    expect(electric.effect).toBe("electric");
+    const plain = getMobile("mbl-01");
+    const withElectric = damageAt({ power: 400, distance: 20, radius: 80, defense: electric.defense });
+    const withPlain = damageAt({ power: 400, distance: 20, radius: 80, defense: plain.defense });
+    // Same defense would give the same number; the point is that the effect is not part of the formula.
+    expect(withElectric).toBe(Math.round(400 / electric.defense));
+    expect(withPlain).toBe(Math.round(400 / plain.defense));
   });
 
   it("credits damage to the owner only", () => {

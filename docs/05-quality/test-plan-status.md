@@ -12,7 +12,7 @@ does not generate it.
 
 ## Written
 
-97 Vitest files (813 cases) across the four suites, and 12 Playwright specs (49 cases), green on 2026-11-06:
+97 Vitest files (833 cases) across the four suites, and 12 Playwright specs (49 cases), green on 2026-11-06:
 
 | Area | Files |
 |------|-------|

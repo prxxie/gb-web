@@ -175,7 +175,7 @@ describe("movement limits", () => {
     expect(foxMove.distance).toBe(fox.moveDistance);
   });
 
-  it("TC-CORE-914: a unit walking onto a fresh crater falls to the new ground instead of floating", () => {
+  it("TC-CORE-951: a unit walking onto a fresh crater falls to the new ground instead of floating", () => {
     const mobile = getMobile("mbl-01");
     const terrain = flat();
     const walker = player({ mobileId: mobile.mobileId, y: groundY(terrain, 1_000) - 8 });
@@ -191,7 +191,7 @@ describe("movement limits", () => {
     expect(outcome.player!.y).toBeGreaterThan(walker.y);
   });
 
-  it("TC-CORE-914: a fully buried unit cannot move until the terrain is opened", () => {
+  it("TC-CORE-949: a fully buried unit cannot move until the terrain is opened", () => {
     const mobile = getMobile("mbl-01");
     const terrain = flat();
     const walker = player({ mobileId: mobile.mobileId, y: 812 });
