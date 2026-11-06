@@ -2,7 +2,7 @@
 id: US-ROOM-005
 title: Elect a new host within five seconds when the host disappears
 epic: EPIC-02-rooms
-status: ready
+status: done
 priority: P0
 size: M
 depends_on: [US-ROOM-004]
@@ -79,8 +79,10 @@ lower than the current one.
 ## 8. Test notes
 
 `TC-ROOM-048`, `TC-ROOM-049`, `TC-ROOM-124`, `TC-ROOM-149`, `TC-ROOM-182`; `TC-NET-044` covers the stale-host
-rejection. Worker test drives `electHost` as a pure function plus a socket-level test for the broadcast. Red first:
-`apps/worker/tests/room.test.ts::host_election_on_close`.
+rejection. Worker test drives `electHost` as a pure function plus a socket-level test for the broadcast.
+Red: none — the election, the socket broadcast and their cases were written in one change, so no earlier failing case
+exists to name; the closest red this story ever had is `tests/e2e/migration.spec.ts::TC-ROOM-182`, written first and
+red until the replaced host was demoted.
 
 ## 9. Open questions
 
@@ -88,8 +90,17 @@ rejection. Worker test drives `electHost` as a pure function plus a socket-level
 - **OQ-30** (accepted assumption) — a tampered host client is only caught by plausibility checks at result submission;
   this story does not attempt to verify simulation correctness mid-match.
 
-<!-- delivery:2026-11-05 -->
+<!-- delivery:2026-11-06 -->
 
-## Delivery status — 2026-11-05
+## Delivery status — 2026-11-06
 
-**done.** host election by `joinedAt`, `hostGeneration` and `host_changed` are implemented in `packages/core/src/room.ts` and `apps/worker/src/room-do.ts`; election is covered by `packages/core/tests/room.test.ts`
+**done** (2026-11-06). Every acceptance criterion is traced to an automated case that passed on 2026-11-06: election by
+`joinedAt` with the `hostGeneration` bump and the `host_changed` payload including `lastSnapshot`
+(`apps/worker/tests/room-election.test.ts` TC-ROOM-048, `packages/core/tests/room.test.ts`); the single retry that ends
+in `abandoned` (TC-ROOM-191); the replaced host returning as a plain player whose `snapshot_push` is refused with
+`not-host` (TC-ROOM-194); the survivor receiving the promoted host's snapshot (TC-ROOM-061); lobby promotion and a
+force-quit mid-match in the browser (`tests/e2e/migration.spec.ts` TC-ROOM-149, TC-ROOM-182). Verification: `pnpm test`
+93 files / 781 cases green, `npx playwright test` 49 cases green, `pnpm lint` and `pnpm typecheck` exit 0.
+
+The earlier hold is resolved: `US-ROOM-004` closed the same day, its dependency on this story's ordering is satisfied,
+and `verify-docs` reports no dependency error.

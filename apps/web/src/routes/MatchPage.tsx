@@ -10,7 +10,6 @@ import { useNavigate, useParams } from "react-router-dom";
 import {
   TUNABLES,
   applyInput,
-  applySnapshot,
   botTurn,
   createMatch,
   createRng,
@@ -36,6 +35,8 @@ import { useLocale } from "../app/providers";
 import { useLiveAnnouncement } from "../app/useLiveAnnouncement";
 import { translate, type Locale } from "../i18n";
 import { createMesh, type Mesh } from "../net/mesh";
+import { decideTurn } from "../net/host-clock";
+import { resyncFromSnapshot } from "../net/resync";
 import { itemFrame } from "../net/frames";
 import { connectWithReconnect, type ReconnectingSocket } from "../net/reconnect";
 import type { ServerMessage } from "../net/signaling";
@@ -127,6 +128,10 @@ export function MatchPage(): JSX.Element {
   const seq = useRef(1);
   const stateRef = useRef<MatchState | null>(null);
   const ended = useRef(false);
+  // Slots the room reports as `grace` or `disconnected`, and the newest host election seen: the first
+  // decides who gets skipped, the second which snapshots are still valid (`US-ROOM-004` AC3/AC5/AC7).
+  const absent = useRef<readonly number[]>([]);
+  const hostGeneration = useRef(0);
 
   stateRef.current = state;
 
@@ -217,7 +222,7 @@ export function MatchPage(): JSX.Element {
           // A shot that carved the mask is the only moment the peers need the terrain itself: they resolve
           // hits against it (`US-CORE-006` AC4), and the mask is far too big to ride in every snapshot.
           const carved = result.events.some((event) => event.kind === "shot" && event.carved);
-          const snapshot = toSnapshot(result.state, 1, { includeTerrain: carved });
+          const snapshot = toSnapshot(result.state, hostGeneration.current, { includeTerrain: carved });
           mesh.current?.broadcast(snapshot);
           socket.current?.send({ t: "snapshot_push", snapshot });
           setPower(0);
@@ -256,19 +261,35 @@ export function MatchPage(): JSX.Element {
     return () => window.clearTimeout(timer);
   }, [state, plan, commit]);
 
-  // Turn clock: when it runs out the server (or the local engine) advances the turn.
+  // Turn clock: the host is the clock, and an absent player's turn is skipped rather than waited out
+  // (`US-ROOM-004` AC3, AC7). `decideTurn` owns the rules; this effect only applies the answer.
+  const hosting = !plan || plan.kind === "bot" || plan.hostPlayerId === plan.playerId;
   useEffect(() => {
     if (!state || state.status !== "playing") return;
     const tick = window.setInterval(() => {
       const current = stateRef.current;
-      if (!current || current.status !== "playing") return;
-      if (Date.now() > current.turn.deadlineAt && current.turn.activeSlot === (plan?.localSlot ?? 0)) {
-        const result = applyInput(current, { kind: "skip", slot: current.turn.activeSlot, seq: seq.current++ }, Date.now());
-        commit(result.state, result.events);
+      if (!current || current.status !== "playing" || !plan) return;
+      const decision = decideTurn({
+        isHost: hosting,
+        localSlot: plan.localSlot,
+        activeSlot: current.turn.activeSlot,
+        deadlineAt: current.turn.deadlineAt,
+        absentSlots: absent.current,
+        now: Date.now(),
+      });
+      if (decision.kind === "wait") return;
+      const result = applyInput(current, { kind: "skip", slot: current.turn.activeSlot, seq: seq.current++ }, Date.now());
+      commit(result.state, result.events);
+      // A skip this client decided is the host's word: the peers resync from the snapshot, which carries
+      // the new `deadlineAt`, so their clocks do not drift from the turn (`US-ROOM-004` § 5).
+      if (hosting && plan.kind === "online") {
+        const snapshot = toSnapshot(result.state, hostGeneration.current);
+        mesh.current?.broadcast(snapshot);
+        socket.current?.send({ t: "snapshot_push", snapshot });
       }
     }, 500);
     return () => window.clearInterval(tick);
-  }, [state, plan, commit]);
+  }, [state, plan, hosting, commit]);
 
   // Online: join the room socket and the peer mesh.
   useEffect(() => {
@@ -300,22 +321,9 @@ export function MatchPage(): JSX.Element {
         onSnapshot: (snapshot) => {
           const current = stateRef.current;
           if (!current) return;
-          const applied = applySnapshot(current, snapshot);
-          if (!applied.changed) return;
-          commit(
-            {
-              ...current,
-              players: applied.players,
-              seq: applied.seq,
-              turn: snapshot.turn,
-              weather: snapshot.weather,
-              // Scores and jewels decide who is winning and who carries what, so a peer that ignored them
-              // would show a different result screen than the host (`US-CORE-004` AC5).
-              scores: applied.scores,
-              ...(applied.terrain ? { terrain: applied.terrain } : {}),
-            },
-            [],
-          );
+          const synced = resyncFromSnapshot(current, snapshot, hostGeneration.current);
+          hostGeneration.current = synced.hostGeneration;
+          if (synced.applied) commit(synced.state, []);
         },
         onControl: (from, message) => {
           const current = stateRef.current;
@@ -357,7 +365,23 @@ export function MatchPage(): JSX.Element {
           void mesh.current?.addPeer(message.playerId);
           return;
         }
+        if (message.t === "snapshot_state") {
+          // The relay and the rejoin replay share one name: a returning client lands the host's hp, turn
+          // and wind without a reload (`US-ROOM-004` AC2, AC5).
+          const current = stateRef.current;
+          if (!current) return;
+          const synced = resyncFromSnapshot(current, message.snapshot, hostGeneration.current);
+          hostGeneration.current = synced.hostGeneration;
+          if (synced.applied) commit(synced.state, []);
+          return;
+        }
         if (message.t === "room_state") {
+          // Who is present decides whose turn is skipped (`US-ROOM-004` AC3/AC7), and the generation
+          // decides which snapshots are still valid (AC5).
+          absent.current = message.room.members
+            .filter((member) => member.connectionState !== "connected")
+            .map((member) => member.slot);
+          hostGeneration.current = Math.max(hostGeneration.current, message.room.hostGeneration);
           for (const member of message.room.members) {
             if (member.playerId !== plan.playerId) void mesh.current?.addPeer(member.playerId);
           }
@@ -396,7 +420,7 @@ export function MatchPage(): JSX.Element {
           Date.now(),
         );
         commit(result.state, result.events);
-        mesh.current?.broadcast(toSnapshot(result.state, 1));
+        mesh.current?.broadcast(toSnapshot(result.state, hostGeneration.current));
       }
     },
     [plan, mobile, commit],
@@ -422,7 +446,7 @@ export function MatchPage(): JSX.Element {
       if (!current || !plan || current.turn.activeSlot !== plan.localSlot || !isItemId(itemId)) return;
       const result = applyInput(current, { kind: "item", slot: plan.localSlot, itemId, seq: seq.current++ }, Date.now());
       commit(result.state, result.events);
-      mesh.current?.broadcast(toSnapshot(result.state, 1));
+      mesh.current?.broadcast(toSnapshot(result.state, hostGeneration.current));
       socket.current?.send(itemFrame(itemId));
     },
     [plan, commit],
@@ -434,7 +458,7 @@ export function MatchPage(): JSX.Element {
     if (!current || !plan || current.turn.activeSlot !== plan.localSlot) return;
     const result = applyInput(current, { kind: "skip", slot: plan.localSlot, seq: seq.current++ }, Date.now());
     commit(result.state, result.events);
-    mesh.current?.broadcast(toSnapshot(result.state, 1));
+    mesh.current?.broadcast(toSnapshot(result.state, hostGeneration.current));
   }, [plan, commit]);
 
   // A phrase carries an id, never a string the player typed (AC7), so every receiver renders it in
