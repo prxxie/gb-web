@@ -35,7 +35,9 @@ function stories(): Story[] {
         .map((file) => {
           const text = readFileSync(join(epicDirectory, epic, file), "utf8");
           const status = /^status:\s*(\S+)/m.exec(text)?.[1] ?? "unknown";
-          return { id: file.slice(0, file.indexOf("-", 7)), status, path: `${epic}/${file}` };
+          // `US-AUTH-001-continue-as-a-guest.md` — the id is `US-<AREA>-<nnn>`, not everything before the
+          // second dash (that slice gave `US-AUTH` for every account story and matched nothing).
+          return { id: /^(US-[A-Z]+-\d+)/.exec(file)?.[1] ?? file, status, path: `${epic}/${file}` };
         }),
     );
 }
