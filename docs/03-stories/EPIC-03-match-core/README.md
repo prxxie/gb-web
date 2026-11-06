@@ -26,20 +26,20 @@ Generated from story frontmatter — run `node .agents/scripts/verify-docs.mjs -
 <!-- cpt:epic-stories -->
 | Id | Title | Priority | Size | Status | Depends on |
 |---|---|---|---|---|---|
-| [US-CORE-001](US-CORE-001-simulate-a-shot.md) | Simulate a shot with the GunBound-shaped integrator | P0 | L | ready | US-FND-001 |
-| [US-CORE-002](US-CORE-002-resolve-turns-and-the-clock.md) | Resolve turns with the delay queue | P0 | M | ready | US-FND-001 |
-| [US-CORE-003](US-CORE-003-apply-damage-with-shield-and-defense.md) | Apply damage with shield, defense and blast tiers | P0 | M | ready | US-CORE-001 |
-| [US-CORE-004](US-CORE-004-encode-and-apply-snapshots.md) | Encode and apply snapshots | P0 | M | ready | US-CORE-002, US-CORE-003 |
-| [US-CORE-005](US-CORE-005-play-against-a-bot.md) | Play against a bot that uses the real rules | P1 | M | ready | US-CORE-003, US-CORE-004, US-CORE-007 |
-| [US-CORE-006](US-CORE-006-carve-terrain-on-impact.md) | Carve terrain and collide with it | P0 | M | ready | US-CORE-001 |
-| [US-CORE-007](US-CORE-007-load-mobile-stats-and-weapons.md) | Load mobile stats and resolve the three weapon slots | P0 | M | ready | US-FND-001 |
-| [US-CORE-008](US-CORE-008-move-with-energy.md) | Move with energy, distance and incline limits | P1 | M | ready | US-CORE-006, US-CORE-007 |
-| [US-CORE-009](US-CORE-009-apply-item-effects.md) | Apply the eleven item effects | P1 | L | ready | US-CORE-003, US-CORE-008 |
-| [US-CORE-010](US-CORE-010-score-the-four-modes.md) | Score the four game modes | P1 | M | ready | US-CORE-003 |
-| [US-CORE-011](US-CORE-011-apply-stage-gimmicks.md) | Apply the per-map stage gimmicks | P1 | L | ready | US-CORE-001, US-CORE-006 |
-| [US-CORE-012](US-CORE-012-load-the-eleven-maps.md) | Load the eleven maps | P1 | M | ready | US-CORE-006, US-CORE-011 |
-| [US-CORE-013](US-CORE-013-apply-avatar-stat-bonuses.md) | Apply avatar stat bonuses | P2 | S | ready | US-CORE-007, US-AUTH-003 |
-| [US-CORE-015](US-CORE-015-roll-the-weather-each-round.md) | Re-roll the weather every round | P0 | S | ready | US-CORE-002 |
+| [US-CORE-001](US-CORE-001-simulate-a-shot.md) | Simulate a shot with the GunBound-shaped integrator | P0 | L | done | US-FND-001 |
+| [US-CORE-002](US-CORE-002-resolve-turns-and-the-clock.md) | Resolve turns with the delay queue | P0 | M | done | US-FND-001 |
+| [US-CORE-003](US-CORE-003-apply-damage-with-shield-and-defense.md) | Apply damage with shield, defense and blast tiers | P0 | M | done | US-CORE-001 |
+| [US-CORE-004](US-CORE-004-encode-and-apply-snapshots.md) | Encode and apply snapshots | P0 | M | done | US-CORE-002, US-CORE-003 |
+| [US-CORE-005](US-CORE-005-play-against-a-bot.md) | Play against a bot that uses the real rules | P1 | M | done | US-CORE-003, US-CORE-004, US-CORE-007 |
+| [US-CORE-006](US-CORE-006-carve-terrain-on-impact.md) | Carve terrain and collide with it | P0 | M | done | US-CORE-001 |
+| [US-CORE-007](US-CORE-007-load-mobile-stats-and-weapons.md) | Load mobile stats and resolve the three weapon slots | P0 | M | done | US-FND-001 |
+| [US-CORE-008](US-CORE-008-move-with-energy.md) | Move with energy, distance and incline limits | P1 | M | done | US-CORE-006, US-CORE-007 |
+| [US-CORE-009](US-CORE-009-apply-item-effects.md) | Apply the eleven item effects | P1 | L | done | US-CORE-003, US-CORE-008 |
+| [US-CORE-010](US-CORE-010-score-the-four-modes.md) | Score the four game modes | P1 | M | done | US-CORE-003 |
+| [US-CORE-011](US-CORE-011-apply-stage-gimmicks.md) | Apply the per-map stage gimmicks | P1 | L | done | US-CORE-001, US-CORE-006 |
+| [US-CORE-012](US-CORE-012-load-the-eleven-maps.md) | Load the eleven maps | P1 | M | done | US-CORE-006, US-CORE-011 |
+| [US-CORE-013](US-CORE-013-apply-avatar-stat-bonuses.md) | Apply avatar stat bonuses | P2 | S | done | US-CORE-007, US-AUTH-003 |
+| [US-CORE-015](US-CORE-015-roll-the-weather-each-round.md) | Re-roll the weather every round | P0 | S | done | US-CORE-002 |
 <!-- /cpt:epic-stories -->
 
 ## Out of scope

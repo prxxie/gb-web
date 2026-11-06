@@ -28,6 +28,9 @@ export const TUNABLES = {
   /** Crater radius as a fraction of the blast radius. */
   terrainCarveRatio: 0.6,
   maxFlightMs: 10_000,
+  /** `itm-bunge`: ms before the shell turns around, and the sideways pull that brings it home. */
+  bungeTurnMs: 350,
+  bungePull: 900,
   mapWidth: 2000,
   mapHeight: 1200,
   /** Positions are rounded to this before they enter a snapshot (`NFR-04`). */
@@ -66,6 +69,8 @@ export const TUNABLES = {
   padRingPx: 96,
   rulerBaseSegments: 8,
   rulerUnitTarget: 125,
+  /** How long the screen takes to catch up to a new state — `US-MATCH-001` AC2 (`tunables.md` § 9). */
+  interpolateMs: 100,
 } as const;
 
 export type Tunables = typeof TUNABLES;

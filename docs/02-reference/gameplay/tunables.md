@@ -259,9 +259,9 @@ Eleven maps in `packages/core/src/data/maps.ts`, each with a `gravityModifier` o
 | `force` | pushes projectiles sideways with a constant field | `TC-CORE-918` |
 | `gust` | periodic 4× wind spikes, announced in the HUD | `TC-CORE-918` |
 | `electric` | every 3rd turn a random cell is struck for 150 damage | `TC-CORE-919` |
-| `wind` | wind re-rolls twice per turn instead of once | `TC-CORE-023` |
+| `wind` | the round re-rolls twice and plays the second roll (`rollWeather(seed, round × 2)`) | `TC-CORE-023` |
 | `return` | shots that leave the map return once with reduced power | `TC-CORE-913` |
-| `heal` | standing in the marked zone heals 100 HP at turn start | `TC-CORE-919` |
+| `heal` | standing within 200 units of the map centre (`HEAL_ZONE_X` 1000, `HEAL_ZONE_RADIUS` 200) heals 100 HP at turn start, capped at `maxHp` | `TC-CORE-919` |
 | `fog` | blast markers hidden; aim arc shortened | `TC-MATCH-901` |
 | tornado | fixed spawn point moves units 60 px per turn | `TC-CORE-919` |
 
@@ -269,6 +269,15 @@ Eleven maps in `packages/core/src/data/maps.ts`, each with a `gravityModifier` o
 
 Worn avatars grant `+2…+8` to one stat (`attack` = damage multiplier, `defense`, `energy`, `delay` reduction), stacked
 from the account's equipped parts and validated server-side at loadout time — `TC-AUTH-104`, `data/accounts.md`.
+
+| Stat | Unit | Cap | Applied as |
+|---|---|---|---|
+| `attack` | percent | `+10` | damage `× (1 + attack/100)` |
+| `defense` | percent | `+10` | incoming damage `÷ (1 + defense/100)` |
+| `energy` | points | `+12` | added to the pool (`base + energy`), not a multiplier |
+| `delay` | percent | `−8` | delay `× (1 − delay/100)` |
+
+`AVATAR_CAPS` in `packages/core/src/data/avatars.ts` is the single source of these numbers (`TC-CORE-921`).
 
 ## 8. Room
 
@@ -288,7 +297,7 @@ the numbers behind it.
 
 | Constant | Value | Why |
 |---|---|---|
-| `viewDefault` | 1000 × 600 units | exactly half the map each way — the whole battlefield is reachable in two pans |
+| `viewDefault` | 1000 × 600 units | half the map each way. Fixed height, aspect-following width: a 2.7:1 phone window is ~1617 × 600, so the window always matches the canvas and nothing is cropped |
 | framing | follows the active mobile | at the start of a turn the window centres on the shooting mobile and keeps its feet ~70 % down the frame, so the shot has room to arc; a pan by the player overrides it until the next turn |
 | `zoomMin` (widest) | whole map, 2000 × 1200 | the strategic view |
 | `zoomMax` (closest) | 250 × 150 units (4 × default) | a 44-unit crater fills the ring, so aim can be placed precisely |
@@ -301,6 +310,7 @@ the numbers behind it.
 | `padRing` | 96 px from the sprite | the four-way pad never covers the mobile or the barrel |
 | `rulerSegments` | `clamp(round(8 × visibleWidth / 1000), 8, 16)` | 8 divisions at the default window, 16 at full-map zoom |
 | `rulerUnit` | visibleWidth / `rulerSegments` world units per division | 125 units at 1000-wide, 125 again at 2000-wide/16 |
+| `interpolateMs` | 100 ms | the screen draws one state behind and catches up within this gap — a state that lands mid-blend continues from the drawn pixel instead of jumping (`US-MATCH-001` AC2) |
 
 **Why the ruler doubles.** A single part scale cannot serve both views: 125-unit divisions would be unreadable at the whole
 map, and 62.5-unit divisions would be noise at half map. Doubling the division count keeps one division at ~125 world

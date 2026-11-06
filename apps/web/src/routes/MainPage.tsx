@@ -2,10 +2,11 @@
  * Main menu (`US-MATCH-001` entry point, `docs/02-reference/screens/main.md`).
  */
 import { useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useOnline } from "../lib/online.js";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { MOBILES, MODES, MAPS, makeRoomCode, type ModeId } from "@gbw/core";
 import { useLocale, useSession } from "../app/providers";
-import { api } from "../lib/api";
+import { ApiError, api, errorMessage } from "../lib/api";
 import type { PlannedMatch } from "./MatchPage";
 import type { JSX } from "react";
 
@@ -21,7 +22,14 @@ export function MainPage(): JSX.Element {
   const [mode, setMode] = useState<ModeId>("solo");
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  // A lobby that could not be entered hands its reason back here (`LobbyPage`), so the menu can say it.
+  const handedOver = (useLocation().state as { error?: string } | null)?.error ?? null;
+  // A screen that finished its job (deleting the account) leaves its confirmation here, not in the session it
+  // just cleared (`US-AUTH-004` AC5).
+  const noticed = (useLocation().state as { notice?: string } | null)?.notice ?? null;
+  const [error, setError] = useState<string | null>(handedOver ? t(handedOver) : noticed);
+  // Ordinary connectivity, not a session: the menu is usable before any account exists (`TC-AUTH-135`).
+  const online = useOnline();
 
   const mapId = useMemo(() => MAPS[0]?.mapId ?? "map-01", []);
 
@@ -69,15 +77,36 @@ export function MainPage(): JSX.Element {
       // The lobby reuses the seat this call created instead of creating a second one.
       sessionStorage.setItem(`gbw.room.${room.roomCode}`, room.playerId);
       navigate(`/lobby/${room.roomCode}`);
-    } catch {
-      setError(t("common.retry"));
+    } catch (caught) {
+      setError(errorMessage(caught, t));
     } finally {
       setBusy(false);
     }
   };
 
-  const joinRoom = (): void => {
-    navigate(`/lobby/${code}`);
+  /**
+   * Join by code: the menu asks the API first, so a code nobody minted answers with a banner here instead of
+   * opening a lobby that can never connect (`docs/02-reference/screens/main.md`, `US-ROOM-002` AC4).
+   */
+  const joinRoom = async (): Promise<void> => {
+    setBusy(true);
+    setError(null);
+    try {
+      await api.roomPreview(code);
+      navigate(`/lobby/${code}`);
+    } catch (caught) {
+      // A code nobody minted reads as "not found"; a room that has closed reads as closed (`US-ROOM-001` AC5).
+      const type = caught instanceof ApiError ? caught.type : null;
+      setError(
+        type === "room-not-found"
+          ? t("errors.room-not-found")
+          : type === "room-closed"
+            ? t("errors.room-closed")
+            : errorMessage(caught, t),
+      );
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (
@@ -87,7 +116,17 @@ export function MainPage(): JSX.Element {
         <p className="muted">{t("app.tagline")}</p>
         <div className="row">
           <span className="badge">{session?.subject.kind === "account" ? session.subject.displayName : t("signIn.guest")}</span>
-          {session?.subject.kind !== "account" ? <Link to="/sign-in">{t("main.signIn")}</Link> : null}
+          {session?.subject.kind !== "account" ? (
+            online ? (
+              <Link to="/sign-in">{t("main.signIn")}</Link>
+            ) : (
+              // Offline the offer stays visible but inert, so the menu explains itself instead of
+              // sending the player to a route that cannot work (`US-PWA-001` §5).
+              <span className="muted" aria-disabled="true" data-testid="signin-disabled">
+                {t("main.signIn")}
+              </span>
+            )
+          ) : null}
           <Link to="/profile">{t("main.profile")}</Link>
           <Link to="/leaderboard">{t("main.leaderboard")}</Link>
         </div>
@@ -113,7 +152,6 @@ export function MainPage(): JSX.Element {
         <button type="button" className="primary" data-testid="play-bot" onClick={startBot}>
           {t("main.playBot")}
         </button>
-        <p className="muted">{t("main.offline")}</p>
       </section>
 
       <section className="card">
@@ -134,9 +172,16 @@ export function MainPage(): JSX.Element {
             ))}
           </select>
         </div>
-        <button type="button" className="primary" data-testid="create-room" onClick={() => void createRoom()} disabled={!session || busy}>
+        <button
+          type="button"
+          className="primary"
+          data-testid="create-room"
+          onClick={() => void createRoom()}
+          disabled={!session || busy || !online}
+        >
           {t("main.createRoom")}
         </button>
+        {online ? null : <p className="muted" data-testid="offline-rooms">{t("main.offline")}</p>}
       </section>
 
       <section className="card">
@@ -147,13 +192,20 @@ export function MainPage(): JSX.Element {
           autoCapitalize="characters"
           autoComplete="off"
           spellCheck={false}
-          maxLength={6}
+          // Twelve, not six: the mask drops separators *after* the box has taken the keystroke, so a
+          // six-character cap would eat "ab-cd 2x3" down to four letters before sanitising it.
+          maxLength={12}
           placeholder={t("main.roomCode")}
           data-testid="room-code-input"
           value={code}
           onChange={(event) => setCode(event.target.value.toUpperCase().replace(CODE_ALPHABET, "").slice(0, 6))}
         />
-        <button type="button" data-testid="join-room" onClick={joinRoom} disabled={code.length !== 6}>
+        <button
+          type="button"
+          data-testid="join-room"
+          onClick={() => void joinRoom()}
+          disabled={code.length !== 6 || busy || !online}
+        >
           {t("main.joinRoom")}
         </button>
         {error ? <p className="muted">{error}</p> : null}

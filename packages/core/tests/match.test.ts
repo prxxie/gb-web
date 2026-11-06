@@ -4,7 +4,7 @@ import { getMobile } from "../src/data/mobiles.js";
 import { applyGimmicks } from "../src/gimmicks.js";
 import { getMap } from "../src/data/maps.js";
 import { advanceTurn, createTurn, extendOrExpire, nextSlotForMode } from "../src/turn.js";
-import { weatherSequence } from "../src/weather.js";
+import { rollWeather, weatherSequence } from "../src/weather.js";
 import { TUNABLES } from "../src/tuning.js";
 
 const NOW = 1_700_000_000_000;
@@ -191,20 +191,32 @@ describe("match", () => {
     expect(turn.number).toBe(2);
   });
 
-  it("TC-CORE-918: force and gust maps replace the round wind", () => {
+  it("TC-CORE-918: a force map announces its field and a gust map spikes the round wind", () => {
     const force = match([seat(0, "A"), seat(1, "B")], { mapId: "map-07" });
     const gust = match([seat(0, "A"), seat(1, "B")], { mapId: "map-03" });
     const forced = applyGimmicks(force, 2, getMap("map-07"));
     const gusted = applyGimmicks(gust, 2, getMap("map-03"));
-    expect(forced.weather?.rolledAtRound).toBe(2);
-    expect(gusted.weather?.wind.magnitude).toBeGreaterThanOrEqual(10);
+    // `force` pushes shells; it does not touch the wind, so the roll stays the round's own.
+    expect(forced.events.some((event) => event.kind === "force")).toBe(true);
+    expect(forced.weather).toBe(force.weather);
+    const base = rollWeather(gust.seed, 2).wind;
+    expect(gusted.events.some((event) => event.kind === "gust")).toBe(true);
+    expect(gusted.weather?.wind.magnitude).toBe(Math.min(TUNABLES.windMax, base.magnitude * 4));
   });
 
-  it("TC-CORE-919: electric, heal and tornado produce their events", () => {
-    const electric = applyGimmicks(match([seat(0, "A"), seat(1, "B")], { mapId: "map-04" }), 2, getMap("map-04"));
+  it("TC-CORE-919: electric strikes every third round, heal tops a wounded unit up, a tornado spawns", () => {
+    const electric = applyGimmicks(match([seat(0, "A"), seat(1, "B")], { mapId: "map-04" }), 3, getMap("map-04"));
     expect(electric.events.some((event) => event.kind === "electric")).toBe(true);
-    const heal = applyGimmicks(match([seat(0, "A"), seat(1, "B")], { mapId: "map-02" }), 2, getMap("map-02"));
-    expect(heal.events.some((event) => event.kind === "heal") || heal.players.every((player) => player.hp <= 1_200)).toBe(true);
+
+    const wounded = match([seat(0, "A"), seat(1, "B")], { mapId: "map-02" });
+    // The heal only reaches the marked zone at the map centre, so a wounded unit is moved into it.
+    const hurt = {
+      ...wounded,
+      players: wounded.players.map((player) => ({ ...player, x: 1000, hp: player.hp - 400 })),
+    };
+    const heal = applyGimmicks(hurt, 2, getMap("map-02"));
+    expect(heal.events.some((event) => event.kind === "heal")).toBe(true);
+
     const storm = applyGimmicks(match([seat(0, "A"), seat(1, "B")], { mapId: "map-06" }), 2, getMap("map-06"));
     expect(storm.events.some((event) => event.kind === "tornado")).toBe(true);
   });

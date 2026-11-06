@@ -12,7 +12,6 @@ import {
   findAccountById,
   findDisplayNameOwner,
   findProfile,
-  now,
   scheduleDeletion,
   touchAccount,
   updateProfile,
@@ -20,7 +19,7 @@ import {
 } from "../lib/db.js";
 import { verifyClerkJwt } from "../lib/jwt.js";
 import { ProblemError } from "../lib/problem.js";
-import { checkLimit, RULES } from "../lib/ratelimit.js";
+import { ipLimit, RULES } from "../lib/ratelimit.js";
 import { bearerOf, mintSession, type SessionToken } from "../lib/session.js";
 import { Field, readJson } from "../lib/validation.js";
 
@@ -43,12 +42,29 @@ export function isValidDisplayName(value: string): boolean {
 
 const AVATAR_PATTERN = /^avatar-(0[1-9]|1[0-2])$/;
 
+/** `ALLOWED_ORIGINS` is the one place the project's own origins are listed, so it is the `azp` allowlist. */
+function partiesOf(allowedOrigins: string): readonly string[] {
+  return allowedOrigins
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter((origin) => origin.length > 0);
+}
+
 export async function createSession(request: Request, env: Env): Promise<Response> {
-  const limit = checkLimit(`sessions:${request.headers.get("cf-connecting-ip") ?? "local"}`, RULES.sessionsPerIp);
-  if (!limit.allowed) throw new ProblemError("rate-limited", "Too many sessions from this address");
+  const limit = ipLimit(request, env, "sessions", RULES.sessionsPerIp);
+  if (limit && !limit.allowed) {
+    throw new ProblemError("rate-limited", "Too many sessions from this address", [], limit.retryAfterSeconds, "ip_sessions");
+  }
 
   const body = await readJson(request);
   const field = new Field([]);
+  // `accounts.md` § POST /sessions documents `kind`, `displayName` and `clerkToken`; an extra key is named back
+  // (`422 errors[]`), because a misspelled `displayname` would otherwise silently drop the name.
+  for (const key of Object.keys(body)) {
+    const IGNORED_IDENTITY = new Set(["accountId", "guestId", "clerkUserId", "subject"]);
+    if (IGNORED_IDENTITY.has(key)) continue; // never honoured: identity comes from the verified token
+    if (key !== "kind" && key !== "displayName" && key !== "clerkToken") field.fail(key, "is not a documented field");
+  }
   const kind = field.oneOf(body["kind"] ?? "guest", "kind", ["guest", "account"] as const);
   const displayName = typeof body["displayName"] === "string" ? body["displayName"] : null;
   field.done();
@@ -68,7 +84,9 @@ export async function createSession(request: Request, env: Env): Promise<Respons
 
   const clerkToken = bearerOf(request) ?? (typeof body["clerkToken"] === "string" ? body["clerkToken"] : null);
   if (!clerkToken) throw new ProblemError("unauthenticated", "Sign in requires a Clerk token");
-  const identity = await verifyClerkJwt(clerkToken, env.CLERK_ISSUER);
+  const identity = await verifyClerkJwt(clerkToken, env.CLERK_ISSUER, {
+    authorizedParties: partiesOf(env.ALLOWED_ORIGINS),
+  });
 
   let account = await findAccountByClerkId(env.GBW_DB, identity.subject);
   if (!account) {
@@ -108,7 +126,7 @@ export async function createSession(request: Request, env: Env): Promise<Respons
         ratedMatches: profile?.rated_matches ?? 0,
       },
     },
-    { status: 200, headers: { "cache-control": "no-store" } },
+    { status: 201, headers: { "cache-control": "no-store" } },
   );
 }
 
@@ -122,38 +140,74 @@ function requireAccountId(session: SessionToken): string {
 export interface PlayerStats {
   readonly matches: number;
   readonly wins: number;
-  readonly bestDamage: number;
+  readonly losses: number;
+  readonly abandons: number;
 }
 
 async function statsFor(env: Env, accountId: string): Promise<PlayerStats> {
   const row = await env.GBW_DB.prepare(
     `SELECT COUNT(*) AS matches,
             COALESCE(SUM(CASE WHEN result = 'win' THEN 1 ELSE 0 END), 0) AS wins,
-            COALESCE(MAX(damage_dealt), 0) AS best_damage
+            COALESCE(SUM(CASE WHEN result = 'loss' THEN 1 ELSE 0 END), 0) AS losses,
+            COALESCE(SUM(CASE WHEN result = 'abandon' THEN 1 ELSE 0 END), 0) AS abandons
        FROM match_player WHERE account_id = ?`,
   )
     .bind(accountId)
-    .first<{ matches: number; wins: number; best_damage: number }>();
-  return { matches: row?.matches ?? 0, wins: row?.wins ?? 0, bestDamage: row?.best_damage ?? 0 };
+    .first<{ matches: number; wins: number; losses: number; abandons: number }>();
+  return {
+    matches: row?.matches ?? 0,
+    wins: row?.wins ?? 0,
+    losses: row?.losses ?? 0,
+    abandons: row?.abandons ?? 0,
+  };
 }
 
-export function profileBody(profile: ProfileRow, stats: PlayerStats) {
+/**
+ * `GET /me` shape, exactly as `accounts.md` lists it: no `updatedAt`, no internal timestamps, and
+ * `deletionScheduledFor` present (null while nothing is pending) so a client never probes for it.
+ */
+export function profileBody(
+  profile: ProfileRow,
+  stats: PlayerStats,
+  account: { readonly created_at: string; readonly status: string; readonly deleted_at?: string | null },
+) {
+  const purgeAt =
+    account.status === "deleted"
+      ? new Date(Date.parse(account.deleted_at ?? account.created_at) + 30 * 24 * 60 * 60 * 1000).toISOString()
+      : null;
   return {
     accountId: profile.account_id,
     displayName: profile.display_name,
     avatarId: profile.avatar_id,
     rating: profile.rating,
     ratedMatches: profile.rated_matches,
-    updatedAt: profile.updated_at,
     stats,
+    createdAt: account.created_at,
+    deletionScheduledFor: purgeAt,
   };
+}
+
+/** A deleted account keeps a valid token until it expires; every authenticated call must still refuse. */
+interface ActiveAccount {
+  readonly clerk_user_id: string;
+  readonly created_at: string;
+  readonly status: string;
+  readonly deleted_at?: string | null;
+}
+
+async function activeAccount(env: Env, accountId: string): Promise<ActiveAccount> {
+  const account = await findAccountById(env.GBW_DB, accountId);
+  if (!account) throw new ProblemError("unauthenticated", "Account no longer exists");
+  if (account.status === "deleted") throw new ProblemError("unauthenticated", "This account was deleted");
+  return account;
 }
 
 export async function getMe(env: Env, session: SessionToken): Promise<Response> {
   const accountId = requireAccountId(session);
+  const account = await activeAccount(env, accountId);
   const profile = await findProfile(env.GBW_DB, accountId);
   if (!profile) throw new ProblemError("unauthenticated", "Account no longer exists");
-  return Response.json(profileBody(profile, await statsFor(env, accountId)), {
+  return Response.json(profileBody(profile, await statsFor(env, accountId), account), {
     headers: { "cache-control": "no-store" },
   });
 }
@@ -162,6 +216,19 @@ export async function patchMe(request: Request, env: Env, session: SessionToken)
   const accountId = requireAccountId(session);
   const body = await readJson(request);
   const field = new Field([]);
+  // `US-AUTH-003` §5 and `accounts.md` § PATCH /me draw the line in two places: the read-model fields a client
+  // may echo back (`rating`, `ratedMatches`, `stats`) are **ignored**, because a form that round-trips a profile
+  // must not fail on save; anything else is rejected and named, so a typo or an attempt to set `clerkUserId`
+  // never looks like a successful save.
+  const ECHO_FIELDS = new Set(["rating", "ratedMatches", "stats"]);
+  const writable = Object.keys(body).some((key) => key === "displayName" || key === "avatarId");
+  for (const key of Object.keys(body)) {
+    if (key === "displayName" || key === "avatarId") continue;
+    // A read-model field echoed back by a form is ignored — but a body made only of them has nothing to
+    // write, so it is refused and named rather than answered with a silent 200.
+    if (ECHO_FIELDS.has(key) && writable) continue;
+    field.fail(key, "is not a writable field");
+  }
   const displayName = typeof body["displayName"] === "string" ? body["displayName"].trim() : undefined;
   const avatarId = typeof body["avatarId"] === "string" ? body["avatarId"].trim() : undefined;
   if (displayName !== undefined && !isValidDisplayName(displayName)) {
@@ -172,6 +239,7 @@ export async function patchMe(request: Request, env: Env, session: SessionToken)
   if (displayName === undefined && avatarId === undefined) {
     throw new ProblemError("validation", "Nothing to update", [{ field: "body", detail: "at least one field" }]);
   }
+  await activeAccount(env, accountId);
 
   let key: string | undefined;
   if (displayName !== undefined) {
@@ -184,18 +252,81 @@ export async function patchMe(request: Request, env: Env, session: SessionToken)
     ...(avatarId === undefined ? {} : { avatarId }),
   });
   if (!profile) throw new ProblemError("internal", "Profile could not be updated");
-  return Response.json(profileBody(profile, await statsFor(env, accountId)));
+  const account = await activeAccount(env, accountId);
+  return Response.json(profileBody(profile, await statsFor(env, accountId), account));
 }
 
 export async function deleteMe(env: Env, session: SessionToken): Promise<Response> {
   const accountId = requireAccountId(session);
-  const live = await env.GBW_DB.prepare(
-    "SELECT COUNT(*) AS rooms FROM profile WHERE account_id = ? AND updated_at > ?",
-  )
-    .bind(accountId, new Date(Date.now() - 60_000).toISOString())
-    .first<{ rooms: number }>();
-  void live;
+  const account = await activeAccount(env, accountId);
+
+  // `TC-AUTH-069`: deleting mid-match would strand the other players in a room whose host record is gone.
+  const live = await liveRoomFor(env, accountId);
+  if (live) throw new ProblemError("invalid-state", `A match is still in progress in room ${live}`);
+
+  // Clerk first, D1 second: if the purge is scheduled and Clerk kept the user, the account could sign
+  // back in and be recreated under the same Clerk subject (`accounts.md` § DELETE /me).
+  await deleteClerkUser(env, account.clerk_user_id);
   await scheduleDeletion(env.GBW_DB, accountId);
-  const purgeAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
-  return Response.json({ deletionScheduledFor: purgeAt, deletedAt: now() }, { status: 202 });
+  return new Response(null, { status: 204 });
+}
+
+/**
+ * The rooms an account is currently playing in. Rooms live in Durable Objects, so this asks each room
+ * the profile knows about; v1 keeps the list small (a player is in at most one match) and an
+ * unreachable room is treated as not playing, because deletion must not hang on a DO.
+ */
+async function liveRoomFor(env: Env, accountId: string): Promise<string | null> {
+  // The lookup is best-effort: a room that cannot be reached, or a query that fails, must not make an
+  // account undeletable — the delete is the user's request, the in-match guard is a courtesy (`TC-AUTH-069`).
+  const remembered = await env.GBW_DB.prepare("SELECT current_room_code FROM profile WHERE account_id = ?")
+    .bind(accountId)
+    .all<{ current_room_code: string | null }>()
+    .catch(() => ({ results: [] as { current_room_code: string | null }[] }));
+  const codes = (remembered.results ?? [])
+    .map((row) => row.current_room_code)
+    .filter((code): code is string => typeof code === "string" && code.length > 0);
+  for (const code of codes) {
+    try {
+      const state = (await (
+        await env.ROOMS.get(env.ROOMS.idFromName(code)).fetch("https://room.internal/state")
+      ).json()) as { status?: string; members?: { accountId?: string | null }[] };
+      const inRoom = (state.members ?? []).some((member) => member.accountId === accountId);
+      if (state.status === "playing" && inRoom) return code;
+    } catch {
+      // A room that cannot answer is not a match in progress for this account.
+    }
+  }
+  const rows = await env.GBW_DB.prepare(
+    "SELECT room_code FROM match_record WHERE submitted_by = ? ORDER BY created_at DESC LIMIT 5",
+  )
+    .bind(accountId)
+    .all<{ room_code: string }>()
+    .catch(() => ({ results: [] as { room_code: string }[] }));
+  for (const row of rows.results ?? []) {
+    try {
+      const state = (await (
+        await env.ROOMS.get(env.ROOMS.idFromName(row.room_code)).fetch("https://room.internal/state")
+      ).json()) as { status?: string; members?: { accountId?: string | null }[] };
+      const inRoom = (state.members ?? []).some((member) => member.accountId === accountId);
+      if (state.status === "playing" && inRoom) return row.room_code;
+    } catch {
+      // A room that cannot answer is not a match in progress for this account.
+    }
+  }
+  return null;
+}
+
+/** Clerk's admin API; a failure must not leave the account undeletable, so it is logged, not thrown. */
+async function deleteClerkUser(env: Env, clerkUserId: string): Promise<void> {
+  const secret = (env as Env & { CLERK_SECRET_KEY?: string }).CLERK_SECRET_KEY;
+  if (!clerkUserId) return;
+  try {
+    await fetch(`https://api.clerk.com/v1/users/${encodeURIComponent(clerkUserId)}`, {
+      method: "DELETE",
+      headers: { authorization: `Bearer ${secret ?? ""}` },
+    });
+  } catch {
+    // The purge still runs; a stale Clerk user is reported by the nightly reconciliation, not here.
+  }
 }

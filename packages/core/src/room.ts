@@ -69,11 +69,14 @@ export function currentHost(room: RoomState): RoomMember | undefined {
  * Longest-connected peer becomes host (`US-ROOM-005`): the oldest `joinedAt`, ties broken by slot.
  * Grace and disconnected members are skipped so a dropped peer cannot inherit the match.
  */
-export function electHost(room: RoomState): string | null {
+export function electHost(room: RoomState, exclude: readonly string[] = []): string | null {
   const candidates = room.members
-    .filter((member) => member.playerId !== room.hostPlayerId)
+    .filter((member) => member.playerId !== room.hostPlayerId && !exclude.includes(member.playerId))
     .sort((a, b) => a.joinedAt - b.joinedAt || a.slot - b.slot);
-  return candidates[0]?.playerId ?? null;
+  // A peer already inside its grace window cannot take the host role: promoting it would hand the room to a
+  // socket that is gone, so the oldest *connected* peer wins and a disconnected one is only the last resort.
+  const connected = candidates.filter((member) => member.connectionState === "connected");
+  return (connected[0] ?? candidates[0])?.playerId ?? null;
 }
 
 export function joinRoom(room: RoomState, request: JoinRequest): JoinOutcome {
@@ -104,7 +107,9 @@ export function joinRoom(room: RoomState, request: JoinRequest): JoinOutcome {
     avatarId: request.avatarId,
     mobileId: request.mobileId,
     slot,
-    team: null,
+    // A joiner is seated in the emptier team, host first on A: a two-player room can start without the host
+    // shuffling anybody, and `team_assign` remains the override (`US-ROOM-003`, `screens/lobby.md`).
+    team: lessPopulatedTeam(room),
     role: room.members.length === 0 ? "host" : "player",
     connectionState: "connected",
     joinedAt: request.now,
@@ -163,6 +168,13 @@ export function leaveRoom(room: RoomState, playerId: string, now: number): Leave
     member,
     reason: "left",
   };
+}
+
+/** The team with fewer members; a tie seats on A. */
+function lessPopulatedTeam(room: RoomState): Team {
+  const a = room.members.filter((member) => member.team === "A").length;
+  const b = room.members.filter((member) => member.team === "B").length;
+  return a <= b ? "A" : "B";
 }
 
 export function setTeam(room: RoomState, playerId: string, team: Team, now: number): RoomState {
@@ -246,8 +258,18 @@ export function isIdle(room: RoomState, now: number): boolean {
   return now - room.lastActivityAt >= TUNABLES.roomIdleMs;
 }
 
-export function isRoomExpired(room: RoomState, now: number): boolean {
-  return isIdle(room, now) || now - room.createdAt >= TUNABLES.roomMatchCapMs;
+/**
+ * The 24 h cap runs from the match start, not from room creation: a room can sit in a lobby for hours
+ * and still get its full day of play (`workflow-state-machine.md`).
+ */
+export function isRoomExpired(room: RoomState, now: number, matchStartedAt: number | null = null): boolean {
+  const startedAt = matchStartedAt ?? room.createdAt;
+  return isIdle(room, now) || now - startedAt >= TUNABLES.roomMatchCapMs;
+}
+
+/** True once no member is connected and none can come back: the grace windows have all run out. */
+export function isAbandoned(room: RoomState): boolean {
+  return room.members.every((member) => member.connectionState === "disconnected");
 }
 
 export function defaultSettings(maxPlayers: RoomSettings["maxPlayers"]): RoomSettings {
@@ -266,6 +288,22 @@ export interface CreateRoomOptions {
 }
 
 /** A fresh lobby. The worker creates one per code; tests create one per case. */
+/**
+ * Change the lobby settings, host-validated by the caller (the DO knows who the host is, core does not).
+ *
+ * A capacity may not be cut below the members already seated: shrinking the room under them would leave
+ * seats that no longer exist (`US-CORE-012` AC4, `TC-ROOM-151`).
+ */
+export function setRoomSettings(
+  room: RoomState,
+  settings: Partial<RoomSettings>,
+): { readonly ok: true; readonly room: RoomState } | { readonly ok: false; readonly reason: "below-seated" } {
+  if (settings.maxPlayers !== undefined && settings.maxPlayers < room.members.length) {
+    return { ok: false, reason: "below-seated" };
+  }
+  return { ok: true, room: { ...room, settings: { ...room.settings, ...settings } } };
+}
+
 export function createRoom(options: CreateRoomOptions): RoomState {
   const maxPlayers = (options.settings?.maxPlayers ?? 4) as RoomSettings["maxPlayers"];
   return {

@@ -3,6 +3,14 @@
 Room state is **ephemeral**: it lives in the `Room` Durable Object (`env.ROOM.idFromName(roomCode)`) and is deleted when
 the room ends. It is never written to D1 — only the finished `match_record` is ([ADR-0003](../../04-decisions/adr/ADR-0003-data-d1.md)).
 
+### The terrain mask travels with the snapshot, not in every snapshot
+
+`snapshot.terrain` (wire key `m`) is the RLE mask from `serializeTerrain` (`packages/core/src/terrain.ts`).
+It is **absent** from most snapshots: the host attaches it only to the snapshot that follows a carve, because
+the mask is ~1.9 KB and the stream runs at 10 Hz. A peer that receives `m` replaces its own mask with it, so
+host and peer carve byte-identical terrain (`US-CORE-006` AC4); a peer that does not receives one within a
+round trip of the shot. `applySnapshot` returns the decoded heights, and the caller stores them on the match.
+
 ## `RoomState`
 
 | Field | Type | Description |

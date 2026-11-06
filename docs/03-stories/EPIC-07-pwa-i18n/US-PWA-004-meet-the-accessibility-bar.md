@@ -79,8 +79,12 @@ Contrast tokens: `#f2f5ff` on `#0b1020` (12.6:1), muted `#a8b3cf` (6.1:1) — bo
 
 None.
 
-<!-- delivery:2026-11-05 -->
+<!-- delivery:2026-11-06 -->
 
-## Delivery status — 2026-11-05
+## Delivery status — 2026-11-06
 
-**in-progress.** focus rings, 60 px canvas targets, `aria-live` and reduced motion are implemented; the axe pass is an e2e spec that was not executed here.
+**held at `ready`.** AC5 passes end to end (`tests/e2e/pwa-a11y.spec.ts`, one polite live region, canvas silent) and AC7 at
+component level (`apps/web/tests/route-focus.test.tsx`, TC-PWA-190). Still open: AC1 needs `axe-core` on the seven
+routes and the package is not a dependency yet (`tests/e2e/a11y.spec.ts` carries TC-PWA-158 as a hand-rolled
+name/size check instead), AC2 (200 % text) has no case, and AC3/AC4/AC6 are only partly covered — the 44 px and 60 px
+targets are measured, the 8 px spacing, the focus order through lobby/results and the colour-plus-label rule are not.

@@ -4,7 +4,7 @@ Questions that block or shape the work and that only the product owner, client, 
 `cpt-decide`. Format: [.agents/rules/02-docs-navigation.md § 5](../../.agents/rules/02-docs-navigation.md#5-open-questions).
 
 <!-- cpt:oq-summary -->
-**Open: 15 · Blocking: 0 · Answered: 25 · Withdrawn: 1**
+**Open: 15 · Blocking: 0 · Answered: 26 · Withdrawn: 1**
 
 | Id | Question | Status | Blocking |
 |---|---|---|---|
@@ -49,6 +49,7 @@ Questions that block or shape the work and that only the product owner, client, 
 | [OQ-39](open-questions.md#oq-39--how-does-fullscreen-work-on-iphone-where-safari-has-no-fullscreen-api) | How does fullscreen work on iPhone, where Safari has no Fullscreen API? | answered | — |
 | [OQ-40](open-questions.md#oq-40--is-the-joystick-gone-for-good-replaced-by-the-four-way-pad-and-gestures) | Is the joystick gone for good, replaced by the four-way pad and gestures? | answered | — |
 | [OQ-41](open-questions.md#oq-41--how-is-wind-expressed-and-when-does-it-change) | How is wind expressed and when does it change? | answered | — |
+| [OQ-42](open-questions.md#oq-42--do-accounts-own-avatar-parts-and-does-the-match-record-keep-the-bonus-totals) | Do accounts own avatar parts, and does the match record keep the bonus totals? | answered | — |
 <!-- /cpt:oq-summary -->
 
 ---
@@ -524,3 +525,18 @@ Questions that block or shape the work and that only the product owner, client, 
   deterministically from the match seed (`tunables.md` § 1.3). `windCoefficient = 42`, so `m = 26` reproduces the push
   the earlier `±10` model was tuned to (~129 units at 6.3 s ≈ one ruler division). The dial has 12 ticks so direction is
   readable to ±15°.
+
+## OQ-42 — Do accounts own avatar parts, and does the match record keep the bonus totals?
+
+- **Status**: answered
+- **Raised**: 2026-11-06 during the EPIC-03 audit
+- **Blocks**: `US-CORE-013`
+- **Context**: `US-CORE-013` AC4/AC5 assumed two things the data model does not have: a per-account inventory of
+  avatar parts (so "a part the account no longer owns" can be detected) and a bonus column on `match_player`.
+  `data/accounts.md` stores only `display_name`, `avatar_id`, `rating`; no parts table exists, and the record is a
+  stat sheet.
+- **Assumption**: v1 validates against the avatar **registry** — an id no build knows is dropped and contributes
+  nothing — and keeps the multipliers out of the record; the record keeps `damageDealt`, `shotsFired`, `hits`,
+  `ratingDelta`, which is what the results screen and the history page show.
+- **Answer**: accepted as the assumption; adding per-account parts and a `bonus` column is a v1.1 change with its own
+  story and migration.

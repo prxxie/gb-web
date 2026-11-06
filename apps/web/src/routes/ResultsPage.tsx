@@ -7,7 +7,9 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useLocale, useSession } from "../app/providers";
-import { api } from "../lib/api";
+import { api, errorMessage } from "../lib/api";
+import { InstallPrompt } from "../components/InstallPrompt";
+import { outcomeText, type WinCondition } from "../lib/outcome";
 import type { JSX } from "react";
 
 interface ResultPayload {
@@ -17,6 +19,8 @@ interface ResultPayload {
   readonly startedAt: number;
   readonly endedAt: number;
   readonly rulesetVersion: string;
+  /** Added with `US-CORE-010` AC6; a payload written before it simply omits the condition. */
+  readonly winCondition?: WinCondition;
   readonly players: readonly {
     readonly slot: number;
     readonly accountId: string | null;
@@ -81,9 +85,9 @@ export function ResultsPage(): JSX.Element {
           ratings: [],
         });
       })
-      .catch(() => {
+      .catch((caught: unknown) => {
         // `409` means another client already recorded it; anything else is shown, never retried twice.
-        setError(t("common.retry"));
+        setError(errorMessage(caught, t));
       });
   }, [payload, session, t]);
 
@@ -108,6 +112,9 @@ export function ResultsPage(): JSX.Element {
             ? t("results.draw")
             : t("results.winner", { team: payload.winnerTeam })}
         </h1>
+        <p className="muted" data-testid="result-outcome">
+          {outcomeText(t, payload.mode, payload.winCondition ?? null)}
+        </p>
         <p className="muted">
           {ranked
             ? t("results.ranked")
@@ -154,6 +161,8 @@ export function ResultsPage(): JSX.Element {
           </button>
         </Link>
       </div>
+      {/* The only place the install offer appears: after a match, when the player is not mid-task. */}
+      <InstallPrompt />
     </div>
   );
 }

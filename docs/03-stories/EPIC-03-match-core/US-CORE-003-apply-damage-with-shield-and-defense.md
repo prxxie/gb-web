@@ -2,7 +2,7 @@
 id: US-CORE-003
 title: Apply damage with shield, defense and blast tiers
 epic: EPIC-03-match-core
-status: ready
+status: done
 priority: P0
 size: M
 depends_on: [US-CORE-001]
@@ -35,11 +35,11 @@ a defense stat, and every weapon has Inner/Mid/Outer power tiers ``.
 |---|---|---|---|
 | AC1 | a weapon with `radius 80`, power 400 | a unit stands at distance 20 / 50 / 90 | it takes 400 (Inner), 240 (Mid), 120 (Outer) and 0 beyond the radius (`TC-CORE-024`) |
 | AC2 | a target with `shield 300`, `maxHp 1200` and `defense 1.15` | a 500-power hit lands at Inner | total is `round(500 / 1.15) = 435`: 300 leaves the shield, 135 leaves HP (`TC-CORE-903`) |
-| AC3 | a mobile with `shieldRegen 40` | its turn starts | shield rises by 40, capped at `maxShield` (`TC-CORE-905`) |
+| AC3 | a mobile with `shieldRegen 40` | its turn starts | shield rises by 40, capped at `maxShield` (`TC-CORE-943`) |
 | AC4 | a unit at `hp 100` takes 435 | the blast resolves | HP floors at 0 and the unit becomes `eliminated` (`TC-CORE-025`) |
 | AC5 | a team mate stands in the blast | it is fired | they take damage too — friendly fire is on (`TC-CORE-027`) |
 | AC6 | all units of a team are eliminated | damage resolves | the match ends with the other team as `winner` (`TC-CORE-027`) |
-| AC7 | a mobile has an `electric` effect type | it fires | the resolved damage is unchanged but the effect is `electric` in the snapshot (`TC-CORE-912`) |
+| AC7 | a mobile has an `electric` effect type | it fires | the resolved damage is unchanged but the effect is `electric` in the snapshot (`TC-CORE-944`) |
 
 ## 4. Contract
 
@@ -73,11 +73,23 @@ Modes with their own scoring ([`US-CORE-010`](US-CORE-010-score-the-four-modes.m
 
 ## 8. Test notes
 
-`TC-CORE-024`, `TC-CORE-025`, `TC-CORE-026`, `TC-CORE-027`, `TC-CORE-903`, `TC-CORE-905`, `TC-CORE-912`.
-`Red first: packages/core/tests/blast.test.ts::inner_tier_hurts_more_than_outer`.
+`TC-CORE-024`, `TC-CORE-025`, `TC-CORE-026`, `TC-CORE-027`, `TC-CORE-903`, `TC-CORE-943`, `TC-CORE-944`.
+Red: none — the engine rules were already implemented and green; this pass added the two cases the ACs cited but no
+test asserted (`TC-CORE-943`, `TC-CORE-944`), and they passed on the first run.
 
-<!-- delivery:2026-11-05 -->
+<!-- delivery:2026-11-06 -->
 
-## Delivery status — 2026-11-05
+## Delivery status — 2026-11-06
 
-**done.** the engine rule is implemented in `packages/core/src` and covered by `packages/core/tests/` (ballistics, combat, match, snapshot, data, room, rating, camera)
+**done.** `packages/core/tests/combat.test.ts` — `TC-CORE-024` (the 400 / 240 / 120 / 0 tiers at 20 / 50 / 79 / 81
+units), `TC-CORE-903` (shield 300 absorbs first, hp loses exactly 135), `TC-CORE-025` (hp floored at 0 and the unit
+eliminated), `TC-CORE-027` (friendly fire, then the last unit decides the winner), `TC-CORE-944` (an `electric` mobile
+deals the plain formula's damage), and `packages/core/tests/turn-queue.test.ts` `TC-CORE-943` (shield refills by its own
+`shieldRegen` at the start of its owner's turn, capped at `maxShield`, and no other slot moves).
+
+Two citations were wrong before this pass and are fixed: AC3 pointed at `TC-CORE-905` and AC7 at `TC-CORE-912`, both of
+which are mobile/weapon *data* cases owned by `US-CORE-007` — the shield regen and the effect carried no test at all until
+`TC-CORE-943` and `TC-CORE-944`. AC1 named distances of 20 / 50 / 90 for a radius-80 blast; 90 is outside the radius, so
+the case pins 79 as the outer tier and 81 as beyond it.
+
+`TC-CORE-024` now names AC5 and AC6 as well, because its tier table also proves the boundary and the `defense` division.

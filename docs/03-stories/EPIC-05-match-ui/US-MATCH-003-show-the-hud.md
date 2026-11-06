@@ -90,8 +90,15 @@ the components from a fixture snapshot; one Playwright test asserts the clock co
 - **OQ-24** (accepted assumption) — eight chips fit in the 64 px strip at the two reference widths; if not, the strip
   scrolls horizontally instead of shrinking text below 12 px.
 
-<!-- delivery:2026-11-05 -->
+<!-- delivery:2026-11-06 -->
 
-## Delivery status — 2026-11-05
+## Delivery status — 2026-11-06
 
-**in-progress.** the HUD (wind dial with twelve ticks, power readout, clock, roster) is implemented and its components are unit-tested; the live HUD needs a running match.
+**in-progress.** the wind dial (twelve ticks), power readout, turn clock, roster and weapon strip are implemented and their
+components are unit-tested; the live HUD needs a running match.
+
+Known layout defect, found while fixing the camera on 2026-11-06: `docs/02-reference/screens/match.md` draws the four-way
+pad **around the mobile**, and the shipped HUD puts it in a fixed bottom-left cluster instead. When the active mobile
+stands near the map's left edge the camera clamp keeps it on screen but the pad covers it
+(`docs/05-quality/evidence/US-MATCH-007/framing-844x390.png`). Fixing it means anchoring the pad and the power ring to the
+mobile's screen position, which is this story's work.

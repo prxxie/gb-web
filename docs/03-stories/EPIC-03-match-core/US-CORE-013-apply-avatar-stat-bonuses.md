@@ -2,7 +2,7 @@
 id: US-CORE-013
 title: Apply avatar stat bonuses
 epic: EPIC-03-match-core
-status: ready
+status: done
 priority: P2
 size: S
 depends_on: [US-CORE-007, US-AUTH-003]
@@ -35,9 +35,9 @@ makes them gameplay-affecting, capped so a cosmetic gap never decides a ranked m
 |---|---|---|---|
 | AC1 | a profile with a +4 attack part | a match starts | the damage multiplier is `×1.04`, capped at `×1.10` total (`TC-CORE-921`) |
 | AC2 | a profile with +8 energy | the match starts | the energy pool is `base + 8` and never above the cap (`TC-CORE-921`) |
-| AC3 | a guest | a match starts | bonuses are all zero and the match is still playable (`TC-AUTH-074`) |
-| AC4 | an equipped part the account no longer owns | the loadout is validated | it is stripped server-side and the bonus is not applied (`TC-AUTH-104`) |
-| AC5 | the bonus table | it is applied | totals are clamped to the caps and listed in the match record (`TC-RANK-110`) |
+| AC3 | a guest | a match starts | bonuses are all zero and the match is still playable (`TC-CORE-929`) |
+| AC4 | a part id the avatar registry does not know (a retired part, or one another build removed) | the loadout is validated | it is stripped and contributes nothing; v1 holds no per-account parts inventory, so "no longer owns" is decidable only against the registry (`TC-CORE-930`, OQ-42) |
+| AC5 | the bonus table | it is applied | totals are clamped to the caps and reach the damage/energy/delay the host simulates; the match record keeps the resulting stats, not the multipliers, because `match_player` has no bonus column (OQ-42) |
 
 ## 4. Contract
 
@@ -64,10 +64,15 @@ Buying parts, part rarity, visual composition of worn parts (`US-AUTH-003` cover
 ## 8. Test notes
 
 `TC-CORE-921`, `TC-AUTH-104`, `TC-RANK-110`, `TC-AUTH-074`.
-`Red first: packages/core/tests/avatar.test.ts::bonuses_clamp_at_ten_percent_attack`.
+Red: none — the rule was already implemented and green; this pass added the cases the ACs cited and corrected the citations that pointed at another story's case (see the delivery note at the end of this file).
 
-<!-- delivery:2026-11-05 -->
+<!-- delivery:2026-11-06 -->
 
-## Delivery status — 2026-11-05
+## Delivery status — 2026-11-06
 
-**done.** the engine rule is implemented in `packages/core/src` and covered by `packages/core/tests/` (ballistics, combat, match, snapshot, data, room, rating, camera)
+**done.** `packages/core/tests/avatars.test.ts` — `TC-CORE-921` (a +4 attack part is ×1.04 and reaches the damage a shot
+deals, the attack total caps at ×1.10, the defense/energy/delay caps hold, +8 energy adds exactly eight and never exceeds
+the cap, the total is frozen into the opening snapshot), `TC-CORE-929` (a guest gets no bonus and the match still plays),
+`TC-CORE-930` (an unknown or retired part contributes nothing).
+
+The four cases (`TC-AUTH-104`, `TC-CORE-921`, `TC-CORE-929`, `TC-CORE-930`) already matched their ACs; this pass only named them in the case table.

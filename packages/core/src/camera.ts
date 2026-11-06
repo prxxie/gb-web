@@ -30,20 +30,34 @@ export interface RulerLayout {
  * Centring vertically would frame empty sky and cut the terrain off — the ground band sits at the
  * bottom of the map, so the window sits on the bottom edge (`docs/02-reference/gameplay/tunables.md` § 9).
  */
+/** A window is drawn from an aspect the canvas reports; a canvas that reports nothing must not make it `NaN`. */
+function safeAspect(aspect: number): number {
+  return Number.isFinite(aspect) ? Math.max(0.1, aspect) : TUNABLES.viewDefaultWidth / TUNABLES.viewDefaultHeight;
+}
+
 export function defaultWindow(aspect: number): CameraWindow {
-  const width = TUNABLES.viewDefaultWidth;
-  const height = Math.min(TUNABLES.viewDefaultHeight, width / aspect);
+  // Height is the floor, width the consequence: a screen wider than 5:3 keeps its 600 units of height and
+  // gains margin on both sides (`docs/02-reference/screens/match.md` § 5), it never loses the sky.
+  const height = Math.min(TUNABLES.mapHeight, TUNABLES.viewDefaultHeight);
+  const width = Math.min(TUNABLES.mapWidth, Math.max(TUNABLES.viewDefaultWidth, height * safeAspect(aspect)));
   return { x: (TUNABLES.mapWidth - width) / 2, y: TUNABLES.mapHeight - height, width, height };
 }
 
-/** Follow a player: centre horizontally, keep the ground anchored (clamped inside the map). */
+/**
+ * Follow a player: centre horizontally, keep the ground anchored (clamped inside the map).
+ *
+ * The window takes the screen's aspect: the height stays the documented 600 units and a screen wider than
+ * 5:3 gains width. Fixing the width instead would crop the height on a landscape phone (844 × 313 is 2.7:1,
+ * so 1,000 units of width show only ~371 of the 600) and push the shooter's feet off the canvas and under
+ * the HUD — `TC-MATCH-918`.
+ */
 export function windowOn(
   targetX: number,
   aspect: number,
   groundY: number = TUNABLES.mapHeight,
-  width = TUNABLES.viewDefaultWidth,
 ): CameraWindow {
-  const height = Math.min(TUNABLES.viewDefaultHeight, width / aspect);
+  const height = Math.min(TUNABLES.mapHeight, TUNABLES.viewDefaultHeight);
+  const width = Math.min(TUNABLES.mapWidth, Math.max(TUNABLES.viewDefaultWidth, height * safeAspect(aspect)));
   // Anchor the frame just under the target's feet, so the mobile sits in the lower third with room to
   // lob upward, and the frame never scrolls past the map's ground line.
   const bottom = Math.min(TUNABLES.mapHeight, groundY + height * GROUND_MARGIN);
@@ -56,7 +70,7 @@ const GROUND_MARGIN = 0.3;
 /** Zoom is expressed as a window width: 250 (closest) … 2,000 (whole map). */
 export function windowFromZoom(zoomWidth: number, aspect: number, anchorX: number, anchorY: number): CameraWindow {
   const width = clamp(zoomWidth, TUNABLES.zoomMaxWidth, TUNABLES.mapWidth);
-  const height = Math.min(TUNABLES.viewDefaultHeight, width / aspect);
+  const height = clamp(width / aspect, TUNABLES.zoomMaxHeight, TUNABLES.mapHeight);
   return clampWindow({ x: anchorX - width / 2, y: anchorY - height / 2, width, height });
 }
 
@@ -65,8 +79,11 @@ export function zoomOf(window: CameraWindow): number {
 }
 
 export function clampWindow(window: CameraWindow): CameraWindow {
+  const aspect = Math.max(0.1, window.width / Math.max(1, window.height));
   const width = clamp(window.width, TUNABLES.zoomMaxWidth, TUNABLES.mapWidth);
-  const height = Math.min(TUNABLES.viewDefaultHeight, width / Math.max(0.1, window.width / window.height));
+  // Zooming all the way out shows the whole map, so the height is bounded by the map, not by the
+  // default view — capping it at 600 made `zoomMin` unreachable (`TC-MATCH-919`).
+  const height = clamp(width / aspect, TUNABLES.zoomMaxHeight, TUNABLES.mapHeight);
   const x = clamp(window.x, 0, Math.max(0, TUNABLES.mapWidth - width));
   const y = clamp(window.y, 0, Math.max(0, TUNABLES.mapHeight - height));
   return { x: roundTo(x), y: roundTo(y), width: roundTo(width), height: roundTo(height) };
@@ -83,7 +100,8 @@ export function pinchTo(window: CameraWindow, factor: number, anchorX: number, a
   const width = clamp(window.width / Math.max(0.2, factor), TUNABLES.zoomMaxWidth, TUNABLES.mapWidth);
   const ratioX = window.width === 0 ? 0.5 : (anchorX - window.x) / window.width;
   const ratioY = window.height === 0 ? 0.5 : (anchorY - window.y) / window.height;
-  const height = Math.min(TUNABLES.viewDefaultHeight, width * (window.height / window.width));
+  // The window keeps its aspect while zooming, so the height follows the width all the way out to the map.
+  const height = clamp(width * (window.height / window.width), TUNABLES.zoomMaxHeight, TUNABLES.mapHeight);
   return clampWindow({ x: anchorX - ratioX * width, y: anchorY - ratioY * height, width, height });
 }
 
@@ -117,6 +135,11 @@ export function angleFromPull(dx: number, dy: number, facing: -1 | 1): number {
 }
 
 /** Ring radius for the power gradient, in screen pixels (constant on screen, not in world units). */
+/**
+ * The ring is a **fixed** screen radius: a ring that grew with power would change the pixels-per-unit the
+ * player has just learned from the ruler, and the number inside it would shrink (`US-MATCH-002` §4).
+ */
 export function powerRingRadius(power: number): number {
-  return roundTo(TUNABLES.powerRingMinPx + (TUNABLES.powerRingMaxPx - TUNABLES.powerRingMinPx) * (power / TUNABLES.powerBarMax));
+  void power;
+  return TUNABLES.powerRingRadiusPx;
 }

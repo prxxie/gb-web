@@ -2,7 +2,7 @@
 id: US-FND-002
 title: Serve /health from the worker with the D1 binding and the error envelope
 epic: EPIC-00-foundation
-status: ready
+status: done
 priority: P0
 size: M
 depends_on: [US-FND-001]
@@ -89,8 +89,14 @@ export { Room } from "./room";
 
 ## 8. Test notes
 
-`TC-FND-001`, `TC-FND-070` (contract fixtures against `openapi.yaml`) and `TC-FND-100`
-(`apps/worker/tests/migrations.test.ts`, miniflare D1). Red first: the health test fails against the empty worker.
+`TC-FND-001` (`apps/worker/tests/health.test.ts`), `TC-FND-071` (`apps/worker/tests/lib.test.ts` and the RFC 9457
+loop in `apps/worker/tests/api-contract.test.ts`), `TC-FND-072` (a `FakeD1.failWhen` statement throws and the route
+still answers a 500 problem with the logged request id), `TC-FND-073`, `TC-FND-070`
+(`tests/meta/openapi.test.ts` against the committed `openapi.yaml`) and `TC-FND-100`
+(`apps/worker/tests/migrations.test.ts`, `node:sqlite` running the real migration).
+- **Red:** `TC-FND-001` in `tests/…` — `apps/worker/tests/health.test.ts` — failed against the empty worker, `TC-FND-100` in
+  `apps/worker/tests/migrations.test.ts` failed before `0001_init.sql` existed, and `TC-FND-072` in
+  `apps/worker/tests/api-contract.test.ts` failed while an unrouted path answered `400 bad-request` with no `instance`.
 
 ## 9. Open questions
 

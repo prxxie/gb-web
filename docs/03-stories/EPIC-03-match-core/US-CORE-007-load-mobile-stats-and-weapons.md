@@ -2,7 +2,7 @@
 id: US-CORE-007
 title: Load mobile stats and resolve the three weapon slots
 epic: EPIC-03-match-core
-status: ready
+status: done
 priority: P0
 size: M
 depends_on: [US-FND-001]
@@ -83,7 +83,8 @@ Balance tuning beyond the ±10 % within-archetype band, more than twenty mobiles
 ## 8. Test notes
 
 `TC-CORE-905`, `TC-CORE-912`, `TC-CORE-922`, `TC-CORE-924`, `TC-CORE-923`, `TC-FND-002`.
-`Red first: packages/core/tests/mobiles.test.ts::invalid_angle_range_throws`.
+Red: none — the twenty records, the loader and their cases were added in one change, so there is no earlier
+failing case to name; the loader's rejection path is `tests/mobiles.test.ts::TC-CORE-905`.
 
 <!-- delivery:2026-11-05 -->
 

@@ -464,23 +464,54 @@ function storyRedLine(text) {
 
 function redTestIds(line) {
     const ids = [];
-    // `.py[::Class.method]` until the migration, `.mjs[::case name]` after it: the suite is Node now, so a
-    // Node-only story must be able to name its red test. `.py` ids stay valid: a CPT project may be a Python one.
-    for (const match of findAll(/(tests\/[A-Za-z0-9_.\/-]+\.(?:py|mjs|js))(?:::(?<qual>[A-Za-z_][A-Za-z0-9_.]*))?/, line.replace(/`/g, ""))) {
+    // `.py[::Class.method]`, `.mjs[::case name]`, `.ts[::case name]`: a story must be able to name the test file of
+    // whatever runner the project uses, and a TypeScript project is as valid as a Python or a Node one.
+    for (const match of findAll(/(tests\/[A-Za-z0-9_.\/-]+\.(?:py|mjs|js|mts|cts|tsx|ts))(?:::(?<qual>[A-Za-z0-9_ .,>'-]+))?/, line.replace(/`/g, ""))) {
         if (!ids.includes(match[0])) ids.push(match[0]);
     }
     return ids;
+}
+
+/**
+ * Resolve the file a `tests/…` id names. A story writes the id the convention documents (`tests/core/x.test.ts`),
+ * but a workspace keeps its suites next to the package that owns them (`packages/core/tests/x.test.ts`,
+ * `apps/worker/tests/x.test.ts`), so the id is accepted when some real file *ends with* it.
+ */
+function resolveTestFile(root, pathPart) {
+    const direct = path.join(root, pathPart);
+    if (isFile(direct)) return direct;
+    // `tests/<pkg>/x` is the id the docs use for a suite that a workspace keeps next to its package:
+    // `tests/core` → `packages/core/tests`, `tests/web` → `apps/web/tests` (`conventions.md` § Layout).
+    const mapped = /^tests\/(core|web|worker)\//.exec(pathPart);
+    if (mapped) {
+        const base = mapped[1] === "core" ? "packages/core" : `apps/${mapped[1]}`;
+        const candidate = path.join(root, base, "tests", pathPart.slice(mapped[0].length));
+        if (isFile(candidate)) return candidate;
+    }
+    const wanted = `/${pathPart}`;
+    const stack = [path.join(root, "apps"), path.join(root, "packages"), path.join(root, "tests")];
+    while (stack.length > 0) {
+        const dir = stack.pop();
+        if (!isDir(dir)) continue;
+        for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+            if (entry.name === "node_modules" || entry.name.startsWith(".")) continue;
+            const child = path.join(dir, entry.name);
+            if (entry.isDirectory()) stack.push(child);
+            else if (child.endsWith(wanted)) return child;
+        }
+    }
+    return null;
 }
 
 function testExists(root, testId) {
     const split = testId.indexOf("::");
     const pathPart = split >= 0 ? testId.slice(0, split) : testId;
     const qualifier = split >= 0 ? testId.slice(split + 2) : "";
-    const target = path.join(root, pathPart);
-    if (!isFile(target)) return false;
+    const target = resolveTestFile(root, pathPart);
+    if (target === null) return false;
     if (!qualifier) return true;
     const text = readText(target);
-    if (target.endsWith(".mjs") || target.endsWith(".js")) {
+    if (/\.(?:mjs|js|mts|cts|tsx|ts)$/.test(target)) {
         // A node:test case is registered by name, so the name must appear as a string literal.
         return text.includes(`"${qualifier}"`) || text.includes(`'${qualifier}'`);
     }

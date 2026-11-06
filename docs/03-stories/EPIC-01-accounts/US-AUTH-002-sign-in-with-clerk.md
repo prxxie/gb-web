@@ -2,7 +2,7 @@
 id: US-AUTH-002
 title: Sign in with Google or an email link and get a profile
 epic: EPIC-01-accounts
-status: ready
+status: done
 priority: P1
 size: M
 depends_on: [US-FND-002, US-FND-003]
@@ -35,7 +35,7 @@ Clerk bundle, and it must never block the guest path.
 
 | # | Given | When | Then |
 |---|-------|------|------|
-| AC1 | A valid Clerk session | `POST /api/v1/sessions` with the Clerk JWT | `201`, `subject.kind = "registered"`, and the session token's `sub` is the internal `account_id` — not the Clerk `sub` |
+| AC1 | A valid Clerk session | `POST /api/v1/sessions` with `{"kind":"account"}` and the Clerk JWT in `Authorization` | `201`, `subject.kind = "account"`, and the session token's `sub` is the internal `account_id` — not the Clerk `sub`. The web client exchanges the Clerk JWT through `upgradeToAccount` and adopts the result, or the player would still be a guest after signing in |
 | AC2 | A first-ever sign-in | The same call completes | Exactly one `account` row and one `profile` row exist for that `clerk_user_id`, with `rating = 1200`, `rated_matches = 0` and a generated `display_name` |
 | AC3 | A JWT signed by an unknown key, expired, or with `azp` outside the allowlist | `POST /sessions` is called | `401 unauthenticated`; nothing is written |
 | AC4 | Clerk's JWKS endpoint is unreachable | A request with a cached key arrives | It succeeds from the cache; with no cache it returns `503` with `retryAfterSeconds`, never `500` |
@@ -45,8 +45,8 @@ Clerk bundle, and it must never block the guest path.
 
 ## 4. Contract
 
-`POST /api/v1/sessions` with `Authorization: Bearer <clerk jwt>`, body `{"kind":"registered"}` → `201` with
-`subject: {kind: "registered", accountId, displayName, rating, avatarId}`.
+`POST /api/v1/sessions` with `Authorization: Bearer <clerk jwt>`, body `{"kind":"account"}` → `201` with
+`subject: {kind: "account", accountId, displayName, avatarId, rating, ratedMatches}`.
 
 `GET /api/v1/me` (Clerk JWT) → `200`:
 
@@ -86,9 +86,11 @@ cached in module scope for 10 minutes; claims checked: `exp`, `nbf`, `azp` ∈ a
 
 ## 8. Test notes
 
-`TC-AUTH-137`, `TC-AUTH-138`; worker tests use a locally generated RSA key pair plus a stubbed JWKS endpoint.
-`TC-AUTH-074` (owned by [US-AUTH-001](US-AUTH-001-continue-as-a-guest.md)) also covers the registered branch of
-`/sessions`. Red first: `apps/worker/tests/sessions.test.ts::registered_session_creates_profile`.
+`TC-AUTH-137`, `TC-AUTH-138`, `TC-AUTH-151`…`TC-AUTH-156`; worker tests use a locally generated RSA key pair plus a
+stubbed JWKS endpoint (`apps/worker/tests/support/clerk.ts`). `TC-AUTH-074` (owned by
+[US-AUTH-001](US-AUTH-001-continue-as-a-guest.md)) also covers the registered branch of `/sessions`.
+- **Red:** `apps/worker/tests/auth.test.ts` — "answers 503 with a retry hint when the JWKS endpoint is unavailable and
+  nothing is cached" asserted `401`, and no case refused a foreign `azp` at all.
 
 ## 9. Open questions
 

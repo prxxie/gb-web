@@ -20,12 +20,13 @@ the budget (`NFR-04`), and readability is worth more at this stage.
 | `t` | Fields | Rule |
 |-----|--------|------|
 | `auth` | `token`, `mobileId?`, `displayName?`, `avatarId?` | First frame, within 5 s, else the socket closes with `4401`. The DO verifies `token` itself and binds the socket to the member whose `accountId`/`guestId` matches the token subject — identity never comes from the frame, and the bearer header cannot be used here because a browser cannot set one on a WebSocket |
-| `signal` | `to` (playerId), `payload` (`{ sdp }` or `{ candidate }`) | Relayed verbatim to `to`; the DO never parses SDP, so a client cannot forge `from`. Max 8 KB per payload. A `to` that is not connected → `error peer-not-connected`, not `unsupported-message` |
-| `team_assign` | `assignments: [{ playerId, team }]` | Host only (`not-host` on a peer). Lobby only (`invalid-state`). One frame carries the whole roster so a half-applied assignment cannot occur; it must leave both teams non-empty and equal in size, which `start_match` re-checks |
+| `signal` | `to` (playerId), `payload` (`{ kind: 'offer' \| 'answer', sdp }` or `{ kind: 'candidate', candidate }`) | Relayed verbatim to `to`; the DO never parses SDP, so a client cannot forge `from`. `kind` is part of the payload because two `{ sdp }` frames are otherwise indistinguishable — an offer and an answer look the same. Max 8 KB per sdp, over that → `payload-too-large`. A `to` that is not connected → `error peer-not-connected`, not `unsupported-message`; signalling yourself → `bad-request` |
+| `team_assign` | `assignments: [{ playerId, team }]` | Host only (`not-host` on a peer). Lobby only (`invalid-state`). One frame carries the whole roster so a half-applied assignment cannot occur. It enforces **capacity** only — no team may hold more than `maxPlayers / 2` (`bad-request`) — because the host must be able to seat the first player; **equality** is `start_match`'s rule |
 | `start_match` | — (no fields) | Host only; every slot filled, both teams non-empty and equal → `status: 'playing'`. The DO stamps `rulesetVersion` from the deployed build: a client cannot choose the version a match is ranked under |
 | `snapshot_push` | `snapshot` (a `Snapshot`, ≤ 8 KB) | Host only; replaces `lastSnapshot` in DO storage and is relayed as `snapshot_state`. `snapshot.seq` must increase — a push at or below the stored `seq` is dropped silently, because a retransmit is not an error. `snapshot.hostGeneration` lets a peer discard a push from a superseded host |
-| `match_end` | `winnerTeam`, `stats: [{ slot, accountId, damageDealt, shotsFired, hits, forfeited }]` | Host only, `playing` only. The DO validates the shape, sets `status: 'ended'`, broadcasts `room_state`, then calls `POST /api/v1/matches` ([matches.md](matches.md), `US-RANK-001`) and broadcasts `match_recorded`. A failed write answers the host with `error internal` and leaves the room `ended`; the host may retry, and `409 match-already-recorded` on that retry is a success from the client's point of view |
-| `leave` | — | Removes the member; if it was the host, election follows |
+| `match_end` | `winnerTeam`, `stats: [{ slot, damageDealt, shotsFired, hits, forfeited? }]` | Host only, `playing` only. The DO validates the shape, sets `status: 'ended'`, broadcasts `room_state`, then calls `POST /api/v1/matches` ([matches.md](matches.md), `US-RANK-001`) and broadcasts `match_recorded`. A failed write answers the host with `error internal` and leaves the room `ended`; the host may retry, and `409 match-already-recorded` on that retry is a success from the client's point of view |
+| `chat` | `kind` (`quick_phrase` \| `emote`) with `id`, or a free `text` (≤ 120 chars) | Any member, any status. Above **2/s** → `error rate-limited` and the socket closes `4429`; the DO keeps nothing of what was said |
+| `leave` | — | Removes the member; if it was the host, the 20 s grace window runs out first and then election follows |
 | `ping` | `at` (client clock, ms) | Any time; the client sends one every 15 s. `pong` echoes `at` and adds the server's `now`, so the client measures RTT without trusting either clock. Above 10/s → `rate-limited`. Three consecutive misses move the member to `grace` (`US-ROOM-002` AC6) |
 
 ## Room socket — DO → client
@@ -35,26 +36,32 @@ the budget (`NFR-04`), and readability is worth more at this stage.
 | `room_state` | `RoomState` (as in [room-state.md](../data/room-state.md), without sockets), `you: { playerId, slot }` | Sent after successful `auth` and on every membership/team/host change |
 | `peer_joined` | `playerId`, `slot`, `room` | Fast path for the lobby UI (also reflected in the next `room_state`) |
 | `peer_left` | `playerId`, `reason`: `'left' \| 'grace' \| 'disconnected'` | Mirrors `connectionState`; the roster change itself arrives in the `room_state` that follows, so this frame stays small and carries no room |
+| `room_closed` | `reason`: `'expired' \| 'empty' \| 'closed'` | Last frame before the socket closes `4410`: the 24 h cap, an empty lobby's 60 s, or an abandonment sweep. Nothing follows it |
 | `snapshot_state` | `snapshot` (a `Snapshot`) | The one relay name: host → peers during play, and the replay a returning or promoted client receives. Discard a snapshot whose `hostGeneration` is below the current one |
 | `signal` | `from` (playerId), `payload` | Relay of a peer's `signal` |
-| `match_started` | `startedAt`, `seed`, `hostPlayerId`, `hostGeneration`, `rulesetVersion`, `assignments[]` (`{ playerId, slot, team, mobileId, accountId }`), `room` | Both peers and host switch to the match scene on this; `seed` makes weather and spawns reproducible on every client |
+| `match_started` | `startedAt`, `seed`, `hostPlayerId`, `hostGeneration`, `rulesetVersion`, `assignments[]` (`{ playerId, slot, team, mobileId, accountId, loadout }`), `room` | Both peers and host switch to the match scene on this; `seed` makes weather and spawns reproducible on every client |
 | `host_changed` | `hostPlayerId`, `hostGeneration`, `lastSnapshot`, `room` | Migration event; peers discard snapshots with a lower `hostGeneration` and resync from `room`. The graced member is not named here — `peer_left.reason` already told everyone who is in grace |
 | `match_recorded` | `matchId`, `winnerTeam`, `ranked`, `ratings[]`, `players[]` | Broadcast to every member after the write succeeds, so the results screen can show the winner and the deltas without another request. `ranked` is false and `ratings` empty for a guest, an offline room, or a ruleset mismatch (`US-RANK-003`); `winnerTeam` is echoed from the host's `match_end` so a peer that missed the final snapshot still renders the result |
 | `pong` | `at` (echo), `now` (server ms) | RTT display; `now - at` includes the round trip, so the client halves it |
 | `error` | `code`, `detail` | Codes follow the [error catalogue](README.md#error-catalogue). The socket carries no `type` URI and no `requestId`: a WS frame has no problem document, and the request id lives in the Worker log line for the same frame |
 
-Close codes: `4401` unauthenticated, `4404` room not found, `4409` room full, `4410` room closed, `4429` rate limited.
+Close codes: `4401` unauthenticated, `4404` room not found, `4409` room full, `4410` room closed, `4429` rate limited,
+`4408` heartbeat lost (three unanswered `ping`s — the client closes, the room then sees the socket close).
 
 ## Host election
 
-On the host's socket closing: mark it `grace`, start the 20 s grace alarm, and immediately elect the **longest-connected
-connected peer** (`joinedAt` ascending, `slot` ascending as tie-break). Increment `hostGeneration`, broadcast
-`host_changed` with the stored `lastSnapshot`, and promote that member to `role: 'host'`. Election is skipped when no
-peer is `connected` (room → `abandoned`) or when the room is in `lobby` (the room simply waits for a new host to join
-and claim by `POST /rooms`-less path: the earliest joiner becomes host automatically).
+On the host's socket closing: mark its seat `grace` (the 20 s window `US-ROOM-004` gives a phone that dropped), and
+**promote at once** — authority over physics cannot wait 20 s (`US-ROOM-005` AC1, `NFR-06`). The promoted member is the
+oldest `connected` peer still holding a socket (`joinedAt` ascending, `slot` ascending as tie-break); a peer that is
+only `grace` is never promoted. Increment `hostGeneration`, broadcast `host_changed` with the stored `lastSnapshot`, and
+give that member `role: 'host'`.
+
+The promotion is then **verified**: five seconds later an alarm checks that the new host is actually live. If it is not,
+the next candidate is tried exactly once; if that fails too, the room is `abandoned` (`US-ROOM-005` AC3, `TC-ROOM-169`).
+A lobby is never abandoned this way — it simply waits for a member to be promoted by the same rule.
 
 If the graced player returns within 20 s it re-joins with the same `accountId`/`guestId`, keeps its slot, and is a peer
-(`NFR-07`).
+(`NFR-07`): the seat was held, the role was not.
 
 ## Snapshot payload (`state` channel)
 
@@ -68,12 +75,18 @@ If the graced player returns within 20 s it re-joins with the same `accountId`/`
 
 Quantisation keeps an 8-player snapshot at ~300–600 B, under the 800 B budget (`NFR-04`, TC-CORE-041).
 
+**The mask is the exception, and it is one frame per carve, not a channel.** A snapshot that carries `terrain` is
+sent once by the host after a shot that carved the ground (`US-CORE-006` AC4) so every peer resolves the next hit
+against the same surface; it measures 2 256 B on `map-01` and 5 537 B on `map-06` (1 001 samples at
+`terrainStep 2`), inside the 8 KB per-frame cap and outside the 800 B state budget, which describes the
+10–20 Hz stream. `TC-CORE-041` asserts both halves: no mask by default, and a masked snapshot under the cap.
+
 ## Control channel messages
 
 | `t` | Fields | Meaning |
 |-----|--------|---------|
 | `input` | `turnNumber`, `slot`, `kind` (`fire` \| `skip`), `angle`, `force` | ~24 B. Host rejects an input whose `turnNumber`/`slot` is not current, or a second input in the same turn |
-| `chat` | `kind` (`quick_phrase` \| `emote`), `id` | Preset ids only; host rate-limits to 1 per 2 s per player and drops excess silently |
+| `chat` | `from`, `kind` (`quick_phrase` \| `emote` \| null), `id`, `text` | The room socket's `chat`, relayed to every other member. The budget in § Budgets is what limits it — the room does not queue, store or reorder |
 | `turn_end` | `turnNumber`, `nextSlot` | Host → peers; keeps the HUD in step even if a snapshot is lost |
 
 Aliasing: the host applies all inputs for a turn at the last-received moment (no rollback netcode in v1); peers predict
@@ -83,9 +96,11 @@ their own projectile locally and reconcile to the next snapshot.
 
 | Path | Rate | Max size | Note |
 |------|------|----------|------|
-| `signal` | bursty, ≤ 20 frames per connection | 8 KB | ICE candidates are small; SDP can be ~2–4 KB |
+| `signal` | ≤ 20/s per socket | 8 KB | ICE candidates are small; SDP can be ~2–4 KB |
+| `ping` | ≤ 10/s per socket | 64 B | Above it the socket is closed `4429` |
+| `chat` | ≤ 2/s per socket | 256 B | Above it the socket is closed `4429` |
 | `snapshot_push` | ≤ 20/s | 8 KB | Only the latest is stored |
-| `state` (per peer) | 10–20/s | 800 B | Host → each peer |
+| `state` (per peer) | 10–20/s | 800 B | Host → each peer; a mask-bearing snapshot (one per carve) is capped at 8 KB |
 | `control` | ≤ 5/s | 256 B | Input + chat |
 | Host uplink at 8 players | 15 Hz | — | ≈ 31 KB/s (7 peers × ~300 B), `OQ-24` |
 
@@ -93,13 +108,13 @@ their own projectile locally and reconcile to the next snapshot.
 
 | Contract | Checked by |
 |----------|-----------|
-| Message names and field sets (both directions) | no single owner yet: the frame types live in `apps/web/src/net/signaling.ts` (union types, no runtime check) and the DO accepts them loosely. `packages/core/src/protocol.ts` — a runtime parser shared by client and DO — does not exist; creating it and testing it in `packages/core/tests/protocol.test.ts` (TC-ROOM-126) is part of closing this contract |
+| Message names and field sets (both directions) | `packages/core/src/protocol.ts` — one runtime parser shared by the client and the DO; `packages/core/tests/protocol.test.ts` (TC-ROOM-126, 13 cases) |
 | `auth` timeout, close codes, `accountId`/token mismatch | `apps/worker/tests/room-auth.test.ts` (TC-ROOM-121) |
 | Relay isolation (`signal` reaches only `to`) | `apps/worker/tests/room-relay.test.ts` (TC-ROOM-050) |
 | Host-only enforcement on `team_assign`, `start_match`, `snapshot_push`, `match_end` | `apps/worker/tests/room-host.test.ts` (TC-NET-044) |
 | Election order, grace window, `hostGeneration` monotonicity | `apps/worker/tests/room-election.test.ts` (TC-ROOM-048) |
-| Snapshot encoding ≤ 800 B at 8 players | `packages/core/tests/snapshot.test.ts` (TC-CORE-041) |
-| Input rejection rules (wrong turn, duplicate, out of range) | `packages/core/tests/input.test.ts` (TC-CORE-045) |
+| Snapshot encoding ≤ 800 B at 8 players, no mask by default, mask-bearing frame ≤ 8 KB | `packages/core/tests/snapshot.test.ts` (TC-CORE-041) |
+| Input rejection rules (wrong turn, duplicate, out of range) | `packages/core/tests/turn-queue.test.ts` (TC-CORE-045), `packages/core/tests/protocol.test.ts` (frame shape) |
 
 Every oracle in this table is a file that must exist; § [Contract status](#contract-status-2026-11-05) says which
 of them are written today.
@@ -115,17 +130,21 @@ stays `1` because no deployed client exists yet.
 |---|---|---|---|---|
 | `move` | `{ t:'move', direction:0\|1, run:boolean }` | active player | server-side clamp against energy/incline is not possible (no physics on the Worker) — the host validates | `TC-CORE-904` |
 | `item` | `{ t:'item', id:string }` | active player | host validates ownership before applying | `TC-CORE-906` |
-| `room_settings` | `{ t:'room_settings', mode:ModeId, mapId:string }` | host only | rejected for members (`TC-NET-067`) | `TC-ROOM-151` |
+| `room_settings` | `{ t:'room_settings', mode:ModeId, mapId:string, maxPlayers?, isPrivate? }` | host only; lobby only; `maxPlayers` may not drop below the members already seated (`invalid-state`) | rejected for members (`TC-NET-067`) | `TC-ROOM-151` |
 | `loadout` | `{ t:'loadout', items:Array<{id:string,qty:number}> }` | any member, lobby only | total quantity ≤ 11 | `TC-MATCH-006` |
 
 `input` (`fire`) gains `weaponSlot: 0 | 1 | 2`; `skip`, `emote` and `quick_phrase` are unchanged.
 
 ### Snapshot additions
 
-`turn` gains `queue: number[]` and `delays: number[]`; each `players[]` entry gains `shield`, `energy`, `weaponSlot`,
-`items: Array<{id:string,qty:number}>` and `bonus`; a new optional `modeState` carries `jewels[]`, `score` or
-`activeTeam`; a new optional `terrain` carries the RLE delta of carved ground. The budget stays **≤800 B at eight
-players** (`NFR-04`), asserted by `TC-CORE-041`.
+`turn` gains `queue: number[]` and `delays: number[]`; each `players[]` entry gains `shield`, `energy` and `weaponSlot`
+(the slot that seat last fired with — the host tracks it from accepted `input` frames, it is not a property of the
+player); `sc` carries the two team scores, `j` the jewel triples (`x, y, carriedBy`) and `at` the tag flag (omitted
+while it is A); `v` carries `rulesetVersion`, so a peer can refuse to rank a match it did not play under; a new
+optional `terrain` carries the RLE mask after a carve. `applySnapshot` restores all of it — scores, jewels, the tag
+flag and the version — so a peer's result screen and jewel HUD match the host's (`TC-CORE-042`). The state budget
+stays **≤800 B at eight players** (`NFR-04`) and a mask-bearing snapshot stays under the **8 KB** frame cap; both
+halves are asserted by `TC-CORE-041`.
 
 ## Contract status (2026-11-05)
 
@@ -138,18 +157,19 @@ believe it.
 
 | Message | Status | Code site today | Change required | Oracle |
 |---------|--------|-----------------|-----------------|--------|
-| `auth` (5 s, then `4401`) | live | `apps/worker/src/room-do.ts:318-343` | — | `apps/worker/tests/room-auth.test.ts` (not written) |
-| `signal` relay | live | `apps/worker/src/room-do.ts:215-223` | answer `error peer-not-connected` instead of `unsupported-message` for an offline `to` | `apps/worker/tests/room-relay.test.ts` (not written) |
-| `team_assign` (batched) | drift | `apps/worker/src/room-do.ts:225-240` | reject with `invalid-state` when `status != 'lobby'` and `teams-not-balanced` when the new roster would be unbalanced; the web client still sends the per-member shape `{t, playerId, team}` (`apps/web/src/net/signaling.ts:11`, sent from `apps/web/src/routes/LobbyPage.tsx:130`) while the DO reads `assignments`, so today every assignment silently no-ops | `apps/worker/tests/room-host.test.ts` (not written) |
-| `start_match` | drift | `apps/worker/src/room-do.ts:242-268` | map `StartRejection` to the catalogue names (`invalid-state`, `room-not-full`, `not-enough-players`, `teams-not-balanced`) instead of leaking core-internal names | `apps/worker/tests/room-host.test.ts` (not written) |
-| `start_match` (duplicate HTTP path) | dead | `apps/worker/src/room-do.ts:161-177` (`action=start`) | delete: it bypasses the socket guards and stamps `rulesetVersion: room.settings.mode`, which would rank a match under the wrong ruleset; it is also the only producer of `turnOrder`, so `StartOutcome.turnOrder` (`packages/core/src/room.ts:203`) goes with it |
-| `snapshot_push` → `snapshot_state` | drift | `apps/worker/src/room-do.ts:269-287` | rename the peer relay frame from `snapshot` to `snapshot_state`, the same name the rejoin replay uses | `apps/worker/tests/room-relay.test.ts` (not written) |
-| `host_changed` + election | drift | `apps/worker/src/room-do.ts:404-433` | the DO sends `room` too, which is what `apps/web/src/net/signaling.ts:28` is missing | `apps/worker/tests/room-election.test.ts` (not written) |
-| `match_end` → `match_recorded` | drift | `apps/worker/src/room-do.ts:288-296` | read `winnerTeam`, call `POST /api/v1/matches`, broadcast `room_state` + `match_recorded`; delete the undocumented `match_ended` frame | `apps/worker/tests/matches.test.ts` (not written) |
-| `peer_left.reason` | drift | `apps/worker/src/room-do.ts:130,303,384` | add `reason`, drop the extra `room` | `apps/worker/tests/room-election.test.ts` (not written) |
-| `ping` / `pong` | drift | `apps/worker/src/room-do.ts:306-308` | echo the client's `at` and add `now`; count three misses into `grace` | `apps/worker/tests/room.test.ts` (not written) |
-| `move`, `item`, `room_settings`, `loadout` (§ 9) | planned | absent | implement the four client frames and their host-only / lobby-only guards | `apps/worker/tests/room-settings.test.ts` (not written) |
-| Snapshot payload additions (§ 9) | planned | `packages/core/src/snapshot.ts` has `seq`, `hostGeneration` only | add `queue`, `delays`, per-player `shield`/`energy`/`weaponSlot`/`items`/`bonus`, optional `modeState` and `terrain`, under the 800 B budget | `packages/core/tests/snapshot.test.ts` (TC-CORE-041) |
+| `auth` (5 s, then `4401`) | live | `apps/worker/src/room-do.ts:318-343` | — | `apps/worker/tests/room-auth.test.ts` |
+| `signal` relay | live | `apps/worker/src/room-do.ts` `relaySignal` | — an offline `to` is `peer-not-connected` and a self-signal is `bad-request` | `apps/worker/tests/room-relay.test.ts` |
+| `team_assign` (batched) | live | `apps/worker/src/room-do.ts` `assignTeams` | — the lobby sends the whole roster (`apps/web/src/routes/LobbyPage.tsx`) and `parseClientFrame` refuses the old per-member shape | `apps/worker/tests/room-host.test.ts` |
+| `start_match` | live | `apps/worker/src/room-do.ts` `startMatch` + `START_REJECTIONS` | — core refusals map to `invalid-state` / `room-not-full` / `not-enough-players` / `teams-not-balanced` | `apps/worker/tests/room-host.test.ts` |
+| `start_match` (duplicate HTTP path) | deleted | was `apps/worker/src/room-do.ts` (`action=start`); `action=settings` went with it | both bypassed the socket guards, and the start path stamped `rulesetVersion: room.settings.mode`. `StartOutcome.turnOrder` (`packages/core/src/room.ts:203`) is now unused | `apps/worker/tests/room-host.test.ts` |
+| `snapshot_push` → `snapshot_state` | live | `apps/worker/src/room-do.ts` `pushSnapshot` | — relay and rejoin replay share one name; a stale `seq` is dropped silently | `apps/worker/tests/room-relay.test.ts` |
+| `host_changed` + election | live | `apps/worker/src/room-do.ts` `electIfHostGone` / `announceHostChange` | — one election path, `hostGeneration` bumped once per change | `apps/worker/tests/room-election.test.ts` |
+| `match_end` → `match_recorded` | live | `apps/worker/src/room-do.ts` `endMatch` / `recordMatch` | — the DO posts to the Worker with the host's own token, a guest room broadcasts `ranked: false`, and `409` counts as success | `apps/worker/tests/matches.test.ts` |
+| `peer_left.reason` | live | `apps/worker/src/room-do.ts` (`left` on `leave`, `grace` on close and heartbeat timeout) | — the roster change arrives in the following `room_state` | `apps/worker/tests/room-election.test.ts` |
+| `ping` / `pong` | live | `apps/worker/src/room-do.ts` (`ping` case + `sweepSilentSockets`) | — `pong` echoes `at` and adds `now`; 45 s of silence moves the member to `grace` | `apps/worker/tests/room.test.ts` |
+| `move`, `item`, `room_settings`, `loadout` (§ 9) | live | `apps/worker/src/room-do.ts` (`applySettings`, `setLoadout`, `relayInput`) | — `move`/`item` are relayed to the host, which validates them; the DO only refuses a non-playing room and a missing host socket | `apps/worker/tests/room-settings.test.ts` |
+| Snapshot payload additions (§ 9) | live, except `queue`/`delays`/`items`/`bonus`/`modeState` | `packages/core/src/snapshot.ts` carries `seq`, `hostGeneration`, per-player `shield`/`energy`/`weaponSlot` and the optional `terrain` mask | add `turn.queue`, `turn.delays`, per-player `items`/`bonus` and optional `modeState`, under the 800 B state budget; the mask rides only a carve frame, under the 8 KB cap | `packages/core/tests/snapshot.test.ts` (TC-CORE-041) |
 
-Client-side counterpart: `apps/web/src/net/signaling.ts` declares `room_settings` (§ 9) but never sends it, and its
-`ClientMessage` lacks `move`, `item` and `loadout`; each is added in the story that owns the feature, not before.
+Client-side counterpart: `apps/web/src/net/signaling.ts` no longer declares its own frame types — it re-exports
+`ClientFrame`/`ServerFrame` from `protocol.ts`, so a rename on one side cannot leave the other behind. The DO parses
+`room_settings`, `loadout`, `move` and `item`; the components that send them belong to `US-MATCH-005`.

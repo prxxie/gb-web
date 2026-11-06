@@ -134,30 +134,31 @@ the cost of double delay.
 Every mobile carries its own `gravity` and `mass` (§ 1) and every mobile shares one power law, so the same force produces
 a different arc — exactly how GB differentiates its mobiles. The table is computed by the real integrator
 (`tunables.md` § 1.1: pure parabola, no drag), at the mobile's `maxPower`, at 45° or the steepest angle its window
-allows, in dead calm.
+allows, in dead calm, measured to the **first** ground contact — a `bounce` shell rebounds afterwards, so its total
+travel is longer than the range below.
 
 | Id | Name | `g` | `mass` | Range at max power | Hang time | Drift at wind +10 |
 |---|---|---|---|---|---|---|
-| `mbl-01` | Stone Sentinel | 100 | 168 | **1,988 units** at 45° | 6.3 s | 130 units |
-| `mbl-02` | River Warden | 112 | 150 | **1,633 units** at 45° | 5.4 s | 107 units |
-| `mbl-03` | Iron Tortoise | 118 | 169 | **1,441 units** at 38° | 4.4 s | 62 units |
-| `mbl-04` | Glacier Mammoth | 115 | 155 | **1,458 units** at 45° | 5.0 s | 90 units |
-| `mbl-05` | Storm Falcon | 86 | 132 | **1,844 units** at 25° | 4.5 s | 83 units |
-| `mbl-06` | Silver Ibex | 92 | 145 | **1,949 units** at 30° | 4.9 s | 93 units |
-| `mbl-07` | Ash Behemoth | 128 | 165 | **1,491 units** at 45° | 4.8 s | 78 units |
-| `mbl-08` | Volcano Toad | 122 | 160 | **1,531 units** at 45° | 5.0 s | 86 units |
-| `mbl-09` | Moon Hare | 98 | 128 | **2,029 units** at 45° | 6.4 s | 178 units |
-| `mbl-10` | Coral Crab | 106 | 152 | **1,828 units** at 42° | 5.6 s | 112 units |
-| `mbl-11` | Pale Stag | 102 | 160 | **1,793 units** at 45° | 5.9 s | 121 units |
-| `mbl-12` | Sacred Crane | 96 | 140 | **1,946 units** at 45° | 6.4 s | 159 units |
-| `mbl-13` | Cinder Fox | 84 | 118 | **2,043 units** at 28° | 5.1 s | 121 units |
-| `mbl-14` | Sky Serpent | 90 | 126 | **2,162 units** at 35° | 5.8 s | 147 units |
-| `mbl-15` | Jade Dragon | 99 | 158 | **2,008 units** at 45° | 6.4 s | 141 units |
-| `mbl-16` | Sun Lion | 104 | 169 | **1,873 units** at 45° | 6.0 s | 117 units |
-| `mbl-17` | Sand Wyrm | 126 | 168 | **1,475 units** at 48° | 5.1 s | 85 units |
-| `mbl-18` | Frost Hydra | 124 | 162 | **1,539 units** at 45° | 5.0 s | 84 units |
-| `mbl-19` | Shadow Cat | 94 | 120 | **2,028 units** at 44° | 6.5 s | 191 units |
-| `mbl-20` | Mist Raven | 88 | 136 | **1,995 units** at 35° | 5.6 s | 128 units |
+| `mbl-01` | Stone Sentinel | 100 | 168 | **1,986 units** at 45° | 6.3 s | 45 units |
+| `mbl-02` | River Warden | 112 | 150 | **1,624 units** at 45° | 5.3 s | 43 units |
+| `mbl-03` | Iron Tortoise | 118 | 169 | **1,433 units** at 38° | 4.3 s | 23 units |
+| `mbl-04` | Glacier Mammoth | 115 | 155 | **1,455 units** at 45° | 5.0 s | 32 units |
+| `mbl-05` | Storm Falcon | 86 | 132 | **1,830 units** at 25° | 4.5 s | 34 units |
+| `mbl-06` | Silver Ibex | 92 | 145 | **1,937 units** at 30° | 4.9 s | 35 units |
+| `mbl-07` | Ash Behemoth | 128 | 165 | **1,479 units** at 45° | 4.8 s | 34 units |
+| `mbl-08` | Volcano Toad | 122 | 160 | **1,526 units** at 45° | 5.0 s | 31 units |
+| `mbl-09` | Moon Hare | 98 | 128 | **2,026 units** at 45° | 6.4 s | 63 units |
+| `mbl-10` | Coral Crab | 106 | 152 | **1,819 units** at 42° | 5.5 s | 42 units |
+| `mbl-11` | Pale Stag | 102 | 160 | **1,777 units** at 42° | 5.6 s | 40 units |
+| `mbl-12` | Sacred Crane | 96 | 140 | **1,941 units** at 45° | 6.3 s | 57 units |
+| `mbl-13` | Cinder Fox | 84 | 118 | **2,032 units** at 28° | 5.0 s | 43 units |
+| `mbl-14` | Sky Serpent | 90 | 126 | **2,058 units** at 32° | 5.3 s | 48 units |
+| `mbl-15` | Jade Dragon | 99 | 158 | **2,005 units** at 45° | 6.3 s | 49 units |
+| `mbl-16` | Sun Lion | 104 | 169 | **1,864 units** at 45° | 6.0 s | 45 units |
+| `mbl-17` | Sand Wyrm | 126 | 168 | **1,472 units** at 48° | 5.0 s | 28 units |
+| `mbl-18` | Frost Hydra | 124 | 162 | **1,528 units** at 45° | 5.0 s | 36 units |
+| `mbl-19` | Shadow Cat | 94 | 120 | **2,020 units** at 44° | 6.5 s | 74 units |
+| `mbl-20` | Mist Raven | 88 | 136 | **1,986 units** at 35° | 5.6 s | 49 units |
 
 The roster spans a factor of 1.5 in reach (`mbl-14` 2,162 vs `mbl-03` 1,441) and 3× in wind sensitivity (`mbl-19` drifts
 191 units, `mbl-03` only 62). That spread is the point: a roster needs a light mobile that flies far and blows in the wind

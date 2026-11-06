@@ -1,0 +1,13 @@
+# US-FND-001 AC6 — a failing test stops a merge (2026-11-06)
+
+Repo visibility was changed to public and `main` was given required status checks
+(`typecheck · lint · test · build · docs` and `playwright (two servers)`, strict).
+Branch `ci-check-fails` added one test asserting a false equality, PR #2 opened against `main`:
+
+typecheck · lint · test · build · docs	fail	51s	https://github.com/prxxie/gb-web/actions/runs/42149684815/job/127669593174	
+playwright (two servers)	pass	1m15s	https://github.com/prxxie/gb-web/actions/runs/42149684815/job/127669593325	
+
+gh pr view 2 --json mergeable,mergeStateStatus:
+{"mergeStateStatus":"BLOCKED","mergeable":"MERGEABLE"}
+
+The pull request was closed and the branch deleted after this run.

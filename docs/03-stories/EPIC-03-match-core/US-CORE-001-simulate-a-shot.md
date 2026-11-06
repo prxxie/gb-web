@@ -2,7 +2,7 @@
 id: US-CORE-001
 title: Simulate a shot with the GunBound-shaped integrator
 epic: EPIC-03-match-core
-status: ready
+status: done
 priority: P0
 size: L
 depends_on: [US-FND-001]
@@ -79,7 +79,7 @@ Requirements: `NFR-28`, `NFR-29`.
 
 - Beam weapons do not integrate: they resolve as a segment on the frame they are fired (`TC-CORE-912`).
 - Cluster splits at apex into three sub-projectiles with `±8` angle offsets (`TC-CORE-912`).
-- Piercing ignores terrain until it hits a unit or leaves the map (`TC-CORE-913`).
+- Piercing ignores terrain until it hits a unit or leaves the map (`TC-CORE-913` in `packages/core/tests/ballistics.test.ts`, `TC-CORE-950` in `terrain.test.ts`).
 - `maxFlightMs` ends a shot that never lands; the turn passes (`TC-CORE-029`).
 - Determinism forbids `Math.random()` in `core`; variance comes from seeded state (`01-overview/conventions.md` § 4).
 
@@ -96,8 +96,11 @@ Terrain collision and crater carving ([`US-CORE-006`](US-CORE-006-carve-terrain-
 
 ## 8. Test notes
 
-`TC-CORE-020`, `TC-CORE-021`, `TC-CORE-022`, `TC-CORE-023`, `TC-CORE-028`, `TC-CORE-029`, `TC-CORE-912`, `TC-CORE-913`.
-`Red first: packages/core/tests/physics.test.ts::step_gravity_accumulates`.
+`TC-CORE-020`, `TC-CORE-021`, `TC-CORE-022`, `TC-CORE-023`, `TC-CORE-028`, `TC-CORE-029`, `TC-CORE-912`,
+`TC-CORE-913`, `TC-CORE-924`, `TC-CORE-935` — `tests/core/ballistics.test.ts`, `tests/core/mobiles.test.ts`.
+- **Red:** `TC-CORE-024`… no: the first red was `TC-CORE-023` in `tests/core/weather.test.ts`, which failed because
+  `stepProjectile` rounded velocity to the 0.1 position quantum, so drift stopped being linear in `magnitude`
+  (half the wind gave double the drift).
 
 <!-- delivery:2026-11-05 -->
 

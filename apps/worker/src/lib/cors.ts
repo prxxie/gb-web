@@ -42,6 +42,9 @@ export function preflight(origin: string | null): Response {
 
 /** Copy a response so its headers carry the CORS decision; the body is reused, not re-read. */
 export function withCors(response: Response, origin: string): Response {
+  // A socket upgrade is not rebuilt: `new Response(body, …)` drops the `webSocket` property and the runtime
+  // answers 500 ("did not return status 101 with a WebSocket") for the handshake. CORS headers are for HTTP.
+  if (response.status === 101 || response.webSocket) return response;
   const headers = new Headers(response.headers);
   for (const [name, value] of Object.entries(corsHeaders(origin, response.status === 204 ? "OPTIONS" : "GET"))) {
     headers.set(name, value);

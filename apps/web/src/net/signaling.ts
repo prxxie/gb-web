@@ -4,49 +4,21 @@
  * The token travels in the first message, never in the URL — a URL ends up in logs and in the
  * Referer header (`NFR-09`).
  */
-import type { RoomState, Snapshot } from "@gbw/core";
+import {
+  PING_INTERVAL_MS,
+  PING_MISSES_BEFORE_GRACE,
+  parseServerFrame,
+  type ClientFrame,
+  type ServerFrame,
+} from "@gbw/core";
 
-export type ClientMessage =
-  | { readonly t: "auth"; readonly token: string; readonly displayName?: string; readonly mobileId?: string; readonly avatarId?: string }
-  | { readonly t: "signal"; readonly to: string; readonly kind: "offer" | "answer" | "candidate"; readonly payload: unknown }
-  | { readonly t: "team_assign"; readonly playerId: string; readonly team: "A" | "B" | null }
-  | { readonly t: "room_settings"; readonly settings: { readonly maxPlayers: number; readonly mode: string; readonly mapId: string } }
-  | { readonly t: "start_match" }
-  | { readonly t: "snapshot_push"; readonly snapshot: Snapshot }
-  | { readonly t: "match_end"; readonly winnerTeam: "A" | "B" | null; readonly abandoned: boolean }
-  | { readonly t: "leave" }
-  | { readonly t: "ping" };
-
-export type ServerMessage =
-  | {
-      readonly t: "room_state";
-      readonly room: RoomState;
-      readonly you?: { readonly playerId: string; readonly slot: number };
-      readonly lastSnapshot?: Snapshot | null;
-    }
-  | { readonly t: "peer_joined"; readonly playerId: string; readonly slot: number; readonly room: RoomState }
-  | { readonly t: "peer_left"; readonly playerId: string }
-  | { readonly t: "signal"; readonly from: string; readonly kind: "offer" | "answer" | "candidate"; readonly payload: unknown }
-  | { readonly t: "host_changed"; readonly hostPlayerId: string; readonly hostGeneration: number; readonly lastSnapshot: Snapshot | null }
-  | {
-      readonly t: "match_started";
-      readonly startedAt: number;
-      readonly seed: number;
-      readonly hostPlayerId: string | null;
-      readonly hostGeneration: number;
-      readonly rulesetVersion: string;
-      readonly assignments: readonly {
-        readonly playerId: string;
-        readonly slot: number;
-        readonly team: "A" | "B" | null;
-        readonly mobileId?: string;
-        readonly accountId: string | null;
-      }[];
-      readonly room: RoomState;
-    }
-  | { readonly t: "snapshot_state"; readonly snapshot: Snapshot }
-  | { readonly t: "pong" }
-  | { readonly t: "error"; readonly code: string; readonly detail: string };
+/**
+ * The frame types are the engine's, not copies: `packages/core/src/protocol.ts` validates the same
+ * field sets on the Worker, so a rename breaks the build here instead of turning into a silent no-op
+ * (`team_assign` used to be exactly that).
+ */
+export type ClientMessage = ClientFrame;
+export type ServerMessage = ServerFrame;
 
 export interface ConnectOptions {
   readonly wsUrl: string;
@@ -57,6 +29,8 @@ export interface ConnectOptions {
   readonly onMessage: (message: ServerMessage) => void;
   readonly onClose?: (code: number) => void;
   readonly onOpen?: () => void;
+  /** Round-trip time in ms, measured from the `pong` echo (`signaling.md` § 3). */
+  readonly onRtt?: (rttMs: number) => void;
 }
 
 export interface RoomSocket {
@@ -65,12 +39,11 @@ export interface RoomSocket {
   readonly readyState: () => number;
 }
 
-const HEARTBEAT_MS = 15_000;
-
 /** Open the room socket and authenticate. Returns as soon as the socket exists, not when it opens. */
 export function connectRoom(options: ConnectOptions): RoomSocket {
   const socket = new WebSocket(options.wsUrl);
   let heartbeat: number | null = null;
+  let misses = 0;
 
   socket.addEventListener("open", () => {
     const auth: ClientMessage = {
@@ -82,18 +55,28 @@ export function connectRoom(options: ConnectOptions): RoomSocket {
     };
     socket.send(JSON.stringify(auth));
     heartbeat = window.setInterval(() => {
-      if (socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify({ t: "ping" } satisfies ClientMessage));
-    }, HEARTBEAT_MS);
+      if (socket.readyState !== WebSocket.OPEN) return;
+      // A missed pong is a missed heartbeat: three of them mean the socket is dead even if it looks open
+      // (`US-ROOM-002` AC6).
+      misses += 1;
+      if (misses > PING_MISSES_BEFORE_GRACE) {
+        socket.close(4408, "heartbeat timeout");
+        return;
+      }
+      socket.send(JSON.stringify({ t: "ping", at: Date.now() } satisfies ClientMessage));
+    }, PING_INTERVAL_MS);
     options.onOpen?.();
   });
 
   socket.addEventListener("message", (event) => {
-    try {
-      const parsed = JSON.parse(String(event.data)) as ServerMessage;
-      options.onMessage(parsed);
-    } catch {
-      // A malformed frame is ignored; the server never sends one, and a bad local frame is not fatal.
+    const parsed = parseServerFrame(String(event.data));
+    if (!parsed.ok) return;
+    if (parsed.frame.t === "pong") {
+      misses = 0;
+      options.onRtt?.(Math.max(0, Date.now() - parsed.frame.at));
     }
+    // A frame the client does not understand is dropped; only `error` is worth surfacing.
+    options.onMessage(parsed.frame);
   });
 
   socket.addEventListener("close", (event) => {

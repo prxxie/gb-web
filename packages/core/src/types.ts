@@ -112,7 +112,12 @@ export type Gimmick = "force" | "gust" | "electric" | "wind" | "return" | "heal"
 
 export interface MapDef {
   readonly mapId: string;
-  readonly name: string;
+  /** Localised display name; the room's locale picks one, so no map name is authored twice. */
+  readonly name: { readonly vi: string; readonly en: string };
+  /** Wind magnitude this map rolls into (`tunables.md` § 6); the global maximum unless a map narrows it. */
+  readonly windRange: { readonly min: number; readonly max: number };
+  /** The authored terrain, RLE over tenths — what the loader validates and a joiner can rebuild from. */
+  readonly terrain: string;
   /** Multiplies every mobile's gravity (`tunables.md` § 1.2). */
   readonly gravityModifier: number;
   /** Terrain generator seed. */
@@ -197,6 +202,11 @@ export interface Projectile {
   readonly parentId: number | null;
   /** `itm-bunge`: the shell returns and explodes near its owner. */
   readonly bunge: boolean;
+  /** Muzzle position, kept so a bunge shell knows where "home" is. */
+  readonly homeX: number;
+  readonly homeY: number;
+  /** `return` maps bounce an off-map shot back once with reduced power instead of despawning it. */
+  readonly returned: boolean;
   /** `itm-blood` / `itm-power-up` modifiers already folded into `power`. */
   readonly blooded: boolean;
 }
@@ -267,6 +277,8 @@ export interface ScoreState {
 export interface ActiveEffects {
   /** `itm-dual` / `itm-dual-plus`: shots still owed this turn. */
   readonly shotsLeft: number;
+  /** The weapon the first of two Dual shots used; the second must follow it (`US-CORE-009` AC2). */
+  readonly dualWeapon: 0 | 1 | 2 | null;
   readonly bloodNext: boolean;
   readonly powerUpNext: boolean;
   readonly dualPlusNext: boolean;
@@ -297,6 +309,8 @@ export interface MatchState {
   /** The team that last acted, for draw resolution. */
   readonly lastActingTeam: Team | null;
   readonly seq: number;
+  /** The `seq` of the last accepted input, so a duplicate or reordered frame is dropped (`TC-CORE-045`). */
+  readonly lastInputSeq: number | null;
   readonly startedAt: number;
 }
 
@@ -309,7 +323,12 @@ export interface Snapshot {
   readonly projectiles: readonly ProjectileSnapshot[];
   readonly scores: ScoreState;
   readonly status: "playing" | "ended";
+  /** RLE mask (`serializeTerrain`), present only on a snapshot that follows a carve — ~1.9 KB, so it can
+   *  not ride along at 10 Hz. Its presence is what makes host and peer masks identical (`US-CORE-006` AC4). */
+  readonly terrain?: string;
   readonly winnerTeam: Team | null;
+  /** The ruleset the host played under, so a peer can refuse to rank across a version change (`US-CORE-007` AC5). */
+  readonly rulesetVersion?: string;
 }
 
 export interface PlayerSnapshot {
@@ -347,6 +366,14 @@ export interface RoomMember {
   readonly joinedAt: number;
   /** Connected at least once; reconnecting is not "joining twice". */
   readonly seenConnected: boolean;
+  /** Lobby loadout (`US-ROOM-007`); empty until the player picks consumables. */
+  readonly loadout?: readonly LoadoutEntry[];
+}
+
+/** One line of a lobby loadout: which consumable and how many (`US-MATCH-005`). */
+export interface LoadoutEntry {
+  readonly id: string;
+  readonly qty: number;
 }
 
 export interface RoomSettings {

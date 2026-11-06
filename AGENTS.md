@@ -48,6 +48,9 @@ backlog of user stories, and stories ship one at a time. The docs are the source
    (regenerates counts and index tables, then checks every contract). Never edit generated blocks by hand.
 6. **Surgical changes.** Touch only what the task requires. No new dependencies without explicit approval.
 7. **No secrets** in code, docs, or commits.
+8. **Reply in Vietnamese.** Every answer to the user, and every progress note, summary, or question you write in chat,
+   is in Vietnamese (tiếng Việt). Code, identifiers, commit messages, and files under `docs/`, `.agents/`, and the code
+   itself stay in English as specified elsewhere. The user must explicitly ask to switch languages before you change this.
 
 **These rules are defaults with one exception: the user may override them explicitly.** The override procedure (what
 counts as explicit, what must be recorded, and the two rules with no override) is
@@ -95,10 +98,10 @@ docs/                ← WHAT to build (layout depends on tier; see docs/README.
 - **Project type**: web-app (PWA frontend + thin API/WebSocket backend)
 - **Stack**: Phaser 4.2 (canvas) inside React 19 + Vite 8 + TypeScript 5; Cloudflare Workers + Durable Objects + D1; Clerk (auth); Cloudflare TURN; Cloudflare Pages; pnpm workspaces
 - **Stack packs**: `react-vite`, `api`, `browser-verify` (skills `cpt-stack-<name>`; `docs/01-overview/conventions.md` overrides them)
-- **Build**: `pnpm build` (planned — verify after US-FND-001)
-- **Test**: `pnpm test` (`vitest run` over `packages/core/tests`, `apps/worker/tests`, `apps/web/tests`); single test: `pnpm vitest run packages/core/tests/match.test.ts`; e2e: `pnpm e2e` (`playwright test`, `E2E_WEB_PORT` to pick a free Vite port)
-- **Lint / typecheck**: `pnpm lint && pnpm typecheck` (planned — verify after US-FND-001)
-- **Run locally**: terminal 1 `pnpm dev:worker` (wrangler dev, :8787); terminal 2 `pnpm dev` (vite, :5173) (planned — verify after US-FND-001)
+- **Build**: `pnpm build` (`tsc -b` + `vite build` for web, `wrangler deploy --dry-run` for the worker; `Total Upload` 175.08 KiB / 45.78 KiB gzip for the worker, verified 2026-11-06)
+- **Test**: `pnpm test` (`vitest run` over `packages/core/tests`, `apps/worker/tests`, `apps/web/tests`, `tests/meta`; 99 files / 843 cases, verified 2026-11-06); single test: `pnpm vitest run packages/core/tests/match.test.ts`; e2e: `pnpm e2e` (`playwright test`, 12 specs / 49 cases; `E2E_WEB_PORT` picks a free Vite port and `E2E_SERVERS_EXTERNAL=1` uses servers you started yourself)
+- **Lint / typecheck**: `pnpm lint && pnpm typecheck` (verified 2026-11-06: eslint exit 0, `tsc -b` exit 0)
+- **Run locally**: terminal 1 `pnpm dev:worker` (wrangler dev, :8787); terminal 2 `pnpm dev` (vite, :5173 — add `--port <n>` when 5173 is taken)
 - **Layout**: `apps/web` (routes, Phaser scenes, i18n), `apps/worker` (API routes, `room-do.ts` Durable Object, `migrations/`), `packages/core` (physics, turns, snapshot, `tunables.json`), `packages/core/tests`, `apps/worker/tests`, `apps/web/tests`, `tests/e2e`, `tests/meta`, `docs/`
 - **Conventions**: `docs/01-overview/conventions.md` — pnpm + TypeScript strict; `packages/core` imports no Phaser/DOM/network; wire frame `t` values `snake_case`, all other wire and in-code fields `camelCase`; i18n vi (default) + en, no literal strings; landscape only; values from `tunables.json` only. Node **22.12+** required (verified on 22.22.2; `package.json` `engines` is the authority).
 <!-- cpt:project:end -->

@@ -5,35 +5,42 @@ D1 columns are in [data/accounts.md](../data/accounts.md).
 
 ## POST /sessions
 
-Mints the 60-minute session token used by the WebSocket and TURN calls. Two modes in one endpoint:
+Mints the 60-minute session token used by the WebSocket and TURN calls. Two modes in one endpoint, chosen by
+the `kind` field:
 
-| Mode | Credential | Result |
-|------|-----------|--------|
-| Registered | `Authorization: Bearer <clerk_jwt>` | Session token bound to `accountId` |
-| Guest | none, or `Authorization: Bearer <guest_jwt>` returned earlier | Session token bound to `guestId` |
+| Mode | `kind` | Credential | Result |
+|------|--------|-----------|--------|
+| Guest | `guest` (default) | none | Session token bound to a fresh `guestId` |
+| Account | `account` | `Authorization: Bearer <clerk_jwt>` | Session token bound to `accountId` |
 
-Request body (optional in both modes):
+Request body:
 
 | Field | Type | Required | Rule |
 |-------|------|----------|------|
-| `displayName` | string | no | Guest display name, 2–16 chars; default `Khách` / `Guest` by locale |
-| `guestId` | string (uuid) | no | Reuse an existing guest identity from `localStorage`; minted when absent |
+| `kind` | enum | no | `guest` \| `account`; anything else is `422 validation` |
+| `displayName` | string | no | Guest display name, 2–16 chars; default `Guest <first 4 of guestId>` |
+| `clerkToken` | string | no | Alternative to the `Authorization` header for the account mode |
 
 ```json
-{ "guestId": "0b0d…", "displayName": "Bao" }
+{ "kind": "guest", "displayName": "Bao" }
 ```
 
-Response `201`:
+Response `201` in both modes:
 
 | Field | Type | Meaning |
 |-------|------|---------|
 | `sessionToken` | string | HMAC-signed JWT, 60 min, claims `{ sub, kind, exp }` |
 | `expiresAt` | string | ISO-8601 expiry |
 | `subject.kind` | enum | `account` \| `guest` |
-| `subject.id` | string | `accountId` or `guestId` |
-| `displayName` | string | Effective name for the lobby |
-| `rating` | integer \| null | Present only for `account` |
-| `wsUrl` | string | Base `wss://` URL (the room code is appended) |
+| `subject.guestId` | string | Present for a guest only |
+| `subject.accountId` | string | Internal id, present for an account only — never the Clerk `sub` |
+| `subject.displayName` | string | Effective name for the lobby |
+| `subject.avatarId` | string | Accounts only |
+| `subject.rating` | integer | Accounts only |
+| `subject.ratedMatches` | integer | Accounts only |
+
+There is no `wsUrl`: the client derives it from `window.location.origin`, because a preview deployment, a
+custom domain and `localhost` all differ and the server cannot know which one the browser used.
 
 Rules: a registered caller's first request creates the `account` + `profile` rows in one transaction; a guest gets no
 server-side record at all. Errors: `401 unauthenticated` (invalid Clerk JWT), `422 validation`, `429 rate-limited`
@@ -66,7 +73,8 @@ Auth: Clerk JWT. Request body (at least one field):
 | `avatarId` | string | Must exist in the avatar allowlist | `422 validation` |
 
 Response `200`: the `GET /me` representation. `rating`, `ratedMatches` and `stats` are **not** writable — a body
-containing them is ignored, and the response proves it (TC-AUTH-102). Optimistic concurrency is not needed: the last write of
+containing them is ignored, and the response proves it (TC-AUTH-102). Any **other** field outside the table is
+rejected with `422 validation` naming it, so a typo or an attempt to set `clerkUserId` never looks like a save. Optimistic concurrency is not needed: the last write of
 one's own name wins (`conventions.md`).
 
 ## DELETE /me
@@ -74,8 +82,9 @@ one's own name wins (`conventions.md`).
 Auth: Clerk JWT. Deletes the Clerk user, sets `account.status = 'deleted'`, and schedules the D1 purge for
 `now + 30 days` (`NFR-13`). Response `204` with no body.
 
-Rules: a player with a match in progress gets `409 room-closed`-style refusal — concretely `409` with
-`type: .../forbidden` and detail "finish or leave the match first". Rating history rows are anonymised rather than
+Rules: a player with a match in progress gets `409 invalid-state` and a detail naming the room
+("A match is still in progress in room ABC234"). `room-closed` is `410` and means the match is already over,
+which is not this case: the account is refused because the room still needs it. Rating history rows are anonymised rather than
 deleted during the 30-day window so other players' deltas stay reconstructable.
 
 ## GET /me/matches
@@ -95,5 +104,5 @@ public handle (`displayName` + `accountId` only inside match history of one's ow
 | Guest and registered modes, token claims and TTL | `apps/worker/tests/sessions.test.ts` (TC-AUTH-074) |
 | First call creates exactly one account + profile | `apps/worker/tests/auth.test.ts` (TC-AUTH-074) |
 | `PATCH /me` rejects `rating`, `409` on duplicate names | `apps/worker/tests/profile.test.ts` (TC-AUTH-101, TC-AUTH-102) |
-| `DELETE /me` removes Clerk user and schedules the purge; refuses mid-match | `apps/worker/tests/deletion.test.ts` (TC-AUTH-103) |
+| `DELETE /me` removes Clerk user and schedules the purge; refuses mid-match | `apps/worker/tests/deletion.test.ts` (TC-AUTH-069, TC-AUTH-103) |
 | No identity leak in responses | `apps/worker/tests/schema-whitelist.test.ts` (TC-AUTH-075) |

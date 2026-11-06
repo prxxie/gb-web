@@ -46,6 +46,11 @@ Response `200`: `{ roomCode, playerId, wsUrl, maxPlayers }`.
 Errors: `404 room-not-found` (unknown or swept code), `409 room-full`, `410 room-closed` (match already started),
 `422 validation`, `401 unauthenticated`. A guest joins with its guest session (`OQ-05`) and is unranked.
 
+The call is **idempotent for one session**: a seat is identified by the account or guest the token names, so a page
+that mounts twice (React's StrictMode) or a lobby that reloads answers `200` with the seat it already owns instead of
+taking a second one. A code nobody minted is `404 room-not-found`: the Durable Object is created before it is named, and the
+first join is what names it.
+
 ## GET /rooms/{code}
 
 Public joinability preview so the join screen can show a good error before opening a socket.
@@ -100,4 +105,4 @@ report to the player ("no relay available") instead of failing the connection ou
 | Rate limits and `Retry-After` | `apps/worker/tests/rooms.test.ts` (TC-ROOM-072) |
 | `GET /rooms/{code}` leaks no identity fields | `apps/worker/tests/rooms.test.ts` — schema whitelist assertion (TC-AUTH-075) |
 | TURN credential TTL and absence from logs | `apps/worker/tests/turn.test.ts` (TC-ROOM-051) |
-| Client rejects non-TLS ICE URLs | `packages/core/tests/ice.test.ts` (TC-ROOM-050) |
+| SDP is relayed byte-identical and never stored | `apps/worker/tests/room-relay.test.ts` (TC-ROOM-050) |

@@ -35,6 +35,11 @@ export interface TeamRatings {
   readonly team: "A" | "B";
   readonly total: number;
   readonly count: number;
+  /**
+   * Rated-match counts of this team's members, when the caller knows them. A team's K is the K of its most
+   * settled member, so a veteran's win against a newcomer cannot be priced at the newcomer's K (`AC3`).
+   */
+  readonly ratedMatches?: readonly number[];
 }
 
 export interface RatedMatchInput {
@@ -59,19 +64,28 @@ export function rateMatch(input: RatedMatchInput): readonly RatingChange[] {
   const averageB = teamB.total / Math.max(1, teamB.count);
   const scoreA = input.winner === null ? 0.5 : input.winner === "A" ? 1 : 0;
   const scoreB = 1 - scoreA;
-  const ratedA = Object.values(input.ratedMatchesByPlayer ?? {}).reduce((max, value) => Math.max(max, value), 0);
+  // Per-team K. The flat `ratedMatchesByPlayer` map is the older shape: it carries no team, so its counts are
+  // read as one per player and handed out from the most settled down (`A` first), which is what the caller
+  // that only has the roster can rely on.
+  const flat = Object.values(input.ratedMatchesByPlayer ?? {}).sort((left, right) => right - left);
+  const countedA = teamA.ratedMatches ?? flat.filter((_, index) => index % 2 === 0);
+  const countedB = teamB.ratedMatches ?? flat.filter((_, index) => index % 2 === 1);
+  const settledA = countedA.length > 0 ? Math.max(...countedA) : 0;
+  const settledB = countedB.length > 0 ? Math.max(...countedB) : 0;
   return [
-    { team: "A", delta: delta(averageA, averageB, scoreA as 0 | 1, ratedA) },
-    { team: "B", delta: delta(averageB, averageA, scoreB as 0 | 1, ratedA) },
+    { team: "A", delta: delta(averageA, averageB, scoreA as 0 | 1, settledA) },
+    { team: "B", delta: delta(averageB, averageA, scoreB as 0 | 1, settledB) },
   ];
 }
 
 /** True when the match may change ratings (`matches.md` § Validation). */
 export function isRanked(input: {
-  readonly hasGuest: boolean;
   readonly hasBot: boolean;
   readonly abandoned: boolean;
   readonly rulesetMismatch: boolean;
 }): boolean {
-  return !input.hasGuest && !input.hasBot && !input.abandoned && !input.rulesetMismatch;
+  // A guest seat does not void a match (`US-RANK-002` AC7): the seat has no account to rate, so it is skipped and
+  // the registered players on both teams are still rated against each other. Bots are different — a bot match is
+  // practice, and an abandoned or stale-ruleset match is not comparable (`US-RANK-001` AC5/AC6).
+  return !input.hasBot && !input.abandoned && !input.rulesetMismatch;
 }

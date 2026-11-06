@@ -2,7 +2,7 @@
 id: US-FND-003
 title: Render the app shell with routing, locale loading and an error boundary
 epic: EPIC-00-foundation
-status: ready
+status: done
 priority: P0
 size: M
 depends_on: [US-FND-001]
@@ -88,8 +88,11 @@ Top bar: 56 px, contains the locale toggle (44×44 minimum) and the slot for the
 
 ## 8. Test notes
 
-`TC-FND-132`; `apps/web/tests/shell.test.tsx` for AC1–AC3 (RTL, memory router), `apps/web/tests/i18n.test.ts` for key parity.
-Red first: the shell test fails before the router exists.
+`TC-FND-131` (`apps/web/tests/shell.test.tsx`, RTL + memory router) and `TC-PWA-130` (`apps/web/tests/i18n.test.tsx`
+for the two locale tables) cover AC1–AC3 and AC5; `TC-FND-132` (`apps/web/tests/errors.test.tsx`) covers AC4 and
+`TC-FND-133` (`tests/e2e/a11y.spec.ts`) covers AC6.
+- **Red:** `TC-FND-132` in `apps/web/tests/errors.test.tsx` failed while the banner showed only the dictionary line
+  and dropped the `request_id`, so support could not connect a screenshot to a log line.
 
 ## 9. Open questions
 

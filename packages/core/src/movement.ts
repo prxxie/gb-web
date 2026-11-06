@@ -1,7 +1,7 @@
 import type { Mobile, PlayerState } from "./types.js";
 import { clamp } from "./tuning.js";
 import { MAP_BOUNDS } from "./data/maps.js";
-import { groundY, slopeAt, type Terrain } from "./terrain.js";
+import { groundY, heightAt, isUnderGround, slopeAt, type Terrain } from "./terrain.js";
 
 /**
  * Movement is a turn action paid in **energy** and in **queue delay** (`tunables.md` § 4.4):
@@ -14,7 +14,14 @@ import { groundY, slopeAt, type Terrain } from "./terrain.js";
  * Guards: per-turn move budget, enough energy, climbable slope, inside the map. Energy never
  * regenerates, so a mobile that spends it early becomes a fixed turret.
  */
-export type MoveRejection = "no-moves-left" | "not-enough-energy" | "too-steep" | "out-of-map" | "eliminated";
+export type MoveRejection =
+  | "no-moves-left"
+  | "not-enough-energy"
+  | "too-steep"
+  | "out-of-map"
+  | "eliminated"
+  /** Fully inside the ground: it can still fire, but it has no ground to walk on (`US-CORE-006` AC5). */
+  | "buried";
 
 export interface MoveOutcome {
   readonly ok: boolean;
@@ -40,12 +47,23 @@ export function tryMove(
   movesThisTurn: number,
 ): MoveOutcome {
   if (player.eliminated) return { ok: false, reason: "eliminated" };
+  if (isUnderGround(terrain, player.x, player.y)) return { ok: false, reason: "buried" };
   if (movesThisTurn >= mobile.maxMovesPerTurn) return { ok: false, reason: "no-moves-left" };
   const cost = moveCost(mobile, run);
   if (player.energy < cost) return { ok: false, reason: "not-enough-energy" };
   const targetX = clamp(player.x + direction * moveDistance(mobile, run), 8, MAP_BOUNDS.width - 8);
   if (targetX === player.x) return { ok: false, reason: "out-of-map" };
-  if (Math.abs(slopeAt(terrain, targetX)) > mobile.maxIncline) return { ok: false, reason: "too-steep" };
+  // The whole path, not the destination: sampling only where it lands lets a unit walk straight over a
+  // cliff, because the far side of a wall can be flat again (`US-CORE-008` AC3). Only *climbing* is
+  // limited — a unit may always walk down into a crater, which is what makes a fresh hole usable cover.
+  const stride = terrain.step * Math.sign(targetX - player.x);
+  for (let x = player.x; Math.abs(x - targetX) >= terrain.step; x += stride) {
+    const climbing = heightAt(terrain, x + stride) < heightAt(terrain, x);
+    if (climbing && Math.abs(slopeAt(terrain, x)) > mobile.maxIncline) return { ok: false, reason: "too-steep" };
+  }
+  if (Math.abs(slopeAt(terrain, targetX)) > mobile.maxIncline && heightAt(terrain, targetX) < heightAt(terrain, player.x)) {
+    return { ok: false, reason: "too-steep" };
+  }
   return {
     ok: true,
     distance: Math.abs(targetX - player.x),

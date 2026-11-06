@@ -2,7 +2,7 @@
 id: US-PWA-003
 title: Enforce the landscape layout with a rotate notice
 epic: EPIC-07-pwa-i18n
-status: ready
+status: done
 priority: P1
 size: S
 depends_on: [US-FND-003]
@@ -66,14 +66,20 @@ Detection: `matchMedia("(orientation: landscape)")` plus `window.innerHeight > w
 
 ## 8. Test notes
 
-`TC-PWA-063` (portrait → notice, landscape → route; rotation mid-match keeps state).
+`TC-PWA-063` (portrait → notice, landscape → route; rotation mid-match keeps state), `TC-PWA-152`.
+Red: none — the gate and its cases arrived in the same change, so no earlier case exists to name; the first failure
+on this surface is `tests/e2e/a11y.spec.ts::TC-FND-133`, which belongs to the shell's tap targets, not to the gate.
 
 ## 9. Open questions
 
 None. The deviation from the spec is recorded as answered `OQ-22`.
 
-<!-- delivery:2026-11-05 -->
+<!-- delivery:2026-11-06 -->
 
-## Delivery status — 2026-11-05
+## Delivery status — 2026-11-06
 
-**in-progress.** the landscape gate is implemented and unit-tested (hidden, never unmounted); rotation on a real device is manual.
+**done.** All six ACs passed on 2026-11-06. `tests/e2e/pwa-shell.spec.ts` proves the portrait notice with nothing of
+the game reachable and the locale toggle as the only control (TC-PWA-063, AC1/AC3), rotation painting the requested
+route without a second navigation (AC2), the tablet's extra height going to the battlefield instead of a stretched
+canvas (AC4) and a mid-match rotation keeping the same canvas and the same turn clock (AC5); a tall desktop window
+shows the notice too (AC6). `apps/web/tests/orientation.test.tsx` covers the gate itself, including the debounced resize.

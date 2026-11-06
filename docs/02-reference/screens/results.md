@@ -24,6 +24,7 @@ reloadable for 10 minutes from the `match_recorded` payload kept in `sessionStor
 | Field | Type | Source | Notes |
 |-------|------|--------|-------|
 | Winner | `ĐỘI A` / `ĐỘI B` / `HÒA` | `match_recorded.winnerTeam` (echoed from the host's `match_end`) | `HÒA` is only possible if both teams are eliminated in the same resolution |
+| Mode and win condition | `Chế độ Điểm số — thắng bằng: …` | result payload `mode` + `winCondition` | Names the mode and the rule that ended the match (`US-CORE-010` AC6); `winCondition` is read back from the finished state by `apps/web/src/lib/outcome.ts` |
 | Per-player result | `Thắng` / `Thua` / `Bỏ cuộc` | `players[].result` | Abandon is shown for a player who left before the end |
 | Rating before → after | integers | `ratingBefore`, `ratingAfter` | Only for ranked matches; guests and bot matches show `—` |
 | Delta | signed integer | computed | `+12` in `primary`, `−12` in `danger` |
@@ -62,14 +63,15 @@ reloadable for 10 minutes from the `match_recorded` payload kept in `sessionStor
 `results.winner.teamA`, `results.winner.teamB`, `results.winner.draw`, `results.ratings.unranked`,
 `results.ratings.reasonGuest`, `results.ratings.reasonBot`, `results.ratings.reasonAbandoned`,
 `results.ratings.reasonRuleset`, `results.stats.damage`, `results.stats.shots`, `results.stats.hits`,
-`results.rematch`, `results.exit`, `results.recording`, `results.recordFailed`, `results.ended`.
+`results.outcome`, `results.mode.*`, `results.condition.*`, `results.rematch`, `results.exit`, `results.recording`, `results.recordFailed`, `results.ended`.
 
 ## Oracle
 
 | Contract | Checked by |
 |----------|-----------|
-| All fields render for a ranked match, deltas match the server's values | `tests/e2e/results.spec.ts` (TC-RANK-153) |
-| Guest/bot matches show `unranked` and no delta | `tests/e2e/results.spec.ts` (TC-RANK-154) |
-| `409` shows the stored record rather than retrying | `tests/e2e/results.spec.ts` (TC-RANK-155) |
-| Reload without `sessionStorage` recovers from `GET /me/matches` | `tests/e2e/results.spec.ts` (TC-RANK-156) |
-| Back navigation does not return into the finished match | `tests/e2e/results.spec.ts` (TC-RANK-157) |
+| All fields render for a ranked match, deltas match the server's values | not covered — `tests/e2e/results.spec.ts` does not exist (`US-RANK-005` records the gap) |
+| The mode and the win condition are named, in the player's language | `apps/web/tests/outcome.test.tsx` (TC-CORE-962) |
+| Guest/bot matches show `unranked` and no delta | not covered (`US-RANK-005`) |
+| `409` shows the stored record rather than retrying | not covered (`US-RANK-005`) |
+| Reload without `sessionStorage` recovers from `GET /me/matches` | not covered (`US-RANK-005`) |
+| Back navigation does not return into the finished match | not covered (`US-RANK-005`) |

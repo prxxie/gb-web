@@ -13,7 +13,7 @@ import {
 } from "@gbw/core";
 import type { Env } from "../lib/db.js";
 import { ProblemError } from "../lib/problem.js";
-import { checkLimit, RULES } from "../lib/ratelimit.js";
+import { ipLimit, RULES } from "../lib/ratelimit.js";
 import type { SessionToken } from "../lib/session.js";
 import { Field, readJson } from "../lib/validation.js";
 
@@ -27,6 +27,17 @@ export interface RoomHandle {
 function stubFor(env: Env, roomCode: string): DurableObjectStub {
   const id = env.ROOMS.idFromName(roomCode);
   return env.ROOMS.get(id);
+}
+
+/** Reads a room's public state; an unwritten object still answers, so the caller decides what "empty" means. */
+async function roomState(
+  env: Env,
+  roomCode: string,
+): Promise<{ status: string; members: readonly unknown[]; roomCode?: string; settings?: RoomSettings }> {
+  return await callRoom<{ status: string; members: readonly unknown[]; roomCode?: string; settings?: RoomSettings }>(
+    stubFor(env, roomCode),
+    "state",
+  );
 }
 
 async function callRoom<T>(stub: DurableObjectStub, path: string, body?: unknown): Promise<T> {
@@ -63,16 +74,21 @@ export async function createRoom(
   env: Env,
   session: SessionToken,
   originBase: string,
+  /** Code generator; tests pin it to force collisions (`US-ROOM-001` AC2). */
+  nextCode: () => string = () => makeRoomCode(() => crypto.getRandomValues(new Uint32Array(1))[0]! / 2 ** 32),
 ): Promise<Response> {
-  const limit = checkLimit(`rooms:${request.headers.get("cf-connecting-ip") ?? "local"}`, RULES.roomsPerIp);
-  if (!limit.allowed) throw new ProblemError("rate-limited", "Too many rooms created from this address");
+  const limit = ipLimit(request, env, "rooms", RULES.roomsPerIp);
+  if (limit && !limit.allowed) {
+    throw new ProblemError("rate-limited", "Too many rooms created from this address", [], limit.retryAfterSeconds, "ip_rooms");
+  }
 
   const body = await readJson(request);
   const field = new Field([]);
   const displayName = field.string(body["displayName"] ?? "Player", "displayName", { min: 2, max: 16 });
   const mobileId = field.string(body["mobileId"] ?? "mbl-01", "mobileId");
   const avatarId = field.string(body["avatarId"] ?? "avatar-01", "avatarId");
-  const maxPlayers = field.oneOf(body["maxPlayers"] ?? 4, "maxPlayers", ALLOWED_CAPACITIES) as RoomSettings["maxPlayers"];
+  // `rooms.md` marks `maxPlayers` required: defaulting to 4 silently seats a room the host did not ask for.
+  const maxPlayers = field.oneOf(body["maxPlayers"], "maxPlayers", ALLOWED_CAPACITIES) as RoomSettings["maxPlayers"];
   const mode = field.oneOf(body["mode"] ?? "solo", "mode", ["solo", "score", "tag", "jewel"] as const);
   const mapId = field.string(body["mapId"] ?? "map-01", "mapId");
   const isPrivate = typeof body["isPrivate"] === "boolean" ? body["isPrivate"] : false;
@@ -80,7 +96,11 @@ export async function createRoom(
 
   const playerId = crypto.randomUUID();
   for (let attempt = 0; attempt < CODE_ATTEMPTS; attempt += 1) {
-    const roomCode = makeRoomCode(() => crypto.getRandomValues(new Uint32Array(1))[0]! / 2 ** 32);
+    const roomCode = nextCode();
+    // A code that already names a room is taken (`US-ROOM-001` AC2): joining it would seat the creator in
+    // somebody else's room, so pick another code instead.
+    const taken = await roomState(env, roomCode);
+    if (taken.roomCode) continue;
     try {
       const joined = await callRoom<{ room: unknown; member: { playerId: string } }>(stubFor(env, roomCode), "join", {
         playerId,
@@ -97,6 +117,7 @@ export async function createRoom(
           roomCode,
           playerId: joined.member.playerId,
           wsUrl: `${originBase}/api/v1/rooms/${roomCode}/ws`,
+          joinUrl: `${originBase}/lobby/${roomCode}`,
           maxPlayers,
           settings: { maxPlayers, mode, mapId, isPrivate },
           expiresAt: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
@@ -109,7 +130,8 @@ export async function createRoom(
       throw error;
     }
   }
-  throw new ProblemError("internal", "Could not allocate a room code");
+  // Five collisions in a row is a "come back in a moment", not a bug (`US-ROOM-001` AC2).
+  throw new ProblemError("unavailable", "Could not allocate a room code", [], 5);
 }
 
 /** Join an existing room by code (`US-ROOM-002`). The roster lives in the Durable Object. */
@@ -121,6 +143,17 @@ export async function joinRoomByCode(
   originBase: string,
 ): Promise<Response> {
   if (!isValidRoomCode(roomCode)) throw new ProblemError("room-not-found", "Room codes are six characters");
+  // A code that names no room must not *create* one: the DO would seat the caller in a fresh object and the
+  // join would look like a success (`rooms.md` § POST /rooms/{code}/join → 404 room-not-found).
+  const existing = await roomState(env, roomCode);
+  // A finished room keeps answering `410 room-closed` even after everyone left, so status is checked first.
+  if (existing.status === "ended" || existing.status === "abandoned") {
+    throw new ProblemError("room-closed", "That match is already over");
+  }
+  // A room object exists as soon as its stub is created, so the code it was *named* with is what tells a real
+  // room from a ghost: `POST /rooms` names the room and seats its host in the same call, and a code nobody
+  // minted leaves `roomCode` empty.
+  if (!existing.roomCode) throw new ProblemError("room-not-found", "No room answers to that code");
   const body = await readJson(request);
   const field = new Field([]);
   const displayName = field.string(body["displayName"] ?? "Player", "displayName", { min: 2, max: 16 });
@@ -141,6 +174,11 @@ export async function joinRoomByCode(
       roomCode,
     },
   );
+  // Remember where this player sits so `DELETE /me` can refuse mid-match (`TC-AUTH-069`).
+  await env.GBW_DB.prepare("UPDATE profile SET current_room_code = ?, updated_at = ? WHERE account_id = ?")
+    .bind(roomCode, new Date().toISOString(), session.sub.accountId)
+    .run()
+    .catch(() => undefined);
   return Response.json(
     {
       roomCode,
@@ -155,8 +193,15 @@ export async function joinRoomByCode(
 
 export async function roomPreview(env: Env, roomCode: string): Promise<Response> {
   if (!isValidRoomCode(roomCode)) throw new ProblemError("room-not-found", "Room codes are six characters");
-  const state = await callRoom<Record<string, unknown>>(stubFor(env, roomCode), "state");
+  const state = (await roomState(env, roomCode)) as unknown as Record<string, unknown>;
   const members = Array.isArray(state["members"]) ? (state["members"] as Record<string, unknown>[]) : [];
+  const maxPlayers = (state["settings"] as { maxPlayers?: number } | undefined)?.maxPlayers ?? members.length;
+  if (state["status"] === "ended" || state["status"] === "abandoned") {
+    throw new ProblemError("room-closed", "That match is already over");
+  }
+  // A preview is public and read-only: an empty roster still answers 200 with `joined: 0`, because telling a
+  // stranger whether a code was ever used is exactly what `US-ROOM-001` AC7 asks us not to do. Only `join`
+  // refuses an empty room (`404`), since that is where a ghost room would be created.
   return Response.json(
     {
       roomCode,
@@ -164,8 +209,9 @@ export async function roomPreview(env: Env, roomCode: string): Promise<Response>
       settings: state["settings"],
       joined: members.length,
       playerCount: members.length,
-      maxPlayers: (state["settings"] as { maxPlayers?: number } | undefined)?.maxPlayers ?? members.length,
-      joinable: state["status"] === "lobby",
+      maxPlayers,
+      // `rooms.md` § GET /rooms/{code}: joinable is the lobby *and* a free seat, not the lobby alone.
+      joinable: state["status"] === "lobby" && members.length < maxPlayers,
       hostDisplayName:
         (members.find((member) => member["playerId"] === state["hostPlayerId"])?.["displayName"] as string) ?? null,
       host: members.find((member) => member["role"] === "host") !== undefined,
@@ -183,9 +229,15 @@ export async function roomPreview(env: Env, roomCode: string): Promise<Response>
  */
 export async function roomSocket(env: Env, roomCode: string, request: Request): Promise<Response> {
   if (!isValidRoomCode(roomCode)) throw new ProblemError("room-not-found", "Room codes are six characters");
-  return await stubFor(env, roomCode).fetch(`https://room.internal/ws`, {
-    headers: { upgrade: request.headers.get("upgrade") ?? "websocket" },
-  });
+  // The DO is reached through a reserved host, so its own `request.url` can never tell it the public
+  // origin. The proxy passes it explicitly: `match_end` needs it to call back into `POST /matches`.
+  //
+  // The upgrade is forwarded as a *copy of the incoming request*, not as a fresh `fetch` with a hand-made
+  // header set: the WebSocket handshake needs the browser's `sec-websocket-key`, `sec-websocket-version`
+  // and `connection` headers, and a rebuilt request without them is answered 500 by the runtime.
+  const forwarded = new Request("https://room.internal/ws", request);
+  forwarded.headers.set("x-room-origin", new URL(request.url).origin);
+  return await stubFor(env, roomCode).fetch(forwarded);
 }
 
 export interface IceServer {

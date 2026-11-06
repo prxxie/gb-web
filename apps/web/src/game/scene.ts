@@ -23,6 +23,14 @@ import {
   type PlayerState,
 } from "@gbw/core";
 import { addPointer, classify, clearPointers, movePointer, removePointer, screenToWorld, viewportFor, type Point, type PointerState } from "./viewport";
+import {
+  INTERPOLATION_MS,
+  poseOfFrames,
+  unitFrames,
+  unitLook,
+  type UnitFrame,
+  type UnitPose,
+} from "./interpolate";
 
 export interface BattleCallbacks {
   readonly onPull: (power: number, angle: number) => void;
@@ -34,6 +42,11 @@ export interface BattleCallbacks {
 export interface BattleHandle {
   setState(state: MatchState, localSlot: number): void;
   destroy(): void;
+}
+
+/** A monotonic clock in milliseconds: `Date.now()` can be corrected backwards and would blend a unit in reverse. */
+function now(): number {
+  return typeof performance === "undefined" ? Date.now() : performance.now();
 }
 
 interface Options {
@@ -49,6 +62,12 @@ class BattleScene extends Phaser.Scene {
   private readonly callbacks: BattleCallbacks;
   private graphics!: Phaser.GameObjects.Graphics;
   private window: CameraWindow;
+  /** The pose the current blend starts from and when it started — the near end of the segment (`AC2`). */
+  private fromPose: readonly UnitPose[] | null = null;
+  private fromAt = 0;
+  /** What the last frame put on screen: the next blend has to start there, or a state that lands mid-segment
+   *  would make the units jump forward by however far they had already travelled. */
+  private lastDrawn: readonly UnitPose[] | null = null;
   private pointers: PointerState = clearPointers();
   private origin: Point | null = null;
   private previousSpread: number | null = null;
@@ -62,17 +81,27 @@ class BattleScene extends Phaser.Scene {
     this.state = state;
     this.localSlot = localSlot;
     this.callbacks = callbacks;
-    // The camera is framed in `create()`: Phaser has no `scale` until the scene is booted.
-    this.window = defaultWindow(16 / 9);
+    // A placeholder only: `create()` frames the window on the real canvas, because Phaser has no `scale`
+    // until the scene is booted (`this.scale` in the constructor throws).
+    this.window = defaultWindow(TUNABLES.viewDefaultWidth / TUNABLES.viewDefaultHeight);
   }
 
   setState(state: MatchState, localSlot: number): void {
-    const previous = this.state.turn.activeSlot;
+    const previousActiveSlot = this.state.turn.activeSlot;
+    // Start the segment where the screen actually is, so a state that lands mid-blend continues from the drawn
+    // pixel instead of teleporting the rest of the way (`US-MATCH-001` AC2).
+    this.fromPose = this.lastDrawn;
+    this.fromAt = now();
     this.state = state;
     this.localSlot = localSlot;
     // The camera follows whoever is shooting until the player pans; a shot that never leaves the screen
     // does not exist, so the view settles on the active mobile at the start of each turn.
-    if (state.turn.activeSlot !== previous) this.frameOn(state.turn.activeSlot, state);
+    if (state.turn.activeSlot !== previousActiveSlot) this.frameOn(state.turn.activeSlot, state);
+  }
+
+  /** Segment progress in [0, 1] once `clampProgress` reads it; `now()` is monotonic for the reason on line 47. */
+  private progress(): number {
+    return (now() - this.fromAt) / INTERPOLATION_MS;
   }
 
   /** Centre horizontally on the active mobile and keep the ground line anchored. */
@@ -232,8 +261,14 @@ class BattleScene extends Phaser.Scene {
       graphics.lineBetween(tickX, this.window.y + this.window.height - tickHeight, tickX, this.window.y + this.window.height);
     }
 
-    for (const player of this.state.players) this.drawPlayer(graphics, player);
-    this.drawAim(graphics);
+    const frames = unitFrames(this.fromPose, this.state, this.progress());
+    this.lastDrawn = poseOfFrames(frames);
+    // `unitFrames` answers one frame per player in roster order, so no lookup per frame is needed.
+    this.state.players.forEach((player, index) => {
+      const frame = frames[index];
+      if (frame) this.drawPlayer(graphics, player, frame);
+    });
+    this.drawAim(graphics, frames);
     void height;
   }
 
@@ -241,16 +276,18 @@ class BattleScene extends Phaser.Scene {
    * A vector mobile: treads, hull in the team colour, a turret whose barrel follows the aim, a health bar
    * with the shield ring around it, and a name plate. Placeholder art — `US-CORE-007` swaps in sprites.
    */
-  private drawPlayer(graphics: Phaser.GameObjects.Graphics, player: PlayerState): void {
+  private drawPlayer(graphics: Phaser.GameObjects.Graphics, player: PlayerState, frame: UnitFrame): void {
     const mobile = getMobile(player.mobileId);
     const halfWidth = 26;
     const hullHeight = 16;
-    const groundY = player.y;
+    const groundY = frame.y;
+    const look = unitLook(frame);
 
-    if (player.eliminated) {
-      graphics.lineStyle(3, 0x6b3f3f, 0.9);
-      graphics.lineBetween(player.x - halfWidth, groundY - 6, player.x + halfWidth, groundY - 26);
-      graphics.lineBetween(player.x + halfWidth, groundY - 6, player.x - halfWidth, groundY - 26);
+    if (frame.eliminated) {
+      // A wreck fades but keeps its place and its facing: nothing about a dead mobile may look alive (`AC6`).
+      graphics.lineStyle(3, 0x6b3f3f, look.alpha);
+      graphics.lineBetween(frame.x - halfWidth, groundY - 6, frame.x + halfWidth, groundY - 26);
+      graphics.lineBetween(frame.x + halfWidth, groundY - 6, frame.x - halfWidth, groundY - 26);
       return;
     }
 
@@ -259,75 +296,75 @@ class BattleScene extends Phaser.Scene {
 
     // Drop shadow and treads.
     graphics.fillStyle(0x000000, 0.28);
-    graphics.fillEllipse(player.x, groundY - 1, halfWidth * 2.4, 9);
+    graphics.fillEllipse(frame.x, groundY - 1, halfWidth * 2.4, 9);
     graphics.fillStyle(0x1b2531, 1);
-    graphics.fillRoundedRect(player.x - halfWidth - 4, groundY - 12, (halfWidth + 4) * 2, 12, 5);
+    graphics.fillRoundedRect(frame.x - halfWidth - 4, groundY - 12, (halfWidth + 4) * 2, 12, 5);
     graphics.lineStyle(1, 0x33465c, 0.9);
     for (let tick = -halfWidth; tick <= halfWidth; tick += 8) {
-      graphics.lineBetween(player.x + tick, groundY - 11, player.x + tick, groundY - 2);
+      graphics.lineBetween(frame.x + tick, groundY - 11, frame.x + tick, groundY - 2);
     }
 
     // Hull with a lighter top deck, then the turret and barrel.
     graphics.fillStyle(accent, 1);
-    graphics.fillRoundedRect(player.x - halfWidth, groundY - 12 - hullHeight, halfWidth * 2, hullHeight, 5);
+    graphics.fillRoundedRect(frame.x - halfWidth, groundY - 12 - hullHeight, halfWidth * 2, hullHeight, 5);
     graphics.fillStyle(0xffffff, 0.18);
-    graphics.fillRoundedRect(player.x - halfWidth + 3, groundY - 11 - hullHeight, halfWidth * 2 - 6, 5, 3);
+    graphics.fillRoundedRect(frame.x - halfWidth + 3, groundY - 11 - hullHeight, halfWidth * 2 - 6, 5, 3);
 
     const turretY = groundY - 12 - hullHeight - 2;
     const aim = ((this.pullAngleFor(player) * Math.PI) / 180) * -1;
     const barrel = 30;
     graphics.lineStyle(7, 0x16202b, 1);
     graphics.lineBetween(
-      player.x,
+      frame.x,
       turretY,
-      player.x + Math.cos(aim) * barrel * player.facing,
+      frame.x + Math.cos(aim) * barrel * frame.facing,
       turretY + Math.sin(aim) * barrel,
     );
     graphics.lineStyle(3, accent, 1);
     graphics.lineBetween(
-      player.x,
+      frame.x,
       turretY,
-      player.x + Math.cos(aim) * (barrel - 4) * player.facing,
+      frame.x + Math.cos(aim) * (barrel - 4) * frame.facing,
       turretY + Math.sin(aim) * (barrel - 4),
     );
     graphics.fillStyle(0x16202b, 1);
-    graphics.fillCircle(player.x, turretY, 8);
+    graphics.fillCircle(frame.x, turretY, 8);
     graphics.fillStyle(accent, 1);
-    graphics.fillCircle(player.x, turretY, 5);
+    graphics.fillCircle(frame.x, turretY, 5);
 
     // Health bar, shield arc and the active-player ring.
-    const ratio = Math.max(0, Math.min(1, player.hp / Math.max(1, mobile.maxHp)));
+    const ratio = Math.max(0, Math.min(1, frame.hp / Math.max(1, mobile.maxHp)));
     const barY = turretY - 22;
     graphics.fillStyle(0x0b1220, 0.9);
-    graphics.fillRoundedRect(player.x - 26, barY, 52, 7, 3);
+    graphics.fillRoundedRect(frame.x - 26, barY, 52, 7, 3);
     graphics.fillStyle(ratio > 0.5 ? 0x5cd67a : ratio > 0.25 ? 0xf2c14e : 0xe5544b, 1);
-    graphics.fillRoundedRect(player.x - 26, barY, 52 * ratio, 7, 3);
+    graphics.fillRoundedRect(frame.x - 26, barY, 52 * ratio, 7, 3);
     if (ratio < 1) {
       graphics.lineStyle(1, 0xffffff, 0.25);
-      graphics.strokeRoundedRect(player.x - 26, barY, 52, 7, 3);
+      graphics.strokeRoundedRect(frame.x - 26, barY, 52, 7, 3);
     }
     if (player.shield > 0) {
       const shieldRatio = Math.max(0, Math.min(1, player.shield / Math.max(1, mobile.maxShield)));
       graphics.lineStyle(3, 0x7fd6ff, 0.85);
       graphics.beginPath();
-      graphics.arc(player.x, turretY, 30, Math.PI, Math.PI + Math.PI * shieldRatio, false);
+      graphics.arc(frame.x, turretY, 30, Math.PI, Math.PI + Math.PI * shieldRatio, false);
       graphics.strokePath();
     }
     if (active) {
       graphics.lineStyle(2, 0xffffff, 0.8);
-      graphics.strokeCircle(player.x, turretY, 34);
+      graphics.strokeCircle(frame.x, turretY, 34);
       graphics.fillStyle(0xffffff, 0.9);
       graphics.fillTriangle(
-        player.x - 6,
+        frame.x - 6,
         turretY - 46,
-        player.x + 6,
+        frame.x + 6,
         turretY - 46,
-        player.x,
+        frame.x,
         turretY - 38,
       );
     }
     graphics.lineStyle(1, 0xffffff, 0.12);
-    graphics.lineBetween(player.x - halfWidth, groundY, player.x + halfWidth, groundY);
+    graphics.lineBetween(frame.x - halfWidth, groundY, frame.x + halfWidth, groundY);
   }
 
   private pullAngleFor(player: PlayerState): number {
@@ -335,9 +372,10 @@ class BattleScene extends Phaser.Scene {
     return this.pullAngle;
   }
 
-  private drawAim(graphics: Phaser.GameObjects.Graphics): void {
+  private drawAim(graphics: Phaser.GameObjects.Graphics, frames: readonly UnitFrame[]): void {
+    const frame = frames.find((candidate) => candidate.slot === this.localSlot);
     const player = this.state.players.find((candidate) => candidate.slot === this.localSlot);
-    if (!player || player.eliminated) return;
+    if (!frame || !player || frame.eliminated) return;
     const mobile = getMobile(player.mobileId);
     const map = getMap(this.state.mapId);
 
@@ -345,15 +383,15 @@ class BattleScene extends Phaser.Scene {
       const radius = powerRingRadius(this.pullPower);
       for (let ring = 0; ring < 12; ring += 1) {
         graphics.lineStyle(3, 0x4f9dff, 0.12 + (ring / 12) * 0.5);
-        graphics.strokeCircle(player.x, player.y - 10, radius * (1 - ring / 16));
+        graphics.strokeCircle(frame.x, frame.y - 10, radius * (1 - ring / 16));
       }
       const projectile = launch({
         id: 1,
-        ownerSlot: player.slot,
+        ownerSlot: frame.slot,
         weaponSlot: 0,
         weapon: mobile.weapons[0]!,
-        from: { x: player.x, y: player.y },
-        facing: player.facing,
+        from: { x: frame.x, y: frame.y },
+        facing: frame.facing,
         angle: this.pullAngle,
         force: Math.round(this.pullPower * 25),
         powerMultiplier: 1,
@@ -372,7 +410,7 @@ class BattleScene extends Phaser.Scene {
       // A dotted arc from the muzzle to the predicted impact: the player sees where the shot goes.
       if (flight.impact) {
         const steps = 14;
-        const from = { x: player.x, y: player.y };
+        const from = { x: frame.x, y: frame.y };
         graphics.fillStyle(0xffffff, 0.4);
         for (let index = 1; index <= steps; index += 1) {
           const t = index / steps;

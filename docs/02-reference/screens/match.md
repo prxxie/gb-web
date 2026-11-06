@@ -29,7 +29,7 @@ The camera shows a **window** onto the 2000 × 1200-unit map, not the whole map.
 
 | Property | Value | Notes |
 |---|---|---|
-| Default window | **1000 × 600 units** — half the map each way | `zoomDefault` = fit of that box; on a wider phone the extra width comes as margin, never as a smaller box |
+| Default window | **1000 × 600 units** — half the map each way | the height is fixed at 600 units and the width follows the screen: 1000 on a 5:3 screen, wider on a landscape phone (844 × 313 is 2.7:1, so ~1617 units), so the box is never cropped and the extra width comes as more battlefield, never as a smaller box |
 | Zoom out limit | whole map (2000 × 1200) | `zoomMin` |
 | Zoom in limit | 4 × default (250 × 150 units) | `zoomMax`, enough to aim at a 44-unit-wide crater |
 | Pan | two-finger drag, 1:1 with the finger centroid | clamped so the window never leaves the map bounds |
@@ -81,7 +81,7 @@ your mobile on your turn (`OQ-40` — this supersedes the optional joystick in s
 | Angle up / down | tap or hold the ▲ / ▼ of the four-way pad (**±1° per tap, 10°/s held**) | Rotates the barrel, clamped to the mobile's own `angleMin…angleMax`; the chip shows the value | — (folded into the next `fire`) | active slot |
 | Move left / right | tap or hold the ◀ / ▶ of the four-way pad | Walks/ runs the mobile within `moveDistance`, debits `moveEnergy` and `moveDelay` as it moves | `input{kind:'move', direction, distance, seq}` on `control` | active slot |
 | Skip turn | `Bỏ lượt` button, 60×60 | Forfeits the turn | `input{kind:'skip'}` | active slot |
-| Chat | preset phrase grid / emote buttons | Bubble for 3 s | `chat{kind, id}` | any member, rate-limited 2/s |
+| Chat | the `Trò chuyện` button opens a preset phrase grid and emote buttons (closed by default, so the pull gesture keeps the canvas) | Bubble for 3 s | `chat{kind, id}` | any member, rate-limited 2/s |
 | Rotate notice | — | Portrait blocks play with a rotate prompt | — | — |
 
 Gesture arbitration: a two-finger gesture cancels any power pull in progress **without firing**; the pad, the weapon
@@ -122,19 +122,21 @@ a drag. All pad and button targets are ≥ 60 × 60 logical px (`NFR-17`).
 
 | Contract | Checked by |
 |----------|-----------|
-| Aim drag → angle/force within tolerance, release fires once | `tests/e2e/match.spec.ts` (TC-MATCH-151) |
+| Aim drag → angle/force within tolerance, a pull under the deadzone sends nothing | `apps/web/tests/aim.test.tsx` (TC-MATCH-914, TC-MATCH-916) |
 | Power ring shows 0.0–4.0 and maps to `force = power × 25` | `apps/web/tests/power-ring.test.tsx` (TC-MATCH-915) |
-| Release below 0.3 cancels; two-finger gesture cancels without firing | `apps/web/tests/gestures.test.ts` (TC-MATCH-916) |
-| Camera default window 1000 × 600, clamped pan, zoom bounds | `apps/web/tests/camera.test.ts` (TC-MATCH-918, TC-MATCH-919) |
-| Ruler divisions 8 → 16 as the window widens | `apps/web/tests/ruler.test.ts` (TC-MATCH-920) |
-| Fullscreen requested on first tap; safe-area insets respected | `tests/e2e/fullscreen.spec.ts` (TC-MATCH-921) |
+| Release below 0.3 cancels; two-finger gesture cancels without firing | `apps/web/tests/gestures.test.tsx` (TC-MATCH-916) |
+| Camera default window 1000 × 600, clamped pan, zoom bounds | `packages/core/tests/camera.test.ts` + `apps/web/tests/camera.test.tsx` (TC-MATCH-918, TC-MATCH-919) |
+| Ruler divisions 8 → 16 as the window widens | `apps/web/tests/ruler.test.tsx` (TC-MATCH-920) |
+| Units blend between two snapshots 100 ms apart; positions only, `hp`/`facing`/`eliminated` snap | `apps/web/tests/interpolate.test.tsx` (TC-MATCH-924) |
+| An eliminated mobile is drawn as a faded wreck in place and keeps its roster cell, ordered by slot | `apps/web/tests/interpolate.test.tsx` (TC-MATCH-924, the wreck) and `apps/web/tests/roster.test.tsx` (TC-MATCH-925, the strip) |
+| Landscape launch, safe-area insets respected, no fullscreen launch flag | `tests/e2e/smoke.spec.ts` (TC-PWA-063) |
 | Turn clock starts at 20 s, skips on timeout, does not drift > 1 s | `packages/core/tests/turn.test.ts` (TC-CORE-152) |
-| Wind re-rolled once per round, dial shows 12 sectors and 0–26 | `packages/core/tests/weather.test.ts` (TC-CORE-926), `apps/web/tests/wind-dial.test.ts` (TC-MATCH-923) |
-| Blast damage, friendly fire, elimination, team-loss detection | `packages/core/tests/physics.test.ts` (TC-CORE-020…TC-CORE-028) |
+| Wind re-rolled once per round, dial shows 12 sectors and 0–26 | `packages/core/tests/weather.test.ts` (TC-CORE-926), `apps/web/tests/wind-dial.test.tsx` (TC-MATCH-923) |
+| Blast damage, friendly fire, elimination, team-loss detection | `packages/core/tests/combat.test.ts`, `packages/core/tests/match.test.ts` (TC-CORE-020…TC-CORE-028) |
 | Snapshot apply is idempotent and duck-types by `seq` | `packages/core/tests/snapshot.test.ts` (TC-CORE-040) |
-| Reconnect overlay countdown matches the 20 s grace | `tests/e2e/reconnect.spec.ts` (TC-ROOM-047) |
-| Host migration overlay ≤ 5 s end-to-end | `tests/e2e/migration.spec.ts` (TC-ROOM-049) |
-| Offline bot match needs no network at all | `tests/e2e/offline.spec.ts` (TC-PWA-064) |
+| Reconnect overlay countdown matches the 20 s grace | `apps/web/tests/reconnect.test.tsx` (TC-ROOM-174…TC-ROOM-177) |
+| Host migration overlay ≤ 5 s end-to-end | `tests/e2e/migration.spec.ts` (TC-ROOM-149, TC-ROOM-182) |
+| Offline bot match needs no network at all | `tests/e2e/pwa-offline.spec.ts` (TC-PWA-064) |
 
 ## GunBound rule-set extensions
 

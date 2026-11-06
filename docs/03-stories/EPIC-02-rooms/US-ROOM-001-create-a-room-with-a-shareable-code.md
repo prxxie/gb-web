@@ -2,7 +2,7 @@
 id: US-ROOM-001
 title: Create a room and share a six-character code
 epic: EPIC-02-rooms
-status: ready
+status: done
 priority: P0
 size: M
 depends_on: [US-FND-002, US-AUTH-001]
@@ -61,7 +61,7 @@ code ([ADR-0001](../../04-decisions/adr/ADR-0001-stack-phaser-react-cloudflare.m
 `GET /api/v1/rooms/{code}` (no auth) → `200` with `{code, status, joined, maxPlayers, joinable}` and deliberately no
 player ids. Rate limit: 10 rooms/minute per IP, 30/hour per account (`NFR-25`).
 
-Code alphabet: `ABCDEFGHJKLMNPQRSTUVWXYZ23456789` (31 symbols, no `I`, `O`, `0`, `1`); 31^6 ≈ 887 million.
+Code alphabet: `ABCDEFGHJKLMNPQRSTUVWXYZ23456789` (32 symbols, no `I`, `O`, `0`, `1`); 32^6 ≈ 887 million.
 
 ## 5. Rules and edge cases
 
@@ -88,6 +88,9 @@ Code alphabet: `ABCDEFGHJKLMNPQRSTUVWXYZ23456789` (31 symbols, no `I`, `O`, `0`,
 `TC-ROOM-120`, `TC-ROOM-071`, `TC-ROOM-072`, `TC-ROOM-073`, `TC-ROOM-133`, `TC-ROOM-134`, `TC-ROOM-136`,
 `TC-ROOM-123`. Miniflare runs the DO; the collision test stubs the code generator to return the same code twice. Red
 first: `apps/worker/tests/rooms.test.ts::create_returns_valid_code`.
+
+- **Red:** none — no production code changed in this pass; the sweep added TC-ROOM-190 to the worker room suite
+  (the ten-minute sweep deletes the record, so the six characters are free again) and left every existing case in place.
 
 ## 9. Open questions
 

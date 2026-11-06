@@ -15,7 +15,7 @@ function env(): Record<string, string> {
 }
 
 describe("problem responses", () => {
-  it("TC-FND-001: a problem body carries type, title, status, detail and request id", () => {
+  it("TC-FND-071: a problem body carries type, title, status, detail, instance and request id", () => {
     const body = problemBody(new ProblemError("room-not-found", "room ABCD23 is unknown"), "req-1");
     expect(body).toMatchObject({
       type: "https://gbw.example/problems/room-not-found",
@@ -26,7 +26,7 @@ describe("problem responses", () => {
     expect(body.title.length).toBeGreaterThan(0);
   });
 
-  it("TC-FND-001: a problem response is application/problem+json with x-request-id", async () => {
+  it("TC-FND-071: a problem response is application/problem+json with x-request-id", async () => {
     const response = problemResponse(
       new ProblemError("validation", "bad body", [{ field: "maxPlayers", detail: "must be 2, 4, 6 or 8" }]),
       "req-2",
@@ -81,7 +81,7 @@ describe("TC-AUTH-074: session tokens", () => {
   });
 });
 
-describe("TC-FND-070: request validation", () => {
+describe("TC-FND-071: request validation collects every invalid field", () => {
   it("collects every invalid field instead of stopping at the first", () => {
     const errors: FieldError[] = [];
     const field = new Field(errors);

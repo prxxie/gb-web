@@ -17,11 +17,12 @@ import { getMobile } from "./data/mobiles.js";
 import { getMap } from "./data/maps.js";
 import { ITEMS_BY_ID, isItemId } from "./data/items.js";
 import { avatarBonus, bonusMultipliers } from "./data/avatars.js";
-import { createTerrain, carve, groundY, type Terrain } from "./terrain.js";
+import { carve, createTerrain, groundY, heightAt, type Terrain } from "./terrain.js";
 import { launch, segmentImpact, stepProjectile } from "./ballistics.js";
 import { applyBlast, damageByTeam, mergeHits, teamStatus, type HitResult } from "./combat.js";
 import { addDelay, advanceTurn, createTurn, nextSlot } from "./turn.js";
-import { rollWeather, rollWind } from "./weather.js";
+import { FORCE_FIELD, returnsOffMapShots } from "./gimmicks.js";
+import { newerWeather, rollWeather, rollWind } from "./weather.js";
 import { applyGimmicks } from "./gimmicks.js";
 import { tryMove, teleportTo } from "./movement.js";
 import { createRng } from "./rng.js";
@@ -70,7 +71,13 @@ export type MatchEvent =
   | { readonly kind: "turn"; readonly turn: MatchState["turn"] }
   | { readonly kind: "weather"; readonly weather: Weather }
   | { readonly kind: "reject"; readonly slot: number; readonly reason: string }
-  | { readonly kind: "end"; readonly winner: Team | null; readonly scores: Readonly<Record<Team, number>> };
+  | {
+      readonly kind: "end";
+      readonly winner: Team | null;
+      readonly scores: Readonly<Record<Team, number>>;
+      readonly mode: ModeId;
+      readonly modeState: MatchState["scores"];
+    };
 
 export interface InputResult {
   readonly state: MatchState;
@@ -79,6 +86,7 @@ export interface InputResult {
 
 export const EMPTY_EFFECTS: ActiveEffects = {
   shotsLeft: 1,
+  dualWeapon: null,
   bloodNext: false,
   powerUpNext: false,
   dualPlusNext: false,
@@ -119,7 +127,10 @@ function seatsToPlayers(seats: readonly Seat[], map: MapDef): readonly PlayerSta
       facing: seat.team === "A" ? 1 : -1,
       hp: mobile.maxHp,
       shield: mobile.maxShield,
-      energy: Math.round(mobile.energy * bonus.energy),
+      // Energy is a pool of points, so the avatar adds points (`base + 8`, `US-CORE-013` AC2); attack,
+      // defense and delay are percentages and multiply.
+      // `bonus.energy` is the multiplier `1 + points/100`, so the points are recovered before adding them.
+      energy: mobile.energy + Math.round((bonus.energy - 1) * 100),
       delay: Math.round(mobile.baseDelay * bonus.delay),
       eliminated: false,
       attack: bonus.attack,
@@ -171,6 +182,7 @@ export function createMatch(config: MatchConfig): MatchState {
     winnerTeam: null,
     lastActingTeam: null,
     seq: 0,
+    lastInputSeq: null,
     startedAt: config.now,
   };
 }
@@ -197,6 +209,7 @@ function flightPath(state: MatchState, projectile: ReturnType<typeof launch>, mo
     gravity: gravityFor(mobile, map),
     mass: mobile.mass,
     stepMs: TUNABLES.stepMs,
+    forceX: map.gimmicks.includes("force") ? FORCE_FIELD : 0,
   };
   let current = projectile;
   const path: Vec2[] = [{ x: current.x, y: current.y }];
@@ -205,7 +218,28 @@ function flightPath(state: MatchState, projectile: ReturnType<typeof launch>, mo
     current = stepProjectile(current, context);
     path.push({ x: current.x, y: current.y });
     if (current.x < -400 || current.x > TUNABLES.mapWidth + 400 || current.y > TUNABLES.mapHeight + 200) {
+      // `return` maps (map-09) bring an off-map shell back once, at reduced power (`TC-CORE-913`).
+      if (returnsOffMapShots(map) && !current.returned) {
+        current = {
+          ...current,
+          returned: true,
+          x: roundTo(Math.min(Math.max(current.x, 0), TUNABLES.mapWidth)),
+          vx: -current.vx * 0.6,
+          vy: current.vy * 0.6,
+        };
+        path.push({ x: current.x, y: current.y });
+        continue;
+      }
       return { path, impact: null, flightMs: current.ageMs };
+    }
+    // `itm-bunge` comes home: the same rule as `simulateFlight`, so a previewed arc matches the resolver.
+    if (
+      current.bunge &&
+      current.ageMs >= TUNABLES.bungeTurnMs &&
+      Math.abs(current.x - current.homeX) <= 60 &&
+      current.y >= heightAt(terrain, current.x) - 40
+    ) {
+      return { path, impact: { x: roundTo(current.x), y: roundTo(current.y) }, flightMs: current.ageMs };
     }
     const hit = segmentImpact(terrain, previous, { x: current.x, y: current.y });
     if (hit) {
@@ -231,6 +265,9 @@ interface Conclusion {
 /** Decide whether this mode has concluded and who leads (`US-CORE-011`, `US-CORE-012`). */
 function conclusionOf(state: MatchState): Conclusion {
   if (state.mode === "score") {
+    // A wipe-out ends a score match too; the cap only decides a match nobody won by elimination.
+    const wiped = teamStatus(state.players).winner;
+    if (wiped !== null) return { concluded: true, winner: wiped };
     const played = state.turn.number - 1;
     const cap = TUNABLES.scoreTurnCap * Math.max(1, state.players.length);
     if (played < cap) return { concluded: false, winner: null };
@@ -246,7 +283,10 @@ function conclusionOf(state: MatchState): Conclusion {
       const holder = state.players.find((player) => player.slot === jewel.carriedBy);
       if (holder) totals[holder.team] += 1;
     }
-    return { concluded: true, winner: totals.A === totals.B ? null : totals.A > totals.B ? "A" : "B" };
+    // Holding every jewel wins; a split never ends the match, however lopsided it is.
+    if (totals.A === jewels.length) return { concluded: true, winner: "A" };
+    if (totals.B === jewels.length) return { concluded: true, winner: "B" };
+    return { concluded: false, winner: null };
   }
   const winner = teamStatus(state.players).winner;
   return { concluded: winner !== null, winner };
@@ -259,7 +299,13 @@ function checkEnd(state: MatchState): { state: MatchState; event: MatchEvent | n
   const ended: MatchState = { ...state, status: "ended", winnerTeam: winner, seq: state.seq + 1 };
   return {
     state: ended,
-    event: { kind: "end", winner, scores: { A: ended.scores.score.A, B: ended.scores.score.B } },
+    event: {
+      kind: "end",
+      winner,
+      scores: { A: ended.scores.score.A, B: ended.scores.score.B },
+      mode: ended.mode,
+      modeState: ended.scores,
+    },
   };
 }
 
@@ -288,7 +334,37 @@ function advance(state: MatchState, now: number, activeSlot: number | null): { s
     lastActingTeam: state.players.find((player) => player.slot === state.turn.activeSlot)?.team ?? null,
     seq: state.seq + 1,
   };
+  if (state.mode === "tag") {
+    // Tag scores the team that is *acting*: the flag flips with the queue (`TC-CORE-916`).
+    const actingTeam = state.players.find((player) => player.slot === next.turn.activeSlot)?.team;
+    if (actingTeam && actingTeam !== next.scores.activeTeam) {
+      next = { ...next, scores: { ...next.scores, activeTeam: actingTeam } };
+    }
+  }
+  // Shield refills at the start of its owner's turn, capped at `maxShield` (`US-CORE-003` AC3,
+  // `mobiles.md`): a shield is a per-turn buffer, which is the only reading that makes `shieldRegen` a
+  // tunable rather than a one-off.
+  const starting = next.players.find((player) => player.slot === turn.activeSlot && !player.eliminated);
+  if (starting && starting.shield < getMobile(starting.mobileId as Parameters<typeof getMobile>[0]).maxShield) {
+    const cap = getMobile(starting.mobileId as Parameters<typeof getMobile>[0]).maxShield;
+    const regen = getMobile(starting.mobileId as Parameters<typeof getMobile>[0]).shieldRegen;
+    const shield = Math.min(cap, starting.shield + regen);
+    next = {
+      ...next,
+      players: next.players.map((player) => (player.slot === starting.slot ? { ...player, shield } : player)),
+      seq: next.seq + 1,
+    };
+  }
   const events: MatchEvent[] = [{ kind: "turn", turn }];
+  if (!roundCompleted) {
+    // A `gust` spike lasts exactly one turn: when it ends, the round's own roll comes back (`TC-CORE-918`).
+    const map = getMap(state.mapId);
+    if (map.gimmicks.includes("gust") && state.weather.rolledAtRound === state.turn.round) {
+      const base = rollWeather(state.seed, state.turn.round);
+      next = { ...next, weather: base, seq: next.seq + 1 };
+      events.push({ kind: "weather", weather: base });
+    }
+  }
   if (roundCompleted) {
     const weather = rollWeather(state.seed, turn.round);
     next = { ...next, weather, seq: next.seq + 1 };
@@ -296,7 +372,8 @@ function advance(state: MatchState, now: number, activeSlot: number | null): { s
     const map = getMap(next.mapId);
     if (map.gimmicks.length > 0) {
       const effect = applyGimmicks(next, turn.round, map);
-      const gimmicked: Weather = effect.weather ?? next.weather;
+      // A gimmick may only speak for the round it was applied to; anything older is a stale roll (`AC7`).
+      const gimmicked: Weather = effect.weather ? newerWeather(next.weather, effect.weather) : next.weather;
       next = { ...next, weather: gimmicked, players: effect.players, seq: next.seq + 1 };
       if (effect.weather) events.push({ kind: "weather", weather: gimmicked });
     }
@@ -374,7 +451,11 @@ function resolveShot(
         ...state.scores,
         jewels: state.scores.jewels.map((jewel) => {
           const carrier = dropped.find((candidate) => candidate.slot === jewel.carriedBy);
-          return carrier ? { ...jewel, carriedBy: null, x: carrier.x, y: carrier.y } : jewel;
+          if (!carrier) return jewel;
+          // The killer inherits the loot (`TC-CORE-917`); a self-inflicted death drops it where it fell.
+          return carrier.slot === slot
+            ? { ...jewel, carriedBy: null, x: carrier.x, y: carrier.y }
+            : { ...jewel, carriedBy: slot };
         }),
       };
     }
@@ -386,11 +467,24 @@ function resolveShot(
       players,
       scores,
       lastActingTeam: player.team,
-      effects: { ...effects, shotsLeft: Math.max(0, effects.shotsLeft - 1), bloodNext: false, powerUpNext: false, dualPlusNext: false, bungeNext: false },
+      effects: {
+        ...effects,
+        shotsLeft: Math.max(0, effects.shotsLeft - 1),
+        // The first shot of a Dual pair fixes the weapon and the second must reuse it, so a player cannot
+        // fire slot 1 and then slot 2 for two different maps of effect (`US-CORE-009` AC2).
+        dualWeapon: effects.shotsLeft > 1 ? weaponSlot : effects.dualWeapon,
+        bloodNext: false,
+        powerUpNext: false,
+        dualPlusNext: false,
+        bungeNext: false,
+      },
       seq: state.seq + 1,
     },
     terrain,
   );
+  // A crater under a unit takes the ground out from under it; it falls to the new surface instead of
+  // floating (`US-CORE-006` AC3).
+  if (carved) next = reground(next);
 
   events.push({
     kind: "shot",
@@ -426,6 +520,9 @@ function applyItem(state: MatchState, slot: number, itemId: ItemId, now: number)
   if (!player) return { state, events: [{ kind: "reject", slot, reason: "unknown-slot" }] };
   const item = ITEMS_BY_ID.get(itemId);
   if (!item) return { state, events: [{ kind: "reject", slot, reason: "unknown-item" }] };
+  // An item between Dual's two shots would let the second shot carry a second effect (`US-CORE-009` AC2).
+  const midDual = state.effects.shotsLeft > 1 || (state.effects.dualWeapon !== null && state.effects.shotsLeft > 0);
+  if (midDual) return { state, events: [{ kind: "reject", slot, reason: "dual-in-progress" }] };
   const quantity = player.items[itemId] ?? 0;
   if (quantity <= 0) return { state, events: [{ kind: "reject", slot, reason: "no-item-left" }] };
 
@@ -475,11 +572,13 @@ function applyItem(state: MatchState, slot: number, itemId: ItemId, now: number)
     case "itm-team-teleport": {
       const caster = players.find((candidate) => candidate.slot === slot);
       if (caster) {
-        let offset = 0;
+        let index = 0;
         players = players.map((candidate) => {
           if (candidate.team !== caster.team || candidate.eliminated || candidate.slot === slot) return candidate;
-          offset += 40;
-          return teleportTo(candidate, terrain, caster.x + offset * caster.facing);
+          // Alternate the sides of the caster so every mate lands inside 40 px, however many there are.
+          const side = index % 2 === 0 ? 1 : -1;
+          index += 1;
+          return teleportTo(candidate, terrain, caster.x + side * 40 * caster.facing);
         });
       }
       break;
@@ -528,39 +627,48 @@ export function applyInput(state: MatchState, input: MatchInput, now: number): I
   if (input.slot !== state.turn.activeSlot) {
     return { state, events: [{ kind: "reject", slot: input.slot, reason: "not-your-turn" }] };
   }
+  // The sender owns `seq` (`conventions.md` §7): a frame that is not newer than the last accepted one is a
+  // retransmit or a reordering, and applying it twice would simulate a second shot (`TC-CORE-045`).
+  if (state.lastInputSeq !== null && input.seq <= state.lastInputSeq) {
+    return { state, events: [{ kind: "reject", slot: input.slot, reason: "stale-input" }] };
+  }
+  const accepted: MatchState = { ...state, lastInputSeq: input.seq };
   if (input.kind === "fire") {
-    return resolveShot(state, input.slot, input.weaponSlot, input.angle, input.force, now);
+    // The second shot of a Dual pair follows the first shot's weapon (`US-CORE-009` AC2).
+    const weaponSlot = accepted.effects.dualWeapon ?? input.weaponSlot;
+    return resolveShot(accepted, input.slot, weaponSlot, input.angle, input.force, now);
   }
   if (input.kind === "skip") {
-    const advanced = advance(state, now, null);
+    const advanced = advance(accepted, now, null);
     let next = pickUpJewels(advanced.state);
     const ended = checkEnd(next);
     next = ended.state;
     return { state: next, events: ended.event ? [...advanced.events, ended.event] : advanced.events };
   }
   if (input.kind === "item") {
-    return applyItem(state, input.slot, input.itemId, now);
+    return applyItem(accepted, input.slot, input.itemId, now);
   }
   if (input.kind !== "move") {
     return { state, events: [{ kind: "reject", slot: input.slot, reason: "unknown-input" }] };
   }
-  const player = state.players.find((candidate) => candidate.slot === input.slot);
+  const player = accepted.players.find((candidate) => candidate.slot === input.slot);
   if (!player) return { state, events: [{ kind: "reject", slot: input.slot, reason: "unknown-slot" }] };
-  const outcome = tryMove(player, mobileOf(player), terrainOf(state), input.dir, input.run, state.effects.movesThisTurn);
+  const outcome = tryMove(player, mobileOf(player), terrainOf(accepted), input.dir, input.run, accepted.effects.movesThisTurn);
   if (!outcome.ok || !outcome.player) {
     return { state, events: [{ kind: "reject", slot: input.slot, reason: outcome.reason ?? "move-failed" }] };
   }
   const moved = outcome.player;
-  const players = state.players.map((candidate) => (candidate.slot === input.slot ? moved : candidate));
+  const players = accepted.players.map((candidate) => (candidate.slot === input.slot ? moved : candidate));
   const next: MatchState = {
-    ...state,
+    ...accepted,
     players,
-    effects: { ...state.effects, movesThisTurn: state.effects.movesThisTurn + 1 },
+    effects: { ...accepted.effects, movesThisTurn: accepted.effects.movesThisTurn + 1 },
     lastActingTeam: player.team,
-    seq: state.seq + 1,
+    seq: accepted.seq + 1,
   };
   return {
-    state: next,
+    // A step onto a jewel is a pickup: the walker carries it from that moment, not at turn end.
+    state: pickUpJewels(next),
     events: [{ kind: "move", slot: input.slot, from: { x: player.x, y: player.y }, to: { x: moved.x, y: moved.y }, run: input.run }],
   };
 }
@@ -570,12 +678,14 @@ export function passTurn(state: MatchState, now: number): InputResult {
   return applyInput(state, { kind: "skip", slot: state.turn.activeSlot, seq: state.seq }, now);
 }
 
-/** Re-ground every unit after terrain changed. */
+/**
+ * Re-ground every unit after terrain changed (`US-CORE-006` AC3). `seq` is left alone: the caller has
+ * already committed the action, and a second bump would make one shot look like two inputs.
+ */
 export function reground(state: MatchState): MatchState {
   const terrain = terrainOf(state);
   return {
     ...state,
     players: state.players.map((player) => ({ ...player, y: groundY(terrain, player.x) - 8 })),
-    seq: state.seq + 1,
   };
 }

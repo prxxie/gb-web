@@ -1,0 +1,51 @@
+# Test cases whose table scope does not match the file that cites them.
+#
+# Each line is `<TC id> <path>` and is a debt, not a permission: the case table's scope column says how a
+# case is executed (`unit` = packages/core, `worker` = miniflare, `web` = jsdom, `e2e` = Playwright), so a
+# citation in another scope means the id was borrowed. `tests/meta/traceability.test.ts` fails when a
+# violation is missing from this file, and also when a line here stops violating — the list only shrinks.
+#
+# Clear these while shipping the owning story: give the borrowed test its own case row, or move the case
+# row's scope to where the behaviour is really executed.
+TC-CORE-926 apps/web/tests/hud.test.tsx
+TC-MATCH-006 apps/web/tests/match-controls.test.tsx
+TC-MATCH-902 tests/e2e/smoke.spec.ts
+TC-MATCH-905 apps/web/tests/match-controls.test.tsx
+TC-MATCH-906 apps/web/tests/match-controls.test.tsx
+TC-MATCH-918 packages/core/tests/camera.test.ts
+TC-MATCH-919 packages/core/tests/camera.test.ts
+TC-MATCH-920 packages/core/tests/camera.test.ts
+TC-MATCH-921 packages/core/tests/camera.test.ts
+TC-MATCH-922 packages/core/tests/camera.test.ts
+TC-NET-067 packages/core/tests/movement.test.ts
+TC-PWA-130 apps/web/tests/hud.test.tsx
+TC-PWA-130 apps/web/tests/input.test.tsx
+TC-PWA-162 apps/web/tests/hud.test.tsx
+TC-RANK-116 packages/core/tests/rating.test.ts
+TC-ROOM-048 packages/core/tests/room.test.ts
+TC-ROOM-049 packages/core/tests/room.test.ts
+TC-ROOM-059 packages/core/tests/room.test.ts
+TC-ROOM-071 tests/e2e/lobby.spec.ts
+TC-ROOM-120 packages/core/tests/room.test.ts
+TC-ROOM-121 tests/e2e/lobby.spec.ts
+TC-ROOM-122 packages/core/tests/room.test.ts
+TC-ROOM-123 packages/core/tests/room.test.ts
+TC-ROOM-148 packages/core/tests/room.test.ts
+TC-ROOM-153 packages/core/tests/room.test.ts
+# Cases whose documented level and citing directory differ. Every line below is a citation-level mismatch that a
+# later pass has to resolve by moving the assertion or by re-cutting the case row — it is registered, not fixed,
+# so the list stays honest rather than quiet (see `docs/05-quality/test-plan-status.md` § Known debt).
+TC-MATCH-006 apps/worker/tests/room-validate.test.ts
+TC-MATCH-905 apps/web/tests/phrases.test.tsx
+TC-MATCH-906 apps/web/tests/weapon-strip.test.tsx
+TC-MATCH-907 apps/web/tests/direction-pad.test.tsx
+TC-PWA-130 apps/web/tests/i18n.test.tsx
+TC-RANK-113 apps/worker/tests/elo.test.ts
+TC-RANK-114 apps/worker/tests/elo.test.ts
+TC-RANK-141 apps/worker/tests/history.test.ts
+TC-ROOM-049 apps/worker/tests/room.test.ts
+TC-ROOM-052 apps/worker/tests/room.test.ts
+TC-ROOM-055 apps/worker/tests/room.test.ts
+TC-ROOM-056 apps/worker/tests/room.test.ts
+TC-ROOM-151 apps/worker/tests/room-validate.test.ts
+TC-ROOM-163 apps/worker/tests/room-validate.test.ts

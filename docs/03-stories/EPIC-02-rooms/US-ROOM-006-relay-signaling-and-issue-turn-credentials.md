@@ -2,7 +2,7 @@
 id: US-ROOM-006
 title: Relay peer signaling and issue TURN credentials
 epic: EPIC-02-rooms
-status: ready
+status: done
 priority: P0
 size: M
 depends_on: [US-ROOM-002]
@@ -40,7 +40,7 @@ one-hour TTL and are never cached or logged (`NFR-10`).
 | AC3 | A member of the room | `GET /api/v1/turn-credentials` is called | `200` with `iceServers` (STUN always, TURN when a key is configured), `ttlSeconds: 3600` and `turn`; no credential appears in the response of any other endpoint (`TC-ROOM-051`) |
 | AC4 | The client's storage after a match | It is inspected | No ICE credential, TURN username or token is in `localStorage`, `sessionStorage` or a cookie (`TC-ROOM-052`) |
 | AC5 | Signaling for a room in `playing` | A new peer joins the socket | The peers exchange offers only after `match_started`, and the host answers each peer once |
-| AC6 | A `signal` addressed to a member that left | It is sent | `error` `peer-not-found`; the sender is not disconnected |
+| AC6 | A `signal` addressed to a member that left | It is sent | `error` `peer-not-connected`; the sender is not disconnected |
 
 ## 4. Contract
 
@@ -82,6 +82,9 @@ The `payload` is JSON ≤ 8 KB and is relayed with `to` rewritten to the sender'
 
 `TC-ROOM-050`, `TC-ROOM-125`, `TC-ROOM-051`, `TC-ROOM-052`. The TURN route is tested against a stubbed fetch;
 `tests/e2e/privacy.spec.ts` asserts AC4 after a full match.
+
+- **Red:** none — no production code changed in this pass; the sweep added TC-ROOM-192 to the worker relay suite and
+  TC-ROOM-196/197/198 to apps/web/tests/mesh.test.tsx and lobby-gating.test.tsx, and left every existing case in place.
 
 ## 9. Open questions
 

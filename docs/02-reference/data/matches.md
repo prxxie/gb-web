@@ -20,6 +20,7 @@ rating columns `NULL`.
 | `started_at` | TEXT | no | — | Host-reported ISO-8601, clamped |
 | `ended_at` | TEXT | no | — | Host-reported ISO-8601, must be after `started_at` |
 | `submitted_by` | TEXT | no | — | `account_id` of the submitter (must be the host and a participant) |
+| `delay_table` | TEXT | no | `[]` | JSON array of the accumulated delay of each slot at the end, in slot order — the table that produced the turn order (`US-CORE-002` AC7); kept so a disputed match can be replayed |
 | `created_at` | TEXT | no | — | Server receive time |
 
 Keys and indexes: `PRIMARY KEY (match_id)`, `INDEX (created_at DESC)`, `INDEX (room_code, created_at DESC)`.

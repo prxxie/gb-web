@@ -1,4 +1,7 @@
 import type { Gimmick, MapDef } from "../types.js";
+import { serializeTerrain } from "../terrain.js";
+import { createTerrain } from "../terrain.js";
+import { TUNABLES } from "../tuning.js";
 
 /**
  * Eleven maps (`docs/02-reference/gameplay/tunables.md` § 6).
@@ -6,6 +9,21 @@ import type { Gimmick, MapDef } from "../types.js";
  * `gravityModifier` is the per-map knob on top of each mobile's own gravity (`×0.95–1.05`), never a
  * replacement for it: a heavy mobile on a low-gravity map is still heavy.
  */
+/** Vietnamese labels for the eleven maps; the English one is the authored row name. */
+const VI_NAMES: Readonly<Record<string, string>> = {
+  "map-01": "Đồng Bằng Đá Lớn",
+  "map-02": "Ruộng Bậc Thang Ngọc",
+  "map-03": "Vịnh Băng Giá",
+  "map-04": "Miệng Núi Lửa",
+  "map-05": "Cầu Mây",
+  "map-06": "Phế Tích Chìm",
+  "map-07": "Cồn Cát Hổ Phách",
+  "map-08": "Rừng Trăng",
+  "map-09": "Mỏ Đá Sắt",
+  "map-10": "Thềm San Hô",
+  "map-11": "Tháp Bão",
+};
+
 interface MapRow {
   readonly mapId: string;
   readonly name: string;
@@ -74,7 +92,14 @@ export const MAP_PROFILES: ReadonlyMap<string, MapProfile> = new Map(
 
 export const MAPS: readonly MapDef[] = ROWS.map((row) => ({
   mapId: row.mapId,
-  name: row.name,
+  // The authored names are English; the Vietnamese label lives beside them so `t()` never invents one.
+  name: { vi: VI_NAMES[row.mapId] ?? row.name, en: row.name },
+  windRange: { min: 0, max: TUNABLES.windMax },
+  // Serialised on first read, not at module load: `terrain.ts` reads `MAP_PROFILES` from this file, so an
+  // eager call would hit the half-initialised binding. The mask is cached, so it is still built once.
+  get terrain(): string {
+    return terrainRle(row.mapId);
+  },
   gravityModifier: row.gravityModifier,
   seed: row.seed,
   gimmicks: row.gimmicks,
@@ -85,6 +110,17 @@ export const MAPS: readonly MapDef[] = ROWS.map((row) => ({
     [1360, surfaceHeight(row, 1360) - 40],
   ],
 }));
+
+/** Authored terrain RLE per map, built once on first use (`US-CORE-012` AC1). */
+const TERRAIN_RLE = new Map<string, string>();
+
+function terrainRle(mapId: string): string {
+  const cached = TERRAIN_RLE.get(mapId);
+  if (cached !== undefined) return cached;
+  const encoded = serializeTerrain(createTerrain(mapId));
+  TERRAIN_RLE.set(mapId, encoded);
+  return encoded;
+}
 
 export const MAPS_BY_ID: ReadonlyMap<string, MapDef> = new Map(MAPS.map((map) => [map.mapId, map]));
 

@@ -13,6 +13,7 @@ import {
   leaveRoom,
   makeRoomCode,
   markDisconnected,
+  setRoomSettings,
   setTeam,
   startMatch,
   ROOM_CODE_ALPHABET,
@@ -41,6 +42,45 @@ function lobby(maxPlayers: 2 | 4 | 6 | 8 = 2) {
   const room = createRoom({ roomCode: "ABC234", now: NOW, settings: { maxPlayers } });
   return join(room, 0, "A");
 }
+
+it("TC-ROOM-168: settings are a patch, and capacity may not drop below the seated members", () => {
+  const room = createRoom({ roomCode: "ABC234", now: 1_000 });
+  const changed = setRoomSettings(room, { mapId: "map-07", mode: "tag" });
+  expect(changed.ok).toBe(true);
+  if (!changed.ok) return;
+  expect(changed.room.settings.mapId).toBe("map-07");
+  expect(changed.room.settings.mode).toBe("tag");
+  // Everything else is still in place: a settings change is a patch, not a rewrite.
+  expect(changed.room.settings.maxPlayers).toBe(room.settings.maxPlayers);
+
+  const seated = joinRoom(room, {
+    playerId: "p1",
+    accountId: null,
+    guestId: "g1",
+    displayName: "A",
+    avatarId: "default",
+    mobileId: "mbl-01",
+    now: 1_000,
+  });
+  expect(seated.member).not.toBeNull();
+  let crowded = seated.room;
+  for (const playerId of ["p2", "p3"]) {
+    const next = joinRoom(crowded, {
+      playerId,
+      accountId: null,
+      guestId: `g-${playerId}`,
+      displayName: playerId,
+      avatarId: "default",
+      mobileId: "mbl-01",
+      now: 1_000,
+    });
+    if (next.member) crowded = next.room;
+  }
+  expect(crowded.members).toHaveLength(3);
+  // Three people are seated, so the room may not shrink to two (`US-CORE-012` AC4).
+  expect(setRoomSettings(crowded, { maxPlayers: 2 }).ok).toBe(false);
+  expect(setRoomSettings(crowded, { maxPlayers: 4 }).ok).toBe(true);
+});
 
 describe("TC-ROOM-120: room creation", () => {
   it("starts in the lobby with the genre capacity and a generation counter", () => {
@@ -113,9 +153,13 @@ describe("TC-ROOM-148: start conditions", () => {
     room = join(room, 1, "B");
     expect(canStart(room, "p-0")).toBe("not-full");
     room = join(room, 2, "A");
-    room = join(room, 3, null);
+    // A joiner is seated in the emptier team (`lobby.md` § Late joiner), so the lobby is balanced on arrival
+    // and only a manual move can unbalance it — that is the state this case is about.
+    room = join(room, 3);
+    expect(isBalanced(room)).toBe(true);
+    room = setTeam(room, "p-2", "B", NOW + 350);
     expect(canStart(room, "p-0")).toBe("teams-unbalanced");
-    room = setTeam(room, "p-3", "B", NOW + 400);
+    room = setTeam(room, "p-2", "A", NOW + 400);
     expect(isBalanced(room)).toBe(true);
     expect(canStart(room, "p-1")).toBe("not-host");
     expect(canStart(room, "p-0")).toBeNull();

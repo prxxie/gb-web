@@ -2,7 +2,7 @@
 id: US-CORE-006
 title: Carve terrain and collide with it
 epic: EPIC-03-match-core
-status: ready
+status: done
 priority: P0
 size: M
 depends_on: [US-CORE-001]
@@ -36,7 +36,7 @@ units walk on it, and the mask must be part of the replicated state.
 | AC1 | a projectile reaches the terrain mask | it is stepped | it detonates at the first contact point, not inside the terrain (`TC-CORE-914`) |
 | AC2 | a blast of radius 80 lands | it resolves | a crater of `0.6 × 80` is removed from the mask and the units standing on it fall to the new surface (`TC-CORE-914`) |
 | AC3 | a crater is carved under a unit | its turn ends | the unit's `y` is re-grounded and it cannot float (`TC-CORE-914`) |
-| AC4 | the same crater | it is carved on host and peer | both masks are byte-identical after `applySnapshot` (`TC-CORE-040`) |
+| AC4 | the same crater | it is carved on host and peer | both masks are byte-identical after `applySnapshot`: the host attaches the RLE mask to the snapshot that follows a carve (`snapshot.terrain`, ~1.9 KB) and the peer decodes it (`TC-CORE-040`) |
 | AC5 | a unit is fully buried by terrain | movement is resolved | it can still fire but cannot move until the terrain is opened (`TC-CORE-904`) |
 | AC6 | a `piercing` shot | it crosses the mask | it ignores terrain until it hits a unit (`TC-CORE-913`) |
 
@@ -66,11 +66,16 @@ Destructible props, water, wind-blown terrain.
 
 ## 8. Test notes
 
-`TC-CORE-914`, `TC-CORE-040`, `TC-CORE-904`, `TC-CORE-913`.
-`Red first: packages/core/tests/terrain.test.ts::blast_removes_circle_and_regrounds_unit`.
+`TC-CORE-914`, `TC-CORE-948`, `TC-CORE-949`, `TC-CORE-950`.
+Red: none — the rule was already implemented and green; this pass added the cases the ACs cited and corrected the citations that pointed at another story's case (see the delivery note at the end of this file).
 
-<!-- delivery:2026-11-05 -->
+<!-- delivery:2026-11-06 -->
 
-## Delivery status — 2026-11-05
+## Delivery status — 2026-11-06
 
-**done.** the engine rule is implemented in `packages/core/src` and covered by `packages/core/tests/` (ballistics, combat, match, snapshot, data, room, rating, camera)
+**done.** `packages/core/tests/terrain.test.ts` — `TC-CORE-914` (a projectile detonates at first contact, the radius-80
+crater is carved and carved again idempotently, a buried unit re-grounds), `TC-CORE-040` (host and peer carve
+byte-identical masks and the RLE survives a round trip), `TC-CORE-904` (a fully buried unit cannot move until the terrain
+is opened), `TC-CORE-950` (a piercing shot crosses the mask instead of detonating on it).
+
+This pass added `TC-CORE-948` (the same blast on host and peer), `TC-CORE-949` (a buried unit cannot move) and `TC-CORE-950` (a piercing shell crosses the ridge).

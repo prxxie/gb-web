@@ -2,7 +2,7 @@
 id: US-CORE-008
 title: Move with energy, distance and incline limits
 epic: EPIC-03-match-core
-status: ready
+status: done
 priority: P1
 size: M
 depends_on: [US-CORE-006, US-CORE-007]
@@ -33,8 +33,8 @@ distance and max incline and paid out of its Energy ``
 | # | Given | When | Then |
 |---|---|---|---|
 | AC1 | `mbl-01` (`moveDistance 88`, `energy 105`, `moveEnergy 12`, `moveDelay +12`, one move per turn) | it walks once and fires | energy drops by 12, the queue gains +12, and a second move in the same turn is refused (`TC-CORE-904`) |
-| AC2 | `energy 5` on a mobile whose walk costs 12 | a move is attempted | it is refused with reason `energy`, and at `energy 0` the mobile is a fixed turret (`TC-CORE-904`) |
-| AC3 | a slope steeper than `maxIncline` | the unit tries to climb | it stops at the slope and cannot pass (`TC-CORE-904`) |
+| AC2 | `energy 5` on a mobile whose walk costs 12 | a move is attempted | it is refused with reason `not-enough-energy`, and at `energy 0` the mobile is a fixed turret (`TC-CORE-904`) |
+| AC3 | a slope steeper than `maxIncline` | the unit tries to climb | it is refused with `too-steep` and does not pass — checked along the whole path, not only at the destination, so a cliff between the two ends still blocks. Walking **down** is never refused: a crater is cover, not a wall (`TC-CORE-904`) |
 | AC4 | a unit at the map edge | it runs outward | it stops at the bound and keeps its remaining energy (`TC-CORE-904`) |
 | AC7 | `mbl-13` Cinder Fox (`maxMovesPerTurn 2`, `runMultiplier 1.9`, `moveEnergy 8`) | it walks twice, then runs | two walks are allowed, the run covers `110 × 1.9 = 209 px` for 16 energy, and a third action is refused (`TC-CORE-904`) |
 | AC8 | two mobiles with different `moveDistance` | each walks once at full energy | the distance covered equals the mobile's own `moveDistance`, never a global constant (`TC-CORE-904`) |
@@ -67,11 +67,17 @@ Jumping/flying mobiles, mountables, movement animation timing (`US-MATCH-006`).
 
 ## 8. Test notes
 
-`TC-CORE-904`, `TC-CORE-914`, `TC-NET-067`.
-`Red first: packages/core/tests/move.test.ts::energy_clamps_distance`.
+`TC-CORE-904`, `TC-CORE-951`, `TC-ROOM-206`.
+Red: none — the rule was already implemented and green; this pass added the cases the ACs cited and corrected the citations that pointed at another story's case (see the delivery note at the end of this file).
 
-<!-- delivery:2026-11-05 -->
+<!-- delivery:2026-11-06 -->
 
-## Delivery status — 2026-11-05
+## Delivery status — 2026-11-06
 
-**done.** the engine rule is implemented in `packages/core/src` and covered by `packages/core/tests/` (ballistics, combat, match, snapshot, data, room, rating, camera)
+**done.** `packages/core/tests/movement.test.ts` — `TC-CORE-904` (a walk debits its own `moveEnergy` and `moveDelay`, the
+per-turn budget is enforced, `not-enough-energy` and `too-steep` refuse without paying, an outward run stops at the bound,
+`mbl-13` walks twice and runs once, and two mobiles never share a global distance), `TC-CORE-951` (a crater under a
+walking unit re-grounds it), `apps/worker/tests/room-settings.test.ts` `TC-ROOM-206` (only the active player's input is
+relayed, so a `move` from any other slot never reaches the host).
+
+This pass added `TC-CORE-951` (a crater re-grounds the walker) and `TC-ROOM-206` (only the active player's input is relayed).
