@@ -9,6 +9,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { useLocale, useSession } from "../app/providers";
 import { api, errorMessage } from "../lib/api";
 import { InstallPrompt } from "../components/InstallPrompt";
+import { outcomeText, type WinCondition } from "../lib/outcome";
 import type { JSX } from "react";
 
 interface ResultPayload {
@@ -18,6 +19,8 @@ interface ResultPayload {
   readonly startedAt: number;
   readonly endedAt: number;
   readonly rulesetVersion: string;
+  /** Added with `US-CORE-010` AC6; a payload written before it simply omits the condition. */
+  readonly winCondition?: WinCondition;
   readonly players: readonly {
     readonly slot: number;
     readonly accountId: string | null;
@@ -109,6 +112,9 @@ export function ResultsPage(): JSX.Element {
             ? t("results.draw")
             : t("results.winner", { team: payload.winnerTeam })}
         </h1>
+        <p className="muted" data-testid="result-outcome">
+          {outcomeText(t, payload.mode, payload.winCondition ?? null)}
+        </p>
         <p className="muted">
           {ranked
             ? t("results.ranked")

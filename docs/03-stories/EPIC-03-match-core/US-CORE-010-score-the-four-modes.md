@@ -2,7 +2,7 @@
 id: US-CORE-010
 title: Score the four game modes
 epic: EPIC-03-match-core
-status: ready
+status: done
 priority: P1
 size: M
 depends_on: [US-CORE-003]
@@ -36,7 +36,7 @@ GunBound's room `info` bits 16–17 carry the mode, `0–3` = Solo / Score / Tag
 | AC3 | mode `tag` | a turn ends | the whole opposing team becomes active and `activeTeam` flips (`TC-CORE-916`) |
 | AC4 | mode `jewel` | a unit walks over a jewel | it is carried, and a kill transfers the victim's jewels to the killer's team (`TC-CORE-917`) |
 | AC5 | mode `jewel`, all jewels held by one team | the state resolves | that team wins immediately (`TC-CORE-917`) |
-| AC6 | any mode | a match ends | the result screen names the mode and the win condition used (`TC-RANK-153`) |
+| AC6 | any mode | a match ends | the result screen names the mode and the win condition used (`TC-CORE-962`, `TC-RANK-153`) |
 | AC7 | a mode not in `0–3` | the room state is loaded | it is rejected at the boundary (`TC-ROOM-120`) |
 
 ## 4. Contract
@@ -64,25 +64,34 @@ Mode-specific maps, tournaments, ranked per mode (`OQ-28` keeps one Elo).
 
 ## 8. Test notes
 
-`TC-CORE-027`, `TC-CORE-915`, `TC-CORE-916`, `TC-CORE-917`, `TC-RANK-153`, `TC-RANK-155`.
+`TC-CORE-027`, `TC-CORE-915`, `TC-CORE-916`, `TC-CORE-917`, `TC-CORE-961`, `TC-CORE-962`, `TC-RANK-153`, `TC-RANK-155`.
 Red: none — the rule was already implemented and green; this pass added the cases the ACs cited and corrected the citations that pointed at another story's case (see the delivery note at the end of this file).
 
 <!-- delivery:2026-11-06 -->
 
 ## Delivery status — 2026-11-06
 
-**ready** — one acceptance criterion is not met, and it is a client gap rather than a test gap.
+**done.** Every acceptance criterion is proven by a case this file can name.
 
 Verified: `packages/core/tests/modes.test.ts` — `TC-CORE-915` (score mode reaches the 12-turn cap and the higher damage
-total wins), `TC-CORE-916` (tag flips `activeTeam` to the opposing team, and the team-queue rule in `turn-queue.test.ts`
-shows it), `TC-CORE-917` (a jewel is carried, then transferred on a kill; all jewels on one team wins immediately);
-`packages/core/tests/combat.test.ts` `TC-CORE-027` (solo ends when a team is fully eliminated);
-`apps/worker/tests/rooms.test.ts` `TC-ROOM-205` (a mode outside the four is a 422 naming `mode`);
+total wins), `TC-CORE-916` (tag flips `activeTeam` to the opposing team), `TC-CORE-917` (a jewel is carried, then
+transferred on a kill; all jewels on one team wins immediately), `TC-CORE-961` (mode `solo`, one team wiped, the match
+ends and the surviving team wins); `packages/core/tests/combat.test.ts` `TC-CORE-027` (the same rule at the engine's
+door); `apps/worker/tests/rooms.test.ts` `TC-ROOM-205` (a mode outside the four is a 422 naming `mode`) and
+`TC-CORE-016` (a `room_settings` frame with `mode: royale` or `mapId: map-99` is refused `bad-request`);
 `tests/e2e/smoke.spec.ts` `TC-RANK-153` (a finished match lands on the result screen).
 
-Open: **AC6** — "the result screen names the mode and the win condition used". `apps/web/src/routes/ResultsPage.tsx`
-carries `mode` and `winnerTeam` in its payload (lines 16-17, 69-70) but renders only the winner banner, the ranked line and
-the per-player table; the mode and the win condition are not shown at all. That is a UI change with its own i18n keys
-(`results.*`) and e2e coverage, so the story stays `ready` instead of claiming the criterion.
+AC6 was the one criterion with no implementation behind it, and it is now built rather than cited:
+`apps/web/src/lib/outcome.ts` reads the condition back out of the finished state with the same rules
+`conclusionOf` (`packages/core/src/match.ts:260`) used — a wipe ends any mode, the score cap decides a score match that
+nobody won by elimination, a jewel match ends only when one team holds every jewel — and `apps/web/tests/outcome.test.tsx`
+`TC-CORE-962` pins both the condition and the rendered line in Vietnamese and English. The match screen writes the
+condition into the result payload (`winConditionOf(final)` in `finish`), and the result screen prints
+`data-testid="result-outcome"` under the banner.
 
-This pass added `TC-CORE-961` (solo ends when a team is wiped) to the existing `TC-CORE-915`/`916`/`917`.
+Red: none — `apps/web/src/lib/outcome.ts` was written with its case in the same pass; the first run was green.
+
+Walked in the browser (Chrome DevTools MCP, 844 × 390 landscape, `http://localhost:5273/results/AAAAAA` after seeding a
+`score`/`score-cap` payload): the banner reads `Đội A thắng` and the line under it reads
+`Chế độ Điểm số — thắng bằng: nhiều sát thương hơn khi hết số lượt`; `scrollWidth` 844. Screenshot:
+`docs/05-quality/evidence/US-CORE-010/ac6-result-screen-844x390.png`.

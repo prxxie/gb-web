@@ -35,7 +35,7 @@ Generated from story frontmatter — run `node .agents/scripts/verify-docs.mjs -
 | [US-CORE-007](US-CORE-007-load-mobile-stats-and-weapons.md) | Load mobile stats and resolve the three weapon slots | P0 | M | done | US-FND-001 |
 | [US-CORE-008](US-CORE-008-move-with-energy.md) | Move with energy, distance and incline limits | P1 | M | done | US-CORE-006, US-CORE-007 |
 | [US-CORE-009](US-CORE-009-apply-item-effects.md) | Apply the eleven item effects | P1 | L | done | US-CORE-003, US-CORE-008 |
-| [US-CORE-010](US-CORE-010-score-the-four-modes.md) | Score the four game modes | P1 | M | ready | US-CORE-003 |
+| [US-CORE-010](US-CORE-010-score-the-four-modes.md) | Score the four game modes | P1 | M | done | US-CORE-003 |
 | [US-CORE-011](US-CORE-011-apply-stage-gimmicks.md) | Apply the per-map stage gimmicks | P1 | L | done | US-CORE-001, US-CORE-006 |
 | [US-CORE-012](US-CORE-012-load-the-eleven-maps.md) | Load the eleven maps | P1 | M | done | US-CORE-006, US-CORE-011 |
 | [US-CORE-013](US-CORE-013-apply-avatar-stat-bonuses.md) | Apply avatar stat bonuses | P2 | S | done | US-CORE-007, US-AUTH-003 |

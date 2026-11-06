@@ -220,6 +220,7 @@ The `covers` column names the requirement ([nonfunctional-requirements.md](../01
 |----|-------|------|----------|-------|--------|
 | TC-CORE-016 | US-CORE-010 | `room_settings` with mode `royale`, then with `mapId` `map-99` | Both refused `bad-request` naming the field, so an unknown mode never reaches `createMatch` | unit | FR-05 |
 | TC-CORE-961 | US-CORE-010 | AC1 — mode `solo`, one team wiped | The match ends and the surviving team wins | unit | FR-06 |
+| TC-CORE-962 | US-CORE-010 | AC6 — the result screen after a finished match | Names the mode and the condition that ended it, in the player's language | web | NFR-18 |
 | TC-MATCH-901 | US-MATCH-001 | Mount the scene with a state | Map, units and turn indicator drawn; the ruler's division count matches `clamp(round(8 × visibleWidth / 1000), 8, 16)` with one ~125-unit division each | e2e | NFR-01 |
 | TC-MATCH-151 | US-MATCH-002 | Drag aim and release | One `fire`, angle/force within ±2° / ±3 of the drawn values | e2e | FR-03 |
 | TC-MATCH-902 | US-MATCH-002 | A second finger lands mid-pull | The pull is cancelled without firing and the camera gesture takes over | web | FR-03 |

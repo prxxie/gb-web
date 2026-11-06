@@ -29,6 +29,7 @@ import { PhrasePicker, type ChatKind } from "../components/PhrasePicker";
 import { Ruler } from "../components/Ruler";
 import { ItemTray } from "../components/ItemTray";
 import { Roster } from "../components/Roster";
+import { winConditionOf } from "../lib/outcome";
 import { WeaponStrip, type WeaponSlot } from "../components/WeaponStrip";
 import { WindDial } from "../components/WindDial";
 import { defaultWindow, type CameraWindow } from "@gbw/core";
@@ -151,6 +152,9 @@ export function MatchPage(): JSX.Element {
         startedAt: final.startedAt,
         endedAt: Date.now(),
         rulesetVersion: final.rulesetVersion,
+        // Which rule ended it, for the result screen (`US-CORE-010` AC6): the engine keeps only the
+        // winner, so the condition is read back with the same rules `conclusionOf` used.
+        winCondition: winConditionOf(final),
         players: final.players.map((player) => ({
           slot: player.slot,
           accountId: player.accountId,
