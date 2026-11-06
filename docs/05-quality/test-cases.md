@@ -220,7 +220,7 @@ The `covers` column names the requirement ([nonfunctional-requirements.md](../01
 | TC-CORE-016 | US-CORE-010 | `room_settings` with mode `royale`, then with `mapId` `map-99` | Both refused `bad-request` naming the field, so an unknown mode never reaches `createMatch` | unit | FR-05 |
 | TC-CORE-961 | US-CORE-010 | AC1 — mode `solo`, one team wiped | The match ends and the surviving team wins | unit | FR-06 |
 | TC-CORE-962 | US-CORE-010 | AC6 — the result screen after a finished match | Names the mode and the condition that ended it, in the player's language | web | NFR-18 |
-| TC-MATCH-901 | US-MATCH-001 | Mount the scene with a state | Map, units and turn indicator drawn; the ruler's division count matches `clamp(round(8 × visibleWidth / 1000), 8, 16)` with one ~125-unit division each | e2e | NFR-01 |
+| TC-MATCH-901 | US-MATCH-001 | AC1 — mount the scene with a state | Map, units and turn indicator drawn; the ruler's division count matches `clamp(round(8 × visibleWidth / 1000), 8, 16)` with one ~125-unit division each | e2e | NFR-01 |
 | TC-MATCH-151 | US-MATCH-002 | Drag aim and release | One `fire`, angle/force within ±2° / ±3 of the drawn values | e2e | FR-03 |
 | TC-MATCH-902 | US-MATCH-002 | A second finger lands mid-pull | The pull is cancelled without firing and the camera gesture takes over | web | FR-03 |
 | TC-MATCH-903 | US-MATCH-003 | Snapshot applied | HUD HP, wind and active slot equal the snapshot within 100 ms | web | NFR-02 |
@@ -240,7 +240,11 @@ The `covers` column names the requirement ([nonfunctional-requirements.md](../01
 | TC-MATCH-922 | US-MATCH-007 | Zoom to `zoomMax` and to `zoomMin` with the pad and ring visible | Pad ring stays 96 px, buttons 60 px, ring radius 64 px, roster unchanged at both zooms | web | NFR-17 |
 | TC-MATCH-924 | US-MATCH-001 | AC2 — two snapshots 100 ms apart, read at 0, ¼, ½, ¾ and 1 of the blend | A unit sits halfway at half the interval, never moves backwards or off its segment, `hp`/`facing`/`eliminated` come from the newest snapshot, an eliminated unit snaps to where it died, and the first frame after a mount starts where the state says | web | FR-01, NFR-01 |
 | TC-MATCH-925 | US-MATCH-001 | AC6 — one mobile at HP 0 in a three-mobile roster | It keeps its cell and its order, is labelled `match.eliminated` instead of printing its hp, and only the active slot carries `match__player--active` | web | NFR-17 |
-| TC-MATCH-926 | US-MATCH-001 | AC7 — play a bot match until one side is eliminated, on a phone in landscape | The clock and the bot stop on the final turn, the results screen replaces the match without a page reload and the canvas is released (no second WebGL context in a heap snapshot) | manual | FR-01 |
+| TC-MATCH-926 | US-MATCH-001 | AC7 — the state goes `ended` while the renderer is mounted | `destroy()` is called, the `gbw.result` payload is written once (with `winCondition`) and the route lands on the results screen; the clock and the bot stop on `status !== "playing"` | web | `NFR-03` |
+| TC-MATCH-927 | US-MATCH-001 | AC3 — eight mobile players, 30 s, iPhone 12 + Galaxy A52 in landscape | The scene holds 60 FPS ±5 with the HUD live; the procedure is in `docs/05-quality/evidence/US-MATCH-001/README.md` and has not been run on a device yet (`TC-OPS-180` is the `US-OPS-004` FPS case) | manual | `NFR-01` |
+| TC-MATCH-928 | US-MATCH-001 | AC4 — an 844 × 390 landscape viewport | The canvas fills the viewport behind the overlay HUD and the page never scrolls sideways (`TC-FND-133`), the camera window takes the canvas aspect with its height fixed (`TC-MATCH-918`), and the active mobile's feet sit 70 % down the frame | web | `NFR-17` |
+| TC-MATCH-929 | US-MATCH-001 | AC5 — a portrait device | The scene does not start and the rotate notice from `US-PWA-003` is shown instead (`TC-PWA-063` covers the gate itself) | manual | `NFR-17` |
+
 
 ## Ranked (RANK)
 
