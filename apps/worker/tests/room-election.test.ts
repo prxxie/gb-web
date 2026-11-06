@@ -132,7 +132,7 @@ describe("room host election", () => {
     expect(harness.state().status).toBe("abandoned");
   });
 
-  it("TC-ROOM-127: a peer socket close reports peer_left grace and arms the 20 s alarm", async () => {
+  it("TC-ROOM-127 / TC-ROOM-202: a peer socket close reports peer_left grace and arms the 20 s alarm", async () => {
     const harness = new RoomHarness();
     await harness.ready();
     vi.setSystemTime(BASE);

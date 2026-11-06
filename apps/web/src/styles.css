@@ -114,6 +114,22 @@ button:disabled {
   flex-wrap: wrap;
 }
 
+/*
+ * A link that sits in a control row is a control, not prose: it carries the same tap floor as the buttons
+ * beside it (`TC-FND-133`, `NFR-17`). Inline links inside a sentence keep their natural box.
+ */
+.row a {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--tap);
+  min-width: var(--tap);
+  padding: 0 12px;
+  border-radius: var(--radius);
+  border: 1px solid #2b3a58;
+  color: var(--accent);
+  text-decoration: none;
+}
+
 .grow {
   flex: 1 1 auto;
 }

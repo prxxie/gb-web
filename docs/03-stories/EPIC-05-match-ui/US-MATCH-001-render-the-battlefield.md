@@ -2,7 +2,7 @@
 id: US-MATCH-001
 title: Render the battlefield, units and camera in Phaser
 epic: EPIC-05-match-ui
-status: ready
+status: in-progress
 priority: P0
 size: M
 depends_on: [US-FND-003, US-CORE-001]
@@ -88,8 +88,11 @@ Red first: `tests/e2e/match.spec.ts::scene_renders_units`.
 - **OQ-20** (accepted assumption) — the shipped art is AI-generated placeholder art with a licence note in `assets/CREDITS.md`;
   replacing it later must not change coordinates or the asset manifest contract.
 
-<!-- delivery:2026-11-05 -->
+<!-- delivery:2026-11-06 -->
 
-## Delivery status — 2026-11-05
+## Delivery status — 2026-11-06
 
-**in-progress.** the Phaser scene, the terrain renderer and the camera are implemented; `TC-MATCH-901` is an e2e case and Playwright was not executed here.
+**in-progress.** AC1 passes end to end — `tests/e2e/smoke.spec.ts` TC-MATCH-901 mounts the battlefield and reads the
+HUD's turn. Still open: AC2 has no case asserting that two snapshots 100 ms apart interpolate without a unit jumping
+back (no test in `apps/web` mentions interpolation), AC3 is the manual device FPS measurement (`TC-OPS-180`), which
+nobody has recorded, and AC4/AC6/AC7 carry no traced case yet.

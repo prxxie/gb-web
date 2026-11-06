@@ -7,3 +7,9 @@
   camera gesture takes over" (`web` level). The Playwright title cites that id but asserts a different behaviour, so this
   run proves the pull path, not the documented case
 - Not proven: second-finger cancellation, multi-touch on a real device, angle/ruler feedback, `fire` on release
+
+## 2026-11-06 — still open
+
+The unit cases (`apps/web/tests/aim.test.tsx`, `power-ring.test.tsx`) cover AC1, AC3's formula, AC4, AC5 and AC6. The
+story stays `in-progress`: nothing asserts that a release sends exactly one `fire` with the angle and weapon slot (no
+drag-to-fire e2e spec exists), and AC7/AC8 have no case. See the story's Delivery status section.

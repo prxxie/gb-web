@@ -103,8 +103,15 @@ one `fire`), `TC-CORE-901` (eliminated). Red first:
 - **OQ-38** (answered) — release fires above a 0.3 dead zone; revisit after the M1 playtest.
 - **OQ-40** (answered) — no joystick anywhere; this controller is the only aiming input.
 
-<!-- delivery:2026-11-05 -->
+<!-- delivery:2026-11-06 -->
 
-## Delivery status — 2026-11-05
+## Delivery status — 2026-11-06
 
-**in-progress.** the pull gesture, the deadzone and `powerFromDrag` are covered by unit tests; the on-device feel needs the two-phone pass.
+**held at `ready`.** AC1, AC4, AC5 and AC6 pass at unit level (`apps/web/tests/aim.test.tsx`, `power-ring.test.tsx`), and
+AC3's `force = round(power × 25)` is unit-tested. Still open: nothing asserts that a release actually sends **exactly
+one** `fire` carrying the angle and the active `weaponSlot` — no drag-to-fire e2e spec exists — and AC7 (a pull in
+someone else's turn) and AC8 (eliminated player, second fire in one turn) have no automated case.
+
+The status is `ready` rather than `in-progress` because the rule requires every `depends_on` story to be `done` first:
+`US-MATCH-001` (the battlefield) is itself `in-progress` — its AC2 (interpolated motion) has no case. The aim and power-ring
+work that exists is in the tree and green; nothing is lost by the label.

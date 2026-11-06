@@ -133,7 +133,7 @@ describe("snapshot relay and stale drop (§ 3)", () => {
     expect(harness.state().lastSnapshot?.seq).toBe(5);
   });
 
-  it("TC-ROOM-059: a reconnecting member is replayed room_state and the last snapshot", async () => {
+  it("TC-ROOM-203: a reconnecting member is replayed room_state and the last snapshot", async () => {
     // Arrange
     const { harness, sockets } = await playing();
     const host = socket(sockets, "h");

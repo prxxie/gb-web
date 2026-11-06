@@ -81,8 +81,15 @@ route. Red first: `tests/e2e/results.spec.ts::shows_rating_delta`.
 - **OQ-28** (accepted assumption) — the numbers shown follow the Elo in [US-RANK-002](US-RANK-002-rate-players-with-elo.md);
   if K changes, only the display fixtures change.
 
-<!-- delivery:2026-11-05 -->
+<!-- delivery:2026-11-06 -->
 
-## Delivery status — 2026-11-05
+## Delivery status — 2026-11-06
 
-**in-progress.** the result screen is implemented and redirects a cold open home (covered by `tests/e2e/smoke.spec.ts`, not executed here); a real rating delta needs a recorded match.
+**held at `ready`.** The result screen renders and `tests/e2e/smoke.spec.ts` TC-RANK-153 is green — but that case asserts a
+cold open with no payload goes home, not the rating deltas this story promises. Still open: AC1/AC2 need a match that
+actually records a rating (`ratingBefore → ratingAfter` and the unranked reason), AC3's per-player stats and the viewer
+highlight have no case, and AC4/AC5/AC6/AC7 (rematch, Back, retry-safety, bot reason `bot`) are untraced. The
+per-case spec would be `tests/e2e/results.spec.ts`, which does not exist.
+
+The status is `ready` rather than `in-progress` because dependencies must be `done` first: `US-RANK-001` (record a
+match) and `US-CORE-003` (damage and elimination) are both still `ready`.

@@ -25,7 +25,7 @@ Generated from story frontmatter — run `node .agents/scripts/verify-docs.mjs -
 |---|---|---|---|---|---|
 | [US-PWA-001](US-PWA-001-install-and-play-offline.md) | Install the app and open it without a network | P1 | M | ready | US-FND-003, US-CORE-005 |
 | [US-PWA-002](US-PWA-002-switch-between-vietnamese-and-english.md) | Switch between Vietnamese and English with no missing string | P2 | M | ready | US-FND-003 |
-| [US-PWA-003](US-PWA-003-landscape-only-layout.md) | Enforce the landscape layout with a rotate notice | P1 | S | ready | US-FND-003 |
+| [US-PWA-003](US-PWA-003-landscape-only-layout.md) | Enforce the landscape layout with a rotate notice | P1 | S | done | US-FND-003 |
 | [US-PWA-004](US-PWA-004-meet-the-accessibility-bar.md) | Meet the accessibility bar on every screen | P2 | M | ready | US-FND-003, US-MATCH-003 |
 <!-- /cpt:epic-stories -->
 

@@ -150,7 +150,7 @@ describe("turn queue (US-CORE-002)", () => {
     expect(skipped.state.players[0]!.shotsFired).toBe(0);
   });
 
-  it("TC-CORE-027: an eliminated slot is skipped but keeps its accumulated delay", () => {
+  it("TC-CORE-027 / TC-CORE-936: an eliminated slot is skipped but keeps its accumulated delay", () => {
     const state = four();
     const dead: MatchState = {
       ...state,
