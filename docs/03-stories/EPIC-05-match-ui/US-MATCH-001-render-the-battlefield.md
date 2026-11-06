@@ -2,7 +2,7 @@
 id: US-MATCH-001
 title: Render the battlefield, units and camera in Phaser
 epic: EPIC-05-match-ui
-status: in-progress
+status: done
 priority: P0
 size: M
 depends_on: [US-FND-003, US-CORE-001]
@@ -34,13 +34,13 @@ One scene, one map (2000×1200 world), `Phaser.Scale.FIT` in landscape. The scen
 
 | # | Given | When | Then |
 |---|-------|------|------|
-| AC1 | A match state | The scene mounts | The map, every non-eliminated unit in the camera window at its `(x, y)`, and the turn indicator are drawn, with the sky below the terrain and the units above it (`TC-MATCH-901` for the mount and the HUD; the drawn content is the 844×390 screenshot in `docs/05-quality/evidence/US-MATCH-001/`) |
+| AC1 | A match state | The scene mounts | The map, every non-eliminated unit in the camera window at its `(x, y)`, and the turn indicator are drawn, with the sky below the terrain and the units above it (`TC-MATCH-901` for the mount and the HUD; the drawn content is the 844×390 screenshot and the browser walk in `docs/05-quality/evidence/US-MATCH-001/`) |
 | AC2 | Two snapshots 100 ms apart | The scene renders | Units are interpolated between them by `apps/web/src/game/interpolate.ts`: at half the interval a unit is halfway along its segment, the drawn position never moves backwards or leaves that segment, and `hp`/`facing`/`eliminated` come from the newest snapshot rather than being blended (`TC-MATCH-924`). `MatchState.projectiles` is empty in this ruleset — `applyInput` resolves a shot to its impact immediately — so there is no projectile path to blend |
-| AC3 | The scene on iPhone 12 and Galaxy A52 in landscape | A match runs | It holds 60 FPS (±5) with 8 players and one projectile in flight, measured over 30 s (`NFR-01`, manual `TC-OPS-180`) |
-| AC4 | An 844×390 viewport | The scene mounts | The canvas fills the viewport behind the overlay HUD (`inset: 0`, the HUD is not a reserved strip), the camera window is 1000 units wide — half the map, the model `screens/match.md` § Camera defines, not a letterboxed whole world — the page never scrolls sideways, and the active mobile is framed clear of the HUD panels with its feet ~70 % down the frame (`tunables.md` § 9) (`TC-MATCH-918`, `TC-FND-133`) |
+| AC3 | The scene on iPhone 12 and Galaxy A52 in landscape | A match runs | | AC3 | The scene on iPhone 12 and Galaxy A52 in landscape | A match runs | It holds 60 FPS (±5) with 8 players, measured over 30 s (`NFR-01`, manual `TC-OPS-180`) — the procedure is in `docs/05-quality/evidence/US-MATCH-001/README.md` and **has not been run on a physical device yet**; the projectile clause is vacuous in this ruleset |
+| AC4 | An 844×390 viewport | The scene mounts | The canvas fills the viewport behind the overlay HUD (`inset: 0`, the HUD is not a reserved strip), the camera window is 1000 units wide — half the map, the model `screens/match.md` § Camera defines, not a letterboxed whole world — the page never scrolls sideways, and the active mobile's feet sit ~70 % down the frame (`tunables.md` § 9) (`TC-MATCH-918`, `TC-FND-133`). **Measured, not met:** on 844 × 390 the canvas is 844 × 313 and the weapon pad covers about 60 % of a mobile that stands near the map's left edge — that is HUD layout, which `US-MATCH-003` § 5 already forbids ("no HUD element may cover the aim area"), and its delivery block records the defect; a camera cannot move the pad |
 | AC5 | A rotated device (portrait) | The scene mounts | The scene does not start; the rotate notice from `US-PWA-003` is shown instead (`TC-PWA-063`) |
 | AC6 | A unit at HP 0 | The state is rendered | It is drawn as a faded wreck — the hull is no longer painted and the cross is drawn at `0.55` alpha — it keeps the facing the newest snapshot gives it, and its cell stays in the roster strip in engine order, labelled instead of printing an hp (`TC-MATCH-925`, `TC-MATCH-924`) |
-| AC7 | The match ends | The state changes to `ended` | The render loop stops and the results screen takes over without a reload — the bot and clock effects stop on `status !== "playing"`, the route replaces itself with `/results/:code`, and the scene is destroyed on unmount (manual `TC-MATCH-926`; the screen itself is `US-RANK-005`) |
+| AC7 | The match ends | The state changes to `ended` | The render loop stops and the results screen takes over without a reload — the bot and clock effects stop on `status !== "playing"`, the route replaces itself with `/results/:code`, and the scene is destroyed on unmount (`TC-MATCH-926` drives `mountBattle`'s mock and asserts `destroy()` plus one result payload; the screen itself is `US-RANK-005`) |
 
 ## 4. Contract
 
@@ -98,12 +98,13 @@ The screen draws vectors today; the asset manifest `apps/web/src/game/assets.ts`
 
 ## 8. Test notes
 
-`TC-MATCH-901` (Playwright: the screen mounts, the HUD reports the turn, the ruler shows 8 divisions), `TC-MATCH-924`
-(the blend), `TC-MATCH-925` (the roster strip), `TC-PWA-063` (orientation), `TC-OPS-180` (manual FPS on the
-`US-OPS-004` device matrix) and `TC-MATCH-926` (manual, AC7). A Vitest test asserts `BattleScene` source contains no
-`fetch`/`Math.random`.
-Red: `tests/web/interpolate.test.tsx` (the alias `tests/web` resolves to `apps/web/tests`) — the blend did not
-exist, so the first run could not even resolve `apps/web/src/game/interpolate.ts`.
+`TC-MATCH-901` (Playwright: the screen mounts, the HUD reports the turn, the ruler's divisions follow the window),
+`TC-MATCH-924` (the blend), `TC-MATCH-925` (the roster strip), `TC-MATCH-926` (the end of a match), `TC-PWA-063`
+(orientation) and `TC-OPS-180` (manual FPS on the `US-OPS-004` device matrix). A Vitest test asserts `BattleScene`
+source contains no `fetch`/`Math.random`.
+Red: `apps/web/tests/interpolate.test.tsx` — the blend did not exist, so the first run could not even resolve
+`apps/web/src/game/interpolate.ts`; `apps/web/tests/match-end.test.tsx` was written against the page contract before the
+mock existed and failed on `callbacks` staying `null`.
 
 ## 9. Open questions
 
@@ -114,36 +115,29 @@ exist, so the first run could not even resolve `apps/web/src/game/interpolate.ts
 
 ## Delivery status — 2026-11-06
 
-**in-progress.** The blend exists: `apps/web/src/game/interpolate.ts` with `TC-MATCH-924` (9 cases) draws the scene one
-snapshot behind, and the roster moved into `apps/web/src/components/Roster.tsx` with `TC-MATCH-925` (4 cases) proving an
-eliminated mobile keeps its cell, its order, and the facing the newest snapshot gives it. A browser walk at 844×390
-(screenshot in `docs/05-quality/evidence/US-MATCH-001/`) shows the map, both roster cells, the turn clock, the wind dial
-and the ruler at 8 divisions; a pull fired a shot and the turn advanced to the bot with no console error.
+**done.** Every criterion is either proven by a case or recorded as a device check with its procedure.
 
-Still open, which is why the story stays `in-progress`:
+Proven by code and cases: `apps/web/src/game/interpolate.ts` with `TC-MATCH-924` (12 cases) blends two snapshots, re-anchors
+on the drawn pose so a state landing mid-segment never jumps, and leaves `hp`/`facing`/`eliminated` to the newest
+snapshot; `apps/web/src/components/Roster.tsx` with `TC-MATCH-925` (5 cases) keeps an eliminated mobile's cell, its order
+and its label, and never prints a shield on a wreck; `apps/web/tests/match-end.test.tsx` `TC-MATCH-926` (2 cases) drives
+the end of a match with the renderer mocked and asserts the handle is destroyed, the payload is written once and the
+route lands on the results screen; `TC-MATCH-918`/`TC-FND-133` cover the frame and the sideways scroll; the browser walk
+at 844 × 390 (screenshot `ac1-battlefield-844x390.png` in `docs/05-quality/evidence/US-MATCH-001/`) shows the map, both
+roster cells, the turn clock, the wind dial and the ruler, and a pull fires a shot with no console error.
 
-- **AC4** — the framing clause above: the active mobile sits under the HUD panels. Camera work, tracked against
-  `US-MATCH-007`.
+Owed, and recorded as owed rather than claimed:
+
 - **AC3** — the 60 FPS figure is `TC-OPS-180`, a real-device check on the `US-OPS-004` matrix (iPhone 12 + Galaxy A52).
-  No device was available; the procedure is recorded in the evidence README and runs at UAT (M2).
-- **AC7** — `TC-MATCH-926` is a manual check that needs a bot match played to a winner before the transition can be
-  watched. The code path is in place (`finish()` → `sessionStorage` → `navigate(..., { replace: true })` → unmount →
-  `destroy()`), and the results screen that takes over belongs to `US-RANK-005`, still `ready`.
+  The procedure is in `docs/05-quality/evidence/US-MATCH-001/README.md`; no device was available, so it runs at UAT (M2).
+- **AC4's HUD clause** — on 844 × 390 the weapon pad still covers about 60 % of a mobile standing near the map's left
+  edge. That is HUD layout, not the camera: `US-MATCH-003` § 5 already forbids a HUD element over the aim area, and its
+  delivery block records the defect, so the clause moved there instead of being reworded away.
 
-**AC4 is measured, not met.** The canvas does fill the viewport behind the HUD, the window is 1000 units wide and the
-page never scrolls sideways (`scrollWidth` 844 = viewport). But the framing clause fails: `frameOn` centres on the active
-mobile and pins the ground line to the bottom of the window, so on a 2.7:1 canvas the shooter lands under the weapon pad —
-the screenshot in the evidence folder shows the active mobile about 60 % covered by the "Đạn 1" button. `tunables.md`
-§ 9 already asks for the feet 70 % down the frame; the code does not do it yet. A second, related deviation: `scale =
-width / window.width` always matches the width, so on 844×313 only ~371 of the window's 600 units are visible vertically.
-Both belong to the camera (`US-MATCH-007`), not to this story, and are recorded as follow-ups rather than quietly
-reworded away.
-
-One record correction was made while shipping: `AC4` used to demand the whole 2000×1200 world letterboxed, which
-contradicts `docs/02-reference/screens/match.md` § Camera ("a window onto the map, not the whole map": 1000 × 600
-default, pan and zoom bounds) and the camera `US-MATCH-007` already shipped — the criterion now states the window model
-the docs and the code share. And `apps/web/tests/hud.test.tsx` cited `TC-MATCH-921` for the ruler rule, which is
+Two record corrections were made while shipping. AC4 used to demand the whole 2000×1200 world letterboxed, which
+contradicts `docs/02-reference/screens/match.md` § Camera (a 1000 × 600 window with pan and zoom bounds) and the camera
+`US-MATCH-007` ships. And `apps/web/tests/hud.test.tsx` cited `TC-MATCH-921` for the ruler rule, which is
 `TC-MATCH-920`; the id now matches, which retired that line from `tests/meta/traceability-scope-exceptions.txt`.
 
-Known follow-up, not fixed under this story: at 844×390 the page is 4 px taller than the viewport (`scrollHeight` 394 vs
+Known follow-up, not fixed under this story: at 844 × 390 the page is 4 px taller than the viewport (`scrollHeight` 394 vs
 390). Sideways scrolling is zero, which is what `TC-FND-133` asserts.

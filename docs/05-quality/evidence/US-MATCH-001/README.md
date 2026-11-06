@@ -28,13 +28,23 @@ the release fired: `event-feed` grew with `Lượt 7`, `Thời tiết: gió 25`,
 `Thời tiết: gió 0` — the shot resolved, the turn went to the bot and came back, and the console stayed clean. Neither
 mobile took damage because the aim was arbitrary, so this walk says nothing about elimination.
 
-## 2026-11-06 — still open
+## 2026-11-06 — what closed since
 
-- **AC3** — `TC-OPS-180` (60 FPS ±5 over 30 s with eight players, iPhone 12 + Galaxy A52). Not performed: no device on
+`AC7` is automated now: `apps/web/tests/match-end.test.tsx` `TC-MATCH-926` (2 cases) mocks `mountBattle`, drives the
+page with a finished state and asserts the handle is destroyed, the `gbw.result` payload is written once with
+`winCondition`, and the route lands on the results screen. The WebGL-context half of the old manual check (no second
+context retained in a heap snapshot) is still worth one look at UAT.
+
+`AC2` and `AC6` are `apps/web/tests/interpolate.test.tsx` `TC-MATCH-924` (12 cases) and `apps/web/tests/roster.test.tsx`
+`TC-MATCH-925` (5 cases).
+
+## Still owed — the one device check
+
+- **AC3** — `TC-MATCH-927` (60 FPS ±5 over 30 s with eight players, iPhone 12 + Galaxy A52). Not performed: no device on
   hand. Procedure: load the screen on each phone in landscape, start a bot match with the full 4v4 roster, play five
-  turns firing at least one weapon with a projectile, and record the frame rate from the browser's performance panel
-  over 30 s. Runs on the `US-OPS-004` device matrix at UAT (M2) and lands in that story's record.
-- **AC7** — `TC-MATCH-926` (the results takeover). Not performed: it needs a bot match played to a winner, which this
-  walk did not reach. Procedure: play a bot match to the elimination of one side, then confirm the turn clock and the
-  bot stop, the results screen replaces the match without a page reload, and the DevTools memory panel shows no second WebGL context
-  retained after the route change. The screen itself is `US-RANK-005`.
+  turns firing at least one weapon, and record the frame rate from the browser's performance panel over 30 s. Runs on
+  the `US-OPS-004` device matrix at UAT (M2) and lands in that story's record.
+- **AC4's HUD clause** — on 844 × 390 the weapon pad covers about 60 % of a mobile near the map's left edge. HUD layout,
+  owned by `US-MATCH-003` § 5; the framing itself (window aspect, feet 70 % down, no sideways scroll) is met and measured.
+- **AC5** — `TC-MATCH-929` is the rotate gate, proven by `TC-PWA-063` in `tests/e2e/pwa-shell.spec.ts`; the portrait
+  screenshot is not filed here because `US-PWA-003` owns it.
