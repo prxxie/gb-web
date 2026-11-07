@@ -9,7 +9,6 @@
 import { describe, expect, it } from "vitest";
 import { TUNABLES, applyInput, createMatch, encodeBytes, toSnapshot } from "@gbw/core";
 import {
-  SNAPSHOT_BUDGET_BYTES,
   SNAPSHOT_BUFFER_LIMIT,
   SNAPSHOT_HZ_ACTIVE,
   SNAPSHOT_HZ_IDLE,
