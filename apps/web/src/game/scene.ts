@@ -22,7 +22,7 @@ import {
   type MatchState,
   type PlayerState,
 } from "@gbw/core";
-import { addPointer, classify, clearPointers, movePointer, removePointer, screenToWorld, viewportFor, type Point, type PointerState } from "./viewport";
+import { addPointer, classify, clearPointers, movePointer, removePointer, screenToWorld, viewportFor, worldToScreen, type Point, type PointerState } from "./viewport";
 import {
   INTERPOLATION_MS,
   poseOfFrames,
@@ -37,6 +37,11 @@ export interface BattleCallbacks {
   readonly onRelease: (power: number, angle: number) => void;
   readonly onCancel: () => void;
   readonly onCamera: (window: CameraWindow) => void;
+  /**
+   * Where this client's mobile sits on screen, in CSS pixels (`US-MATCH-003` AC11). The pad hangs on this point so it
+   * rings the mobile instead of covering it; `null` means the mobile is not on screen and the pad falls back.
+   */
+  readonly onFocus?: (point: { readonly x: number; readonly y: number } | null) => void;
 }
 
 export interface BattleHandle {
@@ -65,6 +70,8 @@ class BattleScene extends Phaser.Scene {
   /** The pose the current blend starts from and when it started — the near end of the segment (`AC2`). */
   private fromPose: readonly UnitPose[] | null = null;
   private fromAt = 0;
+  /** Last point handed to `onFocus`, so the page is only told when the mobile actually moved. */
+  private reportedFocus: { readonly x: number; readonly y: number } | null = null;
   /** What the last frame put on screen: the next blend has to start there, or a state that lands mid-segment
    *  would make the units jump forward by however far they had already travelled. */
   private lastDrawn: readonly UnitPose[] | null = null;
@@ -97,6 +104,32 @@ class BattleScene extends Phaser.Scene {
     // The camera follows whoever is shooting until the player pans; a shot that never leaves the screen
     // does not exist, so the view settles on the active mobile at the start of each turn.
     if (state.turn.activeSlot !== previousActiveSlot) this.frameOn(state.turn.activeSlot, state);
+  }
+
+  /** Tell the page where this client's mobile landed; a 2 px threshold keeps React out of every frame. */
+  private emitFocus(frames: readonly UnitFrame[]): void {
+    const report = this.callbacks.onFocus;
+    if (!report) return;
+    // The pad belongs to this client, so it rings the local mobile — the active one on the local player's own turn.
+    const active = frames.find((frame) => frame.slot === this.localSlot);
+    if (!active) {
+      if (this.reportedFocus !== null) {
+        this.reportedFocus = null;
+        report(null);
+      }
+      return;
+    }
+    const point = worldToScreen(
+      this.window,
+      viewportFor(this.window, this.scale.width, this.scale.height),
+      active.x,
+      active.y,
+    );
+    const last = this.reportedFocus;
+    if (last && Math.abs(last.x - point.x) < 2 && Math.abs(last.y - point.y) < 2) return;
+    const next = { x: point.x, y: point.y };
+    this.reportedFocus = next;
+    report(next);
   }
 
   /** Segment progress in [0, 1] once `clampProgress` reads it; `now()` is monotonic for the reason on line 47. */
@@ -269,6 +302,7 @@ class BattleScene extends Phaser.Scene {
       if (frame) this.drawPlayer(graphics, player, frame);
     });
     this.drawAim(graphics, frames);
+    this.emitFocus(frames);
     void height;
   }
 

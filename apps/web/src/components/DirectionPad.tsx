@@ -6,6 +6,7 @@
  */
 import { useEffect, useRef } from "react";
 import { stepHold } from "@gbw/core";
+import { padLayout, PAD_BOX, type FocusPoint, type ViewportSize } from "./pad-layout";
 import type { JSX } from "react";
 
 export type PadAction = "left" | "right" | "up" | "down";
@@ -17,6 +18,10 @@ export interface DirectionPadProps {
   readonly movesLeft?: number;
   /** Remaining movement energy, shown beside the step count (`US-MATCH-006` AC2/AC6). */
   readonly energy?: number;
+  /** Where the active mobile is on screen (`US-MATCH-003` AC11): the pad rings it instead of hiding in a corner. */
+  readonly focus?: FocusPoint | null;
+  /** Defaults to the window; a test passes its own. */
+  readonly viewport?: ViewportSize;
   readonly labels: Readonly<Record<PadAction, string>>;
   readonly onAction: (action: PadAction) => void;
   readonly onRepeat: (action: PadAction, times: number) => void;
@@ -31,6 +36,8 @@ export function DirectionPad({
   canMove,
   movesLeft = 0,
   energy = 0,
+  focus = null,
+  viewport,
   labels,
   onAction,
   onRepeat,
@@ -83,8 +90,19 @@ export function DirectionPad({
     }, TICK_MS);
   };
 
+  // The viewport is the visible window: the match screen fills it, so clamping against it is what keeps the bottom
+  // row of buttons reachable. A test passes its own so the geometry stays a unit test.
+  const placement = padLayout(focus, viewport ?? { width: window.innerWidth, height: window.innerHeight });
+
   return (
-    <div className="match__pad" role="group" aria-label={labels.left}>
+    <div
+      className={`match__pad${placement ? " match__pad--on-mobile" : ""}`}
+      role="group"
+      aria-label={labels.left}
+      data-testid="direction-pad"
+      data-focus={placement ? "mobile" : "corner"}
+      style={placement ? { left: `${placement.left}px`, top: `${placement.top}px`, width: `${PAD_BOX}px`, height: `${PAD_BOX}px` } : undefined}
+    >
       <span className="match__pad-budget" data-testid="pad-moves-left">
         {movesLeft}
       </span>

@@ -218,6 +218,33 @@ td {
   pointer-events: auto;
 }
 
+.match__weather-banner {
+  position: absolute;
+  left: 50%;
+  top: 25%;
+  transform: translateX(-50%);
+  padding: 10px 16px;
+  border-radius: 12px;
+  border: 1px solid var(--accent);
+  background: rgba(16, 26, 46, 0.92);
+  color: var(--ink);
+  font-size: 0.95rem;
+  /* Only the banner's own box takes the press; taps elsewhere still reach the canvas (`AC10`). */
+  pointer-events: auto;
+  animation: weather-banner 1.5s ease-out;
+}
+
+@keyframes weather-banner {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -6px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
 .match__top {
   position: absolute;
   top: calc(8px + var(--safe-top));
@@ -243,6 +270,21 @@ td {
   min-width: 84px;
 }
 
+.match__delay {
+  font-variant-numeric: tabular-nums;
+  opacity: 0.85;
+}
+
+.match__round {
+  font-variant-numeric: tabular-nums;
+  font-size: 0.8rem;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(16, 26, 46, 0.9);
+  border: 1px solid #24324c;
+  white-space: nowrap;
+}
+
 .match__player--active {
   border-color: var(--accent);
   box-shadow: 0 0 0 1px var(--accent) inset;
@@ -265,7 +307,17 @@ td {
   grid-template-columns: repeat(3, 60px);
   grid-template-rows: repeat(3, 60px);
   gap: 6px;
-  opacity: 0.95;
+  /* Light enough to read the battlefield through the buttons, on the owner's instruction (`US-MATCH-003` AC11). */
+  opacity: 0.8;
+}
+
+/*
+ * Hanging on the mobile (`US-MATCH-003` AC11): the page reports the point the renderer drew the active mobile at,
+ * `padLayout` clamps it into the viewport, and the box is placed from that corner instead of the screen's.
+ */
+.match__pad--on-mobile {
+  right: auto;
+  bottom: auto;
 }
 
 .match__pad-budget {

@@ -54,6 +54,7 @@
   "match.skip": "Skip",
   "match.fire": "Fire",
   "match.wind": "Wind",
+  "match.round": "Turn {round}",
   "match.weather.changed": "Weather changed: wind {magnitude} from {sector}",
   "match.event.shot": "Shot (power {power})",
   "match.event.weather": "Weather: wind {magnitude}",

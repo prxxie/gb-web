@@ -8,7 +8,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
 import { createMatch, getMobile, type MatchState, type PlayerState } from "@gbw/core";
-import { Roster } from "../src/components/Roster";
+import { Roster, delayText } from "../src/components/Roster";
 
 const NOW = 1_700_000_000_000;
 
@@ -43,10 +43,12 @@ describe("TC-MATCH-925: the roster keeps an eliminated mobile in place (US-MATCH
     expect(screen.getByTestId("roster-2")).toBeTruthy();
   });
 
-  it("labels the dead one instead of printing its hp", () => {
+  it("prints 0 and the marker for the dead one", () => {
+    // `US-MATCH-003` AC5 asks for the `0` **and** the marker: "empty" and "wrecked" are different states.
     render(<Roster players={players()} activeSlot={0} eliminatedLabel="Đã bị hạ" />);
     const dead = screen.getByTestId("roster-2");
     expect(dead.textContent).toContain("Đã bị hạ");
+    expect(dead.textContent).toContain("0 ");
     expect(dead.textContent).not.toContain("0/");
     expect(screen.getByTestId("roster-0").textContent).toContain(`/${getMobile("mbl-01").maxHp}`);
   });
@@ -71,5 +73,25 @@ describe("TC-MATCH-925: the roster keeps an eliminated mobile in place (US-MATCH
     const order = ["roster-0", "roster-1", "roster-2"].map((id) => screen.getByTestId(id).textContent);
     const rendered = Array.from(document.querySelectorAll("[data-testid^='roster-']")).map((node) => node.textContent);
     expect(rendered).toEqual(order);
+  });
+});
+
+describe("TC-MATCH-933: the delay column reads the way GunBound reads it (US-MATCH-003 AC8)", () => {
+  it("shows the absolute delay for the player who is shooting", () => {
+    expect(delayText(120, 120, true)).toBe("120");
+  });
+
+  it("shows a signed distance for everyone else", () => {
+    expect(delayText(240, 120, false)).toBe("+120");
+    expect(delayText(80, 120, false)).toBe("−40");
+    expect(delayText(120, 120, false)).toBe("0");
+  });
+
+  it("renders one delay cell per seat, relative to the active one", () => {
+    const delayed = players().map((player) => ({ ...player, delay: player.slot === 0 ? 100 : 100 + player.slot * 60 }));
+    render(<Roster players={delayed} activeSlot={0} eliminatedLabel="Đã bị hạ" />);
+    expect(screen.getByTestId("delay-0").textContent?.trim()).toBe("100");
+    expect(screen.getByTestId("delay-1").textContent?.trim()).toBe("+60");
+    expect(screen.getByTestId("delay-2").textContent?.trim()).toBe("+120");
   });
 });

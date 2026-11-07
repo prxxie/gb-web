@@ -29,7 +29,9 @@ import { PhrasePicker, type ChatKind } from "../components/PhrasePicker";
 import { Ruler } from "../components/Ruler";
 import { ItemTray } from "../components/ItemTray";
 import { Roster } from "../components/Roster";
+import { WeatherBanner } from "../components/WeatherBanner";
 import { winConditionOf } from "../lib/outcome";
+import { clockSeconds } from "../lib/clock";
 import { WeaponStrip, type WeaponSlot } from "../components/WeaponStrip";
 import { WindDial } from "../components/WindDial";
 import { defaultWindow, type CameraWindow } from "@gbw/core";
@@ -114,6 +116,8 @@ export function MatchPage(): JSX.Element {
   const [, setAngle] = useState(45);
   const [aimDelta, setAimDelta] = useState(0);
   const [camera, setCamera] = useState<CameraWindow>(() => defaultWindow(16 / 9));
+  /** Where the renderer last drew this client's mobile, in CSS pixels (`US-MATCH-003` AC11). */
+  const [focus, setFocus] = useState<{ readonly x: number; readonly y: number } | null>(null);
   const [status, setStatus] = useState<"connecting" | "live" | "reconnecting" | "ended">("connecting");
   const [banner, setBanner] = useState<string | null>(null);
   // The aim selection is local state but the renderer callback is created once, so the ref is what
@@ -206,6 +210,8 @@ export function MatchPage(): JSX.Element {
       state,
       localSlot: plan.localSlot,
       callbacks: {
+        // The pad rings the mobile the player is shooting (`US-MATCH-003` AC11).
+        onFocus: (point) => setFocus(point),
         onPull: (value, nextAngle) => {
           setPower(value);
           setAngle(nextAngle);
@@ -485,7 +491,8 @@ export function MatchPage(): JSX.Element {
     return () => window.clearTimeout(timer);
   }, [chat]);
 
-  const clock = state ? Math.max(0, Math.ceil((state.turn.deadlineAt - Date.now()) / 1000)) : 0;
+  // The clock reads whole seconds from `deadlineAt` and never climbs above the turn duration (`AC2`).
+  const clock = state ? clockSeconds(state.turn.deadlineAt, Date.now(), TUNABLES.turnDurationMs) : 0;
 
   // One polite live region per screen (`US-PWA-004` AC5): it reads the active player and their HP whenever
   // either changes, throttled to one update per second. The canvas is `aria-hidden`, so this text is the
@@ -510,10 +517,21 @@ export function MatchPage(): JSX.Element {
       </div>
       <div className="match__canvas" ref={container} aria-hidden="true" />
       <div className="match__hud">
+        {/* One banner per wind roll, 1.5 s, dismissed by a tap (`US-MATCH-003` AC10). */}
+        <WeatherBanner
+          rolledAtRound={state.weather.rolledAtRound}
+          text={t("match.weather.changed", {
+            magnitude: state.weather.wind.magnitude,
+            sector: state.weather.wind.sector,
+          })}
+        />
         <div className="match__top">
           <Roster players={state.players} activeSlot={state.turn.activeSlot} eliminatedLabel={t("match.eliminated")} />
           <div className="row">
             <WindDial weather={state.weather} label={t("match.wind")} />
+            <div className="match__round" data-testid="turn-round">
+              {t("match.round", { round: state.turn.round })}
+            </div>
             <div className="match__clock" data-testid="turn-clock">
               {clock}s
             </div>
@@ -537,6 +555,7 @@ export function MatchPage(): JSX.Element {
 
         <DirectionPad
           enabled={isMyTurn}
+          focus={focus}
           canMove={Boolean(localPlayer && localPlayer.energy > 0)}
           energy={localPlayer?.energy ?? 0}
           labels={{
