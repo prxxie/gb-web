@@ -37,6 +37,7 @@ Open questions: **Open: 15 · Blocking: 0 · Answered: 26 · Withdrawn: 1**
 | PM / BA / client-facing | [`01-overview/project-overview.md`](01-overview/project-overview.md), [`04-decisions/open-questions.md`](04-decisions/open-questions.md), [`05-quality/acceptance-signoff.md`](05-quality/acceptance-signoff.md) |
 | Shipping a release | [`07-release/README.md`](07-release/README.md), [`01-overview/deployment.md`](01-overview/deployment.md) |
 | On call / operations | [`08-ops/runbook.md`](08-ops/runbook.md), [`08-ops/slo.md`](08-ops/slo.md) |
+| Generating or reviewing the art | [`02-reference/art/sprite-brief.md`](02-reference/art/sprite-brief.md) — sizes, anchors, palette, prompts; gated by `OQ-20` and [`ADR-0006`](04-decisions/adr/ADR-0006-vector-renderer-until-after-m2.md) |
 | Picking up work | [`03-stories/README.md`](03-stories/README.md) — the backlog, then [`03-stories/delivery-plan.md`](03-stories/delivery-plan.md) |
 | Using an AI agent on this repo | [`../AGENTS.md`](../AGENTS.md) — the working agreement lives there and in `.agents/rules/` |
 
@@ -50,9 +51,10 @@ docs/
 ├─ 01-overview/    project overview, architecture, glossary, NFRs, conventions,
 │                  roles and permissions, workflow state machines, environment setup, deployment
 ├─ 02-reference/   api/ (README, rooms, accounts, matches, signaling), data/ (README, accounts, matches, room-state),
-│                  screens/ (README, main, sign-in, profile, leaderboard, lobby, match, results)
+│                  screens/ (README, main, sign-in, profile, leaderboard, lobby, match, results),
+│                  art/ (sprite-brief.md — the hand-off package for generating the art), gameplay/ (tunables, modes)
 ├─ 03-stories/     backlog: epics and user stories (created by cpt-plan)
-├─ 04-decisions/   open-questions.md, adr/ (ADR-0001…ADR-0004)
+├─ 04-decisions/   open-questions.md, adr/ (ADR-0001…ADR-0006)
 ├─ 05-quality/     test-cases.md, acceptance-signoff.md (gates G1–G4)
 ├─ 06-reports/     status, weekly and sprint reports; SLO snapshots
 ├─ 07-release/     release index and REL-… records
