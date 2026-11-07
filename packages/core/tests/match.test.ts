@@ -220,6 +220,25 @@ describe("match", () => {
     const storm = applyGimmicks(match([seat(0, "A"), seat(1, "B")], { mapId: "map-06" }), 2, getMap("map-06"));
     expect(storm.events.some((event) => event.kind === "tornado")).toBe(true);
   });
+
+  // `US-RANK-005` AC6: the retry needs the room's start, the live turn needs this device's clock.
+  it("a rebuilt match keeps its own start while the opening turn starts now", () => {
+    const startedAt = NOW - 120_000;
+    const rebuilt = createMatch({
+      matchId: "match-1",
+      roomCode: "ABC234",
+      seed: 7,
+      mode: "solo",
+      mapId: "map-01",
+      seats: [seat(0, "A"), seat(1, "B")],
+      now: NOW,
+      startedAt,
+    });
+    // The room keys the record on the match's start, so a reload into a live match must not move it...
+    expect(rebuilt.startedAt).toBe(startedAt);
+    // ...while the turn that is running belongs to this device's clock, not to the match's first minute.
+    expect(rebuilt.turn.deadlineAt).toBeGreaterThan(NOW);
+  });
 });
 
 /** The slot whose turn it is right now. */

@@ -105,7 +105,7 @@ export function SignInPage(): JSX.Element {
         </Link>
         <Link to="/">
           <button type="button" className="ghost">
-            {t("results.home")}
+            {t("common.home")}
           </button>
         </Link>
       </div>

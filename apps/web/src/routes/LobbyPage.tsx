@@ -13,7 +13,7 @@ import { SettingsPanel } from "../components/SettingsPanel";
 import { api } from "../lib/api";
 import { connectWithReconnect, type ReconnectingSocket } from "../net/reconnect";
 import type { ServerMessage } from "../net/signaling";
-import type { PlannedMatch } from "./MatchPage";
+import { writePlan, type PlannedMatch } from "../lib/plan";
 import type { JSX } from "react";
 
 /**
@@ -150,12 +150,14 @@ export function LobbyPage(): JSX.Element {
                 mobileId: member.mobileId ?? mobileId,
               })),
               seed: message.seed,
+              // The room's clock, not this device's: it is half of the record's id (`US-RANK-005` AC6).
+              startedAt: message.startedAt,
               mapId: message.room.settings.mapId,
               mode: message.room.settings.mode as PlannedMatch["mode"],
               maxPlayers: message.room.settings.maxPlayers as PlannedMatch["maxPlayers"],
               hostPlayerId: message.room.hostPlayerId ?? "",
             };
-            sessionStorage.setItem("gbw.match", JSON.stringify(plan));
+            writePlan(plan);
             navigate(`/match/${code}`);
           }
         },

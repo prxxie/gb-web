@@ -34,6 +34,7 @@ import {
   type RoomSettings,
   type RoomState,
   type Snapshot,
+  type RankedReason,
   type WireSnapshot,
   expandWire,
   isWireSnapshot,
@@ -103,6 +104,24 @@ function isMobileId(value: string): boolean {
   return MOBILES_BY_ID.has(value);
 }
 
+/** What `POST /api/v1/matches` answered, shaped for the `match_recorded` frame (`US-RANK-001`, `US-RANK-005`). */
+interface RecordedMatch {
+  readonly matchId: string;
+  readonly winnerTeam: "A" | "B" | null;
+  readonly ranked: boolean;
+  /** Straight from the record, so the result screen names the reason instead of guessing it. */
+  readonly rankedReason: RankedReason | null;
+  readonly ratings: readonly { accountId: string; before: number; after: number; delta: number }[];
+  readonly players: readonly { slot: number; result: "win" | "loss" | "abandon" }[];
+}
+
+/** The record's reason, narrowed — an unknown string must never reach the wire as a copy key. */
+function reasonOf(value: string | null | undefined): RankedReason | null {
+  return value === "guest" || value === "bot" || value === "abandoned" || value === "ruleset_mismatch"
+    ? value
+    : null;
+}
+
 export class Room implements DurableObject {
   private room: RoomState;
   private readonly sockets = new Map<string, WebSocket>();
@@ -119,7 +138,7 @@ export class Room implements DurableObject {
    */
   private hostCheck: readonly string[] = [];
   /** The `match_recorded` payload, kept so a host retry after a network blip can be answered, not refused. */
-  private recorded: { matchId: string; winnerTeam: "A" | "B" | null; ranked: boolean; ratings: readonly { accountId: string; before: number; after: number; delta: number }[]; players: readonly { slot: number; result: "win" | "loss" | "abandon" }[] } | null = null;
+  private recorded: RecordedMatch | null = null;
 
   constructor(
     private readonly ctx: DurableObjectState,
@@ -442,8 +461,9 @@ export class Room implements DurableObject {
     const seed = crypto.getRandomValues(new Uint32Array(1))[0] ?? 1;
     this.room = this.withActivity({ ...this.room, status: "playing" });
     this.matchStartedAt = startedAt;
-    await this.persist();
+    // Stored before the status, so a room can never be `playing` without the start its record is keyed on.
     await this.ctx.storage.put("matchStartedAt", startedAt);
+    await this.persist();
     this.broadcast({
       t: "match_started",
       startedAt,
@@ -622,16 +642,24 @@ export class Room implements DurableObject {
     frame: MatchEndFrame,
     endedAt: number,
     options: { readonly abandoned?: boolean } = {},
-  ): Promise<{ ok: true; value: { matchId: string; winnerTeam: "A" | "B" | null; ranked: boolean; ratings: readonly { accountId: string; before: number; after: number; delta: number }[]; players: readonly { slot: number; result: "win" | "loss" | "abandon" }[] } } | { ok: false; detail: string }> {
-    const startedAt = this.matchStartedAt ?? endedAt;
+  ): Promise<{ ok: true; value: RecordedMatch } | { ok: false; detail: string }> {
+    // The record's id is half its idempotency key: a host's retry rebuilds it from `match_started.startedAt`
+    // (`US-RANK-005` AC6), so a guessed start would let the same match in twice. Refuse instead.
+    if (this.matchStartedAt === null) {
+      return { ok: false, detail: "the room has no start time to key the record with" };
+    }
+    const startedAt = this.matchStartedAt;
     const matchId = `${this.room.roomCode}-${startedAt}`;
     const players = this.matchPlayers(frame.stats);
-    const unranked = {
+    const unranked: RecordedMatch = {
       matchId,
       winnerTeam: frame.winnerTeam,
       ranked: false,
-      ratings: [] as readonly { accountId: string; before: number; after: number; delta: number }[],
-      players: [] as readonly { slot: number; result: "win" | "loss" | "abandon" }[],
+      // A room that never reaches the route has no record to read a reason from; a seat without an
+      // account is a guest or a bot, and guessing `guest` would be a fact the object does not hold.
+      rankedReason: null,
+      ratings: [],
+      players: [],
     };
     if (!this.origin || !token || !players.every((player) => player.accountId !== null)) {
       // A guest room, or a host promoted mid-match, cannot be rated; the results screen still needs a winner.
@@ -656,11 +684,16 @@ export class Room implements DurableObject {
         delayTable: frame.delayTable ?? [],
       }),
     });
-    if (response.status === 409) return { ok: true, value: unranked };
+    // Already recorded: the object's own copy is the truth, and the local literal is only what is known
+    // when this instance never wrote one (`ranked:false` there means "unknown", not "unrated").
+    if (response.status === 409) {
+      return { ok: true, value: this.recorded?.matchId === matchId ? this.recorded : unranked };
+    }
     if (response.status === 201) {
       const body = (await response.json()) as {
         matchId: string;
         ranked: boolean;
+        rankedReason?: string | null;
         ratings: readonly { accountId: string; before: number | null; after: number | null }[];
       };
       return {
@@ -669,6 +702,7 @@ export class Room implements DurableObject {
           matchId: body.matchId,
           winnerTeam: frame.winnerTeam,
           ranked: body.ranked,
+          rankedReason: reasonOf(body.rankedReason),
           ratings: body.ratings
             .filter((rating) => rating.before !== null && rating.after !== null)
             .map((rating) => ({

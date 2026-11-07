@@ -88,7 +88,7 @@ The `covers` column names the requirement ([nonfunctional-requirements.md](../01
 | TC-ROOM-175 | US-ROOM-004 | A socket is closed with `4401` | No retry; `onFatal(4401)` | web | NFR-07 |
 | TC-ROOM-176 | US-ROOM-004 | Transient drops keep failing for 21 s | Retries stop at the end of the grace window | web | NFR-07 |
 | TC-ROOM-177 | US-ROOM-004 | The page unmounts while the socket is dead | The retry loop stops with it | web | NFR-07 |
-| TC-ROOM-186 | US-ROOM-004 | AC6 — both seats of one team leave mid-match | The room ends `abandoned` and `POST /matches` records `abandoned: true`, winner A, `abandon` for the B seats | worker | `US-ROOM-004` AC6 |
+| TC-ROOM-186 | US-ROOM-004 | AC6 — both seats of one team leave mid-match | The room ends `abandoned`, `POST /matches` gets `abandoned: true` and winner A, the broadcast says `win` for A and `abandon` for the B seats, and the record row says why | worker | `US-ROOM-004` AC6 |
 | TC-ROOM-183 | US-ROOM-003 | AC1 — `team_assign` fan-out | Every socket, host included, receives exactly one `room_state` carrying A/A/B/B | worker | `api/signaling.md` |
 | TC-ROOM-184 | US-ROOM-004 | AC2 — reconnect 19 s into the grace window | The returning socket keeps slot 3 and team B and is re-sent `snapshot_state` with its 70 HP | worker | NFR-07 |
 | TC-ROOM-185 | US-ROOM-004 | AC3 — grace window runs out | The seat flips to `disconnected`, peers hear `peer_left {reason:"disconnected"}`, the next `room_state` shows it | worker | NFR-07 |
@@ -308,11 +308,11 @@ The `covers` column names the requirement ([nonfunctional-requirements.md](../01
 | TC-RANK-145 | US-RANK-004 | Player with fewer than 10 rated matches | `Mới` badge on their row | e2e | `screens/leaderboard.md` |
 | TC-RANK-146 | US-RANK-004 | Display name containing `<script>` or an emoji | Rendered as escaped text, truncated at 16 characters | e2e | rule 06 § 2 |
 | TC-RANK-147 | US-RANK-004 | Leaderboard opened signed out | Renders without redirect and without a `/me` request | e2e | roles |
-| TC-RANK-153 | US-RANK-005 | Results, ranked | Deltas shown equal the server values | e2e | `screens/results.md` |
-| TC-RANK-154 | US-RANK-005 | Results, guest or bot match | Unranked, no delta, reason stated | e2e | `screens/results.md` |
-| TC-RANK-155 | US-RANK-005 | `Chơi lại` after a finished match | Lobby with the same `maxPlayers`, or a new room when the code is closed | e2e | `screens/results.md` |
-| TC-RANK-156 | US-RANK-005 | Browser Back from results | Does not re-enter the finished match | e2e | `screens/results.md` |
-| TC-RANK-157 | US-RANK-005 | `409 match-already-recorded` during submit | Stored record shown, no retry loop | e2e | `screens/results.md` |
+| TC-RANK-153 | US-RANK-005 | AC1, AC3 — a ranked result | Deltas shown equal the server values | e2e | `screens/results.md` |
+| TC-RANK-154 | US-RANK-005 | AC2, AC7 — a guest or bot result | Unranked, no delta, reason stated | e2e | `screens/results.md` |
+| TC-RANK-155 | US-RANK-005 | AC4 — `Chơi lại` after a finished match | Lobby with the same `maxPlayers`, or a new room when the code is closed | e2e | `screens/results.md` |
+| TC-RANK-156 | US-RANK-005 | AC5 — browser Back from results | Does not re-enter the finished match (`web`: the handover replaces its own history entry) | web | `screens/results.md` |
+| TC-RANK-157 | US-RANK-005 | AC6 — `409 match-already-recorded` during submit | Stored record shown, no retry loop | e2e | `screens/results.md` |
 
 ## PWA and i18n (PWA)
 

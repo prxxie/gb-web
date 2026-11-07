@@ -2,7 +2,7 @@
 id: US-RANK-005
 title: See the result screen with the rating change
 epic: EPIC-06-ranked
-status: ready
+status: done
 priority: P1
 size: M
 depends_on: [US-RANK-001, US-CORE-003]
@@ -47,15 +47,18 @@ view for every participant. It replaces the match route in history so Back canno
 Screen state: `{outcome, winnerTeam, players[], ranked, rankedReason, you}` where `you` carries
 `{damageDealt, shotsFired, hits, ratingBefore, ratingAfter, delta}`.
 
-`rankedReason`: `guest | bot | abandoned | ruleset_mismatch` — rendered as `results.reason.<value>`.
+`rankedReason`: `guest | bot | abandoned | ruleset_mismatch` — read from `match_recorded.rankedReason` and rendered
+through one key per value (`results.ratings.reasonGuest`, `reasonBot`, `reasonAbandoned`, `reasonRuleset`: keys are never
+built by concatenation, `conventions.md` § 2).
 
-Navigation: `history.replaceState(null, "", "/results/<code>")` when the match ends; `Chơi lại` pushes `/lobby/<code>`.
+Navigation: `navigate("/results/<code>", { replace: true })` when the match ends; `Chơi lại` pushes `/lobby/<code>`.
 
 ## 5. Rules and edge cases
 
 - A bot match renders without waiting for the server; an online match waits for `match_recorded` with a 5 s timeout and
   then shows a resubmit affordance.
-- A player who reconnects after the end sees the result screen, not the match.
+- A player who reloads the match route after the end is handed to the result screen by the payload the match screen
+  wrote; the room refuses a new socket (`410 room-closed`), so nothing can re-enter play.
 - No rating is computed on the client; it displays what the worker returned.
 - Reloading the results route re-fetches from `/me/matches` first page rather than trusting local state.
 - This is the only screen that shows another participant's damage numbers.
@@ -73,23 +76,65 @@ Navigation: `history.replaceState(null, "", "/results/<code>")` when the match e
 
 ## 8. Test notes
 
-`TC-RANK-153`…`TC-RANK-157`. Playwright drives a 1v1 to a win, asserts the delta text, presses Back and asserts the
-route. Red first: `tests/e2e/results.spec.ts::shows_rating_delta`.
+`TC-RANK-153`, `154`, `155` and `157` in `tests/e2e/results.spec.ts`. The cases open the screen with the payload the
+match screen writes — finishing a real 1v1 in a browser is `tests/e2e/lobby.spec.ts` plus the turn assertions in
+`tests/e2e/main.spec.ts`, and the engine's own end states are `packages/core/tests` — and then assert the delta text,
+the unranked reason, `Chơi lại` creating a room with the same settings, and a `409` accepted as success. Back
+(`TC-RANK-156`) is a `web` case in `apps/web/tests/match-record.test.tsx`: the browser cannot finish a match
+repeatably, and what the criterion needs is the handover replacing its own history entry.
+
+Red: `tests/e2e/results.spec.ts` — written against the screen that posted on mount and always stored `ratings: []`, so
+`result-rating-0` read `—` for a ranked match, `match_recorded` had no handler, and `Chơi lại` routed into an ended
+room.
+
+Component and unit cases for the same criteria, and the ones a browser cannot reach repeatably:
+`apps/web/tests/results-screen.test.tsx` (twenty cases: deltas, the reasons, retry, `409` recovering the stored record,
+`409` whose lookup fails, reload via `/me/matches`, `Chơi lại` with the viewer's own name and a 500 that does not create
+a room),
+`apps/web/tests/match-record.test.tsx` (the host sends `match_end`, waits for `match_recorded`, keeps the record's reason
+and per-seat results, carries the room's start time, replaces its history entry) and `apps/web/tests/match-end.test.tsx`
+(the bot handover).
 
 ## 9. Open questions
 
 - **OQ-28** (accepted assumption) — the numbers shown follow the Elo in [US-RANK-002](US-RANK-002-rate-players-with-elo.md);
   if K changes, only the display fixtures change.
 
-<!-- delivery:2026-11-06 -->
+<!-- delivery:2026-11-07 -->
 
-## Delivery status — 2026-11-06
+## Delivery status — 2026-11-07
 
-**held at `ready`.** The result screen renders and `tests/e2e/smoke.spec.ts` TC-RANK-153 is green — but that case asserts a
-cold open with no payload goes home, not the rating deltas this story promises. Still open: AC1/AC2 need a match that
-actually records a rating (`ratingBefore → ratingAfter` and the unranked reason), AC3's per-player stats and the viewer
-highlight have no case, and AC4/AC5/AC6/AC7 (rematch, Back, retry-safety, bot reason `bot`) are untraced. The
-per-case spec would be `tests/e2e/results.spec.ts`, which does not exist.
+**done.** Every criterion has a case, and the playback that used to end at the match screen now records itself first:
 
-The status is `ready` rather than `in-progress` because dependencies must be `done` first: `US-RANK-001` (record a
-match) and `US-CORE-003` (damage and elimination) are both still `ready`.
+| AC | Case |
+|----|------|
+| AC1 — the deltas | `tests/e2e/results.spec.ts` TC-RANK-153; `apps/web/tests/match-record.test.tsx` (the room's `match_recorded` is the only source), `apps/web/tests/results-screen.test.tsx` |
+| AC2 — the reason, no numbers | `tests/e2e/results.spec.ts` TC-RANK-154; `apps/web/tests/results-screen.test.tsx` (guest, bot, ruleset, and a record with no reason) |
+| AC3 — stats and the viewer's row | `tests/e2e/results.spec.ts` TC-RANK-153; `apps/web/tests/results-screen.test.tsx` (the row follows the seat, so a guest is marked too) |
+| AC4 — `Chơi lại` | `tests/e2e/results.spec.ts` TC-RANK-155 (a closed code creates a room with the same `maxPlayers` and mode); `apps/web/tests/results-screen.test.tsx` |
+| AC5 — Back | `apps/web/tests/match-record.test.tsx` TC-RANK-156 (the handover replaces its entry; the case is `web`-level because a browser test cannot finish a real match repeatably) |
+| AC6 — a safe retry | `tests/e2e/results.spec.ts` TC-RANK-157 (a `409` is success); `apps/web/tests/results-screen.test.tsx` (the key is the room's match id, a guest host is offered no button, and a draw is not offered one at all) |
+| AC7 — a bot match | `apps/web/tests/results-screen.test.tsx` (no request, reason `bot`); `apps/web/tests/match-end.test.tsx` |
+
+Notes for the next story in this epic:
+
+- `match_recorded` now carries the record's own `rankedReason` (`signaling.md` § match_recorded), because a client can
+  never see its own ruleset drift: `lib/result.ts` `rankedReasonOf` reads that field and nothing else, so a record with no
+  reason prints no reason. Do not reintroduce a client-side derivation — a lost write is indistinguishable from an
+  unrated guest match from here.
+- A forfeit cannot be retried from this screen: the local match never ends (the room records it), so no payload with
+  `failed` exists to carry the button. A surviving player reaches the result screen from the record itself.
+- Only the host posts `POST /matches` (the room does it), so only the host sees `Thử lại`. The retry rebuilds the room's
+  own key — `${roomCode}-${startedAt}` — which is why the lobby now passes `match_started.startedAt` into the plan and the
+  match screen seeds `createMatch({ startedAt })` with it (keep `now` separate: a reload into a live match must not hand
+  the opening turn a deadline that already passed). A retry on this device's clock would have created a *second* record
+  and rated the match twice.
+- A payload written by the previous build carries this device's clock in `startedAt`, so its retry key cannot match the
+  room's record (`gbw.result` lives for one match in `sessionStorage`, so clearing it on deploy closes the window).
+- A draw cannot be recorded at all: `POST /matches` refuses `winnerTeam: null` (`matches.ts`, "winnerTeam must be A or B"),
+  so an abandoned or drawn match shows its statistics and no retry — see **OQ-43**, which owns making that submission
+  representable in `US-RANK-001`'s contract.
+- A retry carries no `delayTable`, and neither does the room's own `match_end` today, so both write `[]`; the day the host
+  starts sending one, the payload and the retry body must carry it too (`US-CORE-002` AC7).
+- A preview never reveals whether a code existed, so `Chơi lại` only learns a room is closed from `410 room-closed`; a
+  never-used code answers `200` and routes to that lobby.

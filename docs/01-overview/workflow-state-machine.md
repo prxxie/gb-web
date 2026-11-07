@@ -74,7 +74,7 @@ stateDiagram-v2
 | `grace` | `connected` | new socket with the same subject | Full `room_state` + `lastSnapshot` sent; no replay of missed messages |
 | `grace` | `disconnected` | 20 s elapsed (`NFR-07`) | Turns skip; team keeps their slot; if they are host, election runs |
 | `disconnected` | `connected` | reconnect during `playing` | Snapshot restored; **no** re-entry animation, no rating penalty |
-| `disconnected` | removed | host explicitly removes, or room ends | Their result is `abandon` if the team forfeits |
+| `disconnected` | removed | host explicitly removes, or room ends | Their result is `abandon` if the team forfeits; once the room is `abandoned`, every seat's stored row is `abandon` |
 
 Forfeit rule: a team loses when **every** member of it is `disconnected`. One disconnected player never forfeits a match
 `[user: interview R5 disconnects]`.
@@ -89,8 +89,8 @@ Forfeit rule: a team loses when **every** member of it is `disconnected`. One di
 | `pending` | `recorded` | `409 match-already-recorded` | — | The stored record is returned instead |
 | `recorded` | `recorded` | any repeat submit | — | Idempotent no-op |
 
-An `abandoned` room records `result: 'abandon'` for the members who left and writes **no** rating change for anyone
-(`matches.md`).
+An `abandoned` room writes **no** rating change for anyone and every seat's row says `result: 'abandon'`, the side that
+stayed included (`matches.md` § `abandoned`); the room's `match_recorded` broadcast keeps `win` for the survivors.
 
 ## Invariants
 
