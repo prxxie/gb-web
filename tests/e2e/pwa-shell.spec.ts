@@ -10,7 +10,7 @@ import { openBotMatch } from "./support";
 const MANIFEST = "/manifest.webmanifest";
 
 test.describe("installed-app surface", () => {
-  test("the shell declares an installable, landscape app (US-PWA-001 AC7)", async ({ page }) => {
+  test("TC-PWA-047: the shell declares an installable, landscape app (US-PWA-001 AC7)", async ({ page }) => {
     await page.goto("/");
 
     const link = page.locator('link[rel="manifest"]');
@@ -30,6 +30,18 @@ test.describe("installed-app surface", () => {
       expect(response.status()).toBe(200);
       expect(response.headers()["content-type"]).toContain("image/png");
     }
+  });
+});
+
+test.describe("the tab iOS opens", () => {
+  test("TC-PWA-046: a normal tab, never a home-screen shell of its own (US-PWA-001 AC6)", async ({ page }) => {
+    // `apple-mobile-web-app-capable` would make iOS open the app outside the browser chrome, where the update
+    // prompt and the safe-area insets behave differently; the manifest is the only install path (`AC7`).
+    const html = await (await page.request.get("/")).text();
+    expect(html).not.toContain("apple-mobile-web-app-capable");
+    expect(html).toContain('name="viewport"');
+    expect(html).toContain("viewport-fit=cover");
+    expect(html).toContain('rel="manifest"');
   });
 });
 

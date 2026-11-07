@@ -708,6 +708,16 @@ export function MatchPage(): JSX.Element {
     return () => window.clearTimeout(timer);
   }, [chat]);
 
+  // The clock is derived from `deadlineAt`, so it only moves when something renders. A one-second heartbeat is
+  // what turns that derivation into a countdown the player can watch (`US-MATCH-003` AC2) — without it the readout
+  // froze at the turn duration until a move, a shot or a skipped turn re-rendered the screen.
+  const [, setSecond] = useState(0);
+  useEffect(() => {
+    if (state?.status !== "playing") return undefined;
+    const timer = setInterval(() => setSecond((second) => second + 1), 1_000);
+    return () => clearInterval(timer);
+  }, [state?.status]);
+
   // The clock reads whole seconds from `deadlineAt` and never climbs above the turn duration (`AC2`).
   const clock = state ? clockSeconds(state.turn.deadlineAt, Date.now(), TUNABLES.turnDurationMs) : 0;
 

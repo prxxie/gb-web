@@ -130,7 +130,10 @@ Red: none — the components and their cases predate this pass; the pad's geomet
 - **The round (AC1)** — `match.round` (`apps/web/src/i18n/{vi,en}.json`) renders in a `data-testid="turn-round"` chip
   beside the clock.
 - **The clock (AC2)** — `apps/web/src/lib/clock.ts` `clockSeconds` caps at `turnDurationMs` and floors at 0
-  (`TC-MATCH-932`).
+  (`TC-MATCH-932`). Corrected 2026-11-07: the readout was correct but frozen — it was derived at render time and
+  nothing re-rendered while a turn ran, so a player watched `20s` for the whole turn (found by the offline walk for
+  `US-PWA-001` AC3). `apps/web/src/routes/MatchPage.tsx` now runs a one-second heartbeat while the turn is live
+  (`TC-MATCH-950`).
 - **The wind banner (AC10)** — `apps/web/src/components/WeatherBanner.tsx` was missing entirely; it now appears once per
   `rolledAtRound`, lasts 1.5 s, and dismisses on a tap (`TC-MATCH-931`).
 - Verified: `npx vitest run` 103 files / 863 cases, `npx tsc -b` and `npx eslint .` clean,
