@@ -18,6 +18,9 @@ export interface DirectionPadProps {
   readonly movesLeft?: number;
   /** Remaining movement energy, shown beside the step count (`US-MATCH-006` AC2/AC6). */
   readonly energy?: number;
+  /** The barrel's current angle and the mobile's own window: at either bound the matching control dims (`AC5`). */
+  readonly angle?: number;
+  readonly angleWindow?: { readonly min: number; readonly max: number };
   /** Where the active mobile is on screen (`US-MATCH-003` AC11): the pad rings it instead of hiding in a corner. */
   readonly focus?: FocusPoint | null;
   /** Defaults to the window; a test passes its own. */
@@ -36,6 +39,8 @@ export function DirectionPad({
   canMove,
   movesLeft = 0,
   energy = 0,
+  angle,
+  angleWindow,
   focus = null,
   viewport,
   labels,
@@ -55,6 +60,12 @@ export function DirectionPad({
   };
 
   useEffect(() => stop, []);
+
+  // The turn ending while a finger is still down must not keep walking or tilting (`US-MATCH-006` AC8): the repeat
+  // stops with the right to move, and the release sends nothing more.
+  useEffect(() => {
+    if (!enabled) stop();
+  }, [enabled]);
 
   const start = (next: PadAction): void => {
     if (!enabled) return;
@@ -115,7 +126,12 @@ export function DirectionPad({
           type="button"
           data-slot={slot}
           aria-label={labels[slot]}
-          disabled={!enabled || ((slot === "left" || slot === "right") && !canMove)}
+          disabled={
+            !enabled ||
+            ((slot === "left" || slot === "right") && !canMove) ||
+            (slot === "up" && angle !== undefined && angleWindow !== undefined && angle >= angleWindow.max) ||
+            (slot === "down" && angle !== undefined && angleWindow !== undefined && angle <= angleWindow.min)
+          }
           onPointerDown={(event) => {
             event.currentTarget.setPointerCapture?.(event.pointerId);
             start(slot);

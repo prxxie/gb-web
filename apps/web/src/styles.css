@@ -368,6 +368,15 @@ td {
   pointer-events: none;
 }
 
+.match__angle {
+  min-width: 44px;
+  padding: 4px 8px;
+  border-radius: var(--radius);
+  border: 1px solid #2b3a58;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
 .match__hint {
   margin-top: 4px;
   font-size: 13px;

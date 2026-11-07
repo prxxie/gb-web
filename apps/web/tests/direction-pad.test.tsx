@@ -140,3 +140,48 @@ describe("TC-MATCH-907: a spent budget", () => {
     expect(within(root).queryAllByText(/^\d+$/)).not.toHaveLength(0);
   });
 });
+
+describe("TC-MATCH-939: the pad honours the barrel window and the turn end (US-MATCH-006 AC5, AC8)", () => {
+  it("dims ▲ at angleMax and ▼ at angleMin, and keeps the other live", () => {
+    pad({ angle: 80, angleWindow: { min: 10, max: 80 } });
+    expect(button(LABELS.up)).toBeDisabled();
+    expect(button(LABELS.down)).toBeEnabled();
+    cleanup();
+    pad({ angle: 10, angleWindow: { min: 10, max: 80 } });
+    expect(button(LABELS.down)).toBeDisabled();
+    expect(button(LABELS.up)).toBeEnabled();
+  });
+
+  it("follows the renderer's focus point, so a pan or zoom keeps it on the mobile (AC7)", () => {
+    pad({ focus: { x: 120, y: 200 }, viewport: { width: 844, height: 390 } });
+    const box = screen.getByTestId("direction-pad");
+    expect(box.getAttribute("data-focus")).toBe("mobile");
+    expect(box.style.left).not.toBe("");
+    cleanup();
+    pad({ focus: { x: 640, y: 120 }, viewport: { width: 844, height: 390 } });
+    expect(screen.getByTestId("direction-pad").style.left).not.toBe(box.style.left);
+  });
+
+  it("stops a hold when the turn ends, so no stray move is sent (AC8)", () => {
+    vi.useFakeTimers();
+    try {
+      const onAction = vi.fn<(action: PadAction) => void>();
+      const onRepeat = vi.fn<(action: PadAction, times: number) => void>();
+      const view = (enabled: boolean) => (
+        <DirectionPad enabled={enabled} canMove labels={LABELS} onAction={onAction} onRepeat={onRepeat} />
+      );
+      const { rerender } = render(view(true));
+      fireEvent.pointerDown(button(LABELS.right), { pointerId: 1 });
+      vi.advanceTimersByTime(400);
+      const before = onRepeat.mock.calls.length;
+      expect(before).toBeGreaterThan(0);
+      // The turn passes mid-hold: the repeat must stop even though the finger is still down.
+      rerender(view(false));
+      vi.advanceTimersByTime(1000);
+      expect(onRepeat.mock.calls.length).toBe(before);
+      expect(onAction).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
