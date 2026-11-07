@@ -47,6 +47,7 @@
   "match.bot": "Bot",
   "match.waitingTurn": "Waiting for {name}",
   "match.power": "Power",
+  "match.hint.pull": "Drag to build power",
   "match.angle.up": "Raise angle",
   "match.angle.down": "Lower angle",
   "match.move.left": "Back",

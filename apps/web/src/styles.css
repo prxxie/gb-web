@@ -358,6 +358,22 @@ td {
   grid-area: 3 / 2;
 }
 
+.match__power--on-ring {
+  /* The number sits at the top of the power ring, exactly where `screens/match.md` puts it (`US-MATCH-002` AC2). */
+  left: 0;
+  top: 0;
+  transform: translate(-50%, -50%);
+  align-items: center;
+  text-align: center;
+  pointer-events: none;
+}
+
+.match__hint {
+  margin-top: 4px;
+  font-size: 13px;
+  color: var(--accent);
+}
+
 .match__power {
   position: absolute;
   left: calc(12px + var(--safe-left));

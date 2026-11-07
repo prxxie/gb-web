@@ -47,6 +47,7 @@
   "match.bot": "Máy",
   "match.waitingTurn": "Đang chờ {name}",
   "match.power": "Lực",
+  "match.hint.pull": "Kéo để lấy lực",
   "match.angle.up": "Tăng góc",
   "match.angle.down": "Giảm góc",
   "match.move.left": "Lùi",
