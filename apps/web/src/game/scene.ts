@@ -13,10 +13,7 @@ import {
   panBy,
   pinchTo,
   rulerLayout,
-  simulateFlight,
-  launch,
   getMobile,
-  getMap,
   type CameraWindow,
   type MatchState,
   type PlayerState,
@@ -31,6 +28,7 @@ import {
   type UnitPose,
 } from "./interpolate";
 import { RING_RADIUS, RING_START, ringColor, ringSweep } from "./aim";
+import { aimPreview } from "./preview";
 
 export interface BattleCallbacks {
   readonly onPull: (power: number, angle: number) => void;
@@ -52,6 +50,10 @@ export interface BattleHandle {
    * or hand a release to `onRelease` while it is false. The camera keeps working — panning is not aiming.
    */
   setAimAllowed(allowed: boolean): void;
+  /** Which of the three weapons the strip has selected (`US-MATCH-005` AC2). */
+  setWeaponSlot(slot: 0 | 1 | 2): void;
+  /** The angle the pad has nudged the shot by, so the aim aid matches the shot that will be sent. */
+  setAimDelta(delta: number): void;
   destroy(): void;
 }
 
@@ -87,6 +89,10 @@ class BattleScene extends Phaser.Scene {
   private pullPower = 0;
   private pullAngle = 0;
   private aimAllowed = true;
+  /** The weapon slot the strip has selected; the preview and the ring use this class (`US-MATCH-005` AC2). */
+  private weaponSlot: 0 | 1 | 2 = 0;
+  /** The pad's angle nudge, mirrored from the page: the preview must carry the angle the shot will carry. */
+  private aimDelta = 0;
   private pointerHandlers: Array<{ type: string; handler: (event: PointerEvent) => void }> = [];
 
 
@@ -98,6 +104,16 @@ class BattleScene extends Phaser.Scene {
     // A placeholder only: `create()` frames the window on the real canvas, because Phaser has no `scale`
     // until the scene is booted (`this.scale` in the constructor throws).
     this.window = defaultWindow(TUNABLES.viewDefaultWidth / TUNABLES.viewDefaultHeight);
+  }
+
+  setAimDelta(delta: number): void {
+    if (this.aimDelta === delta) return;
+    this.aimDelta = delta;
+  }
+
+  setWeaponSlot(slot: 0 | 1 | 2): void {
+    if (this.weaponSlot === slot) return;
+    this.weaponSlot = slot;
   }
 
   setAimAllowed(allowed: boolean): void {
@@ -432,8 +448,6 @@ class BattleScene extends Phaser.Scene {
     if (!frame || !player || frame.eliminated) return;
     // The ring and the preview only exist while this client may actually shoot (`US-MATCH-002` AC7).
     if (!this.aimAllowed) return;
-    const mobile = getMobile(player.mobileId);
-    const map = getMap(this.state.mapId);
 
     if (this.pullPower > 0) {
       // A gradient arc around the mobile, clockwise from −90°, that fills with the pull (`US-MATCH-002` AC2).
@@ -446,42 +460,24 @@ class BattleScene extends Phaser.Scene {
       graphics.strokePath();
       graphics.lineStyle(2, ringColor(this.pullPower), 0.45);
       graphics.strokeCircle(frame.x, centerY, RING_RADIUS + 8);
-      const projectile = launch({
-        id: 1,
-        ownerSlot: frame.slot,
-        weaponSlot: 0,
-        weapon: mobile.weapons[0]!,
-        from: { x: frame.x, y: frame.y },
-        facing: frame.facing,
+      // The resolver's own flight, sampled: the same code that will resolve the shot, so it cannot promise a
+      // landing the engine will not honour (`US-MATCH-005` AC2).
+      const preview = aimPreview({
+        state: this.state,
+        localSlot: this.localSlot,
+        weaponSlot: this.weaponSlot,
         angle: this.pullAngle,
-        force: Math.round(this.pullPower * 25),
-        powerMultiplier: 1,
-        bunge: false,
+        power: this.pullPower,
+        aimDelta: this.aimDelta,
       });
-      const flight = simulateFlight(
-        projectile,
-        {
-          wind: this.state.weather.wind,
-          gravity: mobile.gravity * map.gravityModifier,
-          mass: mobile.mass,
-          stepMs: TUNABLES.stepMs,
-        },
-        { step: this.state.terrainStep, heights: Float64Array.from(this.state.terrain), width: TUNABLES.mapWidth },
-      );
-      // A dotted arc from the muzzle to the predicted impact: the player sees where the shot goes.
-      if (flight.impact) {
-        const steps = 14;
-        const from = { x: frame.x, y: frame.y };
+      if (preview) {
         graphics.fillStyle(0xffffff, 0.4);
-        for (let index = 1; index <= steps; index += 1) {
-          const t = index / steps;
-          const x = from.x + (flight.impact.x - from.x) * t;
-          const arc = Math.sin(Math.PI * t) * 90;
-          const y = from.y + (flight.impact.y - from.y) * t - arc;
-          graphics.fillCircle(x, y, 2);
+        for (const dot of preview.path) graphics.fillCircle(dot.x, dot.y, 2);
+        // No impact means the shot leaves the map: a blast ring in the sky would be a promise nobody keeps.
+        if (preview.impact) {
+          graphics.lineStyle(1, 0xffffff, 0.35);
+          graphics.strokeCircle(preview.impact.x, preview.impact.y, preview.radius);
         }
-        graphics.lineStyle(1, 0xffffff, 0.35);
-        graphics.strokeCircle(flight.impact.x, flight.impact.y, 8);
       }
     }
   }
@@ -514,6 +510,8 @@ export function mountBattle(options: Options): BattleHandle {
   return {
     setState: (state, localSlot) => scene.setState(state, localSlot),
     setAimAllowed: (allowed) => scene.setAimAllowed(allowed),
+    setWeaponSlot: (slot) => scene.setWeaponSlot(slot),
+    setAimDelta: (delta) => scene.setAimDelta(delta),
     destroy: () => {
       window.removeEventListener("resize", resize);
       game.destroy(true);

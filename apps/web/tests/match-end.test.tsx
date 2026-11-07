@@ -14,13 +14,15 @@ import type { BattleCallbacks } from "../src/game/scene";
 
 const destroy = vi.fn();
 const setAimAllowed = vi.fn();
+const setWeaponSlot = vi.fn();
+const setAimDelta = vi.fn();
 const setState = vi.fn();
 let callbacks: BattleCallbacks | null = null;
 
 vi.mock("../src/game/scene", () => ({
   mountBattle: (options: { callbacks: BattleCallbacks }) => {
     callbacks = options.callbacks;
-    return { setState, setAimAllowed, destroy };
+    return { setState, setAimAllowed, setWeaponSlot, setAimDelta, destroy };
   },
 }));
 

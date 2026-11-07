@@ -117,6 +117,7 @@ export function MatchPage(): JSX.Element {
   const [hint, setHint] = useState<string | null>(null);
   const hintShown = useRef(false);
   const [aimDelta, setAimDelta] = useState(0);
+  const aimDeltaRef = useRef(0);
   /** The barrel's resting angle: the gesture angle is added to this at release (`US-MATCH-006` AC4/AC5). */
   const aimAngle = 45 + aimDelta;
   const [camera, setCamera] = useState<CameraWindow>(() => defaultWindow(16 / 9));
@@ -130,6 +131,8 @@ export function MatchPage(): JSX.Element {
   const weaponSlotRef = useRef<WeaponSlot>(0);
   // Turn number the weapon was fired in: the selection is locked until the turn changes (AC3).
   const [lockedTurn, setLockedTurn] = useState<number | null>(null);
+  /** Mirrored for the mount-time closures: `onRelease` is created once and would read a stale state value. */
+  const lockedTurnRef = useRef<number | null>(null);
   const [chat, setChat] = useState<{ readonly kind: ChatKind; readonly id: string } | null>(null);
   const container = useRef<HTMLDivElement | null>(null);
   const battle = useRef<BattleHandle | null>(null);
@@ -231,8 +234,8 @@ export function MatchPage(): JSX.Element {
               weaponSlot: weaponSlotRef.current,
               seq: seq.current,
               mobile,
-              aimDelta,
-              shot: { lockedTurn, turnNumber: current.turn.number },
+              aimDelta: aimDeltaRef.current,
+              shot: { lockedTurn: lockedTurnRef.current, turnNumber: current.turn.number },
             },
           );
           if (!input) return;
@@ -240,6 +243,7 @@ export function MatchPage(): JSX.Element {
           const result = applyInput(current, input, Date.now());
           commit(result.state, result.events);
           setLockedTurn(current.turn.number);
+          lockedTurnRef.current = current.turn.number;
           // A shot that carved the mask is the only moment the peers need the terrain itself: they resolve
           // hits against it (`US-CORE-006` AC4), and the mask is far too big to ride in every snapshot.
           const carved = result.events.some((event) => event.kind === "shot" && event.carved);
@@ -258,6 +262,9 @@ export function MatchPage(): JSX.Element {
         onCamera: (window) => setCamera(window),
       },
     });
+    // A remounted scene starts on slot 0 and no nudge; hand it what the strip and the pad are showing.
+    battle.current.setWeaponSlot(weaponSlotRef.current);
+    battle.current.setAimDelta(aimDeltaRef.current);
     return () => {
       battle.current?.destroy();
       battle.current = null;
@@ -265,6 +272,12 @@ export function MatchPage(): JSX.Element {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [Boolean(state), plan?.localSlot, commit]);
+
+  // The aim aid draws the angle the shot will carry, so the scene needs the pad's nudge (`US-MATCH-006`).
+  useEffect(() => {
+    aimDeltaRef.current = aimDelta;
+    battle.current?.setAimDelta(aimDelta);
+  }, [aimDelta]);
 
   useEffect(() => {
     if (battle.current && state) battle.current.setState(state, plan?.localSlot ?? 0);
@@ -487,7 +500,15 @@ export function MatchPage(): JSX.Element {
   const selectWeapon = useCallback((slot: WeaponSlot) => {
     weaponSlotRef.current = slot;
     setWeaponSlot(slot);
+    // The dotted arc is drawn by the scene, so the selection has to reach it (`US-MATCH-005` AC2).
+    battle.current?.setWeaponSlot(slot);
   }, []);
+
+  // A spent super shot disables its slot (`AC3`), so the aim aid must not keep pointing at it.
+  useEffect(() => {
+    if (weaponSlot === 2 && localPlayer?.superShotUsed) selectWeapon(0);
+  }, [weaponSlot, localPlayer?.superShotUsed, selectWeapon]);
+
 
   // Items go out once, and only on this player's turn (`US-MATCH-005` AC5); the engine still
   // re-checks the quantity, so a double tap cannot spend two.

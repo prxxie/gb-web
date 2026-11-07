@@ -10,6 +10,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { getMobile } from "@gbw/core";
+import { ItemTray } from "../src/components/ItemTray";
 import { WeaponStrip } from "../src/components/WeaponStrip";
 
 const WEAPONS = getMobile("mbl-01").weapons;
@@ -99,5 +100,36 @@ describe("TC-MATCH-906: a spent super shot is empty for the rest of the match (A
     for (const slot of [0, 1, 2]) expect(screen.getByTestId(`weapon-${slot}`)).toBeDisabled();
     await userEvent.click(screen.getByTestId("weapon-0"));
     expect(onSelect).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * TC-MATCH-942: the loadout is readable text, not canvas (`US-MATCH-005` AC7).
+ *
+ * AC7 asks for the weapon name, the charge state *and the item counts* to reach a screen reader. The strip already
+ * carries the first two (`TC-MATCH-906`); this pins the item side: every tray button names the item, how many are
+ * left and what it costs in delay, and the tray exposes that as text rather than only as a glyph.
+ */
+describe("TC-MATCH-942: the item counts are text a screen reader can read (AC7)", () => {
+  it("names each tray item with its quantity and its delay cost", async () => {
+    const onUse = vi.fn();
+    render(
+      <ItemTray
+        items={[
+          { id: "itm-dual", qty: 2, delay: 20 },
+          { id: "itm-blood", qty: 0, delay: 15 },
+        ]}
+        labels={{ toggle: "Vật phẩm", empty: "Không có vật phẩm", quantity: "số lượng", delay: "chờ" }}
+        onUse={onUse}
+      />,
+    );
+    await userEvent.click(screen.getByTestId("item-tray-toggle"));
+    const dual = screen.getByTestId("item-itm-dual");
+    expect(dual.getAttribute("aria-label")).toBe("Dual (số lượng: 2, chờ: +20)");
+    expect(screen.getByTestId("item-qty-itm-dual")).toHaveTextContent("×2");
+    expect(screen.getByTestId("item-delay-itm-dual")).toHaveTextContent("+20");
+    // A spent item stays visible and named, so the count reads "0" instead of the row vanishing.
+    expect(screen.getByTestId("item-itm-blood")).toBeDisabled();
+    expect(screen.getByTestId("item-qty-itm-blood")).toHaveTextContent("×0");
   });
 });
