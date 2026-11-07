@@ -7,6 +7,7 @@
  * names does not exist — the Phaser scene calls these functions directly.
  */
 import { describe, expect, it } from "vitest";
+import { RING_RADIUS as RING_PX } from "../src/game/aim";
 import {
   TUNABLES,
   clampWindow,
@@ -16,6 +17,7 @@ import {
   windowOn,
   type CameraWindow,
 } from "@gbw/core";
+import { screenConstant } from "../src/game/viewport";
 
 const MAP = { width: TUNABLES.mapWidth, height: TUNABLES.mapHeight };
 const SCREEN_WIDTH = 800;
@@ -83,6 +85,25 @@ describe("TC-MATCH-918: panning is 1:1 and bounded by the map (AC4)", () => {
       window = panBy(window, step % 2 === 0 ? 137 : -89, step % 3 === 0 ? -61 : 47, SCREEN_WIDTH);
       expectInsideMap(window);
     }
+  });
+});
+
+describe("TC-MATCH-922: the aim ring and its dots keep their screen size at any zoom (AC6)", () => {
+  it("draws the same 64 px ring at the narrowest and the widest window", () => {
+    const screen = { width: 844, height: 313 };
+    for (const window of [defaultWindow(screen.width / screen.height), { x: 0, y: 0, width: 2000, height: 1200 }]) {
+      const scale = screen.width / window.width;
+      // The scene draws in world units: a CSS-pixel length becomes `pixels / scale` world units and back again.
+      expect(screenConstant(RING_PX, scale) * scale).toBeCloseTo(RING_PX, 6);
+    }
+    // Zoomed to 250 units wide the ring must be ~19 world units, at the whole map ~152: it never shrinks on screen.
+    expect(screenConstant(RING_PX, 844 / 250)).toBeCloseTo(18.96, 1);
+    expect(screenConstant(RING_PX, 844 / 2000)).toBeCloseTo(151.66, 1);
+  });
+
+  it("survives a degenerate scale instead of returning Infinity", () => {
+    expect(screenConstant(64, 0)).toBe(64);
+    expect(screenConstant(64, Number.NaN)).toBe(64);
   });
 });
 
