@@ -121,3 +121,11 @@ export function screenToWorld(window: CameraWindow, viewport: Viewport, x: numbe
 }
 
 export { angleFromPull, panBy, pinchTo, powerFromDrag };
+
+/**
+ * A length that must read the same number of CSS pixels at any zoom (`US-MATCH-007` AC6): the scene draws in world
+ * units, so a fixed 64 px ring is `64 / scale` world units. Guards a degenerate scale instead of returning `Infinity`.
+ */
+export function screenConstant(pixels: number, scale: number): number {
+  return pixels / (Number.isFinite(scale) && scale > 0 ? scale : 1);
+}

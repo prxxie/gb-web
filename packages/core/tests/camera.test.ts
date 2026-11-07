@@ -105,7 +105,7 @@ describe("TC-MATCH-920: panning", () => {
   });
 });
 
-describe("TC-MATCH-921: the ruler", () => {
+describe("the ruler", () => {
   it("counts eight divisions at the default window and sixteen at the whole map", () => {
     expect(rulerLayout(defaultWindow(WIDE)).segments).toBe(8);
     expect(rulerLayout({ x: 0, y: 0, width: 2000, height: 1200 }).segments).toBe(16);
@@ -114,7 +114,7 @@ describe("TC-MATCH-921: the ruler", () => {
   });
 });
 
-describe("TC-MATCH-922: power", () => {
+describe("power from a drag", () => {
   it("maps a drag to a 0–4 power bar and a 0–100 force", () => {
     expect(powerFromDrag(0, 400)).toBe(0);
     expect(powerFromDrag(400 * 0.45, 400)).toBeCloseTo(4, 1);

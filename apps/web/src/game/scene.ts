@@ -18,7 +18,7 @@ import {
   type MatchState,
   type PlayerState,
 } from "@gbw/core";
-import { addPointer, classify, clearPointers, movePointer, removePointer, screenToWorld, viewportFor, worldToScreen, type Point, type PointerState } from "./viewport";
+import { addPointer, classify, clearPointers, movePointer, removePointer, screenConstant, screenToWorld, viewportFor, worldToScreen, type Point, type PointerState } from "./viewport";
 import {
   INTERPOLATION_MS,
   poseOfFrames,
@@ -28,6 +28,7 @@ import {
   type UnitPose,
 } from "./interpolate";
 import { RING_RADIUS, RING_START, ringColor, ringSweep } from "./aim";
+import { armFullscreen } from "../lib/fullscreen";
 import { aimPreview } from "./preview";
 
 export interface BattleCallbacks {
@@ -93,7 +94,11 @@ class BattleScene extends Phaser.Scene {
   private weaponSlot: 0 | 1 | 2 = 0;
   /** The pad's angle nudge, mirrored from the page: the preview must carry the angle the shot will carry. */
   private aimDelta = 0;
+  /** World units per CSS pixel, recomputed every frame: the HUD parts of the canvas stay screen-sized at any zoom. */
+  private screenScale = 1;
   private pointerHandlers: Array<{ type: string; handler: (event: PointerEvent) => void }> = [];
+  /** The one-shot fullscreen request armed on the canvas (`US-MATCH-007` AC1). */
+  private disarmFullscreen: () => void = () => undefined;
 
 
   constructor(state: MatchState, localSlot: number, callbacks: BattleCallbacks) {
@@ -183,6 +188,8 @@ class BattleScene extends Phaser.Scene {
     this.graphics = this.add.graphics();
     this.cameras.main.setBackgroundColor("#0b1220");
     this.attachPointerHandlers();
+    // Fullscreen needs a gesture, so it is armed on the canvas rather than requested at mount (`US-MATCH-007` AC1).
+    this.disarmFullscreen = armFullscreen(this.game.canvas);
     this.events.once("shutdown", () => this.shutdown());
     this.callbacks.onCamera(this.window);
   }
@@ -299,6 +306,7 @@ class BattleScene extends Phaser.Scene {
     const width = this.scale.width;
     const height = this.scale.height;
     const scale = width / this.window.width;
+    this.screenScale = scale;
     this.cameras.main.setZoom(scale);
     this.cameras.main.centerOn(this.window.x + this.window.width / 2, this.window.y + this.window.height / 2);
 
@@ -451,15 +459,18 @@ class BattleScene extends Phaser.Scene {
 
     if (this.pullPower > 0) {
       // A gradient arc around the mobile, clockwise from −90°, that fills with the pull (`US-MATCH-002` AC2).
-      const centerY = frame.y - 10;
-      graphics.lineStyle(6, 0x2b3a58, 0.8);
-      graphics.strokeCircle(frame.x, centerY, RING_RADIUS);
-      graphics.lineStyle(6, ringColor(this.pullPower), 0.95);
+      // Everything the player aims with keeps its screen size at any zoom (`US-MATCH-007` AC6): the scene draws in
+      // world units, so each CSS-pixel length is divided by the canvas scale.
+      const px = (value: number): number => screenConstant(value, this.screenScale);
+      const centerY = frame.y - px(10);
+      graphics.lineStyle(px(6), 0x2b3a58, 0.8);
+      graphics.strokeCircle(frame.x, centerY, px(RING_RADIUS));
+      graphics.lineStyle(px(6), ringColor(this.pullPower), 0.95);
       graphics.beginPath();
-      graphics.arc(frame.x, centerY, RING_RADIUS, RING_START, RING_START + ringSweep(this.pullPower), false);
+      graphics.arc(frame.x, centerY, px(RING_RADIUS), RING_START, RING_START + ringSweep(this.pullPower), false);
       graphics.strokePath();
-      graphics.lineStyle(2, ringColor(this.pullPower), 0.45);
-      graphics.strokeCircle(frame.x, centerY, RING_RADIUS + 8);
+      graphics.lineStyle(px(2), ringColor(this.pullPower), 0.45);
+      graphics.strokeCircle(frame.x, centerY, px(RING_RADIUS + 8));
       // The resolver's own flight, sampled: the same code that will resolve the shot, so it cannot promise a
       // landing the engine will not honour (`US-MATCH-005` AC2).
       const preview = aimPreview({
@@ -472,10 +483,11 @@ class BattleScene extends Phaser.Scene {
       });
       if (preview) {
         graphics.fillStyle(0xffffff, 0.4);
-        for (const dot of preview.path) graphics.fillCircle(dot.x, dot.y, 2);
+        for (const dot of preview.path) graphics.fillCircle(dot.x, dot.y, px(2));
         // No impact means the shot leaves the map: a blast ring in the sky would be a promise nobody keeps.
         if (preview.impact) {
-          graphics.lineStyle(1, 0xffffff, 0.35);
+          graphics.lineStyle(px(2), 0xffffff, 0.35);
+          // The blast radius is a world length (it is what the engine carves), so only its stroke stays screen-sized.
           graphics.strokeCircle(preview.impact.x, preview.impact.y, preview.radius);
         }
       }
@@ -483,6 +495,7 @@ class BattleScene extends Phaser.Scene {
   }
 
   shutdown(): void {
+    this.disarmFullscreen();
     const canvas = this.game.canvas;
     for (const { type, handler } of this.pointerHandlers) canvas.removeEventListener(type, handler as EventListener);
     this.pointerHandlers = [];

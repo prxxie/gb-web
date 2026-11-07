@@ -2,7 +2,7 @@
 id: US-MATCH-007
 title: Fullscreen window with pinch zoom and a measuring ruler
 epic: EPIC-05-match-ui
-status: ready
+status: done
 priority: P0
 size: M
 depends_on: [US-MATCH-001]
@@ -36,12 +36,12 @@ requested on the first tap.
 
 | # | Given | When | Then |
 |---|---|---|---|
-| AC1 | the match scene mounts | the first tap lands anywhere on the canvas | `requestFullscreen()` is called where the API exists; on iPhone Safari the page fills the viewport with safe-area insets and no `apple-mobile-web-app-capable` meta (`TC-MATCH-921`) |
+| AC1 | the match scene mounts | the first tap lands anywhere on the canvas | `requestFullscreen()` is called where the API exists; on iPhone Safari the page fills the viewport with safe-area insets and no `apple-mobile-web-app-capable` meta (`TC-MATCH-921`; the device pass is `TC-MATCH-945`) |
 | AC2 | the scene has just loaded | nothing has been touched | The camera window is **1000 × 600 units ±1 %** on a 5:3 screen and keeps its 600 units of height on a wider one, taking the screen's aspect for its width, centred on the player's own mobile and clamped inside the map bounds (`TC-MATCH-918`) |
 | AC3 | two fingers on the canvas | their separation changes by more than 12 px | The camera zooms about the pinch midpoint, never past `zoomMin` (whole map) or `zoomMax` (250 × 150 units) (`TC-MATCH-919`) |
 | AC4 | two fingers on the canvas | they move together | The camera pans 1:1 with the finger centroid and stops at the map edges; the window never shows void (`TC-MATCH-918`) |
 | AC5 | any zoom level | the bottom strip is drawn | Divisions are `clamp(round(8 × visibleWidth / 1000), 8, 16)` — **8** at the default window, **16** at whole-map zoom, each labelled with its world width and every fourth a major tick (`TC-MATCH-920`) |
-| AC6 | the camera moves or zooms | HUD elements are drawn | The four-way pad, power ring and roster keep their fixed screen size and never scale with the world (`TC-MATCH-922`) |
+| AC6 | the camera moves or zooms | HUD elements are drawn | The four-way pad, power ring and roster keep their fixed screen size and never scale with the world — the canvas draws in world units, so every CSS-pixel length is divided by the zoom (`TC-MATCH-922`) |
 | AC7 | a pinch or pan ends | the gesture stops | The camera keeps its new window (no snap-back) and the state is local — no message is sent, the host is unaffected (`TC-MATCH-919`) |
 | AC8 | a round trip of zoom out to the whole map and back | the ruler is compared | The reported units-per-division equals `visibleWidth / segments` at each step and reads 125 units at both ends (`TC-MATCH-920`) |
 
@@ -79,7 +79,10 @@ zoom.
 - `apps/web/src/game/camera.ts` owns `Phaser.Cameras.Scene2D` zoom/scroll, clamping and the `onChange` stream;
   `apps/web/src/game/hud/Ruler.ts` consumes it. Both are thin wrappers over pure functions (`rulerSegments`,
   `clampWindow`, `zoomAbout`).
-- The scene camera uses `Phaser.Scale.FIT` for the canvas itself and world-unit rendering inside it (`US-MATCH-001`).
+- The scene camera uses `Phaser.Scale.RESIZE` for the canvas itself and world-unit rendering inside it (`US-MATCH-001`).
+- `apps/web/src/lib/fullscreen.ts` arms the one-shot `requestFullscreen()` on the canvas' first pointer-down and swallows
+  a refusal; `apps/web/src/game/viewport.ts` `screenConstant(px, scale)` turns a CSS-pixel length into world units, so the
+  aim ring, its dots and the stroke widths stay the same size at every zoom.
 - Never call `document.exitFullscreen()` on route change inside the match; the shell releases it when the match is left.
 
 ## 7. Out of scope
@@ -91,7 +94,9 @@ zoom.
 
 `TC-MATCH-918` (default window and pan clamp), `TC-MATCH-919` (zoom bounds and midpoint), `TC-MATCH-920` (ruler 8 → 16),
 `TC-MATCH-921` (fullscreen and safe areas), `TC-MATCH-922` (HUD scale independence).
-Red first: `apps/web/tests/ruler.test.ts::segments_go_from_eight_to_sixteen`.
+Red: `apps/web/tests/fullscreen.test.tsx` — the first tap asked for no fullscreen because nothing armed the
+request (`grep -i fullscreen apps/web/src` was empty); `apps/web/tests/camera.test.tsx` — the ring was drawn in world
+units, so `screenConstant`'s 64 px came out as 216 px at the 250-unit zoom and 27 px at the whole map.
 
 ## 9. Open questions
 
@@ -99,24 +104,36 @@ Red first: `apps/web/tests/ruler.test.ts::segments_go_from_eight_to_sixteen`.
 
 <!-- delivery:2026-11-06 -->
 
-## Delivery status — 2026-11-06
+## Delivery status — 2026-11-07
 
-**in-progress.** The window, zoom clamps, pinch, pan clamp and the 8→16 ruler are unit-tested in
-`packages/core/tests/camera.test.ts` and rendered by `apps/web/src/game/scene.ts` +
-`apps/web/src/components/Ruler.tsx`; `tests/e2e/smoke.spec.ts` TC-MATCH-901 reads the ruler's division count off a
-running match and checks it against `clamp(round(8 × visibleWidth / 1000), 8, 16)` with one ~125-unit division each.
+**done.** The window, the pinch clamps, the pan clamp and the 8 → 16 ruler were already proven
+(`packages/core/tests/camera.test.ts`, `apps/web/tests/camera.test.tsx`, `apps/web/tests/ruler.test.tsx`, and
+`tests/e2e/smoke.spec.ts` `TC-MATCH-901` reading the divisions off a running match). Two gaps closed on 2026-11-07:
 
-Fixed on 2026-11-06: the framing used to fix the window's *width* at 1000 units, so on a 2.7:1 phone (844 × 313 above the
-HUD) only ~371 of the 600 units of height were visible and the shooter's feet fell off the bottom of the canvas. The
-window now takes the screen's aspect — 600 units of height, width `max(1000, 600 × aspect)` — so the whole window fits and
-the feet land 70 % down it. Frame: `docs/05-quality/evidence/US-MATCH-007/framing-844x390.png` (window 1617 × 600,
-ruler 13 × ~124.5 units).
+| AC | Evidence |
+|---|---|
+| AC1 | `apps/web/tests/fullscreen.test.tsx` (`TC-MATCH-921`): asked once on the first pointer-down, never at mount, silent when the API is missing or the browser refuses; the device pass is `TC-MATCH-945` (manual) |
+| AC2 | `apps/web/tests/camera.test.tsx` (`TC-MATCH-918`) — 1000 × 600 on 5:3, 600 units of height and the screen's aspect on wider |
+| AC3 | `apps/web/tests/camera.test.tsx` (`TC-MATCH-919`) — midpoint zoom, both clamps |
+| AC4 | `apps/web/tests/camera.test.tsx` (`TC-MATCH-918`) — 1:1 pan, no void at any edge |
+| AC5 | `apps/web/tests/ruler.test.tsx` (`TC-MATCH-920`) |
+| AC6 | `apps/web/tests/camera.test.tsx` (`TC-MATCH-922`): a CSS-pixel length divided by the canvas scale reads the same 64 px at the 250-unit zoom and at the whole map; `screenConstant` guards a degenerate scale |
+| AC7 | `apps/web/tests/camera.test.tsx` (`TC-MATCH-919`) — the gesture's final window is kept, nothing is sent |
+| AC8 | `apps/web/tests/ruler.test.tsx` (`TC-MATCH-920`) — units per division at each step, 125 at both ends |
 
-Still open, and the reason this story is not `done`:
+**AC1 was not implemented before this pass.** `grep -i fullscreen apps/web/src` returned nothing: the story promised a
+fullscreen request on the first tap and no code asked for one. It now does, from a gesture, once per mount.
+**AC6 was violated in the other direction:** the aim ring and the preview dots were drawn in world units, so on the
+250-unit zoom the ring would have been ~216 px instead of 64 and at the whole map ~27 px. The pad, the roster and the
+clock are DOM and were never affected.
 
-- **AC2/AC7 on a device** — pinch, wheel zoom and the no-snap-back rule are asserted in jsdom and by the core camera
-  tests, not with two real fingers; the pinch thresholds need a touch device (`US-OPS-004` matrix, at UAT).
-- **Not this story, but found while here:** the four-way pad and the weapon strip are fixed bottom-left clusters, while
-  `docs/02-reference/screens/match.md` draws the pad *around the mobile*. When the active mobile stands near the map's
-  left edge the window clamp keeps it on screen but under the pad. Recorded against `US-MATCH-003` (HUD layout), not
-  reworded away here.
+Owed before UAT (M2), both manual:
+
+- `TC-MATCH-945` — first tap on an iPhone Safari and on an Android device (fullscreen where the API exists, safe-area
+  insets and no `apple-mobile-web-app-capable` meta where it does not).
+- `TC-MATCH-946` — two real fingers: pinch past both limits, pan to each edge, release, and check the window keeps its
+  place (no snap-back) and that the ruler reads 125 units per division at both ends.
+
+Two follow-ups, not part of this story: the `.match__loadout` strip still overlaps the aim area on 844 × 390 (recorded in
+`US-MATCH-003`), and the mis-cited case ids in `packages/core/tests/camera.test.ts` (a "`TC-MATCH-921`" ruler block and a
+"`TC-MATCH-922`" power block, neither of which is what those rows describe) now carry no id, so their real owners own them.

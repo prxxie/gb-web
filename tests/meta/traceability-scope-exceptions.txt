@@ -14,8 +14,6 @@ TC-MATCH-905 apps/web/tests/match-controls.test.tsx
 TC-MATCH-918 packages/core/tests/camera.test.ts
 TC-MATCH-919 packages/core/tests/camera.test.ts
 TC-MATCH-920 packages/core/tests/camera.test.ts
-TC-MATCH-921 packages/core/tests/camera.test.ts
-TC-MATCH-922 packages/core/tests/camera.test.ts
 TC-NET-067 packages/core/tests/movement.test.ts
 TC-PWA-130 apps/web/tests/hud.test.tsx
 TC-PWA-130 apps/web/tests/input.test.tsx
