@@ -145,6 +145,8 @@ export type ServerFrame =
       readonly matchId: string;
       readonly winnerTeam: Team | null;
       readonly ranked: boolean;
+      /** Why the match was not rated, straight from the record (`US-RANK-005` AC2). Absent on an old room. */
+      readonly rankedReason?: RankedReason | null;
       readonly ratings: readonly { readonly accountId: string; readonly before: number; readonly after: number; readonly delta: number }[];
       readonly players: readonly { readonly slot: number; readonly result: "win" | "loss" | "abandon" }[];
     }
@@ -155,6 +157,12 @@ export type ServerFrame =
   | { readonly t: "room_closed"; readonly reason: "expired" | "empty" | "closed" }
   | { readonly t: "pong"; readonly at: number; readonly now: number }
   | { readonly t: "error"; readonly code: ErrorCode; readonly detail: string };
+
+/**
+ * Why a match was not rated (`docs/02-reference/api/matches.md` § `rankedReason`). The room forwards it so
+ * the result screen can name the reason instead of guessing one (`US-RANK-005` AC2).
+ */
+export type RankedReason = "guest" | "bot" | "abandoned" | "ruleset_mismatch";
 
 export type ParseResult<T> = { readonly ok: true; readonly frame: T } | { readonly ok: false; readonly code: ErrorCode; readonly detail: string };
 

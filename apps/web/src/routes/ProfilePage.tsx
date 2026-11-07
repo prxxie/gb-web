@@ -167,7 +167,7 @@ export function ProfilePage(): JSX.Element {
     <div className="screen">
       <header className="row">
         <h1>{t("main.profile")}</h1>
-        <Link to="/">{t("results.home")}</Link>
+        <Link to="/">{t("common.home")}</Link>
       </header>
 
       <section className="card">

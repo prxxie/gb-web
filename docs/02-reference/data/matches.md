@@ -87,7 +87,8 @@ K               = 32 while rated_matches < 30, else 16
 newRating       = clamp(rating + delta, 0, 4000)
 ```
 
-`abandon` counts as a loss for the abandoning player and does not change teammates' deltas beyond the team result.
+`abandon` counts as a loss for the seat that forfeited a rated match and does not change teammates' deltas beyond the team
+result. A fully abandoned match is unranked, so no row of it carries a delta at all (`matches.md` § `abandoned`).
 
 ## Oracle
 

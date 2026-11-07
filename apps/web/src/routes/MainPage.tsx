@@ -4,10 +4,10 @@
 import { useMemo, useState } from "react";
 import { useOnline } from "../lib/online.js";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { MOBILES, MODES, MAPS, makeRoomCode, type ModeId } from "@gbw/core";
+import { MOBILES, MODES, MAPS, type ModeId } from "@gbw/core";
 import { useLocale, useSession } from "../app/providers";
 import { ApiError, api, errorMessage } from "../lib/api";
-import type { PlannedMatch } from "./MatchPage";
+import { botMatchPlan, writePlan } from "../lib/plan";
 import type { JSX } from "react";
 
 const CAPACITIES = [2, 4, 6, 8] as const;
@@ -35,29 +35,15 @@ export function MainPage(): JSX.Element {
 
   const startBot = (): void => {
     // A bot match runs entirely on the device (`NFR-21`), so it needs no session and works offline.
-    const plan: PlannedMatch = {
-      kind: "bot",
-      roomCode: makeRoomCode(() => Math.floor(Math.random() * 31)),
-      localSlot: 0,
-      playerId: "local",
-      seats: [
-        {
-          slot: 0,
-          team: "A",
-          accountId: session?.subject.accountId ?? null,
-          displayName: session?.subject.displayName ?? t("signIn.guest"),
-          mobileId,
-        },
-        // A practice match always has an opponent, or the team check would end it on the first turn.
-        { slot: 1, team: "B", accountId: null, displayName: t("match.bot"), mobileId: "mbl-04" },
-      ],
-      seed: Math.floor(Math.random() * 0xffffff),
+    const plan = botMatchPlan({
+      displayName: session?.subject.displayName ?? t("signIn.guest"),
+      accountId: session?.subject.accountId ?? null,
+      mobileId,
+      // A practice match always has an opponent, or the team check would end it on the first turn.
+      botLabel: t("match.bot"),
       mapId,
-      mode: "solo",
-      maxPlayers: 2,
-      hostPlayerId: "local",
-    };
-    sessionStorage.setItem("gbw.match", JSON.stringify(plan));
+    });
+    writePlan(plan);
     navigate(`/match/${plan.roomCode}`);
   };
 

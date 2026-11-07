@@ -4,7 +4,7 @@ Questions that block or shape the work and that only the product owner, client, 
 `cpt-decide`. Format: [.agents/rules/02-docs-navigation.md § 5](../../.agents/rules/02-docs-navigation.md#5-open-questions).
 
 <!-- cpt:oq-summary -->
-**Open: 15 · Blocking: 0 · Answered: 26 · Withdrawn: 1**
+**Open: 16 · Blocking: 0 · Answered: 26 · Withdrawn: 1**
 
 | Id | Question | Status | Blocking |
 |---|---|---|---|
@@ -50,6 +50,7 @@ Questions that block or shape the work and that only the product owner, client, 
 | [OQ-40](open-questions.md#oq-40--is-the-joystick-gone-for-good-replaced-by-the-four-way-pad-and-gestures) | Is the joystick gone for good, replaced by the four-way pad and gestures? | answered | — |
 | [OQ-41](open-questions.md#oq-41--how-is-wind-expressed-and-when-does-it-change) | How is wind expressed and when does it change? | answered | — |
 | [OQ-42](open-questions.md#oq-42--do-accounts-own-avatar-parts-and-does-the-match-record-keep-the-bonus-totals) | Do accounts own avatar parts, and does the match record keep the bonus totals? | answered | — |
+| [OQ-43](open-questions.md#oq-43--can-a-draw-or-an-abandonment-be-recorded-at-all) | Can a draw or an abandonment be recorded at all? | open | — |
 <!-- /cpt:oq-summary -->
 
 ---
@@ -541,3 +542,18 @@ Questions that block or shape the work and that only the product owner, client, 
   `ratingDelta`, which is what the results screen and the history page show.
 - **Answer**: accepted as the assumption; adding per-account parts and a `bonus` column is a v1.1 change with its own
   story and migration.
+
+## OQ-43 — Can a draw or an abandonment be recorded at all?
+
+- **Status**: open
+- **Raised**: 2026-11-07 while shipping `US-RANK-005`
+- **Blocks**: —
+- **Context**: `POST /matches` refuses `winnerTeam: null` ("winnerTeam must be A or B"), so a drawn match never reaches
+  `match_record`. The room's forfeit path records `abandoned: true` **with** a winner, which a client cannot reconstruct
+  from what it holds (the flag never travels in `match_end`). The result screen therefore shows a draw's statistics with
+  no `Thử lại` at all (`screens/results.md`), rather than offering a button that can only fail.
+- **Question**: should the contract accept `winnerTeam: null` — a drawn record with no rating change — or should a draw be
+  recorded as an abandonment?
+- **Assumption**: a draw stays unrecorded until the contract answers; the change belongs to `US-RANK-001`, and
+  `match_end` should then carry the forfeit flag so the client's retry can reproduce the room's body.
+- **Answer**: —

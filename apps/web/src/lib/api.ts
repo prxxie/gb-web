@@ -274,7 +274,13 @@ export const api = {
   roomPreview: (roomCode: string) => request<{ roomCode: string; status: string; joined: number }>(`/rooms/${roomCode}`),
   turnCredentials: (token: string) => request<TurnCredentials>("/turn-credentials", { token }),
   submitMatch: (token: string, body: unknown, idempotencyKey: string) =>
-    request<{ matchId: string; ranked: boolean; rankedReason: string | null }>("/matches", {
+    request<{
+      matchId: string;
+      ranked: boolean;
+      rankedReason: "guest" | "bot" | "abandoned" | "ruleset_mismatch" | null;
+      /** The deltas every participant sees; empty for an unranked match (`US-RANK-005` AC1). */
+      ratings: readonly { accountId: string; before: number; after: number; delta: number }[];
+    }>("/matches", {
       method: "POST",
       body,
       token,

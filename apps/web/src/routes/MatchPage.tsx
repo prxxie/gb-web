@@ -59,35 +59,37 @@ import { itemFrame } from "../net/frames";
 import { connectWithReconnect, type ReconnectingSocket } from "../net/reconnect";
 import type { ServerMessage } from "../net/signaling";
 import { api } from "../lib/api";
+import { readPlan, type PlannedMatch } from "../lib/plan";
+import { writeResult, type RecordedMatch, type ResultPayload } from "../lib/result";
 import { currentSession } from "../lib/session";
 import type { JSX } from "react";
 
-export interface PlannedMatch {
-  readonly kind: "bot" | "online";
-  readonly roomCode: string;
-  readonly localSlot: number;
-  readonly playerId: string;
-  readonly seats: readonly Seat[];
-  readonly seed: number;
-  readonly mapId: string;
-  readonly mode: "solo" | "score" | "tag" | "jewel";
-  readonly maxPlayers: number;
-  readonly hostPlayerId: string;
-}
+export type { PlannedMatch };
 
-const PLAN_KEY = "gbw.match";
-const RESULT_KEY = "gbw.result";
+/**
+ * How long a finished match waits for the room's `match_recorded` before the screen offers a retry
+ * (`US-RANK-005` AC6). The round trip is one D1 batch; a room that has not answered in five seconds is
+ * better shown as "not recorded yet" than a screen that never appears.
+ */
+const RECORD_TIMEOUT_MS = 5_000;
+
+/**
+ * The seats with the result the record gave them: the room decides who won, lost or walked out, and the
+ * screen must not keep a second opinion (`US-RANK-005` AC3, `signaling.md` § match_recorded).
+ */
+function withRecordedResults(
+  players: ResultPayload["players"],
+  recorded: Pick<RecordedMatch, "results">,
+): ResultPayload["players"] {
+  if (!recorded.results || recorded.results.length === 0) return players;
+  const bySlot = new Map(recorded.results.map((entry) => [entry.slot, entry.result]));
+  return players.map((player) => {
+    const result = bySlot.get(player.slot);
+    return result ? { ...player, result } : player;
+  });
+}
 
 /** The fixed phrase and emote ids of `US-MATCH-004`; only their copy lives in the locale tables. */
-
-function readPlan(): PlannedMatch | null {
-  try {
-    const raw = sessionStorage.getItem(PLAN_KEY);
-    return raw ? (JSON.parse(raw) as PlannedMatch) : null;
-  } catch {
-    return null;
-  }
-}
 
 function botSeats(local: Seat): readonly Seat[] {
   return [local, { slot: 1, team: "B", accountId: null, displayName: "Bot", mobileId: "mbl-04" }];
@@ -160,6 +162,22 @@ export function MatchPage(): JSX.Element {
   const lastSnapshotAt = useRef(0);
   const stateRef = useRef<MatchState | null>(null);
   const ended = useRef(false);
+  /** Resolves the wait for `match_recorded` started by `finish`; `null` when no result is pending (`AC6`). */
+  const recording = useRef<((recorded: RecordedMatch) => void) | null>(null);
+  /** The same wait's other end, and its timer, so a finished screen can disarm both on unmount. */
+  const resolveRecording = useRef<((recorded: RecordedMatch) => void) | null>(null);
+  const recordTimer = useRef<number | null>(null);
+
+  // Leaving the screen forgets a record still in flight: its answer would navigate from a dead page.
+  useEffect(
+    () => () => {
+      if (recordTimer.current !== null) window.clearTimeout(recordTimer.current);
+      recordTimer.current = null;
+      resolveRecording.current = null;
+      recording.current = null;
+    },
+    [],
+  );
   // Slots the room reports as `grace` or `disconnected`, and the newest host election seen: the first
   // decides who gets skipped, the second which snapshots are still valid (`US-ROOM-004` AC3/AC5/AC7).
   const absent = useRef<readonly number[]>([]);
@@ -180,7 +198,9 @@ export function MatchPage(): JSX.Element {
     (final: MatchState) => {
       if (ended.current) return;
       ended.current = true;
-      const payload = {
+      setStatus("ended");
+      const local = final.players.find((player) => player.slot === plan?.localSlot) ?? null;
+      const payload: ResultPayload = {
         roomCode: final.roomCode,
         mode: final.mode,
         winnerTeam: final.winnerTeam,
@@ -200,12 +220,74 @@ export function MatchPage(): JSX.Element {
           hits: player.hits,
           result: final.winnerTeam === null ? "abandon" : final.winnerTeam === player.team ? "win" : "loss",
         })),
+        localSlot: plan?.localSlot ?? 0,
+        mapId: final.mapId,
+        maxPlayers: plan?.maxPlayers ?? final.players.length,
+        mobileId: local?.mobileId ?? "mbl-01",
+        kind: plan?.kind === "online" ? "online" : "bot",
+        // The host is who runs the simulation now, not who created the room: a migration moves the role
+        // (`US-NET-003` AC2), and only the host may name the winner (`signaling.md` § match_end).
+        isHost: plan?.kind === "online" ? plan.playerId === hostPlayerId.current : true,
+        submission: null,
       };
-      sessionStorage.setItem(RESULT_KEY, JSON.stringify(payload));
-      setStatus("ended");
-      navigate(`/results/${final.roomCode}`, { replace: true });
+
+      // A practice match never leaves the device: there is nothing to record and the screen says so
+      // (`US-RANK-005` AC7).
+      if (payload.kind === "bot") {
+        writeResult({ ...payload, submission: { ranked: false, rankedReason: "bot", ratings: [] } });
+        navigate(`/results/${final.roomCode}`, { replace: true });
+        return;
+      }
+
+      // Written before the round trip, so a reload mid-record still lands on a result screen with the stats.
+      writeResult(payload);
+      if (payload.isHost) {
+        // The host names the winner and the statistics the room's record is built from; every client then
+        // waits for the broadcast that carries the deltas, because a finished room refuses new sockets
+        // (`signaling.md` § match_end → `match_recorded`).
+        socket.current?.send({
+          t: "match_end",
+          winnerTeam: final.winnerTeam,
+          stats: final.players.map((player) => ({
+            slot: player.slot,
+            damageDealt: player.damageDealt,
+            shotsFired: player.shotsFired,
+            hits: player.hits,
+          })),
+        });
+      }
+      // A peer cannot end a match, so a room that never answers leaves the host to resubmit from the
+      // result screen; the wait below is what turns that into a visible state instead of a hang (`AC6`).
+      const timer = window.setTimeout(() => {
+        resolveRecording.current?.({
+          ranked: false,
+          rankedReason: null,
+          ratings: [],
+          failed: true,
+        });
+        resolveRecording.current = null;
+        // Nothing waits after this: the screen has already handed over, and this page unmounts with the
+        // socket, so an answer that arrives later has no one to reach. Only a resubmit from the result screen
+        // can turn that into deltas (`409` -> the stored record).
+        recording.current = null;
+      }, RECORD_TIMEOUT_MS);
+      // Kept in refs so unmount can disarm it: a timer that fires after the player left would drag them
+      // back to a result screen they already walked away from.
+      recordTimer.current = timer;
+      resolveRecording.current = (recorded) => {
+        window.clearTimeout(timer);
+        recordTimer.current = null;
+        recording.current = null;
+        writeResult({ ...payload, submission: recorded, players: withRecordedResults(payload.players, recorded) });
+        navigate(`/results/${final.roomCode}`, { replace: true });
+      };
+      recording.current = (recorded) => {
+        const resolve = resolveRecording.current;
+        resolveRecording.current = null;
+        resolve?.(recorded);
+      };
     },
-    [navigate],
+    [hostPlayerId, navigate, plan],
   );
 
   const commit = useCallback(
@@ -229,6 +311,11 @@ export function MatchPage(): JSX.Element {
       mapId: plan.mapId,
       seats: plan.seats,
       now: Date.now(),
+      // The room's start time, not this device's: the record's id is `${roomCode}-${startedAt}` from the
+      // room's clock (`room-do.ts` § recordMatch), and a result screen can only resubmit that id if the
+      // payload carries the same number (`US-RANK-005` AC6). Kept apart from `now`, because a reload into a
+      // live match must not hand the opening turn a deadline that already passed.
+      startedAt: plan.startedAt,
     });
     setState(match);
     setStatus("live");
@@ -519,6 +606,20 @@ export function MatchPage(): JSX.Element {
       displayName: session.subject.displayName,
       mobileId: localPlayer?.mobileId ?? "mbl-01",
       onMessage: (message: ServerMessage) => {
+        if (message.t === "match_recorded") {
+          // The room's answer to `match_end`: the deltas the result screen renders (`US-RANK-005` AC1).
+          recording.current?.({
+            matchId: message.matchId,
+            ranked: message.ranked,
+            // The record's own reason (`US-RANK-005` AC2): `ruleset_mismatch` can never be derived here.
+            rankedReason: message.rankedReason ?? null,
+            ratings: message.ratings,
+            // The room's verdict on each seat, so the screen prints the record's result and not the one this
+            // client guessed from the winner' team.
+            results: message.players,
+          });
+          return;
+        }
         if (message.t === "signal") {
           const signal = message.payload;
           void mesh.current?.applySignal(

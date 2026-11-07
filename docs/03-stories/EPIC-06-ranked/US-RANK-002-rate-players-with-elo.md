@@ -59,7 +59,9 @@ Applied per player: `rating_after = clampRating(rating_before + delta)`, `profil
 - Team average is the mean of that team's rated players; a team with no rated players makes the match unranked for both sides.
 - `delta` is an integer; the rounding happens once, in `delta()`, so the UI and the database never disagree.
 - Rating is never written by a client call, never accepted in `PATCH /me`.
-- An abandoned match ends with `result = "abandon"` for the forfeiting team and is unranked (`ranked = 0`).
+- An abandoned match is unranked (`ranked = 0`) and every seat is written as `result = "abandon"`, the side that stayed
+  included: `POST /matches` cannot tell the two apart once `abandoned` is set (`matches.md` § `abandoned`). The room's own
+  broadcast does distinguish them (`room-do.ts` § forfeit).
 - The rating clamp is recorded, so an audit can tell a clamp from a normal change.
 
 ## 6. Implementation notes

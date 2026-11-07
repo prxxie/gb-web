@@ -90,7 +90,10 @@ describe("grace and forfeit", () => {
     const posted: unknown[] = [];
     vi.stubGlobal("fetch", async (input: string, init?: RequestInit) => {
       posted.push({ url: input, body: JSON.parse(String(init?.body ?? "{}")) });
-      return Response.json({ matchId: "ABC234-1", ranked: true, ratings: [] }, { status: 201 });
+      return Response.json(
+        { matchId: "ABC234-1", ranked: false, rankedReason: "abandoned", ratings: [] },
+        { status: 201 },
+      );
     });
     const { harness, sockets } = await playingRoom(ORIGIN);
     const host = sockets.get("host")!;
@@ -124,6 +127,8 @@ describe("grace and forfeit", () => {
     expect((survivor.framesOf("match_recorded").at(-1)?.["players"] as readonly { slot: number; result: string }[])?.map(
       (player) => player.result,
     )).toEqual(["win", "abandon", "win", "abandon"]);
+    // The record's own reason travels with the broadcast, so the result screen never guesses it.
+    expect(survivor.framesOf("match_recorded").at(-1)?.["rankedReason"]).toBe("abandoned");
     expect((await harness.state()).status).toBe("abandoned");
     void (null as Snapshot | null);
   });

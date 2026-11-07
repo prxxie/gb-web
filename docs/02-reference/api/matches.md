@@ -11,17 +11,20 @@ Request body:
 
 | Field | Type | Required | Rule |
 |-------|------|----------|------|
+| `matchId` | string | no | `roomCode-startedAt` when the room submits (it is also the `Idempotency-Key`); a resubmit from the results screen rebuilds the same value, so the second call replays the first instead of writing a second record |
 | `roomCode` | string | yes | `^[A-HJ-NP-Z2-9]{6}$` |
 | `startedAt` / `endedAt` | string | yes | ISO-8601 UTC; `duration` clamped to [60 s, 30 min] |
 | `rulesetVersion` | string | yes | Must equal the server's current tunables version, else the match is recorded **unranked** |
-| `winnerTeam` | enum | yes | `A` \| `B` |
+| `winnerTeam` | enum | yes | `A` \| `B`; a draw cannot be submitted (see OQ-43) |
+| `abandoned` | boolean | no | `true` for a forfeited match: it unranks the match **and** marks every player `result = 'abandon'`, including the side that stayed |
 | `players` | array | yes | 2–8 entries, one per participant |
 | `players[].slot` | integer | yes | 0–7, unique |
 | `players[].team` | enum | yes | `A` \| `B`, equal sizes |
 | `players[].accountId` | string \| null | yes | `null` for a guest or a bot |
 | `players[].displayName` | string | yes | For the record's readability; the server does not trust it for identity |
 | `players[].damageDealt` / `.shotsFired` / `.hits` | integer | yes | `0 ≤ hits ≤ shotsFired`; damage `≥ 0` |
-| `players[].forfeited` | boolean | no | `true` marks `result = 'abandon'` |
+| `players[].forfeited` | boolean | no | `true` marks `result = 'abandon'` for that seat; refused on the winning team unless `abandoned` is set |
+| `delayTable` | array | no | Up to eight whole milliseconds; the replayed turn delays of `US-CORE-002` AC7, stored with the record |
 
 ```json
 {

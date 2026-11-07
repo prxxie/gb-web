@@ -45,7 +45,14 @@ export interface MatchConfig {
   readonly mode: ModeId;
   readonly mapId: string;
   readonly seats: readonly Seat[];
+  /** The clock the opening turn runs on: deadlines count from here. */
   readonly now: number;
+  /**
+   * When the match began, when it is older than this call — a client that reloads into a live match rebuilds
+   * the state at `now` but must keep the match's own start, which is half of the id the room records
+   * (`US-RANK-005` AC6). Defaults to `now`, so an ordinary build is unchanged.
+   */
+  readonly startedAt?: number | undefined;
 }
 
 export interface ShotHit extends HitResult {
@@ -183,7 +190,7 @@ export function createMatch(config: MatchConfig): MatchState {
     lastActingTeam: null,
     seq: 0,
     lastInputSeq: null,
-    startedAt: config.now,
+    startedAt: config.startedAt ?? config.now,
   };
 }
 
