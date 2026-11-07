@@ -11,6 +11,7 @@
  */
 import { MAPS_BY_ID } from "./data/maps.js";
 import { isModeId } from "./data/modes.js";
+import { expandWire, isWireSnapshot } from "./snapshot.js";
 import type { LoadoutEntry, ModeId, RoomState, Snapshot, Team } from "./types.js";
 
 export const PROTOCOL_VERSION = 1;
@@ -81,7 +82,11 @@ export type ClientFrame =
   | { readonly t: "signal"; readonly to: string; readonly payload: SignalPayload }
   | { readonly t: "team_assign"; readonly assignments: readonly TeamAssignment[] }
   | { readonly t: "start_match" }
-  | { readonly t: "snapshot_push"; readonly snapshot: Snapshot }
+  | {
+      readonly t: "snapshot_push";
+      /** Packed or expanded — `parseSnapshot` accepts both and always answers with the expanded object (`US-NET-002`). */
+      readonly snapshot: Snapshot | import("./snapshot.js").WireSnapshot;
+    }
   | MatchEndFrame
   | {
       readonly t: "room_settings";
@@ -133,7 +138,7 @@ export type ServerFrame =
       }[];
       readonly room: RoomState;
     }
-  | { readonly t: "snapshot_state"; readonly snapshot: Snapshot }
+  | { readonly t: "snapshot_state"; readonly snapshot: Snapshot | import("./snapshot.js").WireSnapshot }
   | {
       readonly t: "match_recorded";
       readonly matchId: string;
@@ -247,10 +252,13 @@ function parseLoadout(value: unknown): ParseResult<readonly LoadoutEntry[]> {
  */
 function parseSnapshot(value: unknown): ParseResult<Snapshot> {
   if (!isRecord(value)) return fail("bad-request", "snapshot_push needs a snapshot");
-  if (!isInteger(value["seq"]) || (value["seq"] as number) < 0) return fail("bad-request", "snapshot.seq must be a whole number");
-  if (!isInteger(value["hostGeneration"])) return fail("bad-request", "snapshot.hostGeneration is required");
-  if (!Array.isArray(value["players"])) return fail("bad-request", "snapshot.players must be an array");
-  const players = value["players"];
+  // A peer may send the packed form (one number array per player, `US-NET-002` AC7): expand it first, so the DO stores
+  // an ordinary `Snapshot` and the rejoin replay stays readable by every client.
+  const packed = isWireSnapshot(value) ? expandWire(value) : value;
+  if (!isInteger(packed["seq"]) || (packed["seq"] as number) < 0) return fail("bad-request", "snapshot.seq must be a whole number");
+  if (!isInteger(packed["hostGeneration"])) return fail("bad-request", "snapshot.hostGeneration is required");
+  if (!Array.isArray(packed["players"])) return fail("bad-request", "snapshot.players must be an array");
+  const players = packed["players"];
   if (players.length === 0) return fail("bad-request", "snapshot.players cannot be empty");
   if (players.length > 8) return fail("bad-request", "snapshot.players cannot exceed eight slots");
   for (const entry of players) {
@@ -264,23 +272,23 @@ function parseSnapshot(value: unknown): ParseResult<Snapshot> {
       }
     }
   }
-  const turn = value["turn"];
+  const turn = packed["turn"];
   if (!isRecord(turn)) return fail("bad-request", "snapshot.turn is required");
   if (!isInteger(turn["activeSlot"]) || (turn["activeSlot"] as number) < 0 || (turn["activeSlot"] as number) > 7) {
     return fail("bad-request", "snapshot.turn.activeSlot is required");
   }
   if (!isInteger(turn["round"]) || (turn["round"] as number) < 1) return fail("bad-request", "snapshot.turn.round is required");
-  if (value["status"] !== "playing" && value["status"] !== "ended") {
+  if (packed["status"] !== "playing" && packed["status"] !== "ended") {
     return fail("bad-request", "snapshot.status must be playing or ended");
   }
-  if (value["terrain"] !== undefined && typeof value["terrain"] !== "string") {
+  if (packed["terrain"] !== undefined && typeof packed["terrain"] !== "string") {
     return fail("bad-request", "snapshot.terrain must be an RLE string");
   }
-  const bytes = utf8Bytes(JSON.stringify(value));
+  const bytes = utf8Bytes(JSON.stringify(packed));
   if (bytes > MAX_SNAPSHOT_BYTES) {
     return fail("snapshot-too-large", `a snapshot over ${MAX_SNAPSHOT_BYTES} bytes is refused`);
   }
-  return ok(value as unknown as Snapshot);
+  return ok(packed as unknown as Snapshot);
 }
 
 function parseMatchEnd(frame: Record<string, unknown>): ParseResult<MatchEndFrame> {

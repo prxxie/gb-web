@@ -4,7 +4,7 @@
  * generation goes up by one, and every peer gets `host_changed` with the last snapshot to adopt.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { RoomMember, Snapshot } from "@gbw/core";
+import { expandWire, type RoomMember, type Snapshot, type WireSnapshot } from "@gbw/core";
 import { makeSnapshot, RoomHarness, type FakeSocket } from "./support/room-harness";
 
 const BASE = 1_700_000_000_000;
@@ -184,7 +184,8 @@ describe("room host election", () => {
       "connected",
     );
     const [replay] = again.framesOf("snapshot_state");
-    const snapshot = replay?.["snapshot"] as Snapshot;
+    // The relay and the replay carry the packed form (`US-NET-002` AC7), so the test expands it like a peer does.
+    const snapshot = expandWire(replay?.["snapshot"] as WireSnapshot);
     expect(snapshot.seq).toBe(4);
     expect(snapshot.players.find((player) => player.slot === slotBefore)?.hp).toBe(70);
   });
@@ -240,7 +241,8 @@ describe("room host election", () => {
     expect(promoted.framesOf("snapshot_state")).toEqual([]);
     expect(survivor.errors()).toEqual([]);
     const [delivered] = survivor.framesOf("snapshot_state");
-    expect(delivered?.["snapshot"]).toMatchObject({ seq: 2, hostGeneration: 2 });
+    const relayed = delivered?.["snapshot"] as WireSnapshot;
+    expect(relayed).toMatchObject({ s: 2, g: 2 });
     expect(harness.state().lastSnapshot?.seq).toBe(2);
   });
 

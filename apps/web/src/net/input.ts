@@ -5,7 +5,14 @@
  * whole point of the star — one simulation, seven clients rendering it (`ADR-0004`, `OQ-32`: no prediction, no
  * rollback, so the shot appears when the host's answer arrives, one round trip later).
  */
-import type { Snapshot } from "@gbw/core";
+import {
+  decodeSnapshot,
+  encodeBytes,
+  encodeSnapshot,
+  expandWire,
+  type Snapshot,
+  type WireSnapshot,
+} from "@gbw/core";
 
 /** `docs/02-reference/api/signaling.md` § Control channel messages. */
 export interface InputFrame {
@@ -78,14 +85,42 @@ export const SNAPSHOT_BUFFER_LIMIT = 64 * 1024;
 export const SNAPSHOT_BUDGET_BYTES = 800;
 
 /**
- * AC7/the `state` channel's budget: the terrain mask is far too big to ride in every snapshot (it is kilobytes of
- * run-length pairs), so it is stripped before the broadcast and travels with the shot's socket push instead.
+ * AC7/the `state` channel's budget. Two things happen here: the terrain mask is dropped (kilobytes of run-length
+ * pairs travel with the shot's socket push instead) and the players are packed into one number array each, which is
+ * the `WireSnapshot` encoding `packages/core` has shipped since `US-CORE-004` — it was simply never used on this path,
+ * so eight players weighed 1319 B of named fields.
  */
 export function wireSnapshot(snapshot: Snapshot): string {
   const { terrain: _terrain, ...rest } = snapshot as Snapshot & { readonly terrain?: unknown };
-  return JSON.stringify(rest);
+  return encodeSnapshot(rest as Snapshot);
+}
+
+/**
+ * The same packing for a frame that is sent as an object rather than a channel string: the per-turn `snapshot_push`
+ * to the Durable Object, which expands it back into a `Snapshot` before it stores the replay (`parseSnapshot`).
+ */
+export function toPackedSnapshot(snapshot: Snapshot): WireSnapshot {
+  const { terrain: _terrain, ...rest } = snapshot as Snapshot & { readonly terrain?: unknown };
+  return JSON.parse(encodeSnapshot(rest as Snapshot)) as WireSnapshot;
+}
+
+/** {@link readSnapshot} for a frame that arrived as an object rather than a channel string. */
+export function unpackSnapshot(value: Snapshot | WireSnapshot): Snapshot {
+  return isWire(value) ? expandWire(value) : value;
+}
+
+/** The receiving end of {@link wireSnapshot}: packed snapshots are expanded, anything older is read as it came. */
+export function readSnapshot(text: string): Snapshot {
+  const parsed = JSON.parse(text) as unknown;
+  if (isWire(parsed)) return decodeSnapshot(text);
+  return parsed as Snapshot;
+}
+
+function isWire(value: unknown): value is WireSnapshot {
+  const candidate = value as WireSnapshot;
+  return typeof candidate?.s === "number" && typeof candidate?.g === "number" && Array.isArray(candidate.p);
 }
 
 export function withinSnapshotBudget(payload: string): boolean {
-  return payload.length <= SNAPSHOT_BUDGET_BYTES;
+  return encodeBytes(payload) <= SNAPSHOT_BUDGET_BYTES;
 }

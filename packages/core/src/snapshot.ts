@@ -144,6 +144,12 @@ function isWire(value: Snapshot | WireSnapshot): value is WireSnapshot {
   return typeof (value as WireSnapshot).s === "number" && Array.isArray((value as WireSnapshot).p);
 }
 
+/** The packed form as a value, for a frame that is sent as JSON rather than a channel string. */
+export function packSnapshot(snapshot: Snapshot): WireSnapshot {
+  if (isWireSnapshot(snapshot)) return snapshot;
+  return JSON.parse(encodeSnapshot(snapshot)) as WireSnapshot;
+}
+
 /** UTF-8 byte length without depending on the DOM `TextEncoder` (core has no DOM lib). */
 export function encodeBytes(text: string): number {
   let bytes = 0;
@@ -167,9 +173,29 @@ export function assertSnapshotSize(text: string): void {
 
 export function decodeSnapshot(text: string): Snapshot {
   const wire = JSON.parse(text) as WireSnapshot;
-  if (typeof wire.s !== "number" || typeof wire.g !== "number" || !Array.isArray(wire.p)) {
+  if (!isWireSnapshot(wire)) {
     throw new Error("malformed-snapshot");
   }
+  return expandWire(wire);
+}
+
+/**
+ * True for the packed form. `parseSnapshot` uses it to accept a `snapshot_push` that arrives packed, so a peer can
+ * send the small message and the DO still stores an ordinary `Snapshot` for the rejoin replay.
+ */
+export function isWireSnapshot(value: unknown): value is WireSnapshot {
+  const candidate = value as WireSnapshot;
+  return (
+    typeof candidate === "object" &&
+    candidate !== null &&
+    typeof candidate.s === "number" &&
+    typeof candidate.g === "number" &&
+    Array.isArray(candidate.p)
+  );
+}
+
+/** The packed form back into the object the rest of the code reads (`decodeSnapshot` without the JSON step). */
+export function expandWire(wire: WireSnapshot): Snapshot {
   return {
     seq: wire.s,
     hostGeneration: wire.g,

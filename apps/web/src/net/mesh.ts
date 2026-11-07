@@ -7,7 +7,7 @@
  */
 import type { RoomState, Snapshot } from "@gbw/core";
 import { CONTROL_LABEL, STATE_LABEL, createChannels } from "./channels";
-import { SNAPSHOT_BUFFER_LIMIT, snapshotIntervalMs, wireSnapshot } from "./input";
+import { SNAPSHOT_BUFFER_LIMIT, readSnapshot, snapshotIntervalMs, wireSnapshot } from "./input";
 
 export interface SignalChannel {
   readonly kind: "offer" | "answer" | "candidate";
@@ -93,7 +93,7 @@ export function createMesh(options: MeshOptions): Mesh {
     });
     state.addEventListener("message", (event) => {
       try {
-        options.onSnapshot(JSON.parse(String(event.data)) as Snapshot);
+        options.onSnapshot(readSnapshot(String(event.data)));
       } catch {
         // A malformed snapshot is dropped; the next one arrives within 500 ms.
       }

@@ -7,7 +7,7 @@
  * sends instead of simulating — is asserted by `match-wiring.test.tsx`'s harness for the renderer, and by a two-browser pass that is still owed.
  */
 import { describe, expect, it } from "vitest";
-import { TUNABLES, applyInput, createMatch, toSnapshot } from "@gbw/core";
+import { TUNABLES, applyInput, createMatch, encodeBytes, toSnapshot } from "@gbw/core";
 import {
   SNAPSHOT_BUDGET_BYTES,
   SNAPSHOT_BUFFER_LIMIT,
@@ -16,6 +16,7 @@ import {
   SNAPSHOT_WATCHDOG_MS,
   inputFrameOf,
   isStaleInput,
+  readSnapshot,
   snapshotHz,
   snapshotIntervalMs,
   wireSnapshot,
@@ -85,14 +86,27 @@ describe("TC-NET-905: the host publishes at 10 Hz in a turn and 2 Hz when it is 
 });
 
 describe("TC-NET-905: a snapshot carries no terrain and stays inside the budget (US-NET-002 AC5, AC7)", () => {
-  it("records that eight players do not fit 800 bytes yet, and what the payload does weigh", () => {
+  it("packs eight players into the budget", () => {
     const payload = wireSnapshot(toSnapshot(eightPlayers(), 1));
 
-    // Measured 2026-11-07: 1319 B for eight players, because each carries ten named fields. AC7 is open until the
-    // encoding is tightened (see the story's delivery block); the test states the number rather than pretending.
-    expect(payload.length).toBe(1319);
-    expect(withinSnapshotBudget(payload)).toBe(false);
-    expect(SNAPSHOT_BUDGET_BYTES).toBe(800);
+    // Measured 2026-11-07 after the packing: 380 B for eight players, against the 1319 B the named-field form
+    // weighed. AC7 is met with half the budget to spare.
+    expect(withinSnapshotBudget(payload)).toBe(true);
+    expect(encodeBytes(payload)).toBe(380);
+  });
+
+  it("survives the round trip: what the peer reads is what the host packed", () => {
+    const state = eightPlayers();
+    const sent = toSnapshot(state, 2);
+    const read = readSnapshot(wireSnapshot(sent));
+
+    expect(read.seq).toBe(sent.seq);
+    expect(read.hostGeneration).toBe(2);
+    expect(read.turn.activeSlot).toBe(sent.turn.activeSlot);
+    expect(read.weather.wind).toMatchObject({ magnitude: sent.weather.wind.magnitude, sector: sent.weather.wind.sector });
+    expect(read.players).toHaveLength(8);
+    expect(read.players[0]).toMatchObject({ slot: 0, hp: sent.players[0]!.hp, x: sent.players[0]!.x, facing: 1 });
+    expect(read.players[7]!.slot).toBe(7);
   });
 
   it("strips the terrain mask, which is kilobytes of run-length pairs", () => {
@@ -101,9 +115,8 @@ describe("TC-NET-905: a snapshot carries no terrain and stays inside the budget 
     expect("terrain" in withTerrain).toBe(true);
 
     const payload = wireSnapshot(withTerrain);
-    expect(payload.includes("terrain")).toBe(false);
-    expect(payload.length).toBe(wireSnapshot(toSnapshot(state, 1)).length);
-    expect(JSON.parse(payload)).toMatchObject({ seq: withTerrain.seq, hostGeneration: 1 });
+    expect(payload.includes("\"m" + "\"")).toBe(false);
+    expect(withinSnapshotBudget(payload)).toBe(true);
   });
 
   it("keeps the drop threshold and the watchdog at the documented values", () => {

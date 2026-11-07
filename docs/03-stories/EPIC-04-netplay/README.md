@@ -23,7 +23,7 @@ Generated from story frontmatter — run `node .agents/scripts/verify-docs.mjs -
 | Id | Title | Priority | Size | Status | Depends on |
 |---|---|---|---|---|---|
 | [US-NET-001](US-NET-001-connect-peers-with-two-channels.md) | Connect every peer to the host with two data channels | P0 | M | done | US-ROOM-006, US-ROOM-005 |
-| [US-NET-002](US-NET-002-stream-host-state-to-peers.md) | Send inputs to the host and stream state back at 10 Hz | P0 | M | in-progress | US-NET-001, US-CORE-004 |
+| [US-NET-002](US-NET-002-stream-host-state-to-peers.md) | Send inputs to the host and stream state back at 10 Hz | P0 | M | done | US-NET-001, US-CORE-004 |
 | [US-NET-003](US-NET-003-restore-state-after-migration.md) | Restore every peer's state after a host migration | P1 | S | ready | US-NET-002, US-ROOM-005 |
 | [US-NET-004](US-NET-004-reject-messages-from-the-wrong-sender.md) | Reject realtime messages the sender does not own | P1 | S | ready | US-NET-002 |
 <!-- /cpt:epic-stories -->

@@ -38,7 +38,14 @@ import { defaultWindow, type CameraWindow } from "@gbw/core";
 import { useLocale } from "../app/providers";
 import { useLiveAnnouncement } from "../app/useLiveAnnouncement";
 import { translate, type Locale } from "../i18n";
-import { inputFrameOf, isStaleInput, SNAPSHOT_WATCHDOG_MS, type InputFrame } from "../net/input";
+import {
+  inputFrameOf,
+  isStaleInput,
+  SNAPSHOT_WATCHDOG_MS,
+  toPackedSnapshot,
+  unpackSnapshot,
+  type InputFrame,
+} from "../net/input";
 import { createMesh, type Mesh } from "../net/mesh";
 import { decideTurn } from "../net/host-clock";
 import { resyncFromSnapshot } from "../net/resync";
@@ -279,7 +286,7 @@ export function MatchPage(): JSX.Element {
           const carved = result.events.some((event) => event.kind === "shot" && event.carved);
           const snapshot = toSnapshot(result.state, hostGeneration.current, { includeTerrain: carved });
           mesh.current?.broadcast(snapshot);
-          socket.current?.send({ t: "snapshot_push", snapshot });
+          socket.current?.send({ t: "snapshot_push", snapshot: toPackedSnapshot(snapshot) });
           setPower(0);
         },
         onCancel: (reason) => {
@@ -379,7 +386,7 @@ export function MatchPage(): JSX.Element {
       if (hosting && plan.kind === "online") {
         const snapshot = toSnapshot(result.state, hostGeneration.current);
         mesh.current?.broadcast(snapshot);
-        socket.current?.send({ t: "snapshot_push", snapshot });
+        socket.current?.send({ t: "snapshot_push", snapshot: toPackedSnapshot(snapshot) });
       }
     }, 500);
     return () => window.clearInterval(tick);
@@ -448,7 +455,7 @@ export function MatchPage(): JSX.Element {
           const carved = result.events.some((event) => event.kind === "shot" && event.carved);
           const snapshot = toSnapshot(result.state, hostGeneration.current, { includeTerrain: carved });
           mesh.current?.broadcast(snapshot);
-          socket.current?.send({ t: "snapshot_push", snapshot });
+          socket.current?.send({ t: "snapshot_push", snapshot: toPackedSnapshot(snapshot) });
         },
         onPeerState: (playerId, connectionState) => {
           if (connectionState === "failed" || connectionState === "disconnected") {
@@ -505,7 +512,7 @@ export function MatchPage(): JSX.Element {
           lastSnapshotAt.current = Date.now();
           const current = stateRef.current;
           if (!current) return;
-          const synced = resyncFromSnapshot(current, message.snapshot, hostGeneration.current);
+          const synced = resyncFromSnapshot(current, unpackSnapshot(message.snapshot), hostGeneration.current);
           hostGeneration.current = synced.hostGeneration;
           if (synced.applied) commit(synced.state, []);
           return;

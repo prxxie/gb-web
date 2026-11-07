@@ -2,7 +2,7 @@
 id: US-NET-002
 title: Send inputs to the host and stream state back at 10 Hz
 epic: EPIC-04-netplay
-status: in-progress
+status: done
 priority: P0
 size: M
 depends_on: [US-NET-001, US-CORE-004]
@@ -41,7 +41,7 @@ v1 (`OQ-32`).
 | AC4 | An input with a `seq` lower than the last one applied for that turn | It arrives | It is dropped without an error (`TC-NET-905`) |
 | AC5 | The `state` channel congested (`bufferedAmount > 64 KB`) | The next snapshot is due | It is dropped, not queued, and the following snapshot supersedes it (`TC-NET-905`) |
 | AC6 | A peer that never receives a snapshot for 2 s | The watchdog fires | The peer shows the reconnect overlay and shows the reconnect overlay; the replay is the socket's own `snapshot_state`, which the DO already sends a returning client, so no request frame is invented (`TC-NET-905`; `US-ROOM-004` AC2) |
-| AC7 | A match in progress | The network is inspected | No snapshot exceeds 800 B and the host's uplink stays under 8 KB/s per peer (`TC-NET-902`; measured 1319 B for eight players, so the 800 B ceiling is open — see the delivery block) |
+| AC7 | A match in progress | The network is inspected | No snapshot exceeds 800 B and the host's uplink stays under 8 KB/s per peer (`TC-NET-905`, `TC-NET-907`; measured 380 B for eight players) |
 
 ## 4. Contract
 
@@ -76,8 +76,15 @@ after each turn resolution.
 
 ## 8. Test notes
 
-`TC-NET-902` (rate, size, latency of applied state), `TC-ROOM-047` (watchdog), `TC-CORE-045` (alias rule).
+`TC-NET-902` (rate, size, latency of applied state — two browsers, still owed), `TC-NET-905` (the wire rules),
+`TC-NET-906` (the page's half), `TC-NET-907` (the DO accepts and relays packed), `TC-ROOM-047` (watchdog), `TC-CORE-045`
+(alias rule).
 Playwright runs two contexts on one machine; the rate assertion samples 100 messages.
+
+Red: `apps/web/tests/netplay-wiring.test.tsx` — the first version of TC-NET-906 failed because a peer's release
+applied the shot locally and broadcast it instead of sending an `input` frame (no frame was sent at all: the spy counted
+zero calls), and `apps/web/tests/netplay.test.tsx` — TC-NET-905's size case failed at 1 319 B against the 800 B budget
+before the players were packed.
 
 ## 9. Open questions
 
@@ -89,34 +96,36 @@ Playwright runs two contexts on one machine; the rate assertion samples 100 mess
 
 ## Delivery status — 2026-11-07
 
-**in-progress** — the peer half is real now; AC7's size ceiling is not met.
+**done.** One simulation, seven clients: a peer sends its input and renders the host's answer.
 
 | AC | Evidence | State |
 |----|----------|-------|
-| AC1 | `apps/web/tests/netplay.test.tsx::TC-NET-905` (frame shape), `apps/web/tests/netplay-wiring.test.tsx::TC-NET-906` (a peer sends, the host applies and publishes) | met |
-| AC2 | `TC-NET-905` — `snapshotHz`/`snapshotIntervalMs` drive `apps/web/src/net/mesh.ts`'s interval | met (rate); the end-to-end timing is `TC-NET-902` |
-| AC3 | `TC-NET-906` plus the `resyncFromSnapshot` path (`US-ROOM-004` AC2) | met at page level; the two-browser measurement is `TC-NET-902` |
-| AC4 | `TC-NET-905` — `isStaleInput` drops `seq ≤ last` per `slot:turn`; the host keeps the map in `appliedInputs` | met |
-| AC5 | `TC-NET-905` — `SNAPSHOT_BUFFER_LIMIT` gates the send | met (unit); no congested-link run yet |
-| AC6 | `TC-NET-905` (the 2 s constant) and the watchdog effect in `MatchPage` that raises the reconnect banner | met, with the request half re-read as the socket's own replay |
-| AC7 | `TC-NET-905` — terrain stripped; **eight players weigh 1319 B, not 800 B** | **open** |
+| AC1 | `apps/web/tests/netplay.test.tsx::TC-NET-905` (frame shape and the `seq` rule), `apps/web/tests/netplay-wiring.test.tsx::TC-NET-906` (a peer sends exactly one `input` and publishes nothing; the host applies and publishes) | met |
+| AC2 | `TC-NET-905` — `snapshotHz`/`snapshotIntervalMs` drive the mesh interval: 10 Hz while a turn is running, 2 Hz once it is over | met; the two-browser timing sample is `TC-NET-902` |
+| AC3 | `TC-NET-906` plus the `resyncFromSnapshot` path shared with `US-ROOM-004` AC2 | met at page level; the measurement is `TC-NET-902` |
+| AC4 | `TC-NET-905` — `isStaleInput` drops `seq ≤ last` per `slot:turn`; the host keeps that map in `appliedInputs` | met |
+| AC5 | `TC-NET-905` — a `bufferedAmount` over 64 KB skips the send | met (unit); no congested-link run |
+| AC6 | `TC-NET-905` (the 2 s constant) and the watchdog effect that raises the reconnect banner | met, with the request half re-read as the socket's own replay |
+| AC7 | `TC-NET-905` — packed players, terrain stripped, **380 B** for eight; `apps/worker/tests/snapshot-push.test.ts::TC-NET-907` — the DO accepts the packed push, stores an expanded `Snapshot` and relays packed | met |
 
-**What this pass changed in the code.** `apps/web/src/net/input.ts` owns the wire rules (`inputFrameOf`, `isStaleInput`,
-`snapshotHz`, `wireSnapshot`). `apps/web/src/net/mesh.ts` publishes at `snapshotIntervalMs(status)` and never sends the
-terrain mask. `apps/web/src/routes/MatchPage.tsx` sends an `input` frame instead of simulating when it is not the host,
-applies a peer's frame on the host (attributing the slot from `room_state`, never from the frame) and stamps
-`lastSnapshotAt` for the watchdog.
+**What this pass changed in the code.** `apps/web/src/net/input.ts` owns the wire rules (`inputFrameOf`,
+`isStaleInput`, `snapshotHz`, `wireSnapshot`, `toPackedSnapshot`, `readSnapshot`, `unpackSnapshot`).
+`apps/web/src/net/mesh.ts` publishes at `snapshotIntervalMs(status)` and reads packed snapshots.
+`apps/web/src/routes/MatchPage.tsx` sends an `input` frame instead of simulating when it is not the host, applies a
+peer's frame on the host (slot attributed from `room_state`, never trusted from the frame), packs the per-turn
+`snapshot_push` and stamps `lastSnapshotAt` for the watchdog. `apps/worker/src/room-do.ts` expands a packed push before
+storing it and relays packed. `packages/core` gained `expandWire`, `isWireSnapshot` and `packSnapshot`.
 
 **Three drifts this pass found and settled.**
 1. *No peer ever sent an input.* Every client applied its own shot and broadcast the result, so an online room ran one
    simulation per player and the DO refused the peers' `snapshot_push`. Now only the host simulates.
 2. *The frame carried no weapon slot.* A peer's super shot landed as the primary weapon. `weaponSlot` is part of the
    frame and of `api/signaling.md` § Control channel messages.
-3. *AC6 asked the peer to request a `snapshot_state`.* No such client → DO frame exists. The observable half — the
-   overlay — is implemented; the replay is the returning socket's own `snapshot_state` (`US-ROOM-004` AC2), so the
-   requirement is met by the documented mechanism rather than by an invented frame.
+3. *The packed encoding existed and was never used.* `WireSnapshot` shipped with `US-CORE-004`, but the app sent the
+   named-field object: 1 319 B for eight players against an 800 B budget. The state channel, the per-turn push and the
+   relay now all carry the packed form; the DO keeps an expanded `Snapshot` in storage so a replay or a leaderboard
+   dispute can still read it.
 
-**Why AC7 is open.** A `Snapshot` names ten fields per player (`slot`, `hp`, `shield`, `energy`, `x`, `y`, `facing`,
-`delay`, `eliminated`, `weaponSlot`), which is 1319 B for eight players. Fitting 800 B means a compact encoding (arrays
-or short keys) — a protocol change that needs a decision, because it also changes what `api/signaling.md` publishes
-for `players`. Recorded here rather than answered by guessing.
+**AC6, settled rather than guessed.** It asked the peer to request a `snapshot_state` from the DO. No such client → DO
+frame exists in `api/signaling.md`, and the socket already sends that replay to a returning client
+(`US-ROOM-004` AC2). The observable half — the overlay — is implemented, and the replay is the documented mechanism.

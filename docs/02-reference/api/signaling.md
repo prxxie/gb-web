@@ -23,7 +23,7 @@ the budget (`NFR-04`), and readability is worth more at this stage.
 | `signal` | `to` (playerId), `payload` (`{ kind: 'offer' \| 'answer', sdp }` or `{ kind: 'candidate', candidate }`) | Relayed verbatim to `to`; the DO never parses SDP, so a client cannot forge `from`. `kind` is part of the payload because two `{ sdp }` frames are otherwise indistinguishable — an offer and an answer look the same. Max 8 KB per sdp, over that → `payload-too-large`. A `to` that is not connected → `error peer-not-connected`, not `unsupported-message`; signalling yourself → `bad-request` |
 | `team_assign` | `assignments: [{ playerId, team }]` | Host only (`not-host` on a peer). Lobby only (`invalid-state`). One frame carries the whole roster so a half-applied assignment cannot occur. It enforces **capacity** only — no team may hold more than `maxPlayers / 2` (`bad-request`) — because the host must be able to seat the first player; **equality** is `start_match`'s rule |
 | `start_match` | — (no fields) | Host only; every slot filled, both teams non-empty and equal → `status: 'playing'`. The DO stamps `rulesetVersion` from the deployed build: a client cannot choose the version a match is ranked under |
-| `snapshot_push` | `snapshot` (a `Snapshot`, ≤ 8 KB) | Host only; replaces `lastSnapshot` in DO storage and is relayed as `snapshot_state`. `snapshot.seq` must increase — a push at or below the stored `seq` is dropped silently, because a retransmit is not an error. `snapshot.hostGeneration` lets a peer discard a push from a superseded host |
+| `snapshot_push` | `snapshot` (packed `WireSnapshot`, ≤ 8 KB) | Host only; replaces `lastSnapshot` in DO storage and is relayed as `snapshot_state`. `snapshot.seq` must increase — a push at or below the stored `seq` is dropped silently, because a retransmit is not an error. `snapshot.hostGeneration` lets a peer discard a push from a superseded host |
 | `match_end` | `winnerTeam`, `stats: [{ slot, damageDealt, shotsFired, hits, forfeited? }]` | Host only, `playing` only. The DO validates the shape, sets `status: 'ended'`, broadcasts `room_state`, then calls `POST /api/v1/matches` ([matches.md](matches.md), `US-RANK-001`) and broadcasts `match_recorded`. A failed write answers the host with `error internal` and leaves the room `ended`; the host may retry, and `409 match-already-recorded` on that retry is a success from the client's point of view |
 | `chat` | `kind` (`quick_phrase` \| `emote`) with `id`, or a free `text` (≤ 120 chars) | Any member, any status. Above **2/s** → `error rate-limited` and the socket closes `4429`; the DO keeps nothing of what was said |
 | `leave` | — | Removes the member; if it was the host, the 20 s grace window runs out first and then election follows |
@@ -37,7 +37,7 @@ the budget (`NFR-04`), and readability is worth more at this stage.
 | `peer_joined` | `playerId`, `slot`, `room` | Fast path for the lobby UI (also reflected in the next `room_state`) |
 | `peer_left` | `playerId`, `reason`: `'left' \| 'grace' \| 'disconnected'` | Mirrors `connectionState`; the roster change itself arrives in the `room_state` that follows, so this frame stays small and carries no room |
 | `room_closed` | `reason`: `'expired' \| 'empty' \| 'closed'` | Last frame before the socket closes `4410`: the 24 h cap, an empty lobby's 60 s, or an abandonment sweep. Nothing follows it |
-| `snapshot_state` | `snapshot` (a `Snapshot`) | The one relay name: host → peers during play, and the replay a returning or promoted client receives. Discard a snapshot whose `hostGeneration` is below the current one |
+| `snapshot_state` | `snapshot` (packed `WireSnapshot`) | The one relay name: host → peers during play, and the replay a returning or promoted client receives. Discard a snapshot whose `hostGeneration` is below the current one |
 | `signal` | `from` (playerId), `payload` | Relay of a peer's `signal` |
 | `match_started` | `startedAt`, `seed`, `hostPlayerId`, `hostGeneration`, `rulesetVersion`, `assignments[]` (`{ playerId, slot, team, mobileId, accountId, loadout }`), `room` | Both peers and host switch to the match scene on this; `seed` makes weather and spawns reproducible on every client |
 | `host_changed` | `hostPlayerId`, `hostGeneration`, `lastSnapshot`, `room` | Migration event; peers discard snapshots with a lower `hostGeneration` and resync from `room`. The graced member is not named here — `peer_left.reason` already told everyone who is in grace |
@@ -65,17 +65,33 @@ If the graced player returns within 20 s it re-joins with the same `accountId`/`
 
 ## Snapshot payload (`state` channel)
 
+The wire carries the **packed** form (`WireSnapshot`, `packages/core/src/snapshot.ts`), not the object the game code
+reads: keys are one or two characters because this travels ten times a second over an unreliable channel, and `packs`
+means the players are one number array each.
+
 | Field | Type | Meaning |
 |-------|------|---------|
-| `seq` | integer | Monotonic per host generation |
-| `turn` | `{ activeSlot, number, round, deadlineAt }` | Whose turn, which round, and when it ends (`turnDurationMs` = 20 s) |
-| `players` | `[{ slot, hp, x, y, facing, eliminated }]` | Positions quantised to 0.1 world units, HP 0–100 |
-| `projectiles` | `[{ id, x, y, vx, vy }]` | Normally **empty**: a shot resolves at fire time (`US-CORE-001`), so the snapshot carries the result, not a shell in flight; the array exists for the cluster/mine classes that outlive a tick |
-| `weather` | `{ wind: { magnitude, directionDeg, sector }, rolledAtRound }` | The round's weather; constant until `turn.round` changes |
+| `s` | integer | `seq`, monotonic per host generation |
+| `g` | integer | `hostGeneration` |
+| `t` | `[number, activeSlot, deadlineAt, round]` | Whose turn, which round, and when it ends (`turnDurationMs` = 20 s) |
+| `w` | `[magnitude, sector]` | Wind; the direction in degrees is `sector × 30` |
+| `p` | `[[slot, hp, shield, energy, x, y, facing, delay, eliminated, weaponSlot]]` | One row per seat, in slot order. Positions quantised to 0.1 world units, HP 0–maxHp, `eliminated` as `0`/`1` |
+| `j` | `[x, y, carriedBy]…` | Jewels, flat; `carriedBy` is `-1` when nobody carries it |
+| `sc` | `[scoreA, scoreB]` | Team scores |
+| `st` | `"playing" \| "ended"` | Match status |
+| `m` | RLE string, optional | The terrain mask — **only** on the frame that follows a carve |
+| `wt` | `"A" \| "B" \| null` | Winner, or null |
+| `v` | string, optional | `rulesetVersion` |
+| `at` | `"A" \| "B"`, optional | Which team is acting; omitted when it is `A` |
 
-Quantisation keeps an 8-player snapshot at ~300–600 B, under the 800 B budget (`NFR-04`, TC-CORE-041).
+Both directions use this form: `snapshot_push` (host → DO) and `snapshot_state` (DO → peers, and the rejoin replay).
+A client that reads one unpacks it with `unpackSnapshot`/`readSnapshot` (`apps/web/src/net/input.ts`); the DO expands
+before it stores, so `lastSnapshot` and the leaderboard replay are ordinary objects.
 
-**The mask is the exception, and it is one frame per carve, not a channel.** A snapshot that carries `terrain` is
+Packing and quantisation keep an 8-player snapshot at **380 B measured** (2026-11-07, `TC-NET-905`), well under the
+800 B budget (`NFR-04`, TC-CORE-041). The named-field form weighed 1 319 B and never shipped on this path.
+
+**The mask is the exception, and it is one frame per carve, not a channel.** A snapshot that carries `m` is
 sent once by the host after a shot that carved the ground (`US-CORE-006` AC4) so every peer resolves the next hit
 against the same surface; it measures 2 256 B on `map-01` and 5 537 B on `map-06` (1 001 samples at
 `terrainStep 2`), inside the 8 KB per-frame cap and outside the 800 B state budget, which describes the

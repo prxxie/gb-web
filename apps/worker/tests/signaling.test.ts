@@ -108,7 +108,8 @@ describe("snapshot relay and stale drop (§ 3)", () => {
     // Assert
     for (const id of ["p2", "p3", "p4"]) {
       const [frame] = socket(sockets, id).framesOf("snapshot_state");
-      expect((frame?.["snapshot"] as { seq: number } | undefined)?.seq).toBe(1);
+      // Packed on the wire (`US-NET-002` AC7): `s` is `seq`, `g` is `hostGeneration`.
+      expect((frame?.["snapshot"] as { s?: number } | undefined)?.s).toBe(1);
     }
     expect(host.framesOf("snapshot_state")).toHaveLength(0);
     expect(harness.state().lastSnapshot?.seq).toBe(1);
@@ -147,7 +148,7 @@ describe("snapshot relay and stale drop (§ 3)", () => {
     const [state] = again.framesOf("room_state");
     expect(state?.["you"]).toEqual({ playerId: "p2", slot: 1 });
     const [snapshot] = again.framesOf("snapshot_state");
-    expect((snapshot?.["snapshot"] as { seq: number } | undefined)?.seq).toBe(3);
+    expect((snapshot?.["snapshot"] as { s?: number } | undefined)?.s).toBe(3);
   });
 });
 

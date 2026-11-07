@@ -34,6 +34,10 @@ import {
   type RoomSettings,
   type RoomState,
   type Snapshot,
+  type WireSnapshot,
+  expandWire,
+  isWireSnapshot,
+  packSnapshot,
   TUNABLES,
 } from "@gbw/core";
 import type { Env } from "./lib/db.js";
@@ -448,7 +452,11 @@ export class Room implements DurableObject {
     await this.ctx.storage.setAlarm(startedAt + 24 * 60 * 60 * 1000);
   }
 
-  private async pushSnapshot(ws: WebSocket, playerId: string, frame: { snapshot: Snapshot }): Promise<void> {
+  private async pushSnapshot(
+    ws: WebSocket,
+    playerId: string,
+    frame: { snapshot: Snapshot | WireSnapshot },
+  ): Promise<void> {
     if (playerId !== this.room.hostPlayerId) {
       this.reject(ws, "not-host", "only the host pushes snapshots");
       return;
@@ -457,13 +465,18 @@ export class Room implements DurableObject {
       this.reject(ws, "invalid-state", "the room is not playing");
       return;
     }
-    const snapshot = frame.snapshot;
+    // The host sends the packed form to save uplink (`US-NET-002` AC7); the DO stores and relays the expanded object,
+    // because a rejoin replay is one message and every client reads it the same way.
+    const snapshot = isWireSnapshot(frame.snapshot) ? expandWire(frame.snapshot) : frame.snapshot;
     if (this.room.lastSnapshot && snapshot.seq <= this.room.lastSnapshot.seq) return;
     this.room = { ...this.room, lastSnapshot: snapshot, lastActivityAt: Date.now() };
     await this.ctx.storage.put("snapshot", snapshot);
+    // Relayed packed as well: the relay is the 10 Hz path on a congested room and the point of AC7 is that no
+    // snapshot on the wire is bigger than 800 B (`US-NET-002`).
+    const wire = packSnapshot(snapshot);
     for (const [targetId, socket] of this.sockets) {
       if (targetId === playerId) continue;
-      this.send(socket, { t: "snapshot_state", snapshot });
+      this.send(socket, { t: "snapshot_state", snapshot: wire });
     }
   }
 
@@ -773,7 +786,7 @@ export class Room implements DurableObject {
     this.send(ws, { t: "room_state", room: this.publicState(), you: { playerId, slot: member.slot } });
     this.broadcast({ t: "peer_joined", playerId, slot: member.slot, room: this.publicState() }, playerId);
     if (this.room.status === "playing" && this.room.lastSnapshot) {
-      this.send(ws, { t: "snapshot_state", snapshot: this.room.lastSnapshot });
+      this.send(ws, { t: "snapshot_state", snapshot: packSnapshot(this.room.lastSnapshot) });
     }
     await this.scheduleSweep();
   }

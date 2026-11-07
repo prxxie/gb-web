@@ -8,7 +8,8 @@
  * last peer is connected — or five seconds, whichever comes first.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { Snapshot } from "@gbw/core";
+import { createMatch, toSnapshot, type Snapshot } from "@gbw/core";
+import { wireSnapshot } from "../src/net/input";
 import { CONTROL_LABEL, STATE_LABEL, awaitPeerConnected, createChannels } from "../src/net/channels";
 import { createMesh, type SignalChannel } from "../src/net/mesh";
 
@@ -93,7 +94,28 @@ class FakeConnection {
   }
 }
 
-const SNAPSHOT = { seq: 1, hostGeneration: 1, turn: { activeSlot: 0 } } as unknown as Snapshot;
+/**
+ * A snapshot the host really emits: `toSnapshot` of a two-player match. It has to be whole because the wire form is
+ * packed (`US-NET-002` AC7) and pitching the parser against a partial object would test nothing.
+ */
+function realSnapshot(): Snapshot {
+  const state = createMatch({
+    matchId: "m-1",
+    roomCode: "AAAAAA",
+    seed: "seed-1",
+    mode: "solo",
+    mapId: "map-01",
+    seats: [
+      { slot: 0, team: "A", accountId: null, displayName: "Host", mobileId: "mbl-01" },
+      { slot: 1, team: "B", accountId: null, displayName: "Bob", mobileId: "mbl-02" },
+    ],
+    now: 0,
+  });
+  return toSnapshot(state, 1);
+}
+
+const SNAPSHOT = realSnapshot();
+const WIRE = wireSnapshot(SNAPSHOT);
 
 function meshOf(isHost: boolean, hostHello?: () => unknown) {
   const signals: SignalChannel[] = [];
@@ -159,7 +181,7 @@ describe("TC-NET-901: two channels with different promises (US-NET-001 AC1, AC2)
     connection.emit("datachannel", { channel: state });
 
     control.emit("message", { data: JSON.stringify({ t: "input", kind: "skip" }) });
-    state.emit("message", { data: JSON.stringify(SNAPSHOT) });
+    state.emit("message", { data: WIRE });
     expect(controls).toEqual([{ t: "input", kind: "skip" }]);
     expect(snapshots).toHaveLength(1);
   });
