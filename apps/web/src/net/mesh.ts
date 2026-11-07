@@ -7,6 +7,7 @@
  */
 import type { RoomState, Snapshot } from "@gbw/core";
 import { CONTROL_LABEL, STATE_LABEL, createChannels } from "./channels";
+import { SNAPSHOT_BUFFER_LIMIT, snapshotIntervalMs, wireSnapshot } from "./input";
 
 export interface SignalChannel {
   readonly kind: "offer" | "answer" | "candidate";
@@ -48,9 +49,6 @@ interface Peer {
   pendingCandidates: RTCIceCandidateInit[];
 }
 
-const SNAPSHOT_HZ_ACTIVE = 10;
-const SNAPSHOT_HZ_IDLE = 2;
-const BUFFER_LIMIT = 64 * 1024;
 /** `US-NET-001` AC3: snapshots wait for the last peer that is coming, but never longer than this. */
 const READY_TIMEOUT_MS = 5_000;
 
@@ -150,15 +148,16 @@ export function createMesh(options: MeshOptions): Mesh {
     broadcast(snapshot) {
       if (!ready()) return;
       const now = performance.now();
-      const active = snapshot.turn.activeSlot >= 0;
-      const interval = 1000 / (active ? SNAPSHOT_HZ_ACTIVE : SNAPSHOT_HZ_IDLE);
+      // 10 Hz while a turn is running, 2 Hz once it is over (`US-NET-002` AC2); the payload never carries the
+      // terrain mask, which is kilobytes and rides the shot's socket push instead (AC7).
+      const interval = snapshotIntervalMs(snapshot.status);
       if (now - lastBroadcast < interval) return;
       lastBroadcast = now;
-      const payload = JSON.stringify(snapshot);
+      const payload = wireSnapshot(snapshot);
       for (const peer of peers.values()) {
         const channel = peer.state;
         if (!channel || channel.readyState !== "open") continue;
-        if (channel.bufferedAmount > BUFFER_LIMIT) continue;
+        if (channel.bufferedAmount > SNAPSHOT_BUFFER_LIMIT) continue;
         channel.send(payload);
       }
     },

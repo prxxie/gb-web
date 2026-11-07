@@ -85,7 +85,7 @@ against the same surface; it measures 2 256 B on `map-01` and 5 537 B on `map-06
 
 | `t` | Fields | Meaning |
 |-----|--------|---------|
-| `input` | `turnNumber`, `slot`, `kind` (`fire` \| `skip`), `angle`, `force` | ~24 B. Host rejects an input whose `turnNumber`/`slot` is not current, or a second input in the same turn |
+| `input` | `turnNumber`, `slot`, `kind` (`fire` \| `skip`), `angle`, `force`, `weaponSlot` (`0`\|`1`\|`2`, fire only) | ~24 B. Host rejects an input whose `turnNumber`/`slot` is not current, or a second input in the same turn. `slot` is attributed by the host from the sender's member, not trusted from the frame |
 | `chat` | `from`, `kind` (`quick_phrase` \| `emote` \| null), `id`, `text` | The room socket's `chat`, relayed to every other member. The budget in § Budgets is what limits it — the room does not queue, store or reorder |
 | `turn_end` | `turnNumber`, `nextSlot` | Host → peers; keeps the HUD in step even if a snapshot is lost |
 
