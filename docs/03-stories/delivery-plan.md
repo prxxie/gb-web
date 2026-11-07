@@ -25,6 +25,12 @@ order, then priority. Each wave lists the **gates** — open questions that must
 | **W6** — identity + ranks | 10–13 | 14 | `US-AUTH-003`, `US-AUTH-004`, `US-CORE-005`, `US-MATCH-004`, `US-PWA-001`, `US-RANK-001`, `US-RANK-002`, `US-RANK-005` | — |
 | **W7** — polish + go-live (M3) | 13–17 | 15.5 | `US-RANK-003`, `US-RANK-004`, `US-PWA-002`, `US-PWA-004`, `US-OPS-001`, `US-OPS-002`, `US-OPS-003`, `US-OPS-004` | `OQ-33` (load target) |
 
+## Deferred, and why
+
+| Item | Decision | Effect |
+|------|----------|--------|
+| Art pass — sprites, map tilesets, SFX | `ADR-0006`: the vector renderer ships through `M2`; the art wave runs weeks 11–13, and it cannot start while `OQ-20` (AI-asset policy, disclosure, provenance) is unanswered | `M1` and `M2` are judged on gameplay and readability, not art; `OQ-20` is a **release blocker for `M3`** |
+
 ## Critical path
 
 `US-FND-001 → US-FND-002 → US-ROOM-001 → US-ROOM-002 → US-ROOM-006 → US-NET-001 → US-NET-002 → US-RANK-001 →

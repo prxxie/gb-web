@@ -269,9 +269,10 @@ Questions that block or shape the work and that only the product owner, client, 
 
 - **Status**: open
 - **Raised**: 2026-11-04 by cpt-interview
-- **Blocks**: content stories, credits screen
+- **Blocks**: content stories, credits screen, and — per `ADR-0006` — the `M3` release itself
 - **Context**: AI generation is the confirmed asset source, but disclosure requirements, brand approval and provenance
-  rules are unstated.
+  rules are unstated. The art pass is scheduled for weeks 11–13, after `M2` (`ADR-0006`), so this answer is needed before
+  that wave starts, not before `M1`.
 - **Assumption**: A credits/disclosure line in settings, client signs off at M2, assets generated with tools whose terms
   permit commercial use.
 - **Answer**: —
