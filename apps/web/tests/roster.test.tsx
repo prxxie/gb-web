@@ -95,3 +95,38 @@ describe("TC-MATCH-933: the delay column reads the way GunBound reads it (US-MAT
     expect(screen.getByTestId("delay-2").textContent?.trim()).toBe("+120");
   });
 });
+
+describe("TC-MATCH-948: a phrase shows above the sender's chip (US-MATCH-004 AC3, AC6)", () => {
+  it("renders the banner inside the sender's cell and nowhere else", () => {
+    render(
+      <Roster
+        players={players()}
+        activeSlot={0}
+        eliminatedLabel="Đã bị hạ"
+        chat={{ slot: 1, kind: "quick_phrase", text: "Chào nhé!" }}
+      />,
+    );
+
+    const cell = screen.getByTestId("roster-1");
+    const toast = screen.getByTestId("chat-toast-1");
+    expect(cell.contains(toast)).toBe(true);
+    expect(toast.textContent).toBe("Chào nhé!");
+    expect(screen.queryByTestId("chat-toast-0")).toBeNull();
+  });
+
+  it("takes the banner away when the phrase has faded", () => {
+    const { rerender } = render(
+      <Roster
+        players={players()}
+        activeSlot={0}
+        eliminatedLabel="Đã bị hạ"
+        chat={{ slot: 1, kind: "emote", text: "Cười" }}
+      />,
+    );
+    expect(screen.getByTestId("chat-toast-1")).toBeTruthy();
+
+    rerender(<Roster players={players()} activeSlot={0} eliminatedLabel="Đã bị hạ" chat={null} />);
+
+    expect(screen.queryByTestId("chat-toast-1")).toBeNull();
+  });
+});

@@ -344,16 +344,9 @@ export class Room implements DurableObject {
       case "chat": {
         // Preset quick phrases go to everyone else; the limit is the budget above, and the DO never
         // stores what was said (`US-NET-004` §4).
-        this.broadcast(
-          {
-            t: "chat",
-            from: playerId,
-            kind: frame.kind ?? null,
-            id: frame.id ?? null,
-            text: frame.text ?? null,
-          },
-          playerId,
-        );
+        // Only the id crosses: the parser has already refused a free-text frame, and the copy is the receiver's
+        // own locale (`US-MATCH-004` AC5, AC7).
+        this.broadcast({ t: "chat", from: playerId, kind: frame.kind, id: frame.id }, playerId);
         return;
       }
       case "ping": {

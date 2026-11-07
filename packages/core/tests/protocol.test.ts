@@ -176,28 +176,29 @@ describe("TC-ROOM-163: the protocol is versioned and total", () => {
   if (!badMap.ok) expect(badMap.detail).toContain("map-99");
 });
 
-it("TC-ROOM-025: a preset quick phrase and a free text both parse", () => {
-    // Arrange / Act
-    const preset = parseClientFrame(JSON.stringify({ t: "chat", kind: "quick_phrase", id: "phrase-gg" }));
-    const free = parseClientFrame(JSON.stringify({ t: "chat", text: "tốt lắm" }));
+it("TC-ROOM-025: a preset phrase parses and a free text is refused", () => {
+  // Arrange / Act
+  const preset = parseClientFrame(JSON.stringify({ t: "chat", kind: "quick_phrase", id: "phrase-01" }));
+  const free = parseClientFrame(JSON.stringify({ t: "chat", text: "tốt lắm" }));
 
-    // Assert
-    expect(preset.ok && preset.frame).toEqual({ t: "chat", kind: "quick_phrase", id: "phrase-gg" });
-    expect(free.ok && free.frame).toEqual({ t: "chat", text: "tốt lắm" });
-  });
+  // Assert — `OQ-17`: preset only, so prose is refused at the socket and never reaches a peer
+  expect(preset.ok && preset.frame).toEqual({ t: "chat", kind: "quick_phrase", id: "phrase-01" });
+  expect(free.ok).toBe(false);
+});
 
-  it("TC-ROOM-025: a chat frame with neither kind nor text, an unknown kind, or text over 120 is refused", () => {
-    // Arrange / Act
-    const empty = parseClientFrame(JSON.stringify({ t: "chat" }));
-    const unknown = parseClientFrame(JSON.stringify({ t: "chat", kind: "shout", id: "x" }));
-    const long = parseClientFrame(JSON.stringify({ t: "chat", text: "a".repeat(121) }));
+it("TC-ROOM-025: a chat frame with no kind, an unknown kind, or an id outside the catalogue is refused", () => {
+  // Arrange / Act
+  const empty = parseClientFrame(JSON.stringify({ t: "chat" }));
+  const unknown = parseClientFrame(JSON.stringify({ t: "chat", kind: "shout", id: "phrase-01" }));
+  const outside = parseClientFrame(JSON.stringify({ t: "chat", kind: "quick_phrase", id: "phrase-99" }));
+  const extra = parseClientFrame(JSON.stringify({ t: "chat", kind: "emote", id: "emote-01", text: "hi" }));
 
-    // Assert — every refusal names the field, so the client can point at it
-    expect(empty.ok).toBe(false);
-    expect(unknown.ok).toBe(false);
-    expect(long.ok).toBe(false);
-    expect(!long.ok && long.detail).toContain("120");
-  });
+  // Assert — every refusal names the field, so the client can point at it
+  expect(empty.ok).toBe(false);
+  expect(unknown.ok).toBe(false);
+  expect(outside.ok).toBe(false);
+  expect(!extra.ok && extra.detail).toContain("text");
+});
 });
 
 describe("TC-CORE-937: match_end carries the delay table that produced the order (US-CORE-002 AC7)", () => {
@@ -232,5 +233,44 @@ describe("TC-CORE-937: match_end carries the delay table that produced the order
       expect(refusal.code).toBe("bad-request");
       expect(refusal.detail).toContain("delayTable");
     }
+  });
+});
+
+describe("TC-CORE-963: a chat frame carries an id, never text (US-MATCH-004 AC7)", () => {
+  it("TC-CORE-963: a preset phrase parses to the id that crossed the wire", () => {
+    // Arrange / Act
+    const frame = accepted({ t: "chat", kind: "quick_phrase", id: "phrase-03" });
+
+    // Assert — only the id crosses, so the receiver renders its own locale (AC5)
+    expect(frame).toEqual({ t: "chat", kind: "quick_phrase", id: "phrase-03" });
+  });
+
+  it("TC-CORE-963: a free-text chat is bad-request, because no moderation surface exists", () => {
+    // Arrange / Act
+    const extra = rejected({ t: "chat", kind: "quick_phrase", id: "phrase-03", text: "gg ez" });
+
+    // Assert — `OQ-17`: preset only, so the field is not merely ignored, it is refused
+    expect(extra.code).toBe("bad-request");
+    expect(extra.detail).toContain("text");
+  });
+
+  it("TC-CORE-963: a frame with no kind or no id is bad-request", () => {
+    // Arrange / Act
+    const textOnly = rejected({ t: "chat", text: "hello" });
+    const noId = rejected({ t: "chat", kind: "emote" });
+
+    // Assert
+    expect(textOnly.code).toBe("bad-request");
+    expect(noId.code).toBe("bad-request");
+  });
+
+  it("TC-CORE-963: an id outside the catalogue is bad-request", () => {
+    // Arrange / Act
+    const unknown = rejected({ t: "chat", kind: "quick_phrase", id: "phrase-99" });
+    const crossed = rejected({ t: "chat", kind: "quick_phrase", id: "emote-01" });
+
+    // Assert — the catalogue is the only truth; a crossed id would render nothing on the receiver (AC3)
+    expect(unknown.code).toBe("bad-request");
+    expect(crossed.code).toBe("bad-request");
   });
 });

@@ -10,7 +10,6 @@
 TC-CORE-926 apps/web/tests/hud.test.tsx
 TC-MATCH-006 apps/web/tests/match-controls.test.tsx
 TC-MATCH-902 tests/e2e/smoke.spec.ts
-TC-MATCH-905 apps/web/tests/match-controls.test.tsx
 TC-MATCH-918 packages/core/tests/camera.test.ts
 TC-MATCH-919 packages/core/tests/camera.test.ts
 TC-MATCH-920 packages/core/tests/camera.test.ts
@@ -33,7 +32,6 @@ TC-ROOM-153 packages/core/tests/room.test.ts
 # later pass has to resolve by moving the assertion or by re-cutting the case row — it is registered, not fixed,
 # so the list stays honest rather than quiet (see `docs/05-quality/test-plan-status.md` § Known debt).
 TC-MATCH-006 apps/worker/tests/room-validate.test.ts
-TC-MATCH-905 apps/web/tests/phrases.test.tsx
 TC-MATCH-907 apps/web/tests/direction-pad.test.tsx
 TC-PWA-130 apps/web/tests/i18n.test.tsx
 TC-RANK-113 apps/worker/tests/elo.test.ts

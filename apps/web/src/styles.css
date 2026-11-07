@@ -262,6 +262,8 @@ td {
 }
 
 .match__player {
+  /* The phrase banner is positioned against the chip, so it hangs over the speaker and not over the canvas. */
+  position: relative;
   padding: 6px 10px;
   border-radius: 10px;
   background: rgba(16, 26, 46, 0.85);
@@ -283,6 +285,36 @@ td {
   background: rgba(16, 26, 46, 0.9);
   border: 1px solid #24324c;
   white-space: nowrap;
+}
+
+/*
+ * A phrase stays three seconds and an emote one and a half (`US-MATCH-004` AC3, AC6); it hangs under the speaker's
+ * chip so the eye lands on the seat that said it, and it is not tappable — nothing here takes a tap away from the
+ * field.
+ */
+.match__chat-toast {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  max-width: 220px;
+  padding: 4px 8px;
+  border-radius: 8px;
+  background: rgba(16, 26, 46, 0.95);
+  border: 1px solid var(--accent);
+  color: var(--text);
+  font-size: 0.8rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+  /* Above the event feed, which sits under the roster while a turn resolves: the phrase is the player's own
+     message and must not be hidden by a debug surface. */
+  z-index: 52;
+}
+
+.match__chat-toast--emote {
+  font-style: italic;
+  border-color: #6b7a99;
 }
 
 .match__player--active {

@@ -10,6 +10,7 @@
  * tests all run the same checks.
  */
 import { MAPS_BY_ID } from "./data/maps.js";
+import { isChatId, isChatKind, type ChatId, type ChatKind } from "./phrases.js";
 import { isModeId } from "./data/modes.js";
 import { expandWire, isWireSnapshot } from "./snapshot.js";
 import type { WireSnapshot } from "./snapshot.js";
@@ -102,11 +103,10 @@ export type ClientFrame =
   | { readonly t: "leave" }
   | { readonly t: "ping"; readonly at: number }
   | {
-      /** A preset quick phrase or emote; a free `text` is allowed too, bounded to 120 characters. */
+      /** A preset quick phrase or emote, named by an id from the catalogue (`apps/web/src/i18n` holds the copy). */
       readonly t: "chat";
-      readonly kind?: "quick_phrase" | "emote" | undefined;
-      readonly id?: string | undefined;
-      readonly text?: string | undefined;
+      readonly kind: ChatKind;
+      readonly id: ChatId;
     };
 
 export interface PeerLeftFrame {
@@ -149,6 +149,8 @@ export type ServerFrame =
       readonly players: readonly { readonly slot: number; readonly result: "win" | "loss" | "abandon" }[];
     }
   | { readonly t: "move"; readonly from: string; readonly direction: 0 | 1; readonly run: boolean }
+  /** A preset phrase or emote, relayed by the DO or fanned out by the host over `control` (`US-MATCH-004`). */
+  | { readonly t: "chat"; readonly from: string; readonly kind: ChatKind; readonly id: ChatId }
   | { readonly t: "item"; readonly from: string; readonly id: string }
   | { readonly t: "room_closed"; readonly reason: "expired" | "empty" | "closed" }
   | { readonly t: "pong"; readonly at: number; readonly now: number }
@@ -445,28 +447,17 @@ export function parseClientFrame(raw: string): ParseResult<ClientFrame> {
       return ok({ t: "leave" });
     }
     case "chat": {
-      const extra = onlyKeys(parsed, ["t", "kind", "id", "text"], t);
+      // Preset only (`OQ-17`): a `text` field is refused rather than dropped, so a client that tries to send prose
+      // learns here instead of wondering why nobody answered.
+      const extra = onlyKeys(parsed, ["t", "kind", "id"], t);
       if (extra) return fail("bad-request", extra);
       const rawKind = parsed["kind"];
+      if (!isChatKind(rawKind)) return fail("bad-request", 'chat.kind must be "quick_phrase" or "emote"');
       const rawId = parsed["id"];
-      const rawText = parsed["text"];
-      if (rawKind !== undefined && rawKind !== "quick_phrase" && rawKind !== "emote") {
-        return fail("bad-request", 'chat.kind must be "quick_phrase" or "emote"');
+      if (!isChatId(rawKind, rawId)) {
+        return fail("bad-request", `chat.id must name a ${rawKind === "emote" ? "emote" : "quick phrase"}`);
       }
-      if (rawId !== undefined && typeof rawId !== "string") return fail("bad-request", "chat.id must be a string");
-      if (rawText !== undefined && (typeof rawText !== "string" || rawText.length > 120)) {
-        return fail("bad-request", "chat.text must be a string of at most 120 characters");
-      }
-      if (rawKind === undefined && rawText === undefined) return fail("bad-request", "chat needs a kind or a text");
-      const chatKind = rawKind as "quick_phrase" | "emote" | undefined;
-      const chatId = rawId as string | undefined;
-      const chatText = rawText as string | undefined;
-      return ok({
-        t: "chat",
-        ...(chatKind === undefined ? {} : { kind: chatKind }),
-        ...(chatId === undefined ? {} : { id: chatId }),
-        ...(chatText === undefined ? {} : { text: chatText }),
-      });
+      return ok({ t: "chat", kind: rawKind, id: rawId });
     }
     case "ping": {
       const extra = onlyKeys(parsed, ["t", "at"], t);
