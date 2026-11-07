@@ -7,7 +7,7 @@
  * makes the aim aid draw the shot that will actually be fired. The flight itself is `TC-MATCH-941`'s job.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import type { BattleCallbacks } from "../src/game/scene";
 
@@ -93,5 +93,27 @@ describe("TC-MATCH-944: the weapon slot and the pad's nudge reach the renderer (
     if (up!.disabled) return;
     fireEvent.pointerDown(up!);
     await waitFor(() => expect(setAimDelta).toHaveBeenLastCalledWith(1));
+  });
+});
+
+describe("TC-MATCH-950: the turn clock counts down on screen (US-MATCH-003 AC2)", () => {
+  beforeEach(() => {
+    sessionStorage.clear();
+    callbacks = null;
+  });
+  afterEach(cleanup);
+
+  it("moves on its own instead of freezing at the turn duration", async () => {
+    mount();
+    const clock = await screen.findByTestId("turn-clock");
+    const first = clock.textContent;
+
+    // One heartbeat, the interval the page runs while the turn is live. A derived readout with no tick stayed at
+    // `20s` until a move re-rendered the screen, which is what a player saw for the whole turn.
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 1_100));
+    });
+
+    expect(clock.textContent).not.toBe(first);
   });
 });

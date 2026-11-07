@@ -39,7 +39,7 @@ beforeEach(() => {
 
 afterEach(cleanup);
 
-describe("update prompt", () => {
+describe("TC-PWA-045: the update prompt", () => {
   it("stays hidden until a new build is installed", () => {
     renderPrompt();
     expect(screen.queryByTestId("update-prompt")).toBeNull();

@@ -234,6 +234,7 @@ The `covers` column names the requirement ([nonfunctional-requirements.md](../01
 | TC-MATCH-930 | US-MATCH-003 | AC11 — the four-way pad hangs on the active mobile, clamped inside the viewport, and the corner cluster is the fallback | web | FR-01, NFR-17 |
 | TC-MATCH-931 | US-MATCH-003 | AC10 — the wind banner is shown once per `rolledAtRound`, lasts 1.5 s, dismisses on a tap | web | NFR-05, NFR-16 |
 | TC-MATCH-932 | US-MATCH-003 | AC2 — the clock reads whole seconds from `deadlineAt` and never above `turnDurationMs` | web | FR-03 |
+| TC-MATCH-950 | US-MATCH-003 | AC2 — the readout actually counts down | `apps/web/tests/match-wiring.test.tsx`: with the page mounted, the clock's text moves on its own within a second — a derived readout with no tick stayed frozen at `20s` | web | FR-03 |
 | TC-MATCH-933 | US-MATCH-003 | AC1, AC5, AC8 — every seat shows HP, shield and delay (absolute for the active seat, signed for the rest); a wreck shows `0` and the marker | web | FR-01, FR-04 |
 | TC-MATCH-904 | US-MATCH-003 | AC3 — active slot changes | Announced once through the polite live region in the active locale | e2e | NFR-16 |
 | TC-MATCH-923 | US-MATCH-003 | AC6, AC9 — apply `weather` at `m = 0`, `m = 26` and a sector change | Dial draws 12 ticks with long cardinals, arrow at `directionDeg`, numeric 0–26, `0` renders the hollow grey dial, banner appears once per round and dismisses on tap | web | FR-04 |
@@ -300,9 +301,13 @@ The `covers` column names the requirement ([nonfunctional-requirements.md](../01
 
 | ID | Story | Case | Expected | Level | Covers |
 |----|-------|------|----------|-------|--------|
-| TC-PWA-043 | US-PWA-001 | Cold load network sum | Transferred bytes < 5 MB compressed | e2e | NFR-03 |
-| TC-PWA-064 | US-PWA-001 | Offline launch | Shell loads, bot match playable, network actions disabled | e2e | NFR-21 |
-| TC-PWA-139 | US-PWA-001 | Match chunk | Contains no Clerk code | e2e | NFR-03 |
+| TC-PWA-043 | US-PWA-001 | AC1 — the worker installs and precaches the shell and the match | `tests/e2e/pwa-prod.spec.ts` on a production build: `navigator.serviceWorker.ready` reports the root scope, the cache holds `index.html`, a `.css`, the `MatchPage-*` chunk and the manifest, and the served bytes stay under the budget | e2e | NFR-21 |
+| TC-PWA-044 | US-PWA-001 | AC2 — the cold load stays under the transfer budget and fetches no match chunk | `tests/e2e/pwa-prod.spec.ts`: summed `transferSize` of the cold load < 5 MB, no `MatchPage-*` request before the bot button is tapped, and clicking it is what fetches the chunk | e2e | NFR-03 |
+| TC-PWA-045 | US-PWA-001 | AC5 — the update is offered once, and never mid-match | `apps/web/tests/update-prompt.test.tsx`: hidden until a build waits, "Cập nhật" applies it, dismissal applies nothing, `/match/:code` suspends it | web | NFR-21 |
+| TC-PWA-046 | US-PWA-001 | AC6 — iOS opens a normal tab | `tests/e2e/pwa-shell.spec.ts`: the served HTML carries no `apple-mobile-web-app-capable`, and keeps `viewport-fit=cover`, the manifest link and the viewport | e2e | NFR-13 |
+| TC-PWA-047 | US-PWA-001 | AC7 — the manifest is installable | `tests/e2e/pwa-shell.spec.ts`: name, short name, `display: fullscreen`, `orientation: landscape`, theme colour and the 192/512 icons, with both icons really served as PNG | e2e | NFR-21 |
+| TC-PWA-064 | US-PWA-001 | AC3 — with the network off the menu renders and a bot match plays | `tests/e2e/pwa-offline.spec.ts` (menu and disabled server actions) and `tests/e2e/pwa-prod.spec.ts` on a production build: reload offline, "Play bot" reaches the battlefield, the turn clock runs and a pull charges power — all with `context.setOffline(true)` | e2e | NFR-21 |
+| TC-PWA-139 | US-PWA-001 | AC4 — the match chunk carries no Clerk code | `tests/e2e/bundle.spec.ts`: no script served after a bot match contains Clerk | e2e | NFR-03 |
 | TC-PWA-130 | US-PWA-002 | Every route in both locales at both landscape sizes | No overflow, no missing key, no untranslated string | e2e | NFR-18 |
 | TC-PWA-162 | US-PWA-002 | 30 % text expansion fixture in `vi` and `en` | No overflow in the lobby and results layouts | e2e | NFR-18 |
 | TC-PWA-063 | US-PWA-003 | AC3, AC4, AC5, AC6 — the portrait notice, the tablet-height floor, a rotation mid-match and a tall desktop window | Rotate notice with only the locale toggle; the battlefield keeps over 500 px at 1024 × 768; rotation keeps the canvas and the turn clock; 820 × 1180 also gets the notice | e2e | `US-PWA-003` AC3, AC4, AC5, AC6; NFR-19 |
