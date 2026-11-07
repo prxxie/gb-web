@@ -4,11 +4,16 @@
  * The endpoint is the only writer of ratings, so these tests look at the rows, not only the status code:
  * a 201 that wrote half a match is exactly the failure the story's atomicity criterion is about.
  */
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { resetLimits } from "../src/lib/ratelimit";
 import { createRig, seedProfile, type Rig } from "./support/fake-env";
 
 const STARTED = "2026-11-05T10:00:00.000Z";
 const ENDED = "2026-11-05T10:10:00.000Z";
+
+// The limiter's buckets are module state and this file sits well past one account's hourly allowance of
+// submissions, so every case starts from an empty counter the way it starts from an empty database.
+beforeEach(() => resetLimits());
 
 interface PlayerInput {
   slot: number;
@@ -43,17 +48,33 @@ function submission(overrides: Record<string, unknown> = {}): Record<string, unk
 }
 
 async function rigWithProfiles(): Promise<{ rig: Rig; token: string }> {
+  return rigWithRatings({ "acct-a1": 1200, "acct-a2": 1200, "acct-b1": 1200, "acct-b2": 1200 });
+}
+
+/** The same rig, with the ratings and rated-match counts a criterion needs to reach an edge. */
+async function rigWithRatings(
+  ratings: Record<string, number>,
+  ratedMatches: Record<string, number> = {},
+): Promise<{ rig: Rig; token: string }> {
   const rig = createRig();
-  for (const [accountId, rating] of [
-    ["acct-a1", 1200],
-    ["acct-a2", 1200],
-    ["acct-b1", 1200],
-    ["acct-b2", 1200],
-  ] as const) {
-    seedProfile(rig.db, { accountId, displayName: accountId.replace("acct-", "P"), rating });
+  for (const [accountId, rating] of Object.entries(ratings)) {
+    seedProfile(rig.db, {
+      accountId,
+      displayName: accountId.replace("acct-", "P"),
+      rating,
+      ratedMatches: ratedMatches[accountId] ?? 0,
+    });
   }
   const token = await rig.token({ kind: "account", accountId: "acct-a1", guestId: null });
   return { rig, token };
+}
+
+/** The smallest legal submission: one registered player on each team. */
+function oneOnOne(): PlayerInput[] {
+  return [
+    { slot: 0, team: "A", accountId: "acct-a1", damageDealt: 10, shotsFired: 2, hits: 1 },
+    { slot: 1, team: "B", accountId: "acct-b1", damageDealt: 0, shotsFired: 2, hits: 0 },
+  ];
 }
 
 describe("POST /matches — the happy path and the Elo write", () => {
@@ -84,6 +105,14 @@ describe("POST /matches — the happy path and the Elo write", () => {
     // Equal teams: +16 for A, -16 for B (US-RANK-002 AC1)
     expect(body.ratings.find((row) => row.accountId === "acct-a1")?.after).toBe(1216);
     expect(body.ratings.find((row) => row.accountId === "acct-b1")?.after).toBe(1184);
+    // The history is what an audit reads, so the stored rows carry the before/after/delta, not just the response
+    const history = new Map(rig.db.rows("rating_history").map((row) => [row["account_id"], row]));
+    for (const accountId of ["acct-a1", "acct-a2"]) {
+      expect(history.get(accountId)).toMatchObject({ rating_before: 1200, rating_after: 1216, delta: 16 });
+    }
+    for (const accountId of ["acct-b1", "acct-b2"]) {
+      expect(history.get(accountId)).toMatchObject({ rating_before: 1200, rating_after: 1184, delta: -16 });
+    }
     const profile = rig.db.rows("profile").find((row) => row["account_id"] === "acct-a1");
     expect(profile?.["rating"]).toBe(1216);
     expect(profile?.["rated_matches"]).toBe(1);
@@ -304,9 +333,15 @@ describe("POST /matches — ranking rules", () => {
     rig.db.close();
   });
 
-  it("US-RANK-002 AC7: a guest is excluded from the average and the rated players still move", async () => {
-    // Arrange — one guest on team B
-    const { rig, token } = await rigWithProfiles();
+  it("TC-RANK-162: a guest is excluded from the average and the rated players still move", async () => {
+    // Arrange — one guest on team B, with team B rated so the average can only be right if the seat is skipped:
+    // A = (1200 + 1200) / 2 = 1200, B = acct-b2 alone = 1000. Counting the guest as a 1200 player would put B at
+    // 1100 and turn both deltas into ±12, so a `±8` here is what proves the exclusion.
+    const { rig, token } = await rigWithRatings({
+      "acct-a1": 1200,
+      "acct-a2": 1200,
+      "acct-b2": 1000,
+    });
 
     // Act
     const response = await rig.request("POST", "/matches", {
@@ -315,10 +350,147 @@ describe("POST /matches — ranking rules", () => {
     });
 
     // Assert — AC7: "the guest is excluded from the average; the remaining team members are rated"
-    const body = (await response.json()) as { ranked: boolean; ratings: { accountId: string; before: number; after: number }[] };
+    const body = (await response.json()) as {
+      ranked: boolean;
+      ratings: { accountId: string; before: number; after: number; delta: number }[];
+    };
     expect(body.ranked).toBe(true);
-    const ratedB = rig.db.rows("profile").find((row) => row["account_id"] === "acct-b2");
-    expect(ratedB?.["rating"]).not.toBe(1200);
+    // `expected(A) = 1 / (1 + 10 ** ((1000 - 1200) / 400)) = 0.7597…`, so both sides move 8, not the 12 a
+    // guest-inclusive 1100 average would produce.
+    expect(body.ratings.map((row) => [row.accountId, row.delta]).sort()).toEqual([
+      ["acct-a1", 8],
+      ["acct-a2", 8],
+      ["acct-b2", -8],
+    ]);
+    const ratings = new Map(rig.db.rows("profile").map((row) => [row["account_id"], row["rating"]]));
+    expect(ratings.get("acct-a1")).toBe(1208);
+    expect(ratings.get("acct-a2")).toBe(1208);
+    expect(ratings.get("acct-b2")).toBe(992);
+    expect(rig.db.rows("rating_history")).toHaveLength(3);
+    // Only seats with an account are stored in `match_player` (`TC-RANK-119`), so the guest leaves no row.
+    expect(rig.db.rows("match_player")).toHaveLength(3);
+    expect(rig.db.rows("match_player").some((row) => row["slot"] === 2)).toBe(false);
+    rig.db.close();
+  });
+});
+
+describe("POST /matches — the Elo write (US-RANK-002)", () => {
+  it("TC-RANK-158: the favourite gains less than it would against an equal team", async () => {
+    // Arrange — AC2: team A averages 1400, team B 1200, so `expected(A) = 0.7597…` and `round(32 × 0.2403) = 8`:
+    // half the ±16 an equal team earns. A per-player expected score would give the 1200-rated pair −16 each.
+    const { rig, token } = await rigWithRatings({
+      "acct-a1": 1400,
+      "acct-a2": 1400,
+      "acct-b1": 1200,
+      "acct-b2": 1200,
+    });
+
+    // Act
+    const response = await rig.request("POST", "/matches", { body: submission(), token });
+
+    // Assert
+    expect(response.status).toBe(201);
+    const deltas = new Map(
+      rig.db.rows("rating_history").map((row) => [row["account_id"], row["delta"]]),
+    );
+    expect(deltas.get("acct-a1")).toBe(8);
+    expect(deltas.get("acct-a2")).toBe(8);
+    expect(deltas.get("acct-b1")).toBe(-8);
+    expect(deltas.get("acct-b2")).toBe(-8);
+    const history = new Map(rig.db.rows("rating_history").map((row) => [row["account_id"], row]));
+    expect(history.get("acct-a1")).toMatchObject({ rating_before: 1400, rating_after: 1408 });
+    expect(history.get("acct-b1")).toMatchObject({ rating_before: 1200, rating_after: 1192 });
+    const profiles = new Map(rig.db.rows("profile").map((row) => [row["account_id"], row["rating"]]));
+    expect([profiles.get("acct-a1"), profiles.get("acct-b1")]).toEqual([1408, 1192]);
+    rig.db.close();
+  });
+
+  it("TC-RANK-159: a settled player's delta uses K = 16 while a newcomer's uses 32", async () => {
+    // Arrange — AC3: acct-a1 has 30 rated matches, the other three have none; every rating is 1200
+    const { rig, token } = await rigWithRatings(
+      { "acct-a1": 1200, "acct-a2": 1200, "acct-b1": 1200, "acct-b2": 1200 },
+      { "acct-a1": 30 },
+    );
+
+    // Act
+    const response = await rig.request("POST", "/matches", { body: submission(), token });
+
+    // Assert — round(16 × 0.5) = 8 for the settled winner, round(32 × 0.5) = 16 for everybody else
+    expect(response.status).toBe(201);
+    const deltas = new Map(
+      rig.db.rows("rating_history").map((row) => [row["account_id"], row["delta"]]),
+    );
+    expect(deltas.get("acct-a1")).toBe(8);
+    expect(deltas.get("acct-a2")).toBe(16);
+    expect(deltas.get("acct-b1")).toBe(-16);
+    expect(deltas.get("acct-b2")).toBe(-16);
+    const settled = rig.db.rows("profile").find((row) => row["account_id"] === "acct-a1");
+    expect(settled?.["rated_matches"]).toBe(31);
+    rig.db.close();
+  });
+
+  it("TC-RANK-160: a rating at either edge is clamped, and the clamp is what the history records", async () => {
+    // Arrange — AC4: both players sit at 3999, so the +16 an equal team earns would pass 4000
+    const top = await rigWithRatings({ "acct-a1": 3999, "acct-b1": 3999 });
+
+    // Act
+    const won = await top.rig.request("POST", "/matches", {
+      body: submission({ players: oneOnOne() }),
+      token: top.token,
+    });
+
+    // Assert — rating_after is the clamp and `delta` is what was applied, so the clamp is visible
+    expect(won.status).toBe(201);
+    const winner = top.rig.db.rows("rating_history").find((row) => row["account_id"] === "acct-a1");
+    expect(winner).toMatchObject({ rating_before: 3999, rating_after: 4000, delta: 1 });
+    const winnerProfile = top.rig.db.rows("profile").find((row) => row["account_id"] === "acct-a1");
+    expect(winnerProfile?.["rating"]).toBe(4000);
+    top.rig.db.close();
+
+    // Arrange — the other edge: 3 − 16 would be negative
+    const bottom = await rigWithRatings({ "acct-a1": 3, "acct-b1": 3 });
+
+    // Act
+    const lost = await bottom.rig.request("POST", "/matches", {
+      body: submission({ players: oneOnOne(), winnerTeam: "B" }),
+      token: bottom.token,
+    });
+
+    // Assert
+    expect(lost.status).toBe(201);
+    const loser = bottom.rig.db.rows("rating_history").find((row) => row["account_id"] === "acct-a1");
+    expect(loser).toMatchObject({ rating_before: 3, rating_after: 0, delta: -3 });
+    const loserProfile = bottom.rig.db.rows("profile").find((row) => row["account_id"] === "acct-a1");
+    expect(loserProfile?.["rating"]).toBe(0);
+    bottom.rig.db.close();
+  });
+
+  it("TC-RANK-161: one account is rated once per match, because the unique index refuses a second row", async () => {
+    // Arrange — AC6: a recorded match, then the row a replay would try to write
+    const { rig, token } = await rigWithProfiles();
+    const recorded = await rig.request("POST", "/matches", { body: submission(), token });
+    expect(recorded.status).toBe(201);
+
+    // Act + Assert — `UNIQUE (account_id, match_id)` is the guard, not the route's pre-check
+    expect(() =>
+      rig.db.sql
+        .prepare(
+          `INSERT INTO rating_history (account_id, match_id, rating_before, rating_after, delta, created_at)
+           VALUES ('acct-a1', 'match-0001', 1216, 1232, 16, '2026-11-05T10:00:00.000Z')`,
+        )
+        .run(),
+    ).toThrow(/UNIQUE constraint failed: rating_history/);
+    const rows = rig.db
+      .rows("rating_history")
+      .filter((row) => row["account_id"] === "acct-a1" && row["match_id"] === "match-0001");
+    expect(rows).toHaveLength(1);
+
+    // The route never gets that far either: a replay is refused, and no rating moves a second time.
+    const replay = await rig.request("POST", "/matches", { body: submission(), token });
+    expect(replay.status).toBe(409);
+    const afterReplay = new Map(rig.db.rows("profile").map((row) => [row["account_id"], row["rating"]]));
+    expect([afterReplay.get("acct-a1"), afterReplay.get("acct-b1")]).toEqual([1216, 1184]);
+    expect(rig.db.rows("rating_history")).toHaveLength(4);
     rig.db.close();
   });
 });
