@@ -38,6 +38,7 @@ import { defaultWindow, type CameraWindow } from "@gbw/core";
 import { useLocale } from "../app/providers";
 import { useLiveAnnouncement } from "../app/useLiveAnnouncement";
 import { translate, type Locale } from "../i18n";
+import { inputFrameOf, isStaleInput, SNAPSHOT_WATCHDOG_MS, type InputFrame } from "../net/input";
 import { createMesh, type Mesh } from "../net/mesh";
 import { decideTurn } from "../net/host-clock";
 import { resyncFromSnapshot } from "../net/resync";
@@ -139,6 +140,12 @@ export function MatchPage(): JSX.Element {
   const mesh = useRef<Mesh | null>(null);
   const socket = useRef<ReconnectingSocket | null>(null);
   const seq = useRef(1);
+  /** Last `seq` applied per `slot:turn`, so a resent input is dropped instead of applied twice (`US-NET-002` AC4). */
+  const appliedInputs = useRef(new Map<string, number>());
+  /** `playerId → slot` from the last `room_state`, so a control frame can be attributed to a seat (`US-NET-002` AC1). */
+  const slotsByPlayer = useRef(new Map<string, number>());
+  /** When the last snapshot arrived, for the 2 s watchdog (`US-NET-002` AC6). */
+  const lastSnapshotAt = useRef(0);
   const stateRef = useRef<MatchState | null>(null);
   const ended = useRef(false);
   // Slots the room reports as `grace` or `disconnected`, and the newest host election seen: the first
@@ -239,6 +246,29 @@ export function MatchPage(): JSX.Element {
             },
           );
           if (!input) return;
+          const turn = current.turn.number;
+          if (!hosting) {
+            // A peer never simulates (`US-NET-002` AC1): the input goes to the host, the shot appears when the host's
+            // snapshot comes back — one round trip later by design (`OQ-32`, no prediction).
+            seq.current = input.seq + 1;
+            mesh.current?.sendControlAll(
+              inputFrameOf(
+                {
+                  kind: "fire",
+                  angle: input.angle,
+                  force: input.force,
+                  facing: current.players.find((player) => player.slot === plan.localSlot)?.facing ?? 1,
+                  weaponSlot: input.weaponSlot,
+                },
+                turn,
+                input.seq,
+              ),
+            );
+            setLockedTurn(turn);
+            lockedTurnRef.current = turn;
+            setPower(0);
+            return;
+          }
           seq.current += 1;
           const result = applyInput(current, input, Date.now());
           commit(result.state, result.events);
@@ -381,6 +411,7 @@ export function MatchPage(): JSX.Element {
                 : { kind: channel.kind, sdp: (channel.payload as RTCSessionDescriptionInit).sdp ?? "" },
           }),
         onSnapshot: (snapshot) => {
+          lastSnapshotAt.current = Date.now();
           const current = stateRef.current;
           if (!current) return;
           const synced = resyncFromSnapshot(current, snapshot, hostGeneration.current);
@@ -390,11 +421,34 @@ export function MatchPage(): JSX.Element {
         onControl: (from, message) => {
           const current = stateRef.current;
           if (!current) return;
-          const input = message as { kind?: string };
-          if (!input || typeof input.kind !== "string") return;
-          void from;
-          const result = applyInput(current, message as Parameters<typeof applyInput>[1], Date.now());
+          const frame = message as Partial<InputFrame> & { t?: string };
+          if (frame?.t !== "input") return;
+          // Only the host runs the simulation; a peer that receives an input has already made a mistake.
+          if (plan.hostPlayerId !== plan.playerId) return;
+          const slot = slotsByPlayer.current.get(from);
+          if (slot === undefined || frame.turn !== current.turn.number) return;
+          // AC4: an input older than the last one applied for this turn is dropped, not answered.
+          const key = `${slot}:${current.turn.number}`;
+          if (isStaleInput(frame as InputFrame, appliedInputs.current.get(key))) return;
+          appliedInputs.current.set(key, frame.seq ?? 0);
+          const input =
+            frame.kind === "skip"
+              ? { kind: "skip" as const, slot, seq: frame.seq ?? 0 }
+              : {
+                  kind: "fire" as const,
+                  slot,
+                  weaponSlot: frame.weaponSlot ?? 0,
+                  angle: frame.angle ?? 0,
+                  force: frame.force ?? 0,
+                  seq: frame.seq ?? 0,
+                };
+          const result = applyInput(current, input, Date.now());
           commit(result.state, result.events);
+          // A resolved turn is published at once, so the shotter does not wait for the 100 ms tick (AC2, § 5).
+          const carved = result.events.some((event) => event.kind === "shot" && event.carved);
+          const snapshot = toSnapshot(result.state, hostGeneration.current, { includeTerrain: carved });
+          mesh.current?.broadcast(snapshot);
+          socket.current?.send({ t: "snapshot_push", snapshot });
         },
         onPeerState: (playerId, connectionState) => {
           if (connectionState === "failed" || connectionState === "disconnected") {
@@ -448,6 +502,7 @@ export function MatchPage(): JSX.Element {
         if (message.t === "snapshot_state") {
           // The relay and the rejoin replay share one name: a returning client lands the host's hp, turn
           // and wind without a reload (`US-ROOM-004` AC2, AC5).
+          lastSnapshotAt.current = Date.now();
           const current = stateRef.current;
           if (!current) return;
           const synced = resyncFromSnapshot(current, message.snapshot, hostGeneration.current);
@@ -463,6 +518,7 @@ export function MatchPage(): JSX.Element {
             .map((member) => member.slot);
           hostGeneration.current = Math.max(hostGeneration.current, message.room.hostGeneration);
           for (const member of message.room.members) {
+            slotsByPlayer.current.set(member.playerId, member.slot);
             if (member.playerId !== plan.playerId) void mesh.current?.addPeer(member.playerId);
           }
         }
@@ -487,6 +543,18 @@ export function MatchPage(): JSX.Element {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [plan?.roomCode, plan?.playerId]);
 
+  // `US-NET-002` AC6: a peer that has heard nothing for two seconds is looking at a frozen screen, so it says so.
+  // The replay itself is the socket's: a returning client receives `snapshot_state` from the DO (`US-ROOM-004` AC2).
+  useEffect(() => {
+    if (!plan || plan.kind !== "online" || hosting) return undefined;
+    const timer = setInterval(() => {
+      if (stateRef.current?.status !== "playing") return;
+      if (lastSnapshotAt.current === 0) return;
+      if (Date.now() - lastSnapshotAt.current > SNAPSHOT_WATCHDOG_MS) setBanner(t("match.reconnecting"));
+    }, 500);
+    return () => clearInterval(timer);
+  }, [plan, hosting, t]);
+
   const onPad = useCallback(
     (action: PadAction) => {
       const current = stateRef.current;
@@ -500,10 +568,11 @@ export function MatchPage(): JSX.Element {
           Date.now(),
         );
         commit(result.state, result.events);
-        mesh.current?.broadcast(toSnapshot(result.state, hostGeneration.current));
+        // Only the host publishes: a peer's local move is not the simulation anyone else sees (`US-NET-002`).
+        if (hosting) mesh.current?.broadcast(toSnapshot(result.state, hostGeneration.current));
       }
     },
-    [plan, mobile, commit],
+    [plan, mobile, commit, hosting],
   );
 
   const onRepeat = useCallback(
@@ -544,10 +613,15 @@ export function MatchPage(): JSX.Element {
   const onSkip = useCallback(() => {
     const current = stateRef.current;
     if (!current || !plan || current.turn.activeSlot !== plan.localSlot) return;
+    const turn = current.turn.number;
+    if (!hosting) {
+      mesh.current?.sendControlAll(inputFrameOf({ kind: "skip" }, turn, seq.current++));
+      return;
+    }
     const result = applyInput(current, { kind: "skip", slot: plan.localSlot, seq: seq.current++ }, Date.now());
     commit(result.state, result.events);
     mesh.current?.broadcast(toSnapshot(result.state, hostGeneration.current));
-  }, [plan, commit]);
+  }, [plan, commit, hosting]);
 
   // A phrase carries an id, never a string the player typed (AC7), so every receiver renders it in
   // its own locale (AC5).

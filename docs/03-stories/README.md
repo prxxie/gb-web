@@ -8,7 +8,7 @@ decide, a contract that already exists in `02-reference/`, and tests that prove 
 <!-- cpt:stats -->
 | Stories | Done | In progress | Ready | Blocked | Draft | Closed |
 |---|---|---|---|---|---|---|
-| 53 | 35 | 0 | 18 | 0 | 0 | 0 |
+| 53 | 35 | 1 | 17 | 0 | 0 | 0 |
 
 Open questions: **Open: 15 · Blocking: 0 · Answered: 26 · Withdrawn: 1**
 <!-- /cpt:stats -->
