@@ -24,7 +24,7 @@ Generated from story frontmatter — run `node .agents/scripts/verify-docs.mjs -
 |---|---|---|---|---|---|
 | [US-MATCH-001](US-MATCH-001-render-the-battlefield.md) | Render the battlefield, units and camera in Phaser | P0 | M | done | US-FND-003, US-CORE-001 |
 | [US-MATCH-002](US-MATCH-002-aim-and-fire-by-touch.md) | Pull power with one finger and fire on release | P0 | M | ready | US-MATCH-001, US-CORE-002 |
-| [US-MATCH-003](US-MATCH-003-show-the-hud.md) | Show HP, wind, the turn clock and the roster in the HUD | P0 | S | ready | US-MATCH-001 |
+| [US-MATCH-003](US-MATCH-003-show-the-hud.md) | Show HP, wind, the turn clock and the roster in the HUD | P0 | S | done | US-MATCH-001 |
 | [US-MATCH-004](US-MATCH-004-skip-and-send-a-phrase.md) | Skip a turn and send a preset phrase or emote | P2 | S | ready | US-MATCH-003, US-NET-002 |
 | [US-MATCH-005](US-MATCH-005-pick-a-weapon-and-use-items.md) | Pick a weapon slot and use items | P0 | M | ready | US-MATCH-001, US-CORE-007, US-CORE-009 |
 | [US-MATCH-006](US-MATCH-006-move-with-touch-controls.md) | Move and angle with the four-way pad | P1 | S | ready | US-MATCH-002, US-CORE-008 |

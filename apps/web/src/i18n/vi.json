@@ -54,6 +54,7 @@
   "match.skip": "Bỏ lượt",
   "match.fire": "Bắn",
   "match.wind": "Gió",
+  "match.round": "Lượt {round}",
   "match.weather.changed": "Thời tiết thay đổi: gió {magnitude} hướng {sector}",
   "match.event.shot": "Bắn (đạn {power})",
   "match.event.weather": "Thời tiết: gió {magnitude}",

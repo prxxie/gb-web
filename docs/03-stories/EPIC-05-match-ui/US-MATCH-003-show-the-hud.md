@@ -2,7 +2,7 @@
 id: US-MATCH-003
 title: Show HP, wind, the turn clock and the roster in the HUD
 epic: EPIC-05-match-ui
-status: ready
+status: done
 priority: P0
 size: S
 depends_on: [US-MATCH-001]
@@ -45,6 +45,7 @@ text here (`NFR-16`).
 | AC9 | 12 sectors of 30° and magnitudes 0–26 | the dial renders | 12 ticks with longer ticks at `0/90/180/270`, cardinal labels, the arrow at `directionDeg`, the magnitude as a whole number beside it (`TC-MATCH-923`) |
 | AC10 | `weather.rolledAtRound` changes | a new round starts | The 1.5 s banner `match.weather.changed` appears once, shows magnitude and direction in degrees, and any tap dismisses it without blocking input (`TC-MATCH-923`) |
 | AC7 | The app at 200 % text size | The HUD renders | No number is clipped and the canvas keeps its aspect ratio (`TC-PWA-159`) |
+| AC11 | A match on an 844×390 phone | The HUD is laid out | The four-way pad rings **this client's mobile** — the active one on the player's own turn (one button-gap from the hull, icon-only buttons at 80 % opacity), is clamped inside the viewport, and never covers the mobile it belongs to (`TC-MATCH-930`) |
 
 ## 4. Contract
 
@@ -57,7 +58,14 @@ HUD regions (top bar 56 px, roster strip 64 px, controls bottom-right):
 | Turn clock | seconds remaining, active player's name, turn number | `match.turn`, `match.turnOf` |
 | Controls | skip (60×60), phrase/emote (60×60) | `match.skip`, `match.phrases` |
 
-The HUD subscribes to `SceneView.setState` output via the same `GameSession` callback; it never polls.
+The HUD subscribes to `SceneView` output via the same `GameSession` callback; it never polls.
+
+| Signal | Direction | Contract |
+|--------|-----------|----------|
+| `setState(state, localSlot)` | page → scene | draw this snapshot, blending from what is on screen |
+| `onPull/onRelease/onCancel` | scene → page | the local gesture, in power/angle units |
+| `onCamera(window)` | scene → page | the visible window changed (pan or pinch) |
+| `onFocus(point \| null)` | scene → page | where this client's mobile landed, in CSS pixels; `null` when it is not on screen. Reported only when the point moves ≥ 2 px, and `padLayout` turns it into the pad's corner (`TC-MATCH-930`) |
 
 ## 5. Rules and edge cases
 
@@ -66,14 +74,23 @@ The HUD subscribes to `SceneView.setState` output via the same `GameSession` cal
 - The dial is 56 px and sits left of the turn clock; it never scales with camera zoom (`US-MATCH-007` AC6).
 - The clock shows `0` and the skip animation while the turn resolves; it never shows a negative number.
 - A missing member (disconnected) keeps a chip with a "disconnected" badge instead of disappearing.
-- No HUD element may cover the aim area: the canvas is inset by the HUD heights, not overlaid by an opaque panel.
+- The canvas fills the viewport and the HUD is a transparent overlay on top of it (`US-MATCH-001` AC4); the pad's
+  position, not an inset, is what keeps the controls off the aim area.
+- The pad is the **one** control cluster: it rings the active mobile at 96 px, with icon-only buttons at 80 % opacity so
+  the hull stays readable through it. When the ring would leave the viewport the box is clamped, corner-first; when the
+  renderer reports no point (a client that has not drawn yet) the pad stays in its corner cluster.
+- Each seat's delay is absolute for the active slot and signed against it for everyone else, because a queue is only
+  meaningful relative to the player who is shooting.
 - Live-region announcements are throttled to one per second to avoid flooding a screen reader.
 
 ## 6. Implementation notes
 
-- `apps/web/src/game/hud/` with `RosterStrip`, `WindDial`, `TurnClock`, `MatchControls`; each is a pure function of
-  the snapshot.
-- The clock uses `deadlineAt` from the snapshot and a local `requestAnimationFrame` tick; no `setInterval` drift.
+- The components live in `apps/web/src/components/`: `Roster`, `WindDial`, `WeaponStrip`, `ItemTray`, `DirectionPad`,
+  `PhrasePicker`, `WeatherBanner`; each is a pure function of the snapshot plus its labels.
+- The clock reads `deadlineAt` through `clockSeconds` (`apps/web/src/lib/clock.ts`), so "never more than the turn
+  duration" is a unit test rather than a browser observation.
+- The pad's geometry is `padLayout` (`apps/web/src/components/pad-layout.ts`): pure, clamped, and tested without a
+  browser; the scene only reports the point it drew the mobile at.
 
 ## 7. Out of scope
 
@@ -82,8 +99,13 @@ The HUD subscribes to `SceneView.setState` output via the same `GameSession` cal
 
 ## 8. Test notes
 
-`TC-MATCH-903` (values equal the snapshot), `TC-MATCH-904` (announcement), `TC-PWA-160`, `TC-PWA-159`. RTL tests render
-the components from a fixture snapshot; one Playwright test asserts the clock counts down.
+`TC-MATCH-903` (values equal the snapshot), `TC-MATCH-904` (announcement), `TC-MATCH-930` (pad geometry), `TC-MATCH-931`
+(the wind banner), `TC-MATCH-932` (the clock), `TC-MATCH-933` (delay column and the `0` on a wreck), `TC-MATCH-925` and
+`TC-MATCH-923` (roster and dial), `TC-PWA-160` and `TC-PWA-159` (target sizes, 200 % text). RTL tests render the
+components from a fixture snapshot; one Playwright test asserts the clock counts down.
+
+Red: none — the components and their cases predate this pass; the pad's geometry and the banner were written red-first in
+`apps/web/tests/pad-layout.test.tsx` and `apps/web/tests/weather-banner.test.tsx`.
 
 ## 9. Open questions
 
@@ -94,11 +116,27 @@ the components from a fixture snapshot; one Playwright test asserts the clock co
 
 ## Delivery status — 2026-11-06
 
-**in-progress.** the wind dial (twelve ticks), power readout, turn clock, roster and weapon strip are implemented and their
-components are unit-tested; the live HUD needs a running match.
+**done.** All eleven acceptance criteria are met and traced. What this pass changed:
 
-Known layout defect, found while fixing the camera on 2026-11-06: `docs/02-reference/screens/match.md` draws the four-way
-pad **around the mobile**, and the shipped HUD puts it in a fixed bottom-left cluster instead. When the active mobile
-stands near the map's left edge the camera clamp keeps it on screen but the pad covers it
-(`docs/05-quality/evidence/US-MATCH-007/framing-844x390.png`). Fixing it means anchoring the pad and the power ring to the
-mobile's screen position, which is this story's work.
+- **The pad rings the mobile (AC11)** — the defect recorded on 2026-11-06 is closed. `apps/web/src/game/scene.ts` reports
+  the point it drew the active mobile at through the new `onFocus` callback (≤ 2 px threshold, so React is not asked to
+  render per frame); `apps/web/src/components/pad-layout.ts` clamps that point into a 192 px box
+  (`apps/web/tests/pad-layout.test.tsx`, `TC-MATCH-930`); `apps/web/src/components/DirectionPad.tsx` takes the point and
+  the viewport, marks itself `match__pad--on-mobile`, and falls back to the corner cluster when there is none. The buttons
+  stay icon-only (▲◀▶▼ with `aria-label`s) at `opacity: 0.8` in `apps/web/src/styles.css`, per the owner's instruction.
+- **The delay column (AC1, AC5, AC8)** — `apps/web/src/components/Roster.tsx` gained `delayText` and a
+  `data-testid="delay-<slot>"` cell: absolute for the active seat, signed against it for the others. A wreck now prints
+  `0` **and** the marker, which is what this story's AC5 asks for (the `US-MATCH-001` AC6 wording was relaxed to match).
+- **The round (AC1)** — `match.round` (`apps/web/src/i18n/{vi,en}.json`) renders in a `data-testid="turn-round"` chip
+  beside the clock.
+- **The clock (AC2)** — `apps/web/src/lib/clock.ts` `clockSeconds` caps at `turnDurationMs` and floors at 0
+  (`TC-MATCH-932`).
+- **The wind banner (AC10)** — `apps/web/src/components/WeatherBanner.tsx` was missing entirely; it now appears once per
+  `rolledAtRound`, lasts 1.5 s, and dismisses on a tap (`TC-MATCH-931`).
+- Verified: `npx vitest run` 103 files / 863 cases, `npx tsc -b` and `npx eslint .` clean,
+  `node .agents/scripts/verify-docs.mjs --fix` 0/0, `npx playwright test` 49 cases.
+
+Still open, and **not** claimed by this story: the weapon/item strip keeps a fixed bottom-left corner
+(`apps/web/src/styles.css` `.match__loadout`), so on 844×390 it sits over the aim area when the local mobile stands at
+the map's left edge (`evidence/US-MATCH-003/ac11-pad-around-mobile-844x390.png`). AC11 covers the pad, not the strip;
+giving the strip its own placement is a follow-up that needs a `US-MATCH-006` change or a new story.

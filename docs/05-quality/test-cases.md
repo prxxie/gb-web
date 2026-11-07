@@ -223,11 +223,17 @@ The `covers` column names the requirement ([nonfunctional-requirements.md](../01
 | TC-MATCH-901 | US-MATCH-001 | AC1 — mount the scene with a state | Map, units and turn indicator drawn; the ruler's division count matches `clamp(round(8 × visibleWidth / 1000), 8, 16)` with one ~125-unit division each | e2e | NFR-01 |
 | TC-MATCH-151 | US-MATCH-002 | Drag aim and release | One `fire`, angle/force within ±2° / ±3 of the drawn values | e2e | FR-03 |
 | TC-MATCH-902 | US-MATCH-002 | A second finger lands mid-pull | The pull is cancelled without firing and the camera gesture takes over | web | FR-03 |
-| TC-MATCH-903 | US-MATCH-003 | Snapshot applied | HUD HP, wind and active slot equal the snapshot within 100 ms | web | NFR-02 |
-| TC-MATCH-904 | US-MATCH-003 | Active slot changes | Announced once through the polite live region in the active locale | e2e | NFR-16 |
-| TC-MATCH-923 | US-MATCH-003 | Apply `weather` at `m = 0`, `m = 26` and a sector change | Dial draws 12 ticks with long cardinals, arrow at `directionDeg`, numeric 0–26, `0` renders the hollow grey dial, banner appears once per round and dismisses on tap | web | FR-04 |
+| TC-MATCH-903 | US-MATCH-003 | AC1 — snapshot applied | HUD HP, wind and active slot equal the snapshot within 100 ms | web | NFR-02 |
+| TC-MATCH-930 | US-MATCH-003 | AC11 — the four-way pad hangs on the active mobile, clamped inside the viewport, and the corner cluster is the fallback | web | FR-01, NFR-17 |
+| TC-MATCH-931 | US-MATCH-003 | AC10 — the wind banner is shown once per `rolledAtRound`, lasts 1.5 s, dismisses on a tap | web | NFR-05, NFR-16 |
+| TC-MATCH-932 | US-MATCH-003 | AC2 — the clock reads whole seconds from `deadlineAt` and never above `turnDurationMs` | web | FR-03 |
+| TC-MATCH-933 | US-MATCH-003 | AC1, AC5, AC8 — every seat shows HP, shield and delay (absolute for the active seat, signed for the rest); a wreck shows `0` and the marker | web | FR-01, FR-04 |
+| TC-MATCH-904 | US-MATCH-003 | AC3 — active slot changes | Announced once through the polite live region in the active locale | e2e | NFR-16 |
+| TC-MATCH-923 | US-MATCH-003 | AC6, AC9 — apply `weather` at `m = 0`, `m = 26` and a sector change | Dial draws 12 ticks with long cardinals, arrow at `directionDeg`, numeric 0–26, `0` renders the hollow grey dial, banner appears once per round and dismisses on tap | web | FR-04 |
 | TC-MATCH-905 | US-MATCH-004 | Skip, and six phrases in one second | Skip resolves the turn; the third phrase onward is dropped locally | e2e | FR-07 |
 | TC-MATCH-006 | US-MATCH-005 | Item tray with no items, and a loadout of 12 | Empty state with no dead buttons; the 12th item is refused | e2e | `data/items.md` |
+| TC-MATCH-934 | US-MATCH-003 | AC4 — every HUD target at 844×390 | tap floors and gaps: ≥ 44×44 for every control, 60×60 for fire and skip, ≥ 8 px between them, measured by the `TC-PWA-160` sweep | manual | NFR-17 — run by `TC-PWA-160`, recorded in `evidence/US-MATCH-003/README.md` |
+| TC-MATCH-935 | US-MATCH-003 | AC7 — the HUD at 200 % text size | no number clipped and the canvas keeps its aspect at 844×390 with the browser text size doubled | manual | NFR-17 — run by `TC-PWA-159`, recorded in `evidence/US-MATCH-003/README.md` |
 | TC-MATCH-906 | US-MATCH-005 | Select weapon 2, spend the super shot | Active slot changes and the arc redraws by class; the super shot then disables | e2e | FR-03 |
 | TC-MATCH-907 | US-MATCH-006 | Tap and hold ◀ ▶, exhaust the move budget, end the turn while held | Unit walks 8 px per 100 ms with live energy, the badge decrements to `0` and disables the control, no stray move after the turn ends, and a touch starting on the pad never becomes an aim pull | e2e | FR-03 |
 | TC-MATCH-915 | US-MATCH-002 | Pull `powerDragFull`, then half of it | Ring reads `4.0` and `2.0` ±0.1, `force = power × 25` = 100 and 50, gradient runs clockwise from −90° | web | FR-03 |
