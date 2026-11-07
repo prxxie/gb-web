@@ -53,6 +53,8 @@ export interface MatchSubmission {
 }
 
 const MIN_DURATION_MS = 60_000;
+/** `US-RANK-001` § 5: damage above this many times the shots fired is kept, and logged for review (`OQ-30`). */
+const IMPLAUSIBLE_DAMAGE_PER_SHOT = 100;
 const MAX_DURATION_MS = 30 * 60_000;
 const MIN_PLAYERS = 2;
 const MAX_PLAYERS = 8;
@@ -415,6 +417,28 @@ export async function submitMatch(request: Request, env: Env, session: SessionTo
     const raced = await findMatchByRoomOccurrence(env.GBW_DB, submission.roomCode, submission.startedAt);
     if (raced) throw alreadyRecorded(raced.match_id);
     throw error;
+  }
+
+  // `OQ-30`: nothing here can prove a host simulated the match, so an implausible line is not a refusal — a pierce
+  // shot can legitimately beat the per-shot average — but it is one line a human can find (`US-RANK-001` § 5).
+  const implausible = submission.players
+    .filter((player) => player.damageDealt > IMPLAUSIBLE_DAMAGE_PER_SHOT * player.shotsFired)
+    .map((player) => player.slot);
+  if (implausible.length > 0) {
+    console.info(
+      JSON.stringify({
+        level: "warn",
+        request_id: crypto.randomUUID(),
+        route: "POST /api/v1/matches",
+        method: "POST",
+        status: 201,
+        duration_ms: 0,
+        room_code: submission.roomCode,
+        player_id: accountId,
+        code: "implausible_stats",
+        slots: implausible,
+      }),
+    );
   }
 
   return Response.json(payload, { status: 201 });

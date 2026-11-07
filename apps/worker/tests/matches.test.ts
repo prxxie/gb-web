@@ -4,7 +4,7 @@
  * The endpoint is the only writer of ratings, so these tests look at the rows, not only the status code:
  * a 201 that wrote half a match is exactly the failure the story's atomicity criterion is about.
  */
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { createRig, seedProfile, type Rig } from "./support/fake-env";
 
 const STARTED = "2026-11-05T10:00:00.000Z";
@@ -271,10 +271,13 @@ describe("POST /matches — ranking rules", () => {
     });
 
     // Assert
-    const body = (await response.json()) as { ranked: boolean; ratings: { before: number; after: number }[] };
+    const body = (await response.json()) as { ranked: boolean; rankedReason: string; ratings: unknown[] };
     expect(response.status).toBe(201);
     expect(body.ranked).toBe(false);
-    expect(body.ratings.every((row) => row.before === row.after)).toBe(true);
+    // AC6 names the reason on the wire and stores it, so the results screen can say why nothing moved.
+    expect(body.rankedReason).toBe("ruleset_mismatch");
+    expect(body.ratings).toEqual([]);
+    expect(rig.db.rows("match_record")[0]?.["ranked_reason"]).toBe("ruleset_mismatch");
     expect(rig.db.rows("rating_history")).toHaveLength(0);
     rig.db.close();
   });
@@ -292,6 +295,9 @@ describe("POST /matches — ranking rules", () => {
 
     // Assert
     expect(response.status).toBe(201);
+    const body = (await response.json()) as { ranked: boolean; rankedReason: string };
+    expect(body.ranked).toBe(false);
+    expect(body.rankedReason).toBe("abandoned");
     const results = rig.db.rows("match_player").map((row) => row["result"]);
     expect(results.every((result) => result === "abandon")).toBe(true);
     expect(rig.db.rows("rating_history")).toHaveLength(0);
@@ -313,6 +319,128 @@ describe("POST /matches — ranking rules", () => {
     expect(body.ranked).toBe(true);
     const ratedB = rig.db.rows("profile").find((row) => row["account_id"] === "acct-b2");
     expect(ratedB?.["rating"]).not.toBe(1200);
+    rig.db.close();
+  });
+});
+
+describe("POST /matches — one record, one host, one winner", () => {
+  it("TC-RANK-117: a second match for the same room and start time is refused with the stored id", async () => {
+    // Arrange — AC2: the same room occurrence submitted again, with a freshly generated matchId
+    const { rig, token } = await rigWithProfiles();
+    const first = await rig.request("POST", "/matches", { body: submission(), token });
+    expect(first.status).toBe(201);
+    const stored = (await first.json()) as { matchId: string };
+
+    // Act
+    const again = await rig.request("POST", "/matches", { body: submission({ matchId: "match-9999" }), token });
+
+    // Assert — the occurrence, not the id, is what decides; the body names the row that already exists
+    expect(again.status).toBe(409);
+    const problem = (await again.json()) as { type: string; errors?: { field: string; detail: string }[] };
+    expect(problem.type).toContain("match-already-recorded");
+    expect(problem.errors?.some((error) => error.detail === stored.matchId)).toBe(true);
+    expect(rig.db.rows("match_record")).toHaveLength(1);
+    expect(rig.db.rows("rating_history")).toHaveLength(4);
+    rig.db.close();
+  });
+
+  it("TC-RANK-118: a participant who is not the room's host is refused, and the host is not", async () => {
+    // Arrange — a real room: `acct-a1` mints it (and so hosts it), `acct-a2` takes the second seat
+    const { rig, token } = await rigWithProfiles();
+    const created = await rig.request("POST", "/rooms", {
+      token,
+      body: { maxPlayers: 4, displayName: "Host", mobileId: "mbl-01", avatarId: "av-01" },
+    });
+    expect(created.status).toBe(201);
+    const { roomCode } = (await created.json()) as { roomCode: string };
+    const peerToken = await rig.token({ kind: "account", accountId: "acct-a2", guestId: null });
+    const joined = await rig.request("POST", `/rooms/${roomCode}/join`, {
+      token: peerToken,
+      body: { displayName: "Peer", mobileId: "mbl-02", avatarId: "av-01" },
+    });
+    expect(joined.status).toBe(200);
+    const body = submission({ roomCode });
+
+    // Act — the peer submits first; the room names `acct-a1`
+    const asPeer = await rig.request("POST", "/matches", { body, token: peerToken });
+
+    // Assert — AC3: the room is the authority on the role, and nothing was written
+    expect(asPeer.status).toBe(403);
+    expect(((await asPeer.json()) as { type: string }).type).toContain("not-host");
+    expect(rig.db.rows("match_record")).toHaveLength(0);
+    expect(rig.db.rows("rating_history")).toHaveLength(0);
+
+    // Act — the host submits the same payload
+    const asHost = await rig.request("POST", "/matches", { body, token });
+
+    // Assert — the refusal was about the role, not the match: the host's own call lands
+    expect(asHost.status).toBe(201);
+    expect(rig.db.rows("match_record")).toHaveLength(1);
+    rig.db.close();
+  });
+
+  it("TC-RANK-119: a team with no account is stored unranked, with NULL ratings and no history", async () => {
+    // Arrange — AC5: both seats of team B are guests, so there is nobody to rate on that side
+    const { rig, token } = await rigWithProfiles();
+    const guestPlayers = players();
+    guestPlayers[2] = { ...guestPlayers[2]!, accountId: null };
+    guestPlayers[3] = { ...guestPlayers[3]!, accountId: null };
+
+    // Act
+    const response = await rig.request("POST", "/matches", { body: submission({ players: guestPlayers }), token });
+
+    // Assert
+    expect(response.status).toBe(201);
+    const body = (await response.json()) as { ranked: boolean; rankedReason: string; ratings: unknown[] };
+    expect(body.ranked).toBe(false);
+    expect(body.rankedReason).toBe("guest");
+    expect(body.ratings).toEqual([]);
+    const rows = rig.db.rows("match_player");
+    expect(rows.map((row) => row["account_id"])).toEqual(["acct-a1", "acct-a2"]);
+    expect(rows.every((row) => row["rating_before"] === null && row["rating_after"] === null)).toBe(true);
+    expect(rig.db.rows("rating_history")).toHaveLength(0);
+    expect(rig.db.rows("match_record")[0]?.["ranked_reason"]).toBe("guest");
+    rig.db.close();
+  });
+
+  it("TC-RANK-120: two submissions racing for one room leave exactly one record", async () => {
+    // Arrange — AC7: the client fires a retry before the first answer lands
+    const { rig, token } = await rigWithProfiles();
+
+    // Act
+    const [first, second] = await Promise.all([
+      rig.request("POST", "/matches", { body: submission({ matchId: "match-race-a" }), token }),
+      rig.request("POST", "/matches", { body: submission({ matchId: "match-race-b" }), token }),
+    ]);
+
+    // Assert — one winner, one 409, one row: the unique index decides, not a read the other call can pass
+    expect([first.status, second.status].sort()).toEqual([201, 409]);
+    expect(rig.db.rows("match_record")).toHaveLength(1);
+    expect(rig.db.rows("rating_history")).toHaveLength(4);
+    rig.db.close();
+  });
+
+  it("TC-RANK-121: implausible damage is stored, and one line is logged for review", async () => {
+    // Arrange — § 5: damage above 100 × shots is accepted and flagged, never rejected (`OQ-30`)
+    const { rig, token } = await rigWithProfiles();
+    const lines: string[] = [];
+    const spy = vi.spyOn(console, "info").mockImplementation((line: unknown) => {
+      lines.push(String(line));
+    });
+    const implausible = players();
+    implausible[0] = { ...implausible[0]!, damageDealt: 5_000, shotsFired: 3, hits: 2 };
+
+    // Act
+    const response = await rig.request("POST", "/matches", { body: submission({ players: implausible }), token });
+    spy.mockRestore();
+
+    // Assert
+    expect(response.status).toBe(201);
+    expect(rig.db.rows("match_player").map((row) => row["damage_dealt"])).toContain(5_000);
+    const flagged = lines.map((line) => JSON.parse(line) as Record<string, unknown>).filter((line) => line["code"] === "implausible_stats");
+    expect(flagged).toHaveLength(1);
+    expect(flagged[0]?.["slots"]).toEqual([0]);
+    expect(flagged[0]?.["room_code"]).toBe("ABCD23");
     rig.db.close();
   });
 });

@@ -48,6 +48,10 @@ Response `201`:
 Errors: `403 forbidden` (submitter is not a participant or was not the host), `422 validation` (any rule above),
 `409 match-already-recorded`, `401`, `429`.
 
+Side effect on an implausible line (accepted, never refused): when a player's `damageDealt` exceeds `100 × shotsFired`
+the write still answers `201`, and one warn line goes to the log — `code: "implausible_stats"`, the `room_code`, the
+submitting account and the offending `slots`, never the payload (`US-RANK-001` § 5, `OQ-30`).
+
 ## GET /me/matches
 
 Auth: Clerk JWT. Query: `limit` (default 20, max 100), `cursor`.

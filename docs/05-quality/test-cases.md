@@ -152,7 +152,7 @@ The `covers` column names the requirement ([nonfunctional-requirements.md](../01
 | TC-CORE-937 | US-CORE-002 | AC7 — the delay table that produced the order rides on `match_end` | A table parses and comes back unchanged; a fractional, negative or over-long one is `bad-request` naming `delayTable`; a frame without one still parses | unit | FR-02 |
 | TC-CORE-939 | US-CORE-002 | AC7 — the table is stored with the record it explains | `POST /matches` writes `delay_table` in slot order, stores `[]` when the client sent none, and answers 422 for a fractional or negative delay without writing a row | worker | FR-02 |
 | TC-CORE-902 | US-CORE-005 | AC1, AC2, AC3 — Bot's turn starts with three weapons | Fires within 3 s, picks the best simulated weapon, deterministic per seed | unit | NFR-21 |
-| TC-RANK-116 | US-RANK-001 | Match containing a guest slot | `ranked: false`, no `rating_history` rows | worker | roles |
+| TC-RANK-116 | US-RANK-001 | AC5, AC6 — a ruleset the server does not run, or an abandoned match | `201` with `ranked: false` and the reason on the wire (`ruleset_mismatch` / `abandoned`), `ranked_reason` stored, no `rating_history` rows, every `result` is `abandon` for an abandoned match | worker | roles |
 | TC-CORE-903 | US-CORE-003 | AC2 — target with shield 300, hp 1,200, defense 1.15 takes an Inner hit of 500 | Total 435: shield absorbs 300, HP loses 135, shield never goes negative | unit | FR-06  |
 | TC-CORE-904 | US-CORE-008 | AC1, AC2, AC3, AC4, AC7, AC8 — `mbl-01` walks once then tries twice; `mbl-13` walks twice and runs; one climbs too steep a slope | Energy debited by `moveEnergy` (double for a run), queue by `moveDelay`, distance is the mobile's own `moveDistance`, action count capped at `maxMovesPerTurn`, movement stops at `maxIncline` and at the map bound | unit | FR-03 |
 | TC-CORE-914 | US-CORE-006 | AC1, AC2, AC3 — blast radius 80 on the mask | Crater of 0.6x80 carved, units regrounded, mask identical on host and peer | unit | FR-06 |
@@ -278,10 +278,15 @@ The `covers` column names the requirement ([nonfunctional-requirements.md](../01
 
 | ID | Story | Case | Expected | Level | Covers |
 |----|-------|------|----------|-------|--------|
-| TC-RANK-110 | US-RANK-001 | Submit as the host | `201`, `match_record` + `match_player` rows written in one transaction | worker | FR-07 |
-| TC-RANK-111 | US-RANK-001 | Submit the same match twice | Second `409 match-already-recorded`, no second rating change | worker | `data/matches.md` |
-| TC-RANK-112 | US-RANK-001 | Submit as a non-host or non-participant | `403 forbidden`, nothing written | worker | NFR-11 |
-| TC-RANK-115 | US-RANK-001 | Payload with two winners or a bad duration | `422 validation_failed` naming the field | worker | `data/matches.md` |
+| TC-RANK-110 | US-RANK-001 | AC1 — the host submits a finished match | `201`; one `match_record` with its `match_player` rows in a single `batch()`, and the response's `ratings[]` is exactly `{accountId, before, after, delta}` | worker | FR-07 |
+| TC-RANK-111 | US-RANK-001 | AC2 — the same `matchId`, or the same `Idempotency-Key`, arrives twice | `409 match-already-recorded` with no second row and no second rating change; the key replays the first `201` instead | worker | `data/matches.md` |
+| TC-RANK-117 | US-RANK-001 | AC2 — the same room and start time submitted under a new `matchId` | `409` whose error names the match already stored; one `match_record`, four `rating_history` rows | worker | `data/matches.md` |
+| TC-RANK-112 | US-RANK-001 | AC3 — a participant who is not the room's host submits | `403 not-host`, nothing written; the room's own `/state` is what names the host | worker | NFR-11 |
+| TC-RANK-118 | US-RANK-001 | AC3 — a real room: host mints it, a peer takes the second seat and submits | `403 not-host` and an empty `match_record`, while the same payload from the host lands | worker | NFR-11 |
+| TC-RANK-115 | US-RANK-001 | AC4 — a payload the contract refuses | `422 validation` naming the field: short duration, one player, uneven teams, `hits > shotsFired`, a duplicated slot, a `winnerTeam` outside `A`/`B`, a guest token | worker | `data/matches.md` |
+| TC-RANK-119 | US-RANK-001 | AC5 — a team with no account (two guests) | `ranked: false`, `rankedReason: "guest"`, `ratings: []`, `ranked_reason` stored, `match_player` rows only for the signed-in team with `rating_before`/`rating_after` NULL, no `rating_history` | worker | roles |
+| TC-RANK-121 | US-RANK-001 | § 5 — damage above 100 × shots fired | Stored as sent (`201`), and exactly one `implausible_stats` warn line naming the slots and the room (`OQ-30`) | worker | OQ-30 |
+| TC-RANK-120 | US-RANK-001 | AC7 — two submissions race for one room | One `201` and one `409`, exactly one `match_record` and four `rating_history` rows — the unique index decides, not a read the other call can pass | worker | `data/matches.md` |
 | TC-RANK-058 | US-RANK-002 | Rated match with four players | Exactly four `rating_history` rows, before/after/delta consistent | worker | NFR-14 |
 | TC-RANK-113 | US-RANK-002 | Elo with equal ratings | Δ = ±16 at K = 32 | unit | OQ-28 |
 | TC-RANK-114 | US-RANK-002 | K switch at 30 rated matches | K = 16 from the 31st match | unit | OQ-28 |
