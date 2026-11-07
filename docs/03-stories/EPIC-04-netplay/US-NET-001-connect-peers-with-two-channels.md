@@ -2,7 +2,7 @@
 id: US-NET-001
 title: Connect every peer to the host with two data channels
 epic: EPIC-04-netplay
-status: ready
+status: in-progress
 priority: P0
 size: M
 depends_on: [US-ROOM-006, US-ROOM-005]
@@ -38,7 +38,7 @@ semantics are the core of the design: `control` is ordered and reliable, `state`
 | AC1 | A room in `playing` | The host opens a peer connection per peer | Each peer connection has exactly two channels named `control` and `state`, created by the host and accepted by the peer (`TC-NET-901`) |
 | AC2 | The channel configuration | It is inspected | `control` is `{ordered: true}`; `state` is `{ordered: false, maxRetransmits: 0}` (`TC-NET-901`) |
 | AC3 | Four peers | The host reaches `connectionState === "connected"` on all | The match begins sending snapshots only after the last peer is connected or 5 s have passed, whichever first |
-| AC4 | A peer whose connection fails | 5 s pass with no `connected` | The host reports `peer_unreachable` to the DO, the peer stays in `grace`, and the match does not block (`TC-ROOM-055`) |
+| AC4 | A peer whose connection fails | 5 s pass with no `connected` | The host stops waiting for that peer so the match does not block (the 5 s gate, `TC-NET-901`), and the peer's seat stays in `grace` through the DO's own heartbeat (`TC-ROOM-055`). **The "reports `peer_unreachable` to the DO" clause has no wire message** — `api/signaling.md` documents no such frame, so it is an open question, not implemented |
 | AC5 | `match_started` for eight players | It is received | The host creates 7 peer connections and never more; the peer connections are closed when the match ends |
 | AC6 | A new host after migration | It is elected | It rebuilds its peer connections to every other member and reuses the same channel names (`TC-NET-903`) |
 
@@ -63,6 +63,11 @@ channel's `binaryType` stays `"arraybuffer"`; payloads are UTF-8 JSON strings in
 - `state` messages must be dropped silently when the channel's `bufferedAmount` exceeds 64 KB — the next snapshot
   supersedes them.
 - No channel may be created for a member in `disconnected`.
+- `peer_unreachable` (AC4) is named by this story but does not exist in `api/signaling.md`; the DO learns about a dead
+  peer from its own heartbeat, so the report would be redundant — a decision is owed before either the frame or the
+  clause is added.
+- `host_hello` is sent on every new `control` channel; it is documented here and in `api/signaling.md` § Control channel
+  messages.
 - The host sends `host_hello {hostGeneration, seq}` on each new `control` channel so a peer can rejoin the sequence.
 
 ## 6. Implementation notes
@@ -88,8 +93,34 @@ off; no media tracks are used.
   reference phones; if 8-player matches drop frames, the fallback is 4v4 as the largest supported mode (flagged in
   `OQ-24`).
 
-<!-- delivery:2026-11-05 -->
+<!-- delivery:2026-11-07 -->
 
-## Delivery status — 2026-11-05
+## Delivery status — 2026-11-07
 
-**in-progress.** `apps/web/src/net/mesh.ts` builds the star with `control`/`state` channels; needs two browsers — `TC-NET-901` is an e2e case.
+**in-progress.** The star, both channels and the 10/2 Hz broadcast already existed in `apps/web/src/net/mesh.ts`; this
+pass closed four real gaps and left one documented hole.
+
+| AC | Evidence |
+|---|---|
+| AC1 | `apps/web/tests/channels.test.tsx` (`TC-NET-901`): exactly two channels with the contract's labels, created by the host before the offer. A peer that receives `control` before `state` wires nothing until both exist — before this pass it wired `control` as the state channel, so snapshots were pushed down the reliable channel and a control frame could be parsed as a `Snapshot` |
+| AC2 | `TC-NET-901`: `control` `{ordered: true}`, `state` `{ordered: false, maxRetransmits: 0}`, asserted against a stand-in `RTCPeerConnection` that records each `RTCDataChannelInit` |
+| AC3 | `TC-NET-901`: nothing is broadcast before the last peer reports `connected`, and the five-second escape releases the match for one unreachable peer. Found and fixed while testing: the deadline used `0` as its "not started" sentinel, so a first snapshot at `performance.now() === 0` made the escape unreachable forever |
+| AC4 | Half met, see below |
+| AC5 | `createMesh` opens one link per peer (seven at eight players) and `close()` closes every channel and connection; the page closes the mesh when the route unmounts |
+| AC6 | `apps/web/src/routes/MatchPage.tsx` rebuilds the mesh on `host_changed`: the old star is closed, the elected host opens a link to every remaining member, and `hostGeneration` is raised before any snapshot is accepted. Not automated — it needs two browsers (`TC-NET-904`) |
+
+New in this pass: `apps/web/src/net/channels.ts` (`createChannels`, `awaitPeerConnected`, the two label constants and their
+init objects), `host_hello {hostGeneration, seq}` on every new control channel, and the AC3 gate inside `broadcast`.
+
+**Open, and the reason this story is not `done`:**
+
+- **AC4's report half has no protocol.** `api/signaling.md` lists every client → DO frame and none of them says
+  "unreachable"; the DO already moves a silent seat to `grace` from its own heartbeat (`US-ROOM-002` AC6), so the frame
+  would duplicate information the server has. Either the clause is dropped from this AC or the frame is added to
+  `signaling.md` with a budget — a decision, not an implementation detail.
+- `TC-NET-904` (manual, two browsers): seven links at eight players, both channels visible in `about:webrtc`, and every
+  link closed at `match_end`.
+
+Red: `apps/web/tests/channels.test.tsx` — the AC3 cases failed twice for real code reasons, first because a peer wired
+`control` as the state channel as soon as one channel arrived, then because the readiness deadline's `0` sentinel made
+the five-second escape impossible to reach.

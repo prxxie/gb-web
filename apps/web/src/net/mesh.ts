@@ -6,6 +6,7 @@
  * and allowed to drop (snapshots are absolute, so a lost one costs nothing but a frame).
  */
 import type { RoomState, Snapshot } from "@gbw/core";
+import { CONTROL_LABEL, STATE_LABEL, createChannels } from "./channels";
 
 export interface SignalChannel {
   readonly kind: "offer" | "answer" | "candidate";
@@ -21,6 +22,11 @@ export interface MeshOptions {
   readonly onSnapshot: (snapshot: Snapshot) => void;
   readonly onControl: (from: string, message: unknown) => void;
   readonly onPeerState: (playerId: string, state: RTCPeerConnectionState) => void;
+  /**
+   * Sent on every new `control` channel as `host_hello {hostGeneration, seq}` (`US-NET-001` § 5), so a peer that
+   * rejoined can tell which host generation its snapshots belong to.
+   */
+  readonly hostHello?: () => unknown;
 }
 
 export interface Mesh {
@@ -37,20 +43,49 @@ interface Peer {
   readonly connection: RTCPeerConnection;
   control?: RTCDataChannel;
   state?: RTCDataChannel;
+  /** Set once both channels exist and their listeners are attached; never re-wired afterwards. */
+  wired?: boolean;
   pendingCandidates: RTCIceCandidateInit[];
 }
 
 const SNAPSHOT_HZ_ACTIVE = 10;
 const SNAPSHOT_HZ_IDLE = 2;
 const BUFFER_LIMIT = 64 * 1024;
+/** `US-NET-001` AC3: snapshots wait for the last peer that is coming, but never longer than this. */
+const READY_TIMEOUT_MS = 5_000;
 
 export function createMesh(options: MeshOptions): Mesh {
   const peers = new Map<string, Peer>();
   let lastBroadcast = 0;
+  // `null`, not `0`: the first snapshot can be broadcast at `performance.now() === 0`, and a zero sentinel would
+  // reset the deadline on every call and never let the five-second escape fire.
+  let firstPeerAt: number | null = null;
 
-  const wireChannels = (playerId: string, peer: Peer, control: RTCDataChannel, state: RTCDataChannel): void => {
-    peer.control = control;
-    peer.state = state;
+  /** AC3: every peer that is coming is connected, or five seconds have gone by — whichever comes first. */
+  const ready = (): boolean => {
+    if (peers.size === 0) return false;
+    if (firstPeerAt === null) firstPeerAt = performance.now();
+    let all = true;
+    for (const peer of peers.values()) {
+      if (peer.connection.connectionState !== "connected") all = false;
+    }
+    return all || performance.now() - firstPeerAt >= READY_TIMEOUT_MS;
+  };
+
+  const wireChannels = (playerId: string, peer: Peer): void => {
+    const control = peer.control;
+    const state = peer.state;
+    // A half-wired peer used to receive snapshots on `control` and controls on `state` (`US-NET-001` AC1): both
+    // channels must exist before either listener is attached.
+    if (!control || !state || peer.wired) return;
+    peer.wired = true;
+    if (options.isHost && options.hostHello) {
+      const hello = (): void => {
+        if (control.readyState === "open") control.send(JSON.stringify(options.hostHello?.()));
+      };
+      if (control.readyState === "open") hello();
+      else control.addEventListener("open", hello);
+    }
     control.addEventListener("message", (event) => {
       try {
         options.onControl(playerId, JSON.parse(String(event.data)) as unknown);
@@ -80,21 +115,20 @@ export function createMesh(options: MeshOptions): Mesh {
       options.onPeerState(playerId, connection.connectionState);
     });
     if (options.isHost) {
-      const control = connection.createDataChannel("control", { ordered: true });
-      const state = connection.createDataChannel("state", { ordered: false, maxRetransmits: 0 });
-      wireChannels(playerId, peer, control, state);
+      const { control, state } = createChannels(connection);
+      peer.control = control;
+      peer.state = state;
+      wireChannels(playerId, peer);
       const offer = await connection.createOffer();
       await connection.setLocalDescription(offer);
       options.send({ kind: "offer", to: playerId, payload: offer });
     } else {
       connection.addEventListener("datachannel", (event) => {
         const channel = event.channel;
-        if (channel.label === "control") {
-          wireChannels(playerId, peer, channel, peer.state ?? channel);
-        } else if (channel.label === "state") {
-          if (peer.control) wireChannels(playerId, peer, peer.control, channel);
-          else peer.state = channel;
-        }
+        if (channel.label === CONTROL_LABEL) peer.control = channel;
+        else if (channel.label === STATE_LABEL) peer.state = channel;
+        else return;
+        wireChannels(playerId, peer);
       });
     }
     return peer;
@@ -114,6 +148,7 @@ export function createMesh(options: MeshOptions): Mesh {
       peers.delete(playerId);
     },
     broadcast(snapshot) {
+      if (!ready()) return;
       const now = performance.now();
       const active = snapshot.turn.activeSlot >= 0;
       const interval = 1000 / (active ? SNAPSHOT_HZ_ACTIVE : SNAPSHOT_HZ_IDLE);
