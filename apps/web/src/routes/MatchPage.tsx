@@ -49,6 +49,7 @@ import {
 import { createMesh, type Mesh } from "../net/mesh";
 import { decideTurn } from "../net/host-clock";
 import { resyncFromSnapshot } from "../net/resync";
+import { adoptHostChanged } from "../net/migration";
 import { itemFrame } from "../net/frames";
 import { connectWithReconnect, type ReconnectingSocket } from "../net/reconnect";
 import type { ServerMessage } from "../net/signaling";
@@ -159,6 +160,11 @@ export function MatchPage(): JSX.Element {
   // decides who gets skipped, the second which snapshots are still valid (`US-ROOM-004` AC3/AC5/AC7).
   const absent = useRef<readonly number[]>([]);
   const hostGeneration = useRef(0);
+  /**
+   * Who runs the simulation right now. Seeded from the lobby plan and moved by `host_changed`/`room_state`
+   * (`US-NET-003` AC2): the plan is a photograph of the room as it was when the match started.
+   */
+  const hostPlayerId = useRef<string | null>(plan?.hostPlayerId ?? null);
 
   stateRef.current = state;
 
@@ -254,7 +260,7 @@ export function MatchPage(): JSX.Element {
           );
           if (!input) return;
           const turn = current.turn.number;
-          if (!hosting) {
+          if (!hostingRef.current) {
             // A peer never simulates (`US-NET-002` AC1): the input goes to the host, the shot appears when the host's
             // snapshot comes back — one round trip later by design (`OQ-32`, no prediction).
             seq.current = input.seq + 1;
@@ -364,7 +370,18 @@ export function MatchPage(): JSX.Element {
 
   // Turn clock: the host is the clock, and an absent player's turn is skipped rather than waited out
   // (`US-ROOM-004` AC3, AC7). `decideTurn` owns the rules; this effect only applies the answer.
-  const hosting = !plan || plan.kind === "bot" || plan.hostPlayerId === plan.playerId;
+  //
+  // Who the host is changes while a match runs: an election promotes a peer and demotes the client that was hosting
+  // (`US-NET-003` AC2). The plan from the lobby never changes, so it cannot answer that question.
+  const [hosting, setHosting] = useState(() => !plan || plan.kind === "bot" || plan.hostPlayerId === plan.playerId);
+  /**
+   * The role as the renderer holds it. `mountBattle` is not remounted when the role changes, so the callbacks it
+   * captured would keep answering from the lobby's plan (`US-NET-003` AC2).
+   */
+  const hostingRef = useRef(hosting);
+  useEffect(() => {
+    hostingRef.current = hosting;
+  }, [hosting]);
   useEffect(() => {
     if (!state || state.status !== "playing") return;
     const tick = window.setInterval(() => {
@@ -431,7 +448,7 @@ export function MatchPage(): JSX.Element {
           const frame = message as Partial<InputFrame> & { t?: string };
           if (frame?.t !== "input") return;
           // Only the host runs the simulation; a peer that receives an input has already made a mistake.
-          if (plan.hostPlayerId !== plan.playerId) return;
+          if (hostPlayerId.current !== plan.playerId) return;
           const slot = slotsByPlayer.current.get(from);
           if (slot === undefined || frame.turn !== current.turn.number) return;
           // AC4: an input older than the last one applied for this turn is dropped, not answered.
@@ -471,7 +488,7 @@ export function MatchPage(): JSX.Element {
         ...(server.username ? { username: server.username } : {}),
         ...(server.credential ? { credential: server.credential } : {}),
       }));
-      mesh.current = buildMesh(plan.hostPlayerId === plan.playerId);
+      mesh.current = buildMesh(hostPlayerId.current === plan.playerId);
     });
 
     socket.current = connectWithReconnect({
@@ -495,10 +512,25 @@ export function MatchPage(): JSX.Element {
           // everyone drops the links that pointed at the old host. A link to a superseded host would stream state the
           // peers are told to discard anyway, so the mesh is rebuilt from scratch.
           hostGeneration.current = Math.max(hostGeneration.current, message.hostGeneration);
+          hostPlayerId.current = message.hostPlayerId;
+          const promoted = message.hostPlayerId === plan.playerId;
+          setHosting(promoted);
           mesh.current?.close();
-          mesh.current = iceServers.length === 0 ? null : buildMesh(message.hostPlayerId === plan.playerId);
+          mesh.current = iceServers.length === 0 ? null : buildMesh(promoted);
           for (const member of message.room.members) {
             if (member.playerId !== plan.playerId) void mesh.current?.addPeer(member.playerId);
+          }
+          // The DO hands the promoted client the snapshot it kept: adopt it, then publish once so the peers and
+          // the replay any graced member receives carry the new host's numbers (`US-NET-003` AC1, AC4).
+          if (promoted) {
+            const adoption = adoptHostChanged(stateRef.current, message);
+            hostGeneration.current = adoption.hostGeneration;
+            if (adoption.state) {
+              commit(adoption.state, []);
+              const snapshot = toSnapshot(adoption.state, adoption.hostGeneration);
+              mesh.current?.broadcast(snapshot);
+              socket.current?.send({ t: "snapshot_push", snapshot: toPackedSnapshot(snapshot) });
+            }
           }
           return;
         }
@@ -524,6 +556,12 @@ export function MatchPage(): JSX.Element {
             .filter((member) => member.connectionState !== "connected")
             .map((member) => member.slot);
           hostGeneration.current = Math.max(hostGeneration.current, message.room.hostGeneration);
+          if (message.room.hostPlayerId !== hostPlayerId.current) {
+            hostPlayerId.current = message.room.hostPlayerId;
+            setHosting(message.room.hostPlayerId === plan.playerId);
+            mesh.current?.close();
+            mesh.current = iceServers.length === 0 ? null : buildMesh(message.room.hostPlayerId === plan.playerId);
+          }
           for (const member of message.room.members) {
             slotsByPlayer.current.set(member.playerId, member.slot);
             if (member.playerId !== plan.playerId) void mesh.current?.addPeer(member.playerId);

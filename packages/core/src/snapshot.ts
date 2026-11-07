@@ -303,6 +303,29 @@ export function applySnapshot(state: MatchState, snapshot: Snapshot): ApplyResul
   };
 }
 
+/**
+ * Fold a snapshot into the whole state — the adoption a promoted host performs before it publishes again.
+ *
+ * `applySnapshot` merges the parts a *peer* renders; a new host also has to take over the parts only the
+ * simulation reads (turn, weather, status, winner), or the first turn after a migration would run on the
+ * dead host's clock and the result screen would disagree with everyone else's (`US-NET-003` AC1).
+ */
+export function restoreFromSnapshot(state: MatchState, snapshot: Snapshot): MatchState {
+  const applied = applySnapshot(state, snapshot);
+  return {
+    ...state,
+    players: applied.players,
+    seq: applied.seq,
+    turn: { ...snapshot.turn, actedSlots: [...snapshot.turn.actedSlots] },
+    weather: { wind: { ...snapshot.weather.wind }, rolledAtRound: snapshot.weather.rolledAtRound },
+    scores: applied.scores,
+    status: snapshot.status,
+    winnerTeam: snapshot.winnerTeam,
+    ...(applied.terrain ? { terrain: applied.terrain } : {}),
+    ...(applied.rulesetVersion === undefined ? {} : { rulesetVersion: applied.rulesetVersion }),
+  };
+}
+
 /** Size of a snapshot for the current state, in bytes — used by tests and the budget check. */
 /** `MatchState` keeps the mask as plain heights; the RLE works on a `Terrain`. */
 function heightsAsTerrain(state: MatchState): Terrain {

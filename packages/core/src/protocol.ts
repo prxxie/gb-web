@@ -12,6 +12,7 @@
 import { MAPS_BY_ID } from "./data/maps.js";
 import { isModeId } from "./data/modes.js";
 import { expandWire, isWireSnapshot } from "./snapshot.js";
+import type { WireSnapshot } from "./snapshot.js";
 import type { LoadoutEntry, ModeId, RoomState, Snapshot, Team } from "./types.js";
 
 export const PROTOCOL_VERSION = 1;
@@ -85,7 +86,7 @@ export type ClientFrame =
   | {
       readonly t: "snapshot_push";
       /** Packed or expanded — `parseSnapshot` accepts both and always answers with the expanded object (`US-NET-002`). */
-      readonly snapshot: Snapshot | import("./snapshot.js").WireSnapshot;
+      readonly snapshot: Snapshot | WireSnapshot;
     }
   | MatchEndFrame
   | {
@@ -138,7 +139,7 @@ export type ServerFrame =
       }[];
       readonly room: RoomState;
     }
-  | { readonly t: "snapshot_state"; readonly snapshot: Snapshot | import("./snapshot.js").WireSnapshot }
+  | { readonly t: "snapshot_state"; readonly snapshot: Snapshot | WireSnapshot }
   | {
       readonly t: "match_recorded";
       readonly matchId: string;

@@ -6,7 +6,7 @@
  * *same* numbers on screen as the host has — hp, turn and wind — or the two players argue about a hit
  * they are both looking at.
  */
-import { applySnapshot, type MatchState, type Snapshot } from "@gbw/core";
+import { restoreFromSnapshot, type MatchState, type Snapshot } from "@gbw/core";
 
 export interface ResyncResult {
   readonly state: MatchState;
@@ -25,20 +25,7 @@ export interface ResyncResult {
  */
 export function resyncFromSnapshot(state: MatchState, snapshot: Snapshot, hostGeneration: number): ResyncResult {
   if (snapshot.hostGeneration < hostGeneration) return { state, applied: false, hostGeneration };
-  const applied = applySnapshot(state, snapshot);
-  return {
-    state: {
-      ...state,
-      players: applied.players,
-      seq: applied.seq,
-      turn: snapshot.turn,
-      weather: snapshot.weather,
-      // Scores and jewels decide who is winning and who carries what, so a peer that ignored them
-      // would show a different result screen than the host (`US-CORE-004` AC5).
-      scores: applied.scores,
-      ...(applied.terrain ? { terrain: applied.terrain } : {}),
-    },
-    applied: true,
-    hostGeneration: snapshot.hostGeneration,
-  };
+  // The same fold a promoted host performs (`restoreFromSnapshot`), so a peer and a new host cannot disagree
+  // about what a snapshot means.
+  return { state: restoreFromSnapshot(state, snapshot), applied: true, hostGeneration: snapshot.hostGeneration };
 }
