@@ -202,7 +202,7 @@ interface Flight {
 }
 
 /** Precompute the whole flight so the client can animate exactly what the host resolved. */
-function flightPath(state: MatchState, projectile: ReturnType<typeof launch>, mobile: Mobile, map: MapDef): Flight {
+export function flightPath(state: MatchState, projectile: ReturnType<typeof launch>, mobile: Mobile, map: MapDef): Flight {
   const terrain = terrainOf(state);
   const context = {
     wind: state.weather.wind,
@@ -253,6 +253,92 @@ function flightPath(state: MatchState, projectile: ReturnType<typeof launch>, mo
     }
   }
   return { path, impact: null, flightMs: current.ageMs };
+}
+
+/** A shot's flight as the engine would resolve it — what the aim aid is allowed to promise (`US-MATCH-005` AC2). */
+export interface ShotPreview {
+  readonly slot: number;
+  /** The slot that will really fire: `itm-dual` forces one for the rest of the turn (`US-CORE-009` AC2). */
+  readonly weaponSlot: 0 | 1 | 2;
+  readonly angle: number;
+  readonly force: number;
+  readonly path: readonly Vec2[];
+  readonly impact: Vec2 | null;
+  readonly radius: number;
+}
+
+interface Launched {
+  readonly weapon: Mobile["weapons"][number];
+  readonly projectile: ReturnType<typeof launch>;
+  readonly flight: Flight;
+  readonly angle: number;
+  readonly force: number;
+}
+
+/**
+ * Build the projectile exactly as `resolveShot` does — clamp, power multiplier, `itm-bunge` — so the previewed
+ * flight and the fired one cannot diverge. One builder, two callers.
+ */
+function launchFor(
+  state: MatchState,
+  player: PlayerState,
+  weaponSlot: 0 | 1 | 2,
+  angle: number,
+  force: number,
+): Launched {
+  const mobile = mobileOf(player);
+  const weapon = mobile.weapons[weaponSlot];
+  const effects = state.effects;
+
+  const clampedAngle = Math.min(mobile.angleMax, Math.max(mobile.angleMin, angle));
+  const clampedForce = Math.min(mobile.maxPower + (effects.powerUpNext ? 20 : 0), Math.max(0, force));
+  const powerMultiplier = player.attack * (effects.bloodNext ? 1.25 : 1) * (effects.dualPlusNext ? 1.15 : 1);
+
+  const projectile = launch({
+    id: state.seq + 1,
+    ownerSlot: player.slot,
+    weaponSlot,
+    weapon,
+    from: { x: player.x, y: player.y },
+    facing: player.facing,
+    angle: clampedAngle,
+    force: clampedForce,
+    powerMultiplier,
+    bunge: effects.bungeNext,
+  });
+  const flight = flightPath(state, projectile, mobile, getMap(state.mapId));
+
+  return { weapon, projectile, flight, angle: clampedAngle, force: clampedForce };
+}
+
+/**
+ * The flight a shot from `slot` would take. Returns `null` when that shot could not be fired at all — no such
+ * slot, an eliminated player, a spent super shot, or a match that is no longer playing.
+ */
+export function previewShot(
+  state: MatchState,
+  slot: number,
+  weaponSlot: 0 | 1 | 2,
+  angle: number,
+  force: number,
+): ShotPreview | null {
+  if (state.status !== "playing") return null;
+  const player = state.players.find((candidate) => candidate.slot === slot);
+  if (!player || player.eliminated) return null;
+  const effective = state.effects.dualWeapon ?? weaponSlot;
+  if (effective === 2 && player.superShotUsed) return null;
+
+  const launched = launchFor(state, player, effective, angle, force);
+
+  return {
+    slot,
+    weaponSlot: effective,
+    angle: launched.angle,
+    force: launched.force,
+    path: launched.flight.path,
+    impact: launched.flight.impact,
+    radius: launched.weapon.radius,
+  };
 }
 
 interface Conclusion {
@@ -394,28 +480,8 @@ function resolveShot(
   if (weaponSlot === 2 && player.superShotUsed) {
     return { state, events: [{ kind: "reject", slot, reason: "super-shot-spent" }] };
   }
-  const mobile = mobileOf(player);
-  const weapon = mobile.weapons[weaponSlot];
-  const map = getMap(state.mapId);
   const effects = state.effects;
-
-  const clampedAngle = Math.min(mobile.angleMax, Math.max(mobile.angleMin, angle));
-  const clampedForce = Math.min(mobile.maxPower + (effects.powerUpNext ? 20 : 0), Math.max(0, force));
-  const powerMultiplier = player.attack * (effects.bloodNext ? 1.25 : 1) * (effects.dualPlusNext ? 1.15 : 1);
-
-  const projectile = launch({
-    id: state.seq + 1,
-    ownerSlot: slot,
-    weaponSlot,
-    weapon,
-    from: { x: player.x, y: player.y },
-    facing: player.facing,
-    angle: clampedAngle,
-    force: clampedForce,
-    powerMultiplier,
-    bunge: effects.bungeNext,
-  });
-  const flight = flightPath(state, projectile, mobile, map);
+  const { weapon, projectile, flight } = launchFor(state, player, weaponSlot, angle, force);
   const events: MatchEvent[] = [];
 
   const terrain = terrainOf(state);

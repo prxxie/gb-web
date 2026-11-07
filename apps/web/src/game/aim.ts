@@ -66,6 +66,11 @@ export function forceFromPower(power: number): number {
   return Math.max(0, Math.min(FORCE_MAX, Math.round(power * 25)));
 }
 
+/** The angle the shot will actually carry: the pull plus the pad's nudge, clamped to the mobile's window. */
+export function shotAngle(angle: number, aimDelta: number | undefined, mobile: { angleMin: number; angleMax: number }): number {
+  return Math.max(mobile.angleMin, Math.min(mobile.angleMax, Math.round(angle + (aimDelta ?? 0))));
+}
+
 /**
  * The `fire` input for a released pull, or `null` when the finger never left the dead zone (`AC3`/`AC4`).
  *
@@ -75,15 +80,11 @@ export function forceFromPower(power: number): number {
 export function fireFromPull(pull: Pull, context: FireContext): FireInput | null {
   if (!Number.isFinite(pull.power) || pull.power < DEADZONE_POWER) return null;
   if (context.shot && context.shot.lockedTurn === context.shot.turnNumber) return null;
-  const angle = Math.max(
-    context.mobile.angleMin,
-    Math.min(context.mobile.angleMax, Math.round(pull.angle + (context.aimDelta ?? 0))),
-  );
   return {
     kind: "fire",
     slot: context.slot,
     weaponSlot: context.weaponSlot,
-    angle,
+    angle: shotAngle(pull.angle, context.aimDelta, context.mobile),
     force: forceFromPower(pull.power),
     seq: context.seq,
   };

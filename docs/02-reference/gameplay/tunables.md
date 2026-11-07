@@ -311,6 +311,7 @@ the numbers behind it.
 | `rulerSegments` | `clamp(round(8 × visibleWidth / 1000), 8, 16)` | 8 divisions at the default window, 16 at full-map zoom |
 | `rulerUnit` | visibleWidth / `rulerSegments` world units per division | 125 units at 1000-wide, 125 again at 2000-wide/16 |
 | `interpolateMs` | 100 ms | the screen draws one state behind and catches up within this gap — a state that lands mid-blend continues from the drawn pixel instead of jumping (`US-MATCH-001` AC2) |
+| `previewDots` | 24 | how many dots the aim aid samples the resolved flight into — a dotted line, not a curve, so the count is drawing, not physics (`US-MATCH-005` AC2) |
 
 **Why the ruler doubles.** A single part scale cannot serve both views: 125-unit divisions would be unreadable at the whole
 map, and 62.5-unit divisions would be noise at half map. Doubling the division count keeps one division at ~125 world

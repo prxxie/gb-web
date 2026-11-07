@@ -71,6 +71,8 @@ export const TUNABLES = {
   rulerUnitTarget: 125,
   /** How long the screen takes to catch up to a new state — `US-MATCH-001` AC2 (`tunables.md` § 9). */
   interpolateMs: 100,
+  /** How many dots the aim aid samples the resolved flight into (`US-MATCH-005` AC2). */
+  previewDots: 24,
 } as const;
 
 export type Tunables = typeof TUNABLES;
