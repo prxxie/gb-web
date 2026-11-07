@@ -290,7 +290,14 @@ The `covers` column names the requirement ([nonfunctional-requirements.md](../01
 | TC-RANK-058 | US-RANK-002 | Rated match with four players | Exactly four `rating_history` rows, before/after/delta consistent | worker | NFR-14 |
 | TC-RANK-113 | US-RANK-002 | Elo with equal ratings | Δ = ±16 at K = 32 | unit | OQ-28 |
 | TC-RANK-114 | US-RANK-002 | K switch at 30 rated matches | K = 16 from the 31st match | unit | OQ-28 |
-| TC-RANK-141 | US-RANK-003 | History pagination over three pages | Appends without duplicates or gaps; no other player's data | e2e | `data/matches.md` |
+| TC-RANK-141 | US-RANK-003 | AC1 — thirty matches read with `?limit=20` | `200` with 20 items newest first (`match-0029` … `match-0010`), a `next_cursor` and `has_more: true`; the caller's own row only | worker | `data/matches.md` |
+| TC-RANK-142 | US-RANK-003 | AC2 — the returned cursor is followed | The second page holds the remaining 10 in order, `has_more: false`, `next_cursor: null`, no repeat and no gap across 20 + 10 | worker | `data/matches.md` |
+| TC-RANK-143 | US-RANK-003 | AC3 — the caller lost a rated match | The item carries `result: "loss"`, `playerCount: 4`, the caller's own damage and a negative `ratingDelta`, with `ranked: true` and `rankedReason: null` | worker | FR-07 |
+| TC-RANK-148 | US-RANK-003 | AC4 — an unranked row | `ranked: false`, `rankedReason: "ruleset_mismatch"`, `ratingDelta: null` — no rating number on the wire | worker | `data/matches.md` |
+| TC-RANK-149 | US-RANK-003 | AC5 — the whole response body, not just the item | No other account id and no other player's rating anywhere in the JSON; `opponents[]` entries are exactly `{displayName, team}` | worker | NFR-13 |
+| TC-RANK-150 | US-RANK-003 | AC6 — `?accountId=` is supplied | The parameter is ignored: the caller still reads their own row (their team, their damage) | worker | NFR-13 |
+| TC-RANK-151 | US-RANK-003 | § 5 — a cursor the server did not mint | `400 bad-request`, never a page and never a 500 | worker | `matches.md` |
+| TC-RANK-152 | US-RANK-003 | AC3, AC4 — the row the profile screen prints | `apps/web/tests/profile.test.tsx`: result label, `2v2`, the opponents' names, `240 dmg`, `+16`; an unranked row prints `—` and why, never `+0` | web | `screens/profile.md` |
 | TC-RANK-104 | US-RANK-004 | 150 rated players listed | Ordered by rating, then rated matches, then id | worker | `data/accounts.md` |
 | TC-RANK-144 | US-RANK-004 | Player ranked outside the first page | Own row highlighted, sticky footer shows the rank | e2e | `screens/leaderboard.md` |
 | TC-RANK-145 | US-RANK-004 | Player with fewer than 10 rated matches | `Mới` badge on their row | e2e | `screens/leaderboard.md` |

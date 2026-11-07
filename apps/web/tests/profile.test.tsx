@@ -221,3 +221,51 @@ describe("US-AUTH-003 AC6: a display name is text, never markup", () => {
     expect(container.textContent).toContain("Bao <b>&</b>");
   });
 });
+
+describe("TC-RANK-152: the history row reads like the wire (US-RANK-003 AC3, AC4)", () => {
+  const RANKED = {
+    matchId: "match-0001",
+    playedAt: "2026-11-04T09:21:12.000Z",
+    team: "A",
+    result: "win",
+    playerCount: 4,
+    opponents: [
+      { displayName: "Linh", team: "B" },
+      { displayName: "Mai", team: "B" },
+    ],
+    damageDealt: 240,
+    shotsFired: 9,
+    hits: 6,
+    ratingDelta: 16,
+    ranked: true,
+    rankedReason: null,
+    rulesetVersion: "2026-11-05",
+  } as const;
+
+  it("prints the result, the team size, the opponents, the damage and the delta", async () => {
+    client.me.mockResolvedValue(PROFILE);
+    client.history.mockResolvedValue({ items: [RANKED], next_cursor: null });
+    mount();
+
+    const row = await screen.findByTestId("history-match-0001");
+    expect(row.textContent).toContain(copy["profile.result.win"]);
+    expect(row.textContent).toContain("2v2");
+    expect(row.textContent).toContain("Linh, Mai");
+    expect(row.textContent).toContain("240 dmg");
+    expect(screen.getByTestId("history-delta-match-0001").textContent).toBe("+16");
+  });
+
+  it("shows a dash and the reason when the match was not rated", async () => {
+    client.me.mockResolvedValue(PROFILE);
+    client.history.mockResolvedValue({
+      items: [{ ...RANKED, matchId: "match-0002", ranked: false, rankedReason: "guest", ratingDelta: null }],
+      next_cursor: null,
+    });
+    mount();
+
+    const row = await screen.findByTestId("history-match-0002");
+    // AC4: no rating numbers at all — the dash plus why nothing moved
+    expect(row.textContent).not.toContain("+0");
+    expect(screen.getByTestId("history-unranked-match-0002").textContent).toContain(copy["profile.history.reason.guest"]);
+  });
+});

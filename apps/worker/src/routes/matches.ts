@@ -455,7 +455,7 @@ export async function myMatches(request: Request, env: Env, session: SessionToke
   const limit = limitOf(url, 20);
   const rawCursor = cursorOf(url);
   // Decoded here so an unreadable cursor is a problem, never a 500.
-  const after: MatchHistoryCursor | null = rawCursor ? decodeHistoryCursor(rawCursor) : null;
+  const after: MatchHistoryCursor | null = rawCursor ? await decodeHistoryCursor(rawCursor, env.SESSION_TOKEN_SECRET) : null;
 
   const rows = await findHistoryPage(env.GBW_DB, accountId, after, limit);
   const page = rows.slice(0, limit);
@@ -478,16 +478,22 @@ export async function myMatches(request: Request, env: Env, session: SessionToke
     playedAt: row.ended_at,
     team: row.team,
     result: row.result,
+    // The row prints "2v2" and, when nothing moved, the reason instead of a number (`US-RANK-003` AC3/AC4).
+    playerCount: row.player_count,
     opponents: opponentsByMatch.get(row.match_id) ?? [],
     damageDealt: row.damage_dealt,
     shotsFired: row.shots_fired,
     hits: row.hits,
     ratingDelta: row.rating_before === null || row.rating_after === null ? null : row.rating_after - row.rating_before,
+    ranked: row.ranked === 1,
+    rankedReason: row.ranked_reason,
     rulesetVersion: row.ruleset_version,
   }));
   const last = page[page.length - 1];
   const nextCursor =
-    rows.length > limit && last ? encodeHistoryCursor({ endedAt: last.ended_at, matchId: last.match_id }) : null;
+    rows.length > limit && last
+      ? await encodeHistoryCursor({ endedAt: last.ended_at, matchId: last.match_id }, env.SESSION_TOKEN_SECRET)
+      : null;
 
   return Response.json({ items, next_cursor: nextCursor, has_more: nextCursor !== null });
 }

@@ -233,15 +233,28 @@ export function ProfilePage(): JSX.Element {
       <section className="card">
         <h2>{t("profile.history")}</h2>
         {history.length === 0 ? <p className="muted">—</p> : null}
-        {history.map((item) => (
-          <div key={item.matchId} className="row">
-            <span>{new Date(item.endedAt).toLocaleDateString()}</span>
-            <span>{item.result}</span>
-            <span className="muted">
-              {item.damageDealt} dmg · {item.hits}/{item.shotsFired}
-            </span>
-          </div>
-        ))}
+        {history.map((item) => {
+          const teams = `${item.playerCount / 2}v${item.playerCount / 2}`;
+          const delta = item.ratingDelta;
+          return (
+            <div key={item.matchId} className="row" data-testid={`history-${item.matchId}`}>
+              <span>{new Date(item.playedAt).toLocaleDateString()}</span>
+              <span>{t(`profile.result.${item.result}`)}</span>
+              <span className="muted">
+                {teams} · {item.opponents.map((opponent) => opponent.displayName).join(", ")}
+              </span>
+              <span className="muted">
+                {item.damageDealt} dmg · {item.hits}/{item.shotsFired}
+              </span>
+              {/* AC4: nothing moved, so the row says why instead of printing a zero (`screens/profile.md`). */}
+              <span data-testid={delta === null ? `history-unranked-${item.matchId}` : `history-delta-${item.matchId}`}>
+                {delta === null
+                  ? `${t("profile.history.unranked")} ${t(`profile.history.reason.${item.rankedReason ?? "unknown"}`)}`
+                  : `${delta > 0 ? "+" : ""}${delta}`}
+              </span>
+            </div>
+          );
+        })}
         {cursor ? (
           <button type="button" onClick={() => void loadMore()}>
             {t("profile.loadMore")}
