@@ -36,7 +36,6 @@ TC-MATCH-907 apps/web/tests/direction-pad.test.tsx
 TC-PWA-130 apps/web/tests/i18n.test.tsx
 TC-RANK-113 apps/worker/tests/elo.test.ts
 TC-RANK-114 apps/worker/tests/elo.test.ts
-TC-RANK-141 apps/worker/tests/history.test.ts
 TC-ROOM-049 apps/worker/tests/room.test.ts
 TC-ROOM-052 apps/worker/tests/room.test.ts
 TC-ROOM-055 apps/worker/tests/room.test.ts

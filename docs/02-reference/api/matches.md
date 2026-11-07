@@ -63,12 +63,18 @@ Response `200`: `{ items[], next_cursor, has_more }` where each item is
 | `matchId` | string | — |
 | `playedAt` | string | `match_record.ended_at` |
 | `team` / `result` | enum | `A`/`B`, `win`/`loss`/`abandon` |
-| `opponents` | array | `{ displayName, team }`, no account ids |
+| `playerCount` | integer | Total seats, so the row can print `2v2` |
+| `opponents` | array | `{ displayName, team }`, no account ids and no ratings |
 | `damageDealt` / `shotsFired` / `hits` | integer | Own row |
 | `ratingDelta` | integer \| null | `null` for unranked |
+| `ranked` | boolean | `match_record.ranked` |
+| `rankedReason` | enum \| null | `guest` \| `bot` \| `abandoned` \| `ruleset_mismatch`; `null` when rated |
 | `rulesetVersion` | string | — |
 
-Ordered by `ended_at DESC, match_id DESC`; the cursor encodes `(ended_at, match_id)`.
+Ordered by `ended_at DESC, match_id DESC`. The cursor is keyset over `(ended_at, match_id)` and **signed**: it is
+base64url of the payload plus `.` plus an HMAC-SHA-256 signature over that payload, so a cursor the server did not mint
+is `400 bad-request`, never a page and never a 500. An empty history answers `items: []`, `next_cursor: null`,
+`has_more: false`.
 
 ## GET /leaderboard
 

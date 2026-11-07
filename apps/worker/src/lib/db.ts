@@ -226,8 +226,36 @@ export async function findOpponents(
   return rows.results ?? [];
 }
 
-export function encodeHistoryCursor(cursor: MatchHistoryCursor): string {
-  return encodeCursor(JSON.stringify({ v: 1, e: cursor.endedAt, m: cursor.matchId }));
+/**
+ * The cursor is opaque **and** signed (`matches.md` § GET /me/matches, `US-RANK-003` § 5): a page marker a client can
+ * forge is a page marker a client can use to walk someone else's ordering, and a keyset cursor that decodes without a
+ * signature turns every typo into a 500. The signature is HMAC-SHA-256 over the payload with the session secret, so it
+ * needs no new binding — a worker that can verify a session can verify a cursor.
+ */
+const CURSOR_SIGNATURE_CONTEXT = "gbw.cursor.v1";
+
+async function cursorKey(secret: string): Promise<CryptoKey> {
+  return await crypto.subtle.importKey("raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, [
+    "sign",
+  ]);
+}
+
+function base64Url(bytes: Uint8Array): string {
+  return btoa(String.fromCharCode(...bytes))
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
+}
+
+async function cursorSignature(payload: string, secret: string): Promise<string> {
+  const key = await cursorKey(secret);
+  const digest = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(`${CURSOR_SIGNATURE_CONTEXT}.${payload}`));
+  return base64Url(new Uint8Array(digest));
+}
+
+export async function encodeHistoryCursor(cursor: MatchHistoryCursor, secret: string): Promise<string> {
+  const payload = encodeCursor(JSON.stringify({ v: 1, e: cursor.endedAt, m: cursor.matchId }));
+  return `${payload}.${await cursorSignature(payload, secret)}`;
 }
 
 export interface LeaderboardCursor {
@@ -357,12 +385,19 @@ function decodeCursorPayload(cursor: string): unknown {
   }
 }
 
-export function decodeHistoryCursor(cursor: string): MatchHistoryCursor {
-  const payload = decodeCursorPayload(cursor);
-  const record = payload as Record<string, unknown>;
-  if (record["v"] !== 1 || typeof record["e"] !== "string" || typeof record["m"] !== "string") {
-    throw new ProblemError("validation", "Cursor is not readable", [{ field: "cursor", detail: "invalid cursor" }]);
-  }
+export async function decodeHistoryCursor(cursor: string, secret: string): Promise<MatchHistoryCursor> {
+  // `400 bad-request`, not `422 validation`: the client sent a page marker that is not one, and `matches.md`
+  // § GET /me/matches names the code (`US-RANK-003` § 5).
+  const unreadable = (): ProblemError =>
+    new ProblemError("bad-request", "Cursor is not readable", [{ field: "cursor", detail: "invalid cursor" }]);
+  const separator = cursor.lastIndexOf(".");
+  if (separator <= 0) throw unreadable();
+  const payload = cursor.slice(0, separator);
+  const signature = cursor.slice(separator + 1);
+  // Compared before the payload is parsed: an unsigned cursor must not reach the JSON reader at all.
+  if (signature !== (await cursorSignature(payload, secret))) throw unreadable();
+  const record = decodeCursorPayload(payload) as Record<string, unknown>;
+  if (record["v"] !== 1 || typeof record["e"] !== "string" || typeof record["m"] !== "string") throw unreadable();
   return { endedAt: record["e"], matchId: record["m"] };
 }
 

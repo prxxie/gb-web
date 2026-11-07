@@ -219,18 +219,28 @@ export interface TurnCredentials {
   readonly turn: boolean;
 }
 
+/**
+ * One row of `GET /me/matches` (`docs/02-reference/api/matches.md`). The shape here is the wire's, field for field:
+ * an earlier version of this interface named `endedAt`, `opponentTeam`, `ratingBefore` and `ratingAfter`, none of
+ * which the server sends, so every history row rendered `Invalid Date` (`US-RANK-003` AC3).
+ */
 export interface HistoryItem {
   readonly matchId: string;
-  readonly roomCode: string;
+  readonly playedAt: string;
+  readonly team: "A" | "B";
   readonly result: "win" | "loss" | "abandon";
-  readonly ranked: boolean;
-  readonly opponentTeam: string | null;
+  /** Total seats in the match, so the row can print `2v2`. */
+  readonly playerCount: number;
+  /** The other seats, by display name only — never an account id or a rating (`US-RANK-003` AC5). */
+  readonly opponents: readonly { readonly displayName: string; readonly team: string }[];
   readonly damageDealt: number;
   readonly shotsFired: number;
   readonly hits: number;
-  readonly ratingBefore: number | null;
-  readonly ratingAfter: number | null;
-  readonly endedAt: string;
+  /** `null` for an unranked match, which then shows `—` and the reason (`AC4`). */
+  readonly ratingDelta: number | null;
+  readonly ranked: boolean;
+  readonly rankedReason: "guest" | "bot" | "abandoned" | "ruleset_mismatch" | null;
+  readonly rulesetVersion: string;
 }
 
 export interface HistoryResponse {

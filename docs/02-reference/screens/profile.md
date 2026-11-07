@@ -30,8 +30,10 @@ Own profile, rating and match history. Registered players only; a guest landing 
 | Stats | read-only `thắng / thua / bỏ cuộc` | — | `GET /me.stats` | — |
 | History list | rows from `GET /me/matches` | — | API | 20 per page, cursor `Tải thêm` |
 
-History row fields: date, result (`Thắng`/`Thua`/`Bỏ cuộc`), rating delta (`+12`, `−9`, `—` when unranked), opponents'
-names, team size, damage/shots. No account ids are rendered.
+History row fields: date, result (`Thắng`/`Thua`/`Bỏ cuộc` via `profile.result.*`), team size (`2v2` from
+`playerCount`), opponents' display names, damage/shots, and the rating delta (`+12`, `−9`) or `—` followed by the reason
+when the match was unranked (`profile.history.unranked` + `profile.history.reason.guest|bot|abandoned|ruleset_mismatch`).
+No account ids and no other player's rating are rendered.
 
 ## Actions
 
@@ -57,9 +59,11 @@ names, team size, damage/shots. No account ids are rendered.
 ## Copy keys
 
 `profile.title`, `profile.displayName`, `profile.save`, `profile.avatar`, `profile.rating`, `profile.matches`,
-`profile.stats.wins`, `profile.stats.losses`, `profile.stats.abandons`, `profile.history.title`,
-`profile.history.empty`, `profile.history.loadMore`, `profile.history.unranked`, `profile.signOut`,
-`profile.delete`, `profile.delete.confirm`, `profile.error.nameTaken`, `profile.error.nameInvalid`.
+`profile.stats.wins`, `profile.stats.losses`, `profile.stats.abandons`, `profile.history`, `profile.loadMore`,
+`profile.history.unranked`, `profile.result.win`, `profile.result.loss`, `profile.result.abandon`,
+`profile.history.reason.guest`, `profile.history.reason.bot`, `profile.history.reason.abandoned`,
+`profile.history.reason.ruleset_mismatch`, `profile.history.reason.unknown`, `profile.signOut`, `profile.delete`,
+`profile.deleteConfirm`, `profile.error.nameTaken`, `profile.error.nameInvalid`.
 
 ## Oracle
 
