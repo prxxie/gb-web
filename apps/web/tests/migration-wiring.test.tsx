@@ -12,6 +12,7 @@ import { act, cleanup, render, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import type { BattleCallbacks } from "../src/game/scene";
 import type { ServerMessage } from "@gbw/core";
+import { rejectionCounts, resetRejections } from "../src/net/diagnostics";
 
 const setState = vi.fn();
 const setAimAllowed = vi.fn();
@@ -24,6 +25,7 @@ const socketSend = vi.fn();
 const meshClose = vi.fn();
 let callbacks: BattleCallbacks | null = null;
 let onMessage: ((message: ServerMessage) => void) | null = null;
+let onSnapshot: ((snapshot: unknown) => void) | null = null;
 
 vi.mock("../src/game/scene", () => ({
   mountBattle: (options: { callbacks: BattleCallbacks }) => {
@@ -43,16 +45,19 @@ vi.mock("../src/lib/session", () => ({
 }));
 
 vi.mock("../src/net/mesh", () => ({
-  createMesh: () => ({
-    addPeer: vi.fn(),
-    removePeer: vi.fn(),
-    broadcast,
+  createMesh: (options: { onSnapshot?: (snapshot: unknown) => void }) => {
+    onSnapshot = options.onSnapshot ?? null;
+    return {
+      addPeer: vi.fn(),
+      removePeer: vi.fn(),
+      broadcast,
     ready: () => true,
-    sendControl: vi.fn(),
-    sendControlAll,
-    applySignal: vi.fn(),
-    close: meshClose,
-  }),
+      sendControl: vi.fn(),
+      sendControlAll,
+      applySignal: vi.fn(),
+      close: meshClose,
+    };
+  },
 }));
 
 vi.mock("../src/net/reconnect", () => ({
@@ -180,5 +185,24 @@ describe("TC-NET-909: the promotion moves the simulation (US-NET-003 AC1, AC2)",
 
     await waitFor(() => expect(sendControlAll).toHaveBeenCalled());
     expect(broadcast).not.toHaveBeenCalled();
+  });
+
+  it("drops and counts a snapshot from the host that lost the election", async () => {
+    plan("peer");
+    mount();
+    await waitFor(() => expect(onSnapshot).not.toBeNull());
+    act(() => onMessage!(hostChanged("peer-2")));
+    await waitFor(() => expect(onSnapshot).not.toBeNull());
+
+    setState.mockClear();
+    resetRejections();
+    // Generation 4 is what the old host was on; the promotion moved the room to 5.
+    act(() => onSnapshot!({ ...SNAPSHOT }));
+    expect(rejectionCounts().snapshot).toBe(1);
+    expect(setState).not.toHaveBeenCalled();
+
+    // The current host's snapshot still lands.
+    act(() => onSnapshot!({ ...SNAPSHOT, seq: 90, hostGeneration: 5 }));
+    expect(rejectionCounts().snapshot).toBe(1);
   });
 });

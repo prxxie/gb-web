@@ -527,7 +527,7 @@ describe("envelope and ownership (§ 5 of the story)", () => {
     expect(harness.state().members.find((member) => member.playerId === peerId)?.loadout).toBeUndefined();
   });
 
-  it("US-NET-004 AC5: a playerId in the payload cannot re-attribute a frame", async () => {
+  it("TC-NET-016: a playerId in the payload cannot re-attribute a frame", async () => {
     // Arrange — `p3` claims to be `p2` while signalling
     const { harness, sockets, hostId } = await open(["h", "p2", "p3"]);
     const p2 = sockets.get("p2")!;

@@ -49,6 +49,7 @@ import {
 import { createMesh, type Mesh } from "../net/mesh";
 import { decideTurn } from "../net/host-clock";
 import { resyncFromSnapshot } from "../net/resync";
+import { countRejectedSnapshot } from "../net/diagnostics";
 import { adoptHostChanged } from "../net/migration";
 import { itemFrame } from "../net/frames";
 import { connectWithReconnect, type ReconnectingSocket } from "../net/reconnect";
@@ -441,6 +442,9 @@ export function MatchPage(): JSX.Element {
           const synced = resyncFromSnapshot(current, snapshot, hostGeneration.current);
           hostGeneration.current = synced.hostGeneration;
           if (synced.applied) commit(synced.state, []);
+          // A snapshot from a host that lost the election is dropped, and the drop is counted so a support
+          // check can tell a flickering connection from a client that never learned about the promotion.
+          else countRejectedSnapshot();
         },
         onControl: (from, message) => {
           const current = stateRef.current;
@@ -547,6 +551,7 @@ export function MatchPage(): JSX.Element {
           const synced = resyncFromSnapshot(current, unpackSnapshot(message.snapshot), hostGeneration.current);
           hostGeneration.current = synced.hostGeneration;
           if (synced.applied) commit(synced.state, []);
+          else countRejectedSnapshot();
           return;
         }
         if (message.t === "room_state") {

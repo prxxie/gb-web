@@ -218,7 +218,7 @@ The `covers` column names the requirement ([nonfunctional-requirements.md](../01
 | TC-NET-904 | US-NET-001 | AC1, AC3, AC5, AC6 — two real browsers join a room and play | Seven links at eight players and never more, both channels open in `about:webrtc`, the first snapshot lands after the last peer connects, and every link closes when the match ends | manual | ADR-0004 |
 | TC-NET-902 | US-NET-002 | Host streams state for one round | A snapshot every 100 ms while a turn is live and every 500 ms when idle; a peer buffering more than 64 KB is skipped; a silent peer for 2 s is reported | e2e | FR-05 |
 | TC-NET-903 | US-NET-003 | New host adopts the previous snapshot | `acceptSnapshot` refuses an older `hostGeneration` and a stale `seq`; an accepted snapshot restores players, weather and the turn clock; a snapshot that no longer fits the budget is rejected, not truncated | unit | FR-06 |
-| TC-NET-044 | US-NET-004 | Peer sends `snapshot_push` while not host | `error not-host`, `lastSnapshot` unchanged | worker | ADR-0004 |
+| TC-NET-044 | US-NET-004 | AC1 — Peer sends `snapshot_push` while not host | `error not-host`, `lastSnapshot` unchanged | worker | ADR-0004 |
 
 ## Match UI (MATCH)
 
@@ -357,7 +357,12 @@ unrelated meanings), so every row below names the one thing it proves.
 | TC-MATCH-914 | US-MATCH-002 | Drag distance maps to the power ring radius | Radius grows with the pull and stops at the maximum | web | `US-MATCH-002` §4 |
 | TC-NET-045 | US-NET-004 | A peer sends `team_assign`; the host sends it after the start | `not-host` while a peer, `invalid-state` once playing; the roster is unchanged | worker | `US-NET-004` §2 roster |
 | TC-NET-066 | US-NET-004 | A socket signals itself, then signals a seated member with no socket | `bad-request`, then `peer-not-connected`; no frame is relayed | worker | `US-NET-004` §3 `signal` |
-| TC-NET-067 | US-NET-004 | Fire from a non-active slot | Ignored + `error unsupported-message` | worker | FR-02 |
+| TC-NET-067 | US-NET-004 | AC2 — Fire from a non-active slot | Ignored + `error unsupported-message` | worker | FR-02 |
+| TC-NET-011 | US-NET-004 | AC6 — A peer sends `snapshot_push` while not host | One structured line carries `request_id`, `room_code`, `code: not-host` and the authenticated `player_id`, and no part of the payload | worker | NFR-24 |
+| TC-NET-015 | US-NET-004 | AC3 — A socket that never sent `auth` sends `snapshot_push` | Closed with 4401, and the roster is exactly as it was | worker | `api/signaling.md` § 2 |
+| TC-NET-016 | US-NET-004 | AC5 — A frame carries a `playerId` that is not the sender's | The socket's authenticated identity wins; the claim is ignored | worker | NFR-11 |
+| TC-NET-012 | US-NET-004 | AC4 — A peer receives a snapshot from the host that lost the election | Dropped and counted in the `rejected_snapshot` counter; the current host's snapshot still lands | web | ADR-0004 |
+| TC-NET-013 | US-NET-004 | AC4 — A support check reads the counter after a reported flicker | The count matches the drops the client actually made | manual | NFR-24 |
 | TC-PWA-152 | US-PWA-003 | AC1, AC2 — the page is squeezed into portrait, then rotated to landscape | Portrait shows the rotate gate with the hint, landscape shows the match | web | `US-PWA-003` AC1, AC2 |
 | TC-ROOM-025 | US-MATCH-004 | A preset phrase and a free text are sent, then an empty, unknown-kind or 121-char frame | The two valid frames parse; the three invalid ones are refused with the limit in `detail` | unit | `US-MATCH-004` §4 `chat` |
 | TC-ROOM-053 | US-ROOM-001 | A room runs past 24 h from its creation but not from its match start | The cap is measured from the match start; the room survives until then | worker | `room-state.md` expiry |

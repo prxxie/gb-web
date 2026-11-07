@@ -50,6 +50,26 @@ const CLOSE_ROOM_FULL = 4409;
 const CLOSE_ROOM_CLOSED = 4410;
 const CLOSE_RATE_LIMITED = 4429;
 
+/**
+ * The status the same refusal would carry on the REST side, so a log line and a problem body agree.
+ * `problem.ts` cannot answer this: the frame codes include `payload-too-large` and the roster codes,
+ * which no REST route returns.
+ */
+const FRAME_STATUS: Record<ErrorCode, number> = {
+  "bad-request": 400,
+  "unsupported-message": 422,
+  "payload-too-large": 413,
+  "rate-limited": 429,
+  "not-host": 403,
+  "invalid-state": 409,
+  "room-not-full": 409,
+  "not-enough-players": 422,
+  "teams-not-balanced": 422,
+  "peer-not-connected": 404,
+  "snapshot-too-large": 413,
+  internal: 500,
+};
+
 interface SocketMeta {
   playerId: string | null;
   authed: boolean;
@@ -1080,7 +1100,28 @@ export class Room implements DurableObject {
   }
 
   /** One shape for every refusal: `{t:"error", code, detail}` (`signaling.md` § 3). */
+  /**
+   * Refuse a frame: tell the sender, and write one structured line about it.
+   *
+   * The line carries the identity the socket authenticated as — never a `playerId` from the frame, which any browser
+   * can edit (`US-NET-004` AC5) — and none of the refused payload, because a snapshot holds every player's HP and a
+   * `signal` holds SDP (`NFR-13`, `NFR-24`). `detail` stays out too: it quotes field names from the message.
+   */
   private reject(ws: WebSocket, code: ErrorCode, detail: string): void {
+    const meta = this.meta.get(ws);
+    console.info(
+      JSON.stringify({
+        level: "warn",
+        request_id: crypto.randomUUID(),
+        route: "WS /api/v1/rooms/:code/ws",
+        method: "WS",
+        status: FRAME_STATUS[code],
+        duration_ms: 0,
+        room_code: this.room.roomCode,
+        player_id: meta?.playerId ?? undefined,
+        code,
+      }),
+    );
     this.send(ws, { t: "error", code, detail });
   }
 
