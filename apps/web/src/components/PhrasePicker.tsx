@@ -7,8 +7,9 @@
  */
 import { useRef, useState } from "react";
 import type { JSX } from "react";
+import type { ChatId, ChatKind, EmoteId, PhraseId } from "@gbw/core";
 
-export type ChatKind = "quick_phrase" | "emote";
+export type { ChatKind };
 
 export interface PhrasePickerLabels {
   readonly skip: string;
@@ -18,13 +19,13 @@ export interface PhrasePickerLabels {
 
 export interface PhrasePickerProps {
   readonly skipEnabled: boolean;
-  readonly phraseIds: readonly string[];
-  readonly emoteIds: readonly string[];
+  readonly phraseIds: readonly PhraseId[];
+  readonly emoteIds: readonly EmoteId[];
   readonly labels: PhrasePickerLabels;
   readonly phraseText: (id: string) => string;
   readonly emoteText: (id: string) => string;
   readonly onSkip: () => void;
-  readonly onChat: (kind: ChatKind, id: string) => void;
+  readonly onChat: (kind: ChatKind, id: ChatId) => void;
 }
 
 /** Local copy of the client-side chat budget: two sends per rolling second (`US-MATCH-004` AC4). */
@@ -44,7 +45,7 @@ export function PhrasePicker({
   const sent = useRef<number[]>([]);
   const [open, setOpen] = useState(false);
 
-  const chat = (kind: ChatKind, id: string): void => {
+  const chat = (kind: ChatKind, id: ChatId): void => {
     const now = Date.now();
     sent.current = sent.current.filter((at) => now - at < CHAT_WINDOW_MS);
     if (sent.current.length >= CHAT_PER_WINDOW) return;

@@ -6,14 +6,24 @@
  * reads it (`AC8`). A mobile that dies keeps its cell and still prints `0`: the strip answers "who is left" at a
  * glance, and a row that reflowed exactly when someone dies would be unreadable.
  */
-import type { PlayerState } from "@gbw/core";
+import type { ChatKind, PlayerState } from "@gbw/core";
 import { getMobile } from "@gbw/core";
 import type { JSX } from "react";
+
+export interface RosterChat {
+  /** The seat that spoke. */
+  readonly slot: number;
+  readonly kind: ChatKind;
+  /** Already translated into this client's locale — only the id crossed the wire. */
+  readonly text: string;
+}
 
 export interface RosterProps {
   readonly players: readonly PlayerState[];
   readonly activeSlot: number;
   readonly eliminatedLabel: string;
+  /** The phrase or emote currently on screen, shown over the speaker's own cell (`US-MATCH-004` AC3, AC6). */
+  readonly chat?: RosterChat | null;
 }
 
 /**
@@ -27,7 +37,7 @@ export function delayText(delay: number, activeDelay: number, isActive: boolean)
   return delta > 0 ? `+${delta}` : `−${Math.abs(delta)}`;
 }
 
-export function Roster({ players, activeSlot, eliminatedLabel }: RosterProps): JSX.Element {
+export function Roster({ players, activeSlot, eliminatedLabel, chat = null }: RosterProps): JSX.Element {
   const activeDelay = players.find((player) => player.slot === activeSlot)?.delay ?? 0;
   return (
     <div className="match__roster">
@@ -47,6 +57,14 @@ export function Roster({ players, activeSlot, eliminatedLabel }: RosterProps): J
               {delayText(player.delay, activeDelay, player.slot === activeSlot)}
             </span>
           </div>
+          {chat?.slot === player.slot ? (
+            <div
+              className={`match__chat-toast${chat.kind === "emote" ? " match__chat-toast--emote" : ""}`}
+              data-testid={`chat-toast-${player.slot}`}
+            >
+              {chat.text}
+            </div>
+          ) : null}
         </div>
       ))}
     </div>

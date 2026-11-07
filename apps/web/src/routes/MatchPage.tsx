@@ -18,6 +18,9 @@ import {
   isItemId,
   ITEMS_BY_ID,
   toSnapshot,
+  EMOTE_IDS,
+  PHRASE_IDS,
+  type ChatId,
   type MatchEvent,
   type MatchState,
   type Seat,
@@ -50,6 +53,7 @@ import { createMesh, type Mesh } from "../net/mesh";
 import { decideTurn } from "../net/host-clock";
 import { resyncFromSnapshot } from "../net/resync";
 import { countRejectedSnapshot } from "../net/diagnostics";
+import { chatFrame, chatText, isChatFrame, toastMs } from "../net/chat";
 import { adoptHostChanged } from "../net/migration";
 import { itemFrame } from "../net/frames";
 import { connectWithReconnect, type ReconnectingSocket } from "../net/reconnect";
@@ -75,8 +79,6 @@ const PLAN_KEY = "gbw.match";
 const RESULT_KEY = "gbw.result";
 
 /** The fixed phrase and emote ids of `US-MATCH-004`; only their copy lives in the locale tables. */
-const PHRASE_IDS = ["phrase-01", "phrase-02", "phrase-03", "phrase-04", "phrase-05", "phrase-06", "phrase-07", "phrase-08", "phrase-09", "phrase-10", "phrase-11", "phrase-12"] as const;
-const EMOTE_IDS = ["emote-01", "emote-02", "emote-03", "emote-04", "emote-05", "emote-06", "emote-07", "emote-08"] as const;
 
 function readPlan(): PlannedMatch | null {
   try {
@@ -143,7 +145,8 @@ export function MatchPage(): JSX.Element {
   const [lockedTurn, setLockedTurn] = useState<number | null>(null);
   /** Mirrored for the mount-time closures: `onRelease` is created once and would read a stale state value. */
   const lockedTurnRef = useRef<number | null>(null);
-  const [chat, setChat] = useState<{ readonly kind: ChatKind; readonly id: string } | null>(null);
+  /** The phrase on screen, with the seat that said it: the banner belongs above that seat's chip (`AC3`). */
+  const [chat, setChat] = useState<{ readonly slot: number; readonly kind: ChatKind; readonly id: string } | null>(null);
   const container = useRef<HTMLDivElement | null>(null);
   const battle = useRef<BattleHandle | null>(null);
   const mesh = useRef<Mesh | null>(null);
@@ -449,6 +452,21 @@ export function MatchPage(): JSX.Element {
         onControl: (from, message) => {
           const current = stateRef.current;
           if (!current) return;
+          // A phrase is not an input: it never changes the match, so it is handled before the turn guard and
+          // is never attributed by `seq` (`US-MATCH-004` AC3).
+          if (isChatFrame(message)) {
+            const slot = slotsByPlayer.current.get(from);
+            if (slot === undefined) return;
+            setChat({ slot, kind: message.kind, id: message.id });
+            // The host is the star's centre: a peer's phrase has to reach the other peers, and not come back
+            // to the sender, which already showed it.
+            if (hostPlayerId.current === plan.playerId) {
+              for (const playerId of slotsByPlayer.current.keys()) {
+                if (playerId !== from && playerId !== plan.playerId) mesh.current?.sendControl(playerId, message);
+              }
+            }
+            return;
+          }
           const frame = message as Partial<InputFrame> & { t?: string };
           if (frame?.t !== "input") return;
           // Only the host runs the simulation; a peer that receives an input has already made a mistake.
@@ -674,21 +692,19 @@ export function MatchPage(): JSX.Element {
   }, [plan, commit, hosting]);
 
   // A phrase carries an id, never a string the player typed (AC7), so every receiver renders it in
-  // its own locale (AC5).
+  // its own locale (AC5). It is not a match input: it changes no state, so it never spends a `seq`.
   const onChat = useCallback(
-    (kind: ChatKind, id: string) => {
-      const current = stateRef.current;
-      if (!current || !plan) return;
-      const result = applyInput(current, { kind, slot: plan.localSlot, id, seq: seq.current++ }, Date.now());
-      commit(result.state, result.events);
-      setChat({ kind, id });
+    (kind: ChatKind, id: ChatId) => {
+      if (!plan) return;
+      setChat({ slot: plan.localSlot, kind, id });
+      mesh.current?.sendControlAll(chatFrame(kind, id));
     },
-    [plan, commit],
+    [plan],
   );
 
   useEffect(() => {
     if (!chat) return;
-    const timer = window.setTimeout(() => setChat(null), chat.kind === "emote" ? 1500 : 3000);
+    const timer = window.setTimeout(() => setChat(null), toastMs(chat.kind));
     return () => window.clearTimeout(timer);
   }, [chat]);
 
@@ -727,7 +743,12 @@ export function MatchPage(): JSX.Element {
           })}
         />
         <div className="match__top">
-          <Roster players={state.players} activeSlot={state.turn.activeSlot} eliminatedLabel={t("match.eliminated")} />
+          <Roster
+            players={state.players}
+            activeSlot={state.turn.activeSlot}
+            eliminatedLabel={t("match.eliminated")}
+            chat={chat ? { slot: chat.slot, kind: chat.kind, text: chatText(t, chat.kind, chat.id) ?? "" } : null}
+          />
           <div className="row">
             <div className="match__angle" data-testid="angle-value">
             {Math.round(aimAngle)}°
@@ -831,14 +852,7 @@ export function MatchPage(): JSX.Element {
         />
 
         {status === "reconnecting" ? <div className="overlay">{t("match.reconnecting")}</div> : null}
-        {chat ? (
-          <div className="chat-bubble" data-testid="chat-bubble">
-            {t("match.chat.bubble", {
-              name: state.players.find((player) => player.slot === plan.localSlot)?.displayName ?? "",
-              text: t(chat.kind === "emote" ? `match.emote.${chat.id}` : `match.phrase.${chat.id}`),
-            })}
-          </div>
-        ) : null}
+
         {banner ? <div className="banner">{banner}</div> : null}
         {feed.length > 0 ? (
           <div className="banner" style={{ top: "auto", bottom: "96px" }} data-testid="event-feed">

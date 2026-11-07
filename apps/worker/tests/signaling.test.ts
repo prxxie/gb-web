@@ -265,7 +265,9 @@ describe("budgets (signaling.md §2 table, US-NET-004 §5)", () => {
     host.clear();
 
     // Act
-    for (const text of ["gg", "nice shot", "one more"]) await harness.message(p2, { t: "chat", text });
+    for (const id of ["phrase-01", "phrase-02", "phrase-03"]) {
+      await harness.message(p2, { t: "chat", kind: "quick_phrase", id });
+    }
 
     // Assert — §4 documents `chat` as a client frame; §5 budgets it at 2/s
     expect(p2.errors().map((frame) => frame["code"])).toEqual(["rate-limited"]);

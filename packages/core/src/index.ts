@@ -17,6 +17,7 @@ export * from "./match.js";
 export * from "./snapshot.js";
 export * from "./rating.js";
 export * from "./room.js";
+export * from "./phrases.js";
 export * from "./protocol.js";
 export * from "./camera.js";
 export * from "./bot.js";
