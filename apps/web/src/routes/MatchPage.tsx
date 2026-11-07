@@ -18,12 +18,12 @@ import {
   isItemId,
   ITEMS_BY_ID,
   toSnapshot,
-  type FireInput,
   type MatchEvent,
   type MatchState,
   type Seat,
 } from "@gbw/core";
 import { mountBattle, type BattleHandle } from "../game/scene";
+import { canAim, fireFromPull, RING_RADIUS } from "../game/aim";
 import { DirectionPad, type PadAction } from "../components/DirectionPad";
 import { PhrasePicker, type ChatKind } from "../components/PhrasePicker";
 import { Ruler } from "../components/Ruler";
@@ -113,6 +113,9 @@ export function MatchPage(): JSX.Element {
   const [state, setState] = useState<MatchState | null>(null);
   const [feed, setFeed] = useState<readonly MatchEvent[]>([]);
   const [power, setPower] = useState(0);
+  /** The "drag to aim" hint, shown once per match (`US-MATCH-002` AC4). */
+  const [hint, setHint] = useState<string | null>(null);
+  const hintShown = useRef(false);
   const [, setAngle] = useState(45);
   const [aimDelta, setAimDelta] = useState(0);
   const [camera, setCamera] = useState<CameraWindow>(() => defaultWindow(16 / 9));
@@ -219,14 +222,21 @@ export function MatchPage(): JSX.Element {
         onRelease: (value, nextAngle) => {
           const current = stateRef.current;
           if (!current || !plan) return;
-          const input: FireInput = {
-            kind: "fire",
-            slot: plan.localSlot,
-            weaponSlot: weaponSlotRef.current,
-            angle: clampAngle(nextAngle + aimDelta, mobile),
-            force: Math.round(value * 25),
-            seq: seq.current++,
-          };
+          // The scene already refuses to start a pull out of turn, but the release is the moment a shot would leave
+          // the client, so the same decision is taken again here (`US-MATCH-002` AC7/AC8).
+          const input = fireFromPull(
+            { power: value, angle: nextAngle },
+            {
+              slot: plan.localSlot,
+              weaponSlot: weaponSlotRef.current,
+              seq: seq.current,
+              mobile,
+              aimDelta,
+              shot: { lockedTurn, turnNumber: current.turn.number },
+            },
+          );
+          if (!input) return;
+          seq.current += 1;
           const result = applyInput(current, input, Date.now());
           commit(result.state, result.events);
           setLockedTurn(current.turn.number);
@@ -238,7 +248,13 @@ export function MatchPage(): JSX.Element {
           socket.current?.send({ t: "snapshot_push", snapshot });
           setPower(0);
         },
-        onCancel: () => setPower(0),
+        onCancel: (reason) => {
+          setPower(0);
+          if (reason === "deadzone" && !hintShown.current) {
+            hintShown.current = true;
+            setHint(translate(locale, "match.hint.pull"));
+          }
+        },
         onCamera: (window) => setCamera(window),
       },
     });
@@ -253,6 +269,30 @@ export function MatchPage(): JSX.Element {
   useEffect(() => {
     if (battle.current && state) battle.current.setState(state, plan?.localSlot ?? 0);
   }, [state, plan?.localSlot]);
+
+  // The hint says its piece once and goes away on its own (`US-MATCH-002` AC4).
+  useEffect(() => {
+    if (!hint) return;
+    const timer = window.setTimeout(() => setHint(null), 2500);
+    return () => window.clearTimeout(timer);
+  }, [hint]);
+
+  // The scene draws the ring and the preview only while this client may shoot (`US-MATCH-002` AC7/AC8).
+  useEffect(() => {
+    if (!state) return;
+    const localSlot = plan?.localSlot ?? 0;
+    const own = state.players.find((player) => player.slot === localSlot);
+    battle.current?.setAimAllowed(
+      canAim({
+        status: state.status,
+        activeSlot: state.turn.activeSlot,
+        localSlot,
+        eliminated: own?.eliminated ?? false,
+        lockedTurn,
+        turnNumber: state.turn.number,
+      }),
+    );
+  }, [state, plan?.localSlot, lockedTurn]);
 
   // Bot opponent: think for a moment, then shoot.
   useEffect(() => {
@@ -540,10 +580,18 @@ export function MatchPage(): JSX.Element {
 
         <Ruler window={camera} unitLabel={t("match.ruler.unit")} />
 
-        <div className="match__power">
+        <div
+          className={focus ? "match__power match__power--on-ring" : "match__power"}
+          style={focus ? { left: focus.x, top: focus.y - RING_RADIUS - 18 } : undefined}
+        >
           <div className="match__power-value" data-testid="power-value">
             {power.toFixed(2)}
           </div>
+          {hint && (
+            <div className="match__hint" data-testid="pull-hint">
+              {hint}
+            </div>
+          )}
           <div className="muted">
             {isMyTurn
               ? t("match.yourTurn")
@@ -635,10 +683,6 @@ export function MatchPage(): JSX.Element {
       </div>
     </div>
   );
-}
-
-function clampAngle(angle: number, mobile: { angleMin: number; angleMax: number }): number {
-  return Math.max(mobile.angleMin, Math.min(mobile.angleMax, Math.round(angle)));
 }
 
 function describeEvent(event: MatchEvent, locale: Locale): string {

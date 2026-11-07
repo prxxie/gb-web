@@ -13,13 +13,14 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import type { BattleCallbacks } from "../src/game/scene";
 
 const destroy = vi.fn();
+const setAimAllowed = vi.fn();
 const setState = vi.fn();
 let callbacks: BattleCallbacks | null = null;
 
 vi.mock("../src/game/scene", () => ({
   mountBattle: (options: { callbacks: BattleCallbacks }) => {
     callbacks = options.callbacks;
-    return { setState, destroy };
+    return { setState, setAimAllowed, destroy };
   },
 }));
 

@@ -12,7 +12,6 @@ import {
   windowOn,
   panBy,
   pinchTo,
-  powerRingRadius,
   rulerLayout,
   simulateFlight,
   launch,
@@ -31,11 +30,13 @@ import {
   type UnitFrame,
   type UnitPose,
 } from "./interpolate";
+import { RING_RADIUS, RING_START, ringColor, ringSweep } from "./aim";
 
 export interface BattleCallbacks {
   readonly onPull: (power: number, angle: number) => void;
   readonly onRelease: (power: number, angle: number) => void;
-  readonly onCancel: () => void;
+  /** `deadzone` is a release too weak to fire; `gesture` is a second finger taking over the camera (`AC4`/`AC5`). */
+  readonly onCancel: (reason: "deadzone" | "gesture" | "pointercancel") => void;
   readonly onCamera: (window: CameraWindow) => void;
   /**
    * Where this client's mobile sits on screen, in CSS pixels (`US-MATCH-003` AC11). The pad hangs on this point so it
@@ -46,6 +47,11 @@ export interface BattleCallbacks {
 
 export interface BattleHandle {
   setState(state: MatchState, localSlot: number): void;
+  /**
+   * Whether this client may aim right now (`US-MATCH-002` AC7/AC8): the scene refuses to start a pull, draw the ring
+   * or hand a release to `onRelease` while it is false. The camera keeps working — panning is not aiming.
+   */
+  setAimAllowed(allowed: boolean): void;
   destroy(): void;
 }
 
@@ -80,6 +86,7 @@ class BattleScene extends Phaser.Scene {
   private previousSpread: number | null = null;
   private pullPower = 0;
   private pullAngle = 0;
+  private aimAllowed = true;
   private pointerHandlers: Array<{ type: string; handler: (event: PointerEvent) => void }> = [];
 
 
@@ -91,6 +98,17 @@ class BattleScene extends Phaser.Scene {
     // A placeholder only: `create()` frames the window on the real canvas, because Phaser has no `scale`
     // until the scene is booted (`this.scale` in the constructor throws).
     this.window = defaultWindow(TUNABLES.viewDefaultWidth / TUNABLES.viewDefaultHeight);
+  }
+
+  setAimAllowed(allowed: boolean): void {
+    this.aimAllowed = allowed;
+    if (!allowed) {
+      // A pull in flight is dropped rather than fired when the right to aim goes away mid-gesture.
+      this.origin = null;
+      this.pullPower = 0;
+      this.pullAngle = 0;
+      this.callbacks.onCancel("gesture");
+    }
   }
 
   setState(state: MatchState, localSlot: number): void {
@@ -164,13 +182,15 @@ class BattleScene extends Phaser.Scene {
       canvas.setPointerCapture?.(event.pointerId);
       this.pointers = addPointer(this.pointers, toPoint(event));
       if (this.pointers.pointers.length === 1) {
-        this.origin = toPoint(event);
+        // Not this client's turn (or it already fired in it): the finger never becomes a pull, so no ring is drawn and
+        // `up` finds no origin to release (`US-MATCH-002` AC7/AC8).
+        this.origin = this.aimAllowed ? toPoint(event) : null;
         this.pullPower = 0;
         this.pullAngle = 0;
       } else {
         this.previousSpread = this.spread();
         this.origin = null;
-        this.callbacks.onCancel();
+        this.callbacks.onCancel("gesture");
       }
     };
     const move = (event: PointerEvent): void => {
@@ -193,7 +213,7 @@ class BattleScene extends Phaser.Scene {
         const power = gesture.kind === "pull" ? gesture.power : this.pullPower;
         const angle = gesture.kind === "pull" ? gesture.angle : this.pullAngle;
         if (power >= TUNABLES.powerDeadzone) this.callbacks.onRelease(power, angle);
-        else this.callbacks.onCancel();
+        else this.callbacks.onCancel(event.type === "pointercancel" ? "pointercancel" : "deadzone");
       }
       // The pull is spent: clear the ring and the predicted arc until the next gesture starts.
       this.pullPower = 0;
@@ -410,15 +430,22 @@ class BattleScene extends Phaser.Scene {
     const frame = frames.find((candidate) => candidate.slot === this.localSlot);
     const player = this.state.players.find((candidate) => candidate.slot === this.localSlot);
     if (!frame || !player || frame.eliminated) return;
+    // The ring and the preview only exist while this client may actually shoot (`US-MATCH-002` AC7).
+    if (!this.aimAllowed) return;
     const mobile = getMobile(player.mobileId);
     const map = getMap(this.state.mapId);
 
     if (this.pullPower > 0) {
-      const radius = powerRingRadius(this.pullPower);
-      for (let ring = 0; ring < 12; ring += 1) {
-        graphics.lineStyle(3, 0x4f9dff, 0.12 + (ring / 12) * 0.5);
-        graphics.strokeCircle(frame.x, frame.y - 10, radius * (1 - ring / 16));
-      }
+      // A gradient arc around the mobile, clockwise from −90°, that fills with the pull (`US-MATCH-002` AC2).
+      const centerY = frame.y - 10;
+      graphics.lineStyle(6, 0x2b3a58, 0.8);
+      graphics.strokeCircle(frame.x, centerY, RING_RADIUS);
+      graphics.lineStyle(6, ringColor(this.pullPower), 0.95);
+      graphics.beginPath();
+      graphics.arc(frame.x, centerY, RING_RADIUS, RING_START, RING_START + ringSweep(this.pullPower), false);
+      graphics.strokePath();
+      graphics.lineStyle(2, ringColor(this.pullPower), 0.45);
+      graphics.strokeCircle(frame.x, centerY, RING_RADIUS + 8);
       const projectile = launch({
         id: 1,
         ownerSlot: frame.slot,
@@ -486,6 +513,7 @@ export function mountBattle(options: Options): BattleHandle {
   window.addEventListener("resize", resize);
   return {
     setState: (state, localSlot) => scene.setState(state, localSlot),
+    setAimAllowed: (allowed) => scene.setAimAllowed(allowed),
     destroy: () => {
       window.removeEventListener("resize", resize);
       game.destroy(true);
