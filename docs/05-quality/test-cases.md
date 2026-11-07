@@ -208,7 +208,8 @@ The `covers` column names the requirement ([nonfunctional-requirements.md](../01
 
 | ID | Story | Case | Expected | Level | Covers |
 |----|-------|------|----------|-------|--------|
-| TC-NET-901 | US-NET-001 | Host opens a peer connection | Exactly two channels: `control` ordered/reliable, `state` unordered with `maxRetransmits: 0` | e2e | ADR-0004 |
+| TC-NET-901 | US-NET-001 | AC1, AC2, AC3 — host opens a peer connection against a stand-in `RTCPeerConnection`; a peer receives `control` then `state` | Exactly two channels: `control` `{ordered: true}`, `state` `{ordered: false, maxRetransmits: 0}`; a half-arrived pair wires nothing, so no snapshot rides on `control`; `host_hello {hostGeneration, seq}` goes out on each new control channel; snapshots wait for the last peer or 5 s, whichever first | web | ADR-0004 |
+| TC-NET-904 | US-NET-001 | AC1, AC3, AC5 — two real browsers join a room and play | Seven links at eight players and never more, both channels open in `about:webrtc`, the first snapshot lands after the last peer connects, and every link closes when the match ends | manual | ADR-0004 |
 | TC-NET-902 | US-NET-002 | Host streams state for one round | A snapshot every 100 ms while a turn is live and every 500 ms when idle; a peer buffering more than 64 KB is skipped; a silent peer for 2 s is reported | e2e | FR-05 |
 | TC-NET-903 | US-NET-003 | New host adopts the previous snapshot | `acceptSnapshot` refuses an older `hostGeneration` and a stale `seq`; an accepted snapshot restores players, weather and the turn clock; a snapshot that no longer fits the budget is rejected, not truncated | unit | FR-06 |
 | TC-NET-044 | US-NET-004 | Peer sends `snapshot_push` while not host | `error not-host`, `lastSnapshot` unchanged | worker | ADR-0004 |

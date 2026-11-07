@@ -363,16 +363,14 @@ export function MatchPage(): JSX.Element {
     let cancelled = false;
     const base = window.location.origin.replace(/^http/, "ws");
 
-    void api.turnCredentials(session.token).then((credentials) => {
-      if (cancelled) return;
-      mesh.current = createMesh({
+    let iceServers: RTCIceServer[] = [];
+    const buildMesh = (hosting: boolean): Mesh =>
+      createMesh({
         selfPlayerId: plan.playerId,
-        isHost: plan.hostPlayerId === plan.playerId,
-        iceServers: credentials.iceServers.map((server) => ({
-          urls: Array.isArray(server.urls) ? server.urls : [server.urls],
-          ...(server.username ? { username: server.username } : {}),
-          ...(server.credential ? { credential: server.credential } : {}),
-        })),
+        isHost: hosting,
+        iceServers,
+        // `host_hello` on every new control channel (`US-NET-001` § 5).
+        hostHello: () => ({ t: "host_hello", hostGeneration: hostGeneration.current, seq: seq.current }),
         send: (channel) =>
           socket.current?.send({
             t: "signal",
@@ -404,6 +402,15 @@ export function MatchPage(): JSX.Element {
           }
         },
       });
+
+    void api.turnCredentials(session.token).then((credentials) => {
+      if (cancelled) return;
+      iceServers = credentials.iceServers.map((server) => ({
+        urls: Array.isArray(server.urls) ? server.urls : [server.urls],
+        ...(server.username ? { username: server.username } : {}),
+        ...(server.credential ? { credential: server.credential } : {}),
+      }));
+      mesh.current = buildMesh(plan.hostPlayerId === plan.playerId);
     });
 
     socket.current = connectWithReconnect({
@@ -423,6 +430,15 @@ export function MatchPage(): JSX.Element {
         }
         if (message.t === "host_changed") {
           setBanner(t("match.hostChanged"));
+          // Migration rebuilds the star (`US-NET-001` AC6): the elected host opens one link per remaining member and
+          // everyone drops the links that pointed at the old host. A link to a superseded host would stream state the
+          // peers are told to discard anyway, so the mesh is rebuilt from scratch.
+          hostGeneration.current = Math.max(hostGeneration.current, message.hostGeneration);
+          mesh.current?.close();
+          mesh.current = iceServers.length === 0 ? null : buildMesh(message.hostPlayerId === plan.playerId);
+          for (const member of message.room.members) {
+            if (member.playerId !== plan.playerId) void mesh.current?.addPeer(member.playerId);
+          }
           return;
         }
         if (message.t === "peer_joined") {
