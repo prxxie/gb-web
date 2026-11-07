@@ -116,8 +116,9 @@ export function MatchPage(): JSX.Element {
   /** The "drag to aim" hint, shown once per match (`US-MATCH-002` AC4). */
   const [hint, setHint] = useState<string | null>(null);
   const hintShown = useRef(false);
-  const [, setAngle] = useState(45);
   const [aimDelta, setAimDelta] = useState(0);
+  /** The barrel's resting angle: the gesture angle is added to this at release (`US-MATCH-006` AC4/AC5). */
+  const aimAngle = 45 + aimDelta;
   const [camera, setCamera] = useState<CameraWindow>(() => defaultWindow(16 / 9));
   /** Where the renderer last drew this client's mobile, in CSS pixels (`US-MATCH-003` AC11). */
   const [focus, setFocus] = useState<{ readonly x: number; readonly y: number } | null>(null);
@@ -215,9 +216,8 @@ export function MatchPage(): JSX.Element {
       callbacks: {
         // The pad rings the mobile the player is shooting (`US-MATCH-003` AC11).
         onFocus: (point) => setFocus(point),
-        onPull: (value, nextAngle) => {
+        onPull: (value) => {
           setPower(value);
-          setAngle(nextAngle);
         },
         onRelease: (value, nextAngle) => {
           const current = stateRef.current;
@@ -568,7 +568,10 @@ export function MatchPage(): JSX.Element {
         <div className="match__top">
           <Roster players={state.players} activeSlot={state.turn.activeSlot} eliminatedLabel={t("match.eliminated")} />
           <div className="row">
-            <WindDial weather={state.weather} label={t("match.wind")} />
+            <div className="match__angle" data-testid="angle-value">
+            {Math.round(aimAngle)}°
+          </div>
+          <WindDial weather={state.weather} label={t("match.wind")} />
             <div className="match__round" data-testid="turn-round">
               {t("match.round", { round: state.turn.round })}
             </div>
@@ -606,6 +609,9 @@ export function MatchPage(): JSX.Element {
           focus={focus}
           canMove={Boolean(localPlayer && localPlayer.energy > 0)}
           energy={localPlayer?.energy ?? 0}
+          movesLeft={Math.max(0, mobile.maxMovesPerTurn - (state?.effects.movesThisTurn ?? 0))}
+          angle={aimAngle}
+          angleWindow={{ min: mobile.angleMin, max: mobile.angleMax }}
           labels={{
             up: t("match.angle.up"),
             down: t("match.angle.down"),
