@@ -10,7 +10,7 @@ decide, a contract that already exists in `02-reference/`, and tests that prove 
 |---|---|---|---|---|---|---|
 | 55 | 46 | 0 | 9 | 0 | 0 | 0 |
 
-Open questions: **Open: 16 · Blocking: 0 · Answered: 26 · Withdrawn: 1**
+Open questions: **Open: 13 · Blocking: 0 · Answered: 29 · Withdrawn: 1**
 <!-- /cpt:stats -->
 
 ## Epics
