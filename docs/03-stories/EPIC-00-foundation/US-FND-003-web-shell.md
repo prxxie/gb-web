@@ -37,6 +37,7 @@ and the failure path players will actually hit on a flaky mobile network.
 | # | Given | When | Then |
 |---|-------|------|------|
 | AC1 | The shell running | Each of the seven routes is opened directly by URL | Every route renders its own `h1` and nothing else throws; unknown paths redirect to `/` |
+| AC1a | a match is open | the app bar steps aside | `/match/:code` renders without the shared bar so the battlefield owns the viewport; the language toggle moves into the match HUD (`TC-MATCH-910`) |
 | AC2 | The shell running with no `locale` in storage | The app starts | It renders in `vi`, the toggle shows `VI`, and every visible string comes from the locale table |
 | AC3 | The locale set to `en` | The app is reloaded | It renders in `en` and the choice persists in `localStorage` under `gbw.locale` |
 | AC4 | An API call stubbed to return `500` with a `request_id` | The screen settles | A banner shows the translated message and the `request_id`, and no stack trace or raw JSON is visible (`TC-FND-132`) |

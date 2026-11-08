@@ -275,7 +275,12 @@ class BattleScene extends Phaser.Scene {
     this.cameras.main.setBackgroundColor("#070d1a");
     this.attachPointerHandlers();
     // Fullscreen needs a gesture, so it is armed on the canvas rather than requested at mount (`US-MATCH-007` AC1).
-    this.disarmFullscreen = armFullscreen(this.game.canvas);
+    // The fullscreen element has to be the whole match screen, not the canvas: fullscreen renders only the target's
+    // subtree, so arming it on the canvas hid the entire HUD — HP bars, the weapon strip, the turn clock and the
+    // aim-aid toggle — the moment the player pulled for the first time (found by playing, 2026-11-08).
+    this.disarmFullscreen = armFullscreen(
+      ((this.game.canvas.closest(".match") as HTMLElement | null) ?? this.game.canvas) as HTMLElement,
+    );
     this.events.once("shutdown", () => this.shutdown());
     this.callbacks.onCamera(this.window);
   }
@@ -732,11 +737,18 @@ class BattleScene extends Phaser.Scene {
         aimDelta: this.aimDelta,
       }) : null;
       if (preview) {
-        graphics.fillStyle(0xffffff, 0.4);
-        for (const dot of preview.path) graphics.fillCircle(dot.x, dot.y, px(2));
+        // The arc has to be readable at a glance on a night map: a thin line under brighter, larger dots. 2 px at
+        // 40 % was invisible in a real screenshot (2026-11-08), which made the aid look broken next to the ring.
+        graphics.lineStyle(px(1.5), 0xffffff, 0.35);
+        graphics.beginPath();
+        graphics.moveTo(preview.path[0]?.x ?? 0, preview.path[0]?.y ?? 0);
+        for (const dot of preview.path.slice(1)) graphics.lineTo(dot.x, dot.y);
+        graphics.strokePath();
+        graphics.fillStyle(0xffffff, 0.9);
+        for (const dot of preview.path) graphics.fillCircle(dot.x, dot.y, px(2.5));
         // No impact means the shot leaves the map: a blast ring in the sky would be a promise nobody keeps.
         if (preview.impact) {
-          graphics.lineStyle(px(2), 0xffffff, 0.35);
+          graphics.lineStyle(px(2), 0xffffff, 0.55);
           // The blast radius is a world length (it is what the engine carves), so only its stroke stays screen-sized.
           graphics.strokeCircle(preview.impact.x, preview.impact.y, preview.radius);
         }

@@ -85,3 +85,77 @@ test("TC-MATCH-908: the aim aid starts off and remembers being turned on", async
   await page.getByTestId("aim-aid").click();
   await expect(page.getByTestId("aim-aid")).toHaveAttribute("aria-pressed", "false");
 });
+
+/**
+ * `TC-MATCH-909` — going fullscreen keeps the HUD in the game.
+ *
+ * The fullscreen request used to be armed on the canvas, and fullscreen renders only the target's subtree: the first pull
+ * of a match therefore hid the HP bars, the weapon strip, the turn clock and the aim-aid toggle, and every one of them
+ * became unclickable. Found by playing, not by the suite — the HUD stayed queryable, so assertions kept passing.
+ */
+test("TC-MATCH-909: the HUD stays reachable after the match goes fullscreen", async ({ page }) => {
+  await openBotMatch(page);
+  const box = await page.locator("canvas").boundingBox();
+  if (!box) throw new Error("the canvas has no box");
+  // The first pull is what arms the fullscreen request (`US-MATCH-007` AC1).
+  await page.mouse.move(box.x + box.width * 0.62, box.y + box.height * 0.55);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width * 0.68, box.y + box.height * 0.39, { steps: 10 });
+  await page.mouse.up();
+  await page.waitForTimeout(600);
+
+  const reachable = await page.evaluate(() => {
+    const aid = document.querySelector('[data-testid="aim-aid"]');
+    if (!aid) return "no aid button";
+    const rect = aid.getBoundingClientRect();
+    const at = document.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2);
+    return at?.getAttribute("data-testid") === "aim-aid" ? "reachable" : `covered by ${at?.tagName ?? "nothing"}`;
+  });
+  expect(reachable).toBe("reachable");
+  // The fullscreen element, if the browser granted it, has to contain the HUD rather than being the bare canvas.
+  const fullscreenIsTheScreen = await page.evaluate(() => {
+    const element = document.fullscreenElement;
+    return element === null || element.classList.contains("match");
+  });
+  expect(fullscreenIsTheScreen).toBe(true);
+});
+
+/**
+ * `TC-MATCH-910` — the battlefield gets the whole viewport.
+ *
+ * The shared app bar (product name + language toggle) sat above every route and cost the match 77 of 390 px of a
+ * landscape screen: a fifth of the field, spent on a name the player is already inside. The match renders without it and
+ * hosts the language toggle in its own HUD, so the control stays one tap away instead of disappearing with the strip.
+ */
+test("TC-MATCH-910: the match fills the viewport and still offers the language toggle", async ({ page }) => {
+  await openBotMatch(page);
+
+  const layout = await page.evaluate(() => {
+    const canvas = document.querySelector("canvas")?.getBoundingClientRect();
+    const toggles = document.querySelectorAll('[data-testid="locale-toggle"]');
+    const toggle = toggles[0]?.getBoundingClientRect();
+    const at = toggle ? document.elementFromPoint(toggle.x + toggle.width / 2, toggle.y + toggle.height / 2) : null;
+    return {
+      viewportHeight: window.innerHeight,
+      canvasTop: canvas ? Math.round(canvas.y) : null,
+      canvasHeight: canvas ? Math.round(canvas.height) : null,
+      barPresent: document.querySelector(".shell__bar") !== null,
+      toggleCount: toggles.length,
+      toggleHit: at?.getAttribute("data-testid") ?? at?.tagName ?? null,
+      toggleHeight: toggle ? Math.round(toggle.height) : null,
+    };
+  });
+
+  expect(layout.barPresent).toBe(false);
+  expect(layout.canvasTop).toBe(0);
+  expect(layout.canvasHeight).toBe(layout.viewportHeight);
+  // One toggle, and a finger can reach it: the HUD layer is `pointer-events: none`, so this is the real test.
+  expect(layout.toggleCount).toBe(1);
+  expect(layout.toggleHit).toBe("locale-toggle");
+  expect(layout.toggleHeight).toBeGreaterThanOrEqual(44);
+
+  // And it still works from inside the match (`TC-PWA-130`).
+  await page.getByTestId("locale-toggle").click();
+  await expect(page.locator("html")).toHaveAttribute("lang", "en");
+  await expect(page.getByTestId("match-screen")).toBeVisible();
+});

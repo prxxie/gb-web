@@ -16,9 +16,15 @@ import type { JSX } from "react";
 
 export interface ShellProps {
   readonly children: ReactNode;
+  /**
+   * No app bar. The battlefield is the one screen that fills the viewport: at 844×390 the bar cost 77 px, a fifth of
+   * the field, to show a product name the player already knows. The match hosts `LocaleToggle` in its own HUD instead
+   * (`TC-MATCH-910`), so the control stays reachable without the strip.
+   */
+  readonly bare?: boolean;
 }
 
-function LocaleToggle(): JSX.Element {
+export function LocaleToggle(): JSX.Element {
   const { locale, setLocale } = useLocale();
   return (
     <button
@@ -35,15 +41,17 @@ function LocaleToggle(): JSX.Element {
   );
 }
 
-export function Shell({ children }: ShellProps): JSX.Element {
+export function Shell({ children, bare = false }: ShellProps): JSX.Element {
   const { t } = useLocale();
   return (
     <OrientationGate message={t("orientation.rotate")} action={<LocaleToggle />}>
-      <div className="shell">
-        <header className="shell__bar">
-          <span className="shell__title">{t("app.title")}</span>
-          <LocaleToggle />
-        </header>
+      <div className={bare ? "shell shell--bare" : "shell"}>
+        {!bare && (
+          <header className="shell__bar">
+            <span className="shell__title">{t("app.title")}</span>
+            <LocaleToggle />
+          </header>
+        )}
         <main id="main" className="shell__body">
           {children}
         </main>

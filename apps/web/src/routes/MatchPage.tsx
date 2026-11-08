@@ -25,6 +25,7 @@ import {
   type MatchState,
   type Seat,
 } from "@gbw/core";
+import { LocaleToggle } from "../app/Shell";
 import { mountBattle, type BattleHandle } from "../game/scene";
 import { canAim, fireFromPull, RING_RADIUS } from "../game/aim";
 import { DirectionPad, type PadAction } from "../components/DirectionPad";
@@ -932,6 +933,8 @@ export function MatchPage(): JSX.Element {
             <div className="match__clock" data-testid="turn-clock">
               {clock}s
             </div>
+            {/* The app bar is gone in a match (`TC-MATCH-910`), so the language toggle lives here instead. */}
+            <LocaleToggle />
           </div>
         </div>
 

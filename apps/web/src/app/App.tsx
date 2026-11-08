@@ -2,7 +2,6 @@ import { Suspense, lazy } from "react";
 import { createBrowserRouter, Navigate, RouterProvider } from "react-router-dom";
 import { ErrorBoundary } from "./ErrorBoundary";
 import { RouteFrame } from "./RouteFrame";
-import { Shell } from "./Shell";
 import { LocaleProvider, SessionProvider, useLocale } from "./providers";
 import { LeaderboardPage } from "../routes/LeaderboardPage";
 import { LobbyPage } from "../routes/LobbyPage";
@@ -67,9 +66,7 @@ export function App() {
     <ErrorBoundary>
       <LocaleProvider>
         <SessionProvider>
-          <Shell>
-            <RouterProvider router={router} />
-          </Shell>
+          <RouterProvider router={router} />
         </SessionProvider>
       </LocaleProvider>
     </ErrorBoundary>

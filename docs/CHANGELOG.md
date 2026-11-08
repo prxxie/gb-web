@@ -1,5 +1,18 @@
 # Changelog
 
+## 2026-11-08 — the battlefield gets its screen back
+
+The shared app bar (product name + language toggle) sat above every route, and in a match it cost **77 of 390 px** of a
+landscape screen — a fifth of the field, spent on a name the player is already inside. Measured, not guessed: the canvas
+was 844×313 with the bar and 844×390 without it.
+
+- **The match renders without the app bar.** `RouteFrame` owns `Shell` now and passes `bare` for `/match/:code`, so the
+  bar is not rendered at all rather than hidden behind a CSS override (`TC-MATCH-910`).
+- **The language toggle moved into the match HUD**, next to the turn clock: 60×60, hit-testable (`elementFromPoint`
+  resolves to it, not to the canvas — the HUD layer is `pointer-events: none`), and still switching the language mid-match
+  without dropping it (`TC-PWA-130`).
+- Every other route keeps the bar. `US-FND-003` AC1 gains the exception, and `screens/match.md` records the rule.
+
 ## 2026-11-08 — the bar gets its top half back
 
 The GB-parity work made the *rules* the genre's; this makes the **feel** match, measured rather than guessed. A probe over
