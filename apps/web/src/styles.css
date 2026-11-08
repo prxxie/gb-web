@@ -808,6 +808,85 @@ td {
   color: var(--ink-dim);
 }
 
+/*
+ * The mobile grid (`US-ROOM-007` AC7): one cell per mobile, twenty at any width, both team tints inside each
+ * cell so the list is not split by team. Tap targets stay above 44 px in landscape.
+ */
+.mobile-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+  gap: 8px;
+}
+
+.mobile-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  align-items: flex-start;
+  min-height: 56px;
+  padding: 8px;
+  text-align: left;
+  border-radius: 12px;
+  background: rgba(22, 33, 58, 0.92);
+}
+
+.mobile-cell--picked {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent) inset;
+}
+
+.mobile__tints {
+  display: flex;
+  gap: 4px;
+}
+
+.mobile__tint {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+/* Team A is the accent the roster already uses, team B the secondary accent (`--accent-2`). */
+.mobile__tint--a {
+  background: var(--accent);
+}
+
+.mobile__tint--b {
+  background: var(--accent-2);
+}
+
+.mobile__name {
+  font-size: 0.8rem;
+}
+
+.mobile__stat {
+  font-size: 0.7rem;
+  color: var(--ink-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+/* The map the host picked, with its gimmicks — the only view of the choice a non-host gets (`AC5`). */
+.map-preview {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: var(--radius);
+  background: rgba(22, 33, 58, 0.6);
+}
+
+.map-preview__name {
+  font-weight: 600;
+}
+
+.map-preview__gimmicks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
 .banner {
   position: absolute;
   top: 50%;

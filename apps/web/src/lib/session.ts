@@ -49,11 +49,31 @@ function store(response: SessionResponse): Session {
   return session;
 }
 
+/**
+ * The mint that is in flight, shared by everyone who asks before it lands.
+ *
+ * A dev build mounts `SessionProvider`'s effect twice (`StrictMode`), and two mints used to race: the second
+ * identity overwrote the first, so a join made with the first token found no seat when that page's socket
+ * authenticated with the second (`US-ROOM-007` AC7 needs the seat to outlive the frame that made it). One page
+ * load gets one guest.
+ */
+let minting: Promise<Session> | null = null;
+
 /** Reuse a live session, otherwise mint a guest one. Sign-in upgrades the stored session. */
 export async function ensureSession(): Promise<Session> {
   const existing = currentSession();
   if (existing) return existing;
-  return store(await api.createGuestSession());
+  if (!minting) {
+    // A sign-in or an account deletion that lands while this mint is in flight wins: the guest identity was only
+    // ever a fallback for "no session yet", so it must not overwrite one that arrived first.
+    const pending = api.createGuestSession().then((response) => currentSession() ?? store(response));
+    minting = pending;
+    const settle = (): void => {
+      if (minting === pending) minting = null;
+    };
+    pending.then(settle, settle);
+  }
+  return minting;
 }
 
 export async function upgradeToAccount(clerkToken: string): Promise<Session> {

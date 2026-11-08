@@ -151,9 +151,9 @@ describe("US-AUTH-003 AC7: a rename reaches the lobby", () => {
       fireEvent.click(screen.getByRole("button", { name: "rename" }));
     });
 
-    expect(authFrames()).toEqual([
-      { t: "auth", token: "test-token", displayName: "Bao Moi", mobileId: "mbl-01", avatarId: "avatar-03" },
-    ]);
+    // No `mobileId`: it rides its own `loadout` frame, and a rename must not resend a default over the pick
+    // (`US-ROOM-007` AC7).
+    expect(authFrames()).toEqual([{ t: "auth", token: "test-token", displayName: "Bao Moi", avatarId: "avatar-03" }]);
   });
 
   it("shows the peer's new name from the room_state the server answers with, without a reload", async () => {
@@ -214,8 +214,6 @@ describe("US-AUTH-003 AC7: a rename reaches the lobby", () => {
       fireEvent.click(screen.getByRole("button", { name: "new-avatar" }));
     });
 
-    expect(authFrames()).toEqual([
-      { t: "auth", token: "test-token", displayName: "Bao", mobileId: "mbl-01", avatarId: "avatar-09" },
-    ]);
+    expect(authFrames()).toEqual([{ t: "auth", token: "test-token", displayName: "Bao", avatarId: "avatar-09" }]);
   });
 });

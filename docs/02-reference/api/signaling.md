@@ -19,7 +19,7 @@ the budget (`NFR-04`), and readability is worth more at this stage.
 
 | `t` | Fields | Rule |
 |-----|--------|------|
-| `auth` | `token`, `mobileId?`, `displayName?`, `avatarId?` | First frame, within 5 s, else the socket closes with `4401`. The DO verifies `token` itself and binds the socket to the member whose `accountId`/`guestId` matches the token subject — identity never comes from the frame, and the bearer header cannot be used here because a browser cannot set one on a WebSocket |
+| `auth` | `token`, `mobileId?`, `displayName?`, `avatarId?` | First frame, within 5 s, else the socket closes with `4401`. The DO verifies `token` itself and binds the socket to the member whose `accountId`/`guestId` matches the token subject — identity never comes from the frame, and the bearer header cannot be used here because a browser cannot set one on a WebSocket. `mobileId` is a hint for the seat's first value: an id this build no longer ships is dropped by the room, not refused, so a cached client can still reconnect; a later pick travels in `loadout` (`US-ROOM-007` AC7) |
 | `signal` | `to` (playerId), `payload` (`{ kind: 'offer' \| 'answer', sdp }` or `{ kind: 'candidate', candidate }`) | Relayed verbatim to `to`; the DO never parses SDP, so a client cannot forge `from`. `kind` is part of the payload because two `{ sdp }` frames are otherwise indistinguishable — an offer and an answer look the same. Max 8 KB per sdp, over that → `payload-too-large`. A `to` that is not connected → `error peer-not-connected`, not `unsupported-message`; signalling yourself → `bad-request` |
 | `team_assign` | `assignments: [{ playerId, team }]` | Host only (`not-host` on a peer). Lobby only (`invalid-state`). One frame carries the whole roster so a half-applied assignment cannot occur. It enforces **capacity** only — no team may hold more than `maxPlayers / 2` (`bad-request`) — because the host must be able to seat the first player; **equality** is `start_match`'s rule |
 | `start_match` | — (no fields) | Host only; every slot filled, both teams non-empty and equal → `status: 'playing'`. The DO stamps `rulesetVersion` from the deployed build: a client cannot choose the version a match is ranked under |
@@ -115,9 +115,9 @@ their own projectile locally and reconcile to the next snapshot.
 | `signal` | ≤ 20/s per socket | 8 KB | ICE candidates are small; SDP can be ~2–4 KB |
 | `ping` | ≤ 10/s per socket | 64 B | Above it the socket is closed `4429` |
 | `chat` | ≤ 2/s per socket | 256 B | Above it the socket is closed `4429` |
+| `control` (`loadout`, `room_settings`, `team_assign`) | ≤ 20/s per socket | 1 KB | Each one persists and broadcasts the room, so they share one bucket. The budget sits far above a hand (one frame per tap), because crossing any budget closes the socket with `4429` — which a client reads as fatal, so a normal tap sequence must never reach it |
 | `snapshot_push` | ≤ 20/s | 8 KB | Only the latest is stored |
 | `state` (per peer) | 10–20/s | 800 B | Host → each peer; a mask-bearing snapshot (one per carve) is capped at 8 KB |
-| `control` | ≤ 5/s | 256 B | Input + chat |
 | Host uplink at 8 players | 15 Hz | — | ≈ 31 KB/s (7 peers × ~300 B), `OQ-24` |
 
 ## Oracle
@@ -147,7 +147,7 @@ stays `1` because no deployed client exists yet.
 | `move` | `{ t:'move', direction:0\|1, run:boolean }` | active player | server-side clamp against energy/incline is not possible (no physics on the Worker) — the host validates | `TC-CORE-904` |
 | `item` | `{ t:'item', id:string }` | active player | host validates ownership before applying | `TC-CORE-906` |
 | `room_settings` | `{ t:'room_settings', mode:ModeId, mapId:string, maxPlayers?, isPrivate? }` | host only; lobby only; `maxPlayers` may not drop below the members already seated (`invalid-state`) | rejected for members (`TC-NET-067`) | `TC-ROOM-151` |
-| `loadout` | `{ t:'loadout', items:Array<{id:string,qty:number}> }` | any member, lobby only | total quantity ≤ 11 | `TC-MATCH-006` |
+| `loadout` | `{ t:'loadout', items?:Array<{id:string,qty:number}>, mobileId?:string }` | any member, lobby only | each half is written only when present — omitting `items` keeps the item list, omitting `mobileId` keeps the mobile — and a frame carrying neither is `bad-request`; total quantity ≤ 11; `mobileId` must be a shipped mobile (`mbl-01`…`mbl-20`), duplicates across members allowed | `TC-MATCH-006`, `TC-ROOM-708` |
 
 `input` (`fire`) gains `weaponSlot: 0 | 1 | 2`; `skip`, `emote` and `quick_phrase` are unchanged.
 

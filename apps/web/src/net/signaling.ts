@@ -24,7 +24,11 @@ export interface ConnectOptions {
   readonly wsUrl: string;
   readonly token: string;
   readonly displayName: string;
-  readonly mobileId: string;
+  /**
+   * Only the first authentication needs it. A lobby member's pick travels in its `loadout` frame afterwards, and
+   * omitting it on a reconnect leaves the stored pick alone (`US-ROOM-007` AC7).
+   */
+  readonly mobileId?: string;
   readonly avatarId?: string;
   readonly onMessage: (message: ServerMessage) => void;
   readonly onClose?: (code: number) => void;
@@ -50,7 +54,7 @@ export function connectRoom(options: ConnectOptions): RoomSocket {
       t: "auth",
       token: options.token,
       displayName: options.displayName,
-      mobileId: options.mobileId,
+      ...(options.mobileId ? { mobileId: options.mobileId } : {}),
       ...(options.avatarId ? { avatarId: options.avatarId } : {}),
     };
     socket.send(JSON.stringify(auth));

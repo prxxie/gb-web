@@ -169,6 +169,26 @@ describe("TC-ROOM-707: a member's view (AC1, AC5)", () => {
     );
     expect(screen.getByRole("combobox", { name: "Bản đồ" })).toHaveValue("map-07");
   });
+
+  it("previews the host's map and its gimmick, without a reload (AC5)", async () => {
+    // A peer cannot open the map, so the preview is the only place the choice becomes visible to it.
+    sessionStorage.setItem("gbw.room.ABCD", GUEST_ID);
+    await enterLobby(room());
+    expect(screen.getByTestId("map-preview")).toHaveTextContent("Đồng Bằng Đá Lớn");
+    expect(screen.getByTestId("map-preview")).toHaveTextContent("Không có địa hình đặc biệt");
+
+    act(() =>
+      socket.deliver?.({
+        t: "room_state",
+        room: room({ settings: { maxPlayers: 4, mode: "solo", mapId: "map-10", isPrivate: false } }),
+      }),
+    );
+    const preview = screen.getByTestId("map-preview");
+    expect(preview).toHaveTextContent("Thềm San Hô");
+    expect(preview).toHaveTextContent("Hồi máu");
+    expect(preview).toHaveTextContent("Gió giật");
+    expect(screen.getByTestId("map-preview")).toHaveAttribute("data-map-id", "map-10");
+  });
 });
 
 describe("TC-ROOM-707: loadout (AC3, AC4)", () => {
@@ -177,7 +197,7 @@ describe("TC-ROOM-707: loadout (AC3, AC4)", () => {
     await enterLobby(room());
     expect(screen.getByTestId("loadout-picker")).toBeInTheDocument();
     expect(screen.getAllByTestId(/^loadout-page-/)).toHaveLength(2);
-    expect(screen.getByText(/11/)).toBeInTheDocument();
+    expect(screen.getByText("Đã chọn 0/11")).toBeInTheDocument();
   });
 
   it("pages nine cells at a time and each cell shows its quantity and delay cost (AC3)", async () => {

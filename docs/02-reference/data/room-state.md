@@ -89,7 +89,7 @@ round trip of the shot. `applySnapshot` returns the decoded heights, and the cal
 | `weather.wind` | `{ magnitude, directionDeg, sector }` | `magnitude` 0–26, `directionDeg = sector × 30`, `sector` 0–11 | `TC-CORE-926` |
 | `weather.rolledAtRound` | `number` | the `turn.round` the current wind was rolled for | `TC-CORE-926` |
 | `members[].loadout` | `Array<{id,qty}>` | frozen at `match_started`, total ≤ 11 | `TC-MATCH-006` |
-| `members[].mobileId` | `string` | chosen mobile, immutable during the match | `TC-CORE-905` |
+| `members[].mobileId` | `string` | chosen mobile: `auth` seeds it from the seat's join, a lobby `loadout` frame replaces it, and it freezes at `match_started` | `TC-CORE-905`, `TC-ROOM-708` |
 | `members[].weaponSlot` | `0 \| 1 \| 2` | active weapon | `TC-MATCH-906` |
 
 `Turn` keeps `activeSlot`, `number`, `round` and `deadlineAt`; `queue` and `delays` are the authority for who acts next,

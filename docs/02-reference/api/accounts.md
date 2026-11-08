@@ -43,8 +43,10 @@ There is no `wsUrl`: the client derives it from `window.location.origin`, becaus
 custom domain and `localhost` all differ and the server cannot know which one the browser used.
 
 Rules: a registered caller's first request creates the `account` + `profile` rows in one transaction; a guest gets no
-server-side record at all. Errors: `401 unauthenticated` (invalid Clerk JWT), `422 validation`, `429 rate-limited`
-(30/min per IP).
+server-side record at all. A page holds **one** guest identity: a caller that arrives before the first mint lands
+joins the in-flight request rather than minting a second one, because the seat a page joins under is bound to the
+token its socket authenticates with (`US-ROOM-007` AC7). Errors: `401 unauthenticated` (invalid Clerk JWT),
+`422 validation`, `429 rate-limited` (30/min per IP).
 
 ## GET /me
 

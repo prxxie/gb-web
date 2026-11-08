@@ -6,9 +6,18 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { MOBILES, canStart, defaultSettings, type ClientFrame, type LoadoutEntry, type RoomSettings, type RoomState } from "@gbw/core";
+import {
+  DEFAULT_MOBILE_ID,
+  canStart,
+  defaultSettings,
+  type ClientFrame,
+  type LoadoutEntry,
+  type RoomSettings,
+  type RoomState,
+} from "@gbw/core";
 import { useLocale, useSession } from "../app/providers";
 import { LoadoutPicker } from "../components/LoadoutPicker";
+import { MobileGrid } from "../components/MobileGrid";
 import { SettingsPanel } from "../components/SettingsPanel";
 import { api } from "../lib/api";
 import { connectWithReconnect, type ReconnectingSocket } from "../net/reconnect";
@@ -25,6 +34,17 @@ function avatarLabel(avatarId: string): string {
   return digits ?? "–";
 }
 
+/**
+ * The `POST /join` that is in flight, shared between the two mounts a dev build runs of one effect (`StrictMode`).
+ *
+ * Without it the second run sent a join for the first run's seat, and — because the two runs could mint two guest
+ * identities before the first `POST /session` landed — the second join was a *different* player asking for the last
+ * seat, which the room answered `409 room-full`. The page read that as "no seat" and bounced the player to the
+ * menu, losing the mobile pick (`US-ROOM-007` AC7). The entry is in flight only, and it is keyed by the token as
+ * well: a join belongs to the identity that made it, and a settled answer must never be replayed to a later mount.
+ */
+const joinInFlight = new Map<string, Promise<string | null>>();
+
 export function LobbyPage(): JSX.Element {
   const { code = "" } = useParams<{ code: string }>();
   const { t } = useLocale();
@@ -32,7 +52,11 @@ export function LobbyPage(): JSX.Element {
   const navigate = useNavigate();
   const [room, setRoom] = useState<RoomState | null>(null);
   const [playerId, setPlayerId] = useState<string | null>(null);
-  const [mobileId, setMobileId] = useState<string>(MOBILES[0]?.mobileId ?? "mbl-01");
+  /**
+   * The mobile this member just picked, before the room echoes it back. `room_state` overwrites it every time, so
+   * the record — not this state — is what the grid believes after a reconnect (`US-ROOM-007` AC7).
+   */
+  const [picked, setPicked] = useState<string | null>(null);
   const [status, setStatus] = useState<"connecting" | "live" | "reconnecting" | "closed">("connecting");
   const [grace, setGrace] = useState(0);
   const [loadout, setLoadout] = useState<readonly LoadoutEntry[]>([]);
@@ -65,8 +89,10 @@ export function LobbyPage(): JSX.Element {
     const key = `${live.displayName}\u0000${live.avatarId}`;
     if (!socket.current || !token || pushedIdentity.current === key) return;
     pushedIdentity.current = key;
-    socket.current.send({ t: "auth", token, displayName: live.displayName, mobileId, avatarId: live.avatarId });
-  }, [token, mobileId]);
+    // No `mobileId`: the pick travels in its own `loadout` frame, and resending a default here would overwrite
+    // the choice a reconnecting member already made.
+    socket.current.send({ t: "auth", token, displayName: live.displayName, avatarId: live.avatarId });
+  }, [token]);
 
   // The player edited the profile: the socket has to hear the new identity. At mount and on any other
   // re-render the key matches what was already sent, so this sends nothing.
@@ -86,17 +112,26 @@ export function LobbyPage(): JSX.Element {
     /** The first arrival joins with its own identity; anyone returning keeps the playerId the room gave it. */
     const enter = async (): Promise<string | null> => {
       if (stored) return stored;
-      try {
-        const joinedRoom = await api.joinRoom(session.token, code, {
+      const joinKey = `${code}\u0000${session.token}`;
+      const pending = joinInFlight.get(joinKey);
+      if (pending) return pending;
+      const join = api
+        .joinRoom(session.token, code, {
           displayName: connected.displayName,
-          mobileId,
+          mobileId: DEFAULT_MOBILE_ID,
           avatarId: connected.avatarId,
-        });
-        sessionStorage.setItem(`gbw.room.${code}`, joinedRoom.playerId);
-        return joinedRoom.playerId;
-      } catch {
-        return null;
-      }
+        })
+        .then((joinedRoom) => {
+          sessionStorage.setItem(`gbw.room.${code}`, joinedRoom.playerId);
+          return joinedRoom.playerId;
+        })
+        .catch(() => null);
+      joinInFlight.set(joinKey, join);
+      const settle = (): void => {
+        if (joinInFlight.get(joinKey) === join) joinInFlight.delete(joinKey);
+      };
+      join.then(settle, settle);
+      return join;
     };
 
     void enter().then((selfId) => {
@@ -113,9 +148,16 @@ export function LobbyPage(): JSX.Element {
         wsUrl: `${base}/api/v1/rooms/${code}/ws`,
         token: session.token,
         displayName: connected.displayName,
-        mobileId,
         avatarId: connected.avatarId,
         onMessage: (message: ServerMessage) => {
+          if (message.t === "error") {
+            // The record is the truth: a refusal about this frame must not leave the grid pressing a mobile the room
+            // dropped. Other refusals (an unready peer, someone else's chat flood) say nothing about the pick.
+            if (message.code === "bad-request" || message.code === "invalid-state" || message.code === "rate-limited") {
+              setPicked(null);
+            }
+            return;
+          }
           if (message.t === "room_state") {
             setRoom(message.room);
             setStatus("live");
@@ -123,6 +165,7 @@ export function LobbyPage(): JSX.Element {
             // The server echoes the stored loadout, so a reconnecting member sees what it saved.
             const mine = message.room.members.find((member) => member.playerId === (message.you?.playerId ?? selfId));
             if (mine?.loadout) setLoadout(mine.loadout);
+            setPicked(mine?.mobileId ?? null);
             return;
           }
           // `peer_joined` carries the whole roster too (`signaling.md` §3), so the seated players see each
@@ -147,7 +190,7 @@ export function LobbyPage(): JSX.Element {
                 team: member.team ?? "A",
                 accountId: member.accountId,
                 displayName: member.displayName,
-                mobileId: member.mobileId ?? mobileId,
+                mobileId: member.mobileId ?? DEFAULT_MOBILE_ID,
               })),
               seed: message.seed,
               // The room's clock, not this device's: it is half of the record's id (`US-RANK-005` AC6).
@@ -238,6 +281,18 @@ export function LobbyPage(): JSX.Element {
     socket.current?.send({ t: "loadout", items });
   };
 
+  /**
+   * One frame for both picks (`US-ROOM-007` AC7): the frame always carries the whole loadout, so a mobile pick and
+   * a loadout pick are the same message with one more field.
+   */
+  const pickMobile = (nextMobileId: string): void => {
+    // A locked room would refuse the frame, and the optimistic highlight would claim a pick the room never took.
+    if (room?.status !== "lobby") return;
+    setPicked(nextMobileId);
+    // Only the mobile: re-sending `items` would overwrite a list another tab may have just built.
+    socket.current?.send({ t: "loadout", mobileId: nextMobileId });
+  };
+
   if (!session) {
     return (
       <div className="screen screen--center">
@@ -269,14 +324,6 @@ export function LobbyPage(): JSX.Element {
 
       <section className="card">
         <div className="row">
-          <label className="muted">{t("lobby.mobile")}</label>
-          <select value={mobileId} onChange={(event) => setMobileId(event.target.value)}>
-            {MOBILES.map((mobile) => (
-              <option key={mobile.mobileId} value={mobile.mobileId}>
-                {mobile.name}
-              </option>
-            ))}
-          </select>
           {self ? (
             <button type="button" onClick={() => assign(self.playerId, self.team === "A" ? "B" : "A")}>
               {t("lobby.switchTeam")}
@@ -296,6 +343,7 @@ export function LobbyPage(): JSX.Element {
       </section>
 
       <SettingsPanel settings={settings} isHost={isHost} onChange={changeSettings} />
+      <MobileGrid chosen={picked ?? self?.mobileId ?? DEFAULT_MOBILE_ID} onPick={pickMobile} />
       <LoadoutPicker items={loadout} onChange={changeLoadout} />
 
       <div className="row" style={{ alignItems: "flex-start" }}>

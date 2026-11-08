@@ -57,7 +57,9 @@ over the WebSocket ([signaling.md](../api/signaling.md)).
 
 `lobby.title`, `lobby.copy`, `lobby.copied`, `lobby.occupancy`, `lobby.teamA`, `lobby.teamB`, `lobby.empty`,
 `lobby.host`, `lobby.start`, `lobby.startHint`, `lobby.switchTeam`, `lobby.leave`, `lobby.connecting`,
-`lobby.reconnecting`, `lobby.hostLeft`, `lobby.full`, `lobby.closed`.
+`lobby.reconnecting`, `lobby.hostLeft`, `lobby.full`, `lobby.closed`, `lobby.settings`, `lobby.mode`, `lobby.map`,
+`lobby.map.none`, `lobby.capacity`, `lobby.mobile`, `lobby.mobile.hint`, `lobby.mobile.hp`, `lobby.loadout`,
+`lobby.gimmick.{force,gust,electric,wind,return,heal,fog,tornado}`.
 
 ## Oracle
 
@@ -68,6 +70,9 @@ over the WebSocket ([signaling.md](../api/signaling.md)).
 | Host leaving promotes the earliest joiner and the banner shows | `tests/e2e/lobby.spec.ts` (TC-ROOM-149) |
 | Reconnect within 20 s restores slot/team | `tests/e2e/reconnect.spec.ts` (TC-ROOM-046) |
 | Copy button writes the exact code | `tests/e2e/lobby.spec.ts` (TC-ROOM-150) |
+| The mobile grid shows every mobile in both tints and a pick is a `loadout` frame | `apps/web/tests/lobby-mobile.test.tsx` (TC-ROOM-709) |
+| A `loadout` frame stores `mobileId` on the member and echoes it in `room_state` | `apps/worker/tests/room-settings.test.ts` (TC-ROOM-708) |
+| The map preview carries the host's map and its gimmick badges | `apps/web/tests/lobby-settings.test.tsx` (TC-ROOM-147) |
 
 ## GunBound rule-set extensions
 
@@ -78,7 +83,7 @@ The lobby gains a host-only settings column and a per-player loadout step (`US-R
 | Mode | four radio options: Solo, Score, Tag, Jewel | host | `TC-ROOM-151` |
 | Map | eleven maps with a thumbnail and gimmick badges | host | `TC-CORE-920` |
 | Capacity | 4 / 6 / 8 (2 kept for 1v1) | host | `TC-ROOM-071` |
-| Mobile | twenty mobiles in a filterable grid, each shown in both team tints; duplicates allowed | each member | `TC-ROOM-153` |
+| Mobile | twenty mobiles in a grid, each shown in both team tints; duplicates allowed | each member | `TC-ROOM-153` |
 | Loadout | eleven items across two pages of nine, with quantity and delay cost | each member | `TC-MATCH-006` |
 
 Non-hosts see every control read-only, with the host's current choice and a "host is choosing" note. Starting the match
