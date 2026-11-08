@@ -178,8 +178,14 @@ export interface PlayerState {
   readonly damageDealt: number;
   readonly shotsFired: number;
   readonly hits: number;
-  /** A mobile carries exactly one super shot per match (`US-CORE-007`). */
-  readonly superShotUsed: boolean;
+  /**
+   * The super-shot gauge, `0…100` (`US-CORE-007`).
+   *
+   * GB charges it from the fighting — damage dealt fills it faster than damage taken — and spends it on the SS, so a
+   * player who trades hits gets another one. One-per-match was our invention and it made the SS a finisher instead of a
+   * rhythm.
+   */
+  readonly ssCharge: number;
   /** Equipped item quantities, by item id. */
   readonly items: Readonly<Record<string, number>>;
 }
@@ -200,11 +206,6 @@ export interface Projectile {
   readonly piercing: boolean;
   /** Set for sub-projectiles of a cluster shot. */
   readonly parentId: number | null;
-  /** `itm-bunge`: the shell returns and explodes near its owner. */
-  readonly bunge: boolean;
-  /** Muzzle position, kept so a bunge shell knows where "home" is. */
-  readonly homeX: number;
-  readonly homeY: number;
   /** `return` maps bounce an off-map shot back once with reduced power instead of despawning it. */
   readonly returned: boolean;
   /** `itm-blood` / `itm-power-up` modifiers already folded into `power`. */
@@ -342,6 +343,8 @@ export interface PlayerSnapshot {
   readonly delay: number;
   readonly eliminated: boolean;
   readonly weaponSlot: 0 | 1 | 2;
+  /** The super-shot gauge, `0…100` — the HUD draws it, so it has to ride the snapshot. */
+  readonly ssCharge: number;
 }
 
 export interface ProjectileSnapshot {

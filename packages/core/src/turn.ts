@@ -124,6 +124,22 @@ export function extendOrExpire(turn: Turn, now: number): { turn: Turn; expired: 
   return { turn, expired: true };
 }
 
+/**
+ * When the current turn began.
+ *
+ * The clock is stored as a deadline (the wire carries one number, not two), and a turn that was extended adds the grace
+ * on top — so the start is the deadline minus whichever window is in force.
+ */
+export function turnStartedAt(turn: Turn): number {
+  return turn.deadlineAt - (turn.extended ? TUNABLES.turnDurationMs + TUNABLES.turnGraceMs : TUNABLES.turnDurationMs);
+}
+
+/** `+10 delay per second spent deciding` (`tunables.md` § 2), capped at the turn's own length. */
+export function thinkingDelay(turn: Turn, now: number): number {
+  const elapsedMs = clamp(now - turnStartedAt(turn), 0, TUNABLES.turnDurationMs);
+  return Math.floor(elapsedMs / 1000) * TUNABLES.thinkingDelayPerSecond;
+}
+
 export function isExpired(turn: Turn, now: number): boolean {
   return now >= turn.deadlineAt;
 }

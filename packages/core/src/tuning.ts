@@ -20,6 +20,18 @@ export const TUNABLES = {
    * and power tables untransferable between mobiles, which is the opposite of the genre.
    */
   gravity: 100,
+  /**
+   * The delay a player pays for thinking (`tunables.md` § 2).
+   *
+   * GB adds 10 to your delay for every second the turn takes, so a player who deliberates falls down the queue: the
+   * clock is not decoration, it is part of the tempo. Ours adds the same, measured from the turn's own start.
+   */
+  thinkingDelayPerSecond: 10,
+  /** The super-shot gauge: full is `100`, and a shot spends all of it (`US-CORE-007`). */
+  ssCost: 100,
+  /** Gauge points per point of damage dealt / taken — dealing fills it twice as fast as being hit. */
+  ssChargeDealt: 0.25,
+  ssChargeTaken: 0.12,
   /** `v0 = force * speedK` for every mobile. */
   speedK: 6.2,
   /**
@@ -43,9 +55,11 @@ export const TUNABLES = {
   /** Crater radius as a fraction of the blast radius. */
   terrainCarveRatio: 0.6,
   maxFlightMs: 10_000,
-  /** `itm-bunge`: ms before the shell turns around, and the sideways pull that brings it home. */
-  bungeTurnMs: 350,
-  bungePull: 900,
+  /**
+   * `itm-bunge` — GB's Bunge Shot: the same shell, 25 % more ground carved out of it (`US-CORE-009`). It is not a
+   * returning shell; the boomerang arc belongs to a mobile, not to an item.
+   */
+  bungeCarveBonus: 0.25,
   mapWidth: 2000,
   mapHeight: 1200,
   /** Positions are rounded to this before they enter a snapshot (`NFR-04`). */

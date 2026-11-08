@@ -38,8 +38,6 @@ export interface LaunchOptions {
   readonly force: number;
   /** `itm-blood` / `itm-power-up` / avatar attack, already resolved into one factor. */
   readonly powerMultiplier?: number;
-  readonly bunge?: boolean;
-  readonly ownerMass?: number;
 }
 
 const BOUNCE_LIMIT: Partial<Record<ShotClass, number>> = { bounce: 3 };
@@ -64,9 +62,6 @@ export function launch(options: LaunchOptions): Projectile {
     radius: options.weapon.radius,
     piercing: options.weapon.shotClass === "piercing",
     parentId: null,
-    bunge: options.bunge ?? false,
-    homeX: roundTo(options.from.x),
-    homeY: roundTo(options.from.y),
     returned: false,
     blooded: (options.powerMultiplier ?? 1) > 1,
   };
@@ -88,14 +83,8 @@ export interface StepContext {
 export function stepProjectile(projectile: Projectile, context: StepContext): Projectile {
   const dt = (context.stepMs ?? TUNABLES.stepMs) / 1000;
   const wind = windAcceleration(context.wind);
-  // A bunge shell turns around a third of a second into the flight and is pulled back to its muzzle, so it
-  // lands on the side it was fired from (`itm-bunge`, US-CORE-009). The pull is a force, not a teleport, so
-  // it still collides with anything in the way home.
-  const turnHome = projectile.bunge && projectile.ageMs >= TUNABLES.bungeTurnMs;
-  const pullX = turnHome ? Math.sign(projectile.homeX - projectile.x) * TUNABLES.bungePull : 0;
-  const vx =
-    (turnHome ? projectile.vx * 0.5 : projectile.vx) + pullX * dt + wind.ax * dt + (context.forceX ?? 0) * dt;
-  const vy = (turnHome ? projectile.vy * 0.5 : projectile.vy) + (context.gravity + wind.ay) * dt;
+  const vx = projectile.vx + wind.ax * dt + (context.forceX ?? 0) * dt;
+  const vy = projectile.vy + (context.gravity + wind.ay) * dt;
   return {
     ...projectile,
     // Velocity is NOT rounded: `roundTo` is the 0.1 position quantum it takes to make a snapshot compact,
@@ -213,22 +202,6 @@ export function simulateFlight(
         continue;
       }
       return { impact: null, landingX: current.x, landingY: current.y, flightMs: current.ageMs, steps, offMap: true };
-    }
-    // A bunge shell that made it home explodes there instead of orbiting its muzzle forever (`itm-bunge`).
-    if (
-      current.bunge &&
-      current.ageMs >= TUNABLES.bungeTurnMs &&
-      Math.abs(current.x - current.homeX) <= 60 &&
-      current.y >= heightAt(terrain, current.x) - 40
-    ) {
-      return {
-        impact: { x: roundTo(current.x), y: roundTo(current.y), normalSlope: slopeAt(terrain, current.x) },
-        landingX: current.x,
-        landingY: current.y,
-        flightMs: current.ageMs,
-        steps,
-        offMap: false,
-      };
     }
     const hit = segmentImpact(terrain, previous, { x: current.x, y: current.y });
     if (hit) {

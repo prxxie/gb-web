@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { applyInput, createMatch, passTurn, type Seat } from "../src/match.js";
+import { applyInput, createMatch, type Seat } from "../src/match.js";
 import { getMobile } from "../src/data/mobiles.js";
 import { applyGimmicks } from "../src/gimmicks.js";
 import { getMap } from "../src/data/maps.js";
@@ -47,13 +47,17 @@ describe("match", () => {
     expect(harmed.events.length).toBeGreaterThan(0);
   });
 
-  it("TC-CORE-907: Energy up 1 and 2 restore energy", () => {
+  it("TC-CORE-907: Energy up 1 and 2 restore health, not movement points", () => {
+    // GB's Energy up heals (`data/items.md`): the bar it fills is HP, and the movement budget is untouched.
     const state = match([seat(0, "A", "mbl-01", { "itm-energy-1": 1, "itm-energy-2": 1 }), seat(1, "B")]);
-    const start = state.players[0]!.energy;
-    const one = applyInput(state, { kind: "item", slot: 0, itemId: "itm-energy-1", seq: state.seq }, NOW);
-    expect(one.state.players[0]!.energy).toBe(start + 30);
+    const maxHp = getMobile("mbl-01").maxHp;
+    const hurt = { ...state, players: state.players.map((p) => (p.slot === 0 ? { ...p, hp: 300 } : p)) };
+    const startEnergy = hurt.players[0]!.energy;
+    const one = applyInput(hurt, { kind: "item", slot: 0, itemId: "itm-energy-1", seq: hurt.seq }, NOW);
+    expect(one.state.players[0]!.hp).toBe(300 + Math.round(maxHp * 0.1));
+    expect(one.state.players[0]!.energy).toBe(startEnergy);
     const two = applyInput(one.state, { kind: "item", slot: 0, itemId: "itm-energy-2", seq: one.state.seq }, NOW);
-    expect(two.state.players[0]!.energy).toBe(start + 90);
+    expect(two.state.players[0]!.hp).toBe(300 + Math.round(maxHp * 0.1) + Math.round(maxHp * 0.25));
     const again = applyInput(two.state, { kind: "item", slot: 0, itemId: "itm-energy-2", seq: two.state.seq }, NOW);
     expect(again.events[0]).toMatchObject({ kind: "reject", reason: "no-item-left" });
   });
@@ -102,18 +106,32 @@ describe("match", () => {
     }
   });
 
-  it("TC-CORE-922: a super shot can be spent only once", () => {
+  it("TC-CORE-922: the super shot needs a full gauge, and firing it empties the gauge", () => {
+    // GB charges the SS from the fighting instead of granting one per match (`US-CORE-007`), so the gate is the
+    // gauge: empty means refused, full means fired and spent.
     const state = match([seat(0, "A"), seat(1, "B")]);
-    const first = applyInput(state, { kind: "fire", slot: 0, weaponSlot: 2, angle: 45, force: 50, seq: state.seq }, NOW);
-    expect(first.events.some((event) => event.kind === "shot")).toBe(true);
-    const back = applyInput(passTurn(first.state, NOW).state, { kind: "skip", slot: 0, seq: 9 }, NOW);
-    void back;
-    const again = applyInput(
-      { ...first.state, turn: { ...first.state.turn, activeSlot: 0 } },
-      { kind: "fire", slot: 0, weaponSlot: 2, angle: 45, force: 50, seq: first.state.seq },
+    const fresh = applyInput(state, { kind: "fire", slot: 0, weaponSlot: 2, angle: 45, force: 50, seq: state.seq }, NOW);
+    expect(fresh.events[0]).toMatchObject({ kind: "reject", reason: "super-shot-not-charged" });
+
+    const charged: MatchState = {
+      ...state,
+      players: state.players.map((player) => (player.slot === 0 ? { ...player, ssCharge: TUNABLES.ssCost } : player)),
+    };
+    const fired = applyInput(charged, { kind: "fire", slot: 0, weaponSlot: 2, angle: 45, force: 50, seq: charged.seq }, NOW);
+    expect(fired.events.some((event) => event.kind === "shot")).toBe(true);
+    expect(fired.state.players[0]!.ssCharge).toBe(0);
+
+    // And it can be earned back: damage dealt fills the gauge, so a second SS is possible in the same match.
+    const refilled: MatchState = {
+      ...fired.state,
+      players: fired.state.players.map((player) => (player.slot === 0 ? { ...player, ssCharge: TUNABLES.ssCost } : player)),
+    };
+    const second = applyInput(
+      { ...refilled, turn: { ...refilled.turn, activeSlot: 0 } },
+      { kind: "fire", slot: 0, weaponSlot: 2, angle: 45, force: 50, seq: refilled.seq },
       NOW,
     );
-    expect(again.events[0]).toMatchObject({ kind: "reject", reason: "super-shot-spent" });
+    expect(second.events.some((event) => event.kind === "shot")).toBe(true);
   });
 
   it("TC-CORE-904: movement respects the per-turn budget, energy and incline", () => {

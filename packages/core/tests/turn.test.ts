@@ -90,10 +90,11 @@ describe("turn queue (US-CORE-002)", () => {
   it("TC-CORE-901: an item's delay cost is added before sorting, so it can cost the next turn", () => {
     const players = roster();
     const teleport = ITEMS_BY_ID.get("itm-team-teleport");
-    expect(teleport?.delayCost).toBe(40);
+    // GB's Team Teleport is a cheap item (50) next to Dual (600): the queue still feels it.
+    expect(teleport?.delayCost).toBe(50);
 
     const afterItem = addDelay(players, 2, teleport?.delayCost ?? 0);
-    expect(afterItem[2]?.delay).toBe(140);
+    expect(afterItem[2]?.delay).toBe(150);
     expect(slots(queueOrder(afterItem))).toEqual([0, 1, 3, 2]);
     expect(nextSlotForMode(afterItem, 1, "solo")).toBe(3);
     expect(nextSlot(afterItem)).toBe(0);

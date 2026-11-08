@@ -779,10 +779,12 @@ export function MatchPage(): JSX.Element {
     battle.current?.setWeaponSlot(slot);
   }, []);
 
-  // A spent super shot disables its slot (`AC3`), so the aim aid must not keep pointing at it.
+  // The super shot is gated by its gauge, not by a once-per-match flag (`AC3`): when the gauge is not full the slot is
+  // disabled and the aim aid must not keep pointing at it.
+  const ssReady = (localPlayer?.ssCharge ?? 0) >= 100;
   useEffect(() => {
-    if (weaponSlot === 2 && localPlayer?.superShotUsed) selectWeapon(0);
-  }, [weaponSlot, localPlayer?.superShotUsed, selectWeapon]);
+    if (weaponSlot === 2 && !ssReady) selectWeapon(0);
+  }, [weaponSlot, ssReady, selectWeapon]);
 
 
   // Items go out once, and only on this player's turn (`US-MATCH-005` AC5); the engine still
@@ -954,12 +956,14 @@ export function MatchPage(): JSX.Element {
           <WeaponStrip
             weapons={mobile.weapons}
             active={weaponSlot}
-            charges={[1, 1, localPlayer?.superShotUsed ? 0 : 1]}
+            charges={[1, 1, ssReady ? 1 : 0]}
             names={[t("match.weapon.1"), t("match.weapon.2"), t("match.weapon.3")]}
             chargeLabels={[
               t("match.weapon.ready"),
               t("match.weapon.ready"),
-              localPlayer?.superShotUsed ? t("match.weapon.spent") : t("match.weapon.charge", { count: 1, max: 1 }),
+              ssReady
+                ? t("match.weapon.ready")
+                : t("match.weapon.charge", { count: Math.min(100, localPlayer?.ssCharge ?? 0), max: 100 }),
             ]}
             label={t("match.weapon.group")}
             disabled={!isMyTurn || lockedTurn === state.turn.number}

@@ -5,17 +5,17 @@ import type { Item, ItemId } from "../types.js";
  * pushes you back in the turn order, which is what keeps item spam self-limiting without a cooldown.
  */
 const ROWS: readonly (readonly [ItemId, string, number, string])[] = [
-  ["itm-dual", "Dual", 20, "fire twice this turn (second shot uses the same weapon)"],
-  ["itm-blood", "Blood", 15, "next shot deals +25 % damage"],
-  ["itm-energy-2", "Energy up 2", 10, "+60 movement energy this turn"],
-  ["itm-energy-1", "Energy up 1", 5, "+30 movement energy this turn"],
-  ["itm-dual-plus", "Dual+", 30, "fire twice, second shot +15 % power"],
-  ["itm-change-wind", "Change Wind", 25, "re-roll the wind vector and announce it"],
-  ["itm-team-teleport", "Team Teleport", 40, "move every living team mate to the caster ±40 px"],
-  ["itm-bunge", "Bunge shot", 20, "tether the shot: it returns and explodes near the caster"],
-  ["itm-power-up", "Power up", 15, "force cap +20 for this shot"],
-  ["itm-thunder", "Thunder", 35, "lightning strikes a horizontal band at the aim point"],
-  ["itm-teleport", "Teleport", 25, "move the caster up to 150 px, ignoring incline"],
+  ["itm-dual", "Dual", 600, "fire twice this turn (second shot uses the same weapon)"],
+  ["itm-blood", "Blood", 0, "spend 8 % of your health for +33 % damage on this shot"],
+  ["itm-energy-2", "Energy up 2", 300, "restore 25 % of your health"],
+  ["itm-energy-1", "Energy up 1", 100, "restore 10 % of your health"],
+  ["itm-dual-plus", "Dual+", 250, "fire twice, second shot +15 % power"],
+  ["itm-change-wind", "Change Wind", 150, "reverse the wind: same strength, other way"],
+  ["itm-team-teleport", "Team Teleport", 50, "swap places with the team mate on the lowest health"],
+  ["itm-bunge", "Bunge shot", 50, "25 % more ground carved by this shot"],
+  ["itm-power-up", "Power up", 150, "+33 % damage on this shot"],
+  ["itm-thunder", "Thunder", 200, "lightning strikes a horizontal band at the aim point"],
+  ["itm-teleport", "Teleport", 150, "move the caster up to 150 px, ignoring incline"],
 ];
 
 export const ITEMS: readonly Item[] = ROWS.map(([itemId, name, delayCost, effect]) => ({

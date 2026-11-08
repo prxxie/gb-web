@@ -197,29 +197,37 @@ describe("bot (US-CORE-005)", () => {
     expect(shot.weaponSlot).toBe(best);
   });
 
-  it("TC-CORE-927: a bot holding Power up spends it instead of settling for an unreachable shot", () => {
-    // A full-height pillar 250 units ahead of the bot cuts the reachable set in two: the short shots stop on
-    // its face, and the lobs that clear it come down no further than ~1,460, so a target at 1,800 is behind
-    // the pillar's far side and out of reach for every shot in `mbl-02`'s envelope — the item is the only way
-    // to gain the 20 power that would close the gap. An item is its own input in the engine, so the bot
-    // returns the item prior to the shot rather than an `item` field the engine would ignore.
-    const state = walledField("mbl-02", 100, 1_800, 350, 700, { "itm-power-up": 1 });
-    // `botTurnPlan` plays the active slot, so the fixture must actually make the bot the one to act.
+  it("TC-CORE-927: a bot spends Power up to finish a target it can already hit", () => {
+    // GB's Power up is a damage multiplier, not extra range (`data/items.md`), so the condition inverted with the
+    // item: the bot spends it on a shot that lands and whose extra third is what kills. The target is placed inside
+    // the blast so the best shot is on target and its bar is under one boosted shot.
+    const state = walledField("mbl-02", 100, 900, 350, 700, { "itm-power-up": 1 });
     const active: MatchState = { ...state, turn: { ...state.turn, activeSlot: 0 } };
-    const plan = botTurnPlan(active, createRng(5), { ...PERFECT, itemUseChance: 1 });
+    const wounded: MatchState = {
+      ...active,
+      players: active.players.map((player) => (player.slot === 1 ? { ...player, hp: 120, shield: 0 } : player)),
+    };
+    const plan = botTurnPlan(wounded, createRng(5), { ...PERFECT, itemUseChance: 1 });
     expect(plan).toHaveLength(2);
     const [item, fire] = plan as [ItemInput, FireInput];
     expect(item).toMatchObject({ kind: "item", slot: 0, itemId: "itm-power-up" });
     expect(fire.kind).toBe("fire");
 
-    // The item costs its own delay, and the shot is aimed after it — the same seed always agrees.
+    // The item costs its own delay, and the plan is deterministic for a seed.
     const itemCost = ITEMS.find((entry) => entry.itemId === "itm-power-up");
-    expect(itemCost?.delayCost).toBe(15);
-    expect(botTurnPlan(active, createRng(5), { ...PERFECT, itemUseChance: 1 })).toEqual(plan);
+    expect(itemCost?.delayCost).toBe(150);
+    expect(botTurnPlan(wounded, createRng(5), { ...PERFECT, itemUseChance: 1 })).toEqual(plan);
+
+    // A healthy target is not a finisher: the bot keeps the item for one.
+    const healthy: MatchState = {
+      ...active,
+      players: active.players.map((player) => (player.slot === 1 ? { ...player, hp: 1_100, shield: 0 } : player)),
+    };
+    expect(botTurnPlan(healthy, createRng(5), { ...PERFECT, itemUseChance: 1 })).toHaveLength(1);
 
     // With nothing in the bag, or with the coin flip against it, the bot just fires.
-    expect(botTurnPlan(walledField("mbl-02", 100, 1_800, 350, 700), createRng(5), { ...PERFECT, itemUseChance: 1 })).toHaveLength(1);
-    expect(botTurnPlan(active, createRng(5), { ...PERFECT, itemUseChance: 0 })).toHaveLength(1);
+    expect(botTurnPlan({ ...wounded, players: wounded.players.map((p) => (p.slot === 0 ? { ...p, items: {} } : p)) }, createRng(5), { ...PERFECT, itemUseChance: 1 })).toHaveLength(1);
+    expect(botTurnPlan(wounded, createRng(5), { ...PERFECT, itemUseChance: 0 })).toHaveLength(1);
   });
 });
 
