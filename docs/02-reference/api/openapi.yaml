@@ -1204,6 +1204,7 @@ components:
         - items
         - next_cursor
         - has_more
+        - you
         - request_id
       properties:
         items:
@@ -1216,8 +1217,26 @@ components:
             - 'null'
         has_more:
           type: boolean
+        you:
+          description: |
+            The caller's own position, returned with the list so the screen needs no `GET /me`
+            (`US-RANK-004` AC3). `null` for a guest, a stale token or an account with no rated match.
+          oneOf:
+            - $ref: '#/components/schemas/LeaderboardSelf'
+            - type: 'null'
         request_id:
           type: string
+    LeaderboardSelf:
+      type: object
+      required:
+        - rank
+        - rating
+      properties:
+        rank:
+          type: integer
+          minimum: 1
+        rating:
+          type: integer
     LeaderboardEntry:
       type: object
       required:

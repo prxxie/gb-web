@@ -195,6 +195,22 @@ td {
   color: var(--ink-dim);
 }
 
+/* The caller's own position while their row is outside the fetched pages (`screens/leaderboard.md`): there is
+   no row on screen to tint, so the rank stays reachable at the bottom of the viewport. */
+.leaderboard__you {
+  position: sticky;
+  /* Above the bottom inset: on iOS the footer must not sit under the home indicator (`NFR-19`). */
+  bottom: calc(8px + var(--safe-bottom));
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  justify-content: flex-end;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--bg-raised);
+}
+
 /* The match fills the body below the shell bar rather than the whole viewport, so the bar — and with it the
    language toggle — stays reachable during a match (`US-PWA-002` AC4). */
 .match {

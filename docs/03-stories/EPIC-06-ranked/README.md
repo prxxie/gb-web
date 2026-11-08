@@ -25,7 +25,7 @@ Generated from story frontmatter — run `node .agents/scripts/verify-docs.mjs -
 | [US-RANK-001](US-RANK-001-record-a-finished-match.md) | Record a finished match exactly once and rank it | P1 | M | done | US-CORE-003, US-ROOM-005, US-AUTH-002 |
 | [US-RANK-002](US-RANK-002-rate-players-with-elo.md) | Rate players with Elo after every ranked match | P1 | S | done | US-RANK-001 |
 | [US-RANK-003](US-RANK-003-show-my-match-history.md) | Show my match history | P2 | S | done | US-RANK-001, US-AUTH-002 |
-| [US-RANK-004](US-RANK-004-climb-the-leaderboard.md) | Show the leaderboard with the caller's own row | P2 | M | ready | US-RANK-002 |
+| [US-RANK-004](US-RANK-004-climb-the-leaderboard.md) | Show the leaderboard with the caller's own row | P2 | M | done | US-RANK-002 |
 | [US-RANK-005](US-RANK-005-see-the-result-screen.md) | See the result screen with the rating change | P1 | M | done | US-RANK-001, US-CORE-003 |
 <!-- /cpt:epic-stories -->
 

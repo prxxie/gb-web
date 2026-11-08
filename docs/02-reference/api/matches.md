@@ -83,7 +83,7 @@ is `400 bad-request`, never a page and never a 500. An empty history answers `it
 
 Public, no auth. Query: `limit` (default 20, max 100), `cursor`.
 
-Response `200`: `{ items[], next_cursor, has_more }`, each item
+Response `200`: `{ items[], next_cursor, has_more, you }`, each item
 
 | Field | Type | Meaning |
 |-------|------|---------|
@@ -93,8 +93,16 @@ Response `200`: `{ items[], next_cursor, has_more }`, each item
 | `rating` | integer | — |
 | `ratedMatches` | integer | Lets the UI label low-sample players |
 
+`you` is `{ rank, rating }` for a caller whose JWT names an active account with at least one rated match, and `null`
+for a guest, a stale token (`NFR-13`: no `401` on a public read) or an unrated account. It travels with the list so the
+leaderboard screen never needs `GET /me`, which carries no rank.
+
 Ordered by `rating DESC, rated_matches DESC, account_id ASC`; only `account.status = 'active'` and
-`rated_matches > 0` are listed. `Cache-Control: public, max-age=30` (`NFR-05` headroom).
+`rated_matches > 0` are listed. Caching is 30 seconds (`NFR-05` headroom) and split by whether a session
+accompanied the request: `Cache-Control: public, max-age=30` for an anonymous read, `private, no-store` for one that
+carried a token, both with `Vary: authorization, x-session-token`. `you` makes the body caller-dependent, an edge cache
+keys on the URL alone (`Vary` is not a cache key there), and the two reads share one URL — so a page that names a
+reader's rank is never stored by anything, and the anonymous page can never be served in its place.
 
 ## Oracle
 
@@ -107,3 +115,4 @@ Ordered by `rating DESC, rated_matches DESC, account_id ASC`; only `account.stat
 | Idempotency and duplicate detection | `apps/worker/tests/matches.test.ts` (TC-RANK-111) |
 | History ordering and cursor stability under inserts | `apps/worker/tests/history.test.ts` (TC-RANK-141) |
 | Leaderboard ordering, exclusions, cache header | `apps/worker/tests/leaderboard.test.ts` (TC-RANK-104) |
+| Leaderboard `you` for a signed-in caller, absent for a guest or a stale token | `apps/worker/tests/leaderboard.test.ts` (TC-RANK-144, TC-RANK-147) |

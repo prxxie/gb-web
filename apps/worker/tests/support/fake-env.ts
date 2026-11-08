@@ -202,6 +202,8 @@ export interface TestRig {
   ): Promise<Response>;
   /** A 60-minute session token for the subject, already formatted for the `Authorization` header. */
   token(subject: SessionSubject): Promise<string>;
+  /** The same token, minted 61 minutes ago: a session that expired while the tab stayed open (`NFR-13`). */
+  expiredToken(subject: SessionSubject): Promise<string>;
 }
 
 export interface RigOptions {
@@ -243,6 +245,10 @@ export function createRig(options: RigOptions = {}): TestRig {
     },
     async token(subject) {
       const { token } = await mintSession(subject, TEST_SECRET);
+      return token;
+    },
+    async expiredToken(subject) {
+      const { token } = await mintSession(subject, TEST_SECRET, Date.now() - 61 * 60_000);
       return token;
     },
   };
