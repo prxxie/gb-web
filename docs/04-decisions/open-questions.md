@@ -4,7 +4,7 @@ Questions that block or shape the work and that only the product owner, client, 
 `cpt-decide`. Format: [.agents/rules/02-docs-navigation.md § 5](../../.agents/rules/02-docs-navigation.md#5-open-questions).
 
 <!-- cpt:oq-summary -->
-**Open: 16 · Blocking: 0 · Answered: 26 · Withdrawn: 1**
+**Open: 13 · Blocking: 0 · Answered: 29 · Withdrawn: 1**
 
 | Id | Question | Status | Blocking |
 |---|---|---|---|
@@ -34,15 +34,15 @@ Questions that block or shape the work and that only the product owner, client, 
 | [OQ-24](open-questions.md#oq-24--does-the-snapshot-budget-survive-8-players) | Does the snapshot budget survive 8 players? | answered | — |
 | [OQ-25](open-questions.md#oq-25--does-the-contract-date-still-hold-with-accounts-and-ranks) | Does the contract date still hold with accounts and ranks? | answered | — |
 | [OQ-26](open-questions.md#oq-26--which-auth-provider-and-how-is-pii-handled) | Which auth provider, and how is PII handled? | answered | — |
-| [OQ-27](open-questions.md#oq-27--who-are-the-client-side-roles) | Who are the client-side roles? | open | — |
+| [OQ-27](open-questions.md#oq-27--who-are-the-client-side-roles) | Who are the client-side roles? | answered | — |
 | [OQ-28](open-questions.md#oq-28--which-rating-algorithm-and-what-counts-as-a-ranked-match) | Which rating algorithm and what counts as a ranked match? | open | — |
 | [OQ-29](open-questions.md#oq-29--how-are-nicknames-and-avatars-kept-safe) | How are nicknames and avatars kept safe? | open | — |
 | [OQ-30](open-questions.md#oq-30--how-is-a-rated-match-protected-from-a-tampered-host-client) | How is a rated match protected from a tampered host client? | open | — |
-| [OQ-31](open-questions.md#oq-31--which-success-numbers-are-contractual-beyond-matches-complete) | Which success numbers are contractual beyond "matches complete"? | open | — |
+| [OQ-31](open-questions.md#oq-31--which-success-numbers-are-contractual-beyond-matches-complete) | Which success numbers are contractual beyond "matches complete"? | answered | — |
 | [OQ-32](open-questions.md#oq-32--is-rollback-netcode-in-scope-for-v1) | Is rollback netcode in scope for v1? | open | — |
 | [OQ-33](open-questions.md#oq-33--what-load-must-the-system-carry-at-launch) | What load must the system carry at launch? | open | — |
 | [OQ-34](open-questions.md#oq-34--which-operational-targets-and-recovery-drills-are-contractual) | Which operational targets and recovery drills are contractual? | open | — |
-| [OQ-35](open-questions.md#oq-35--who-is-contacted-and-how-for-a-production-incident) | Who is contacted, and how, for a production incident? | open | — |
+| [OQ-35](open-questions.md#oq-35--who-is-contacted-and-how-for-a-production-incident) | Who is contacted, and how, for a production incident? | answered | — |
 | [OQ-36](open-questions.md#oq-36--how-faithful-to-gunbound-should-v1-be-and-does-the-contract-date-move) | How faithful to GunBound should v1 be, and does the contract date move? | answered | — |
 | [OQ-37](open-questions.md#oq-37--how-close-can-gunbound-physics-actually-be-when-the-physics-is-not-in-the-source) | How close can "GunBound physics" actually be, when the physics is not in the source? | answered | — |
 | [OQ-38](open-questions.md#oq-38--does-releasing-the-power-pull-fire-and-how-big-is-the-dead-zone) | Does releasing the power pull fire, and how big is the dead zone? | answered | — |
@@ -347,14 +347,16 @@ Questions that block or shape the work and that only the product owner, client, 
 
 ## OQ-27 — Who are the client-side roles?
 
-- **Status**: open
+- **Status**: answered
 - **Raised**: 2026-11-04 by cpt-interview
 - **Blocks**: M1 gate, legal sign-off
 - **Context**: No named signer, no client QA contact, no legal contact for OQ-18 or OQ-20, and no statement of who owns the
   Cloudflare account.
 - **Assumption**: One product owner who signs gates and answers questions; the development team owns the Cloudflare
   account.
-- **Answer**: —
+- **Answer**: **Chung Pham is the only client-side role**: product owner, gate signer, and the person who runs UAT. There is no
+  separate client developer, QA contact or legal contact, and no external legal review is commissioned for release 1.
+  The development team owns the Cloudflare account and the D1 database. [user, 2026-11-08, approved in chat]
 
 ## OQ-28 — Which rating algorithm and what counts as a ranked match?
 
@@ -390,7 +392,7 @@ Questions that block or shape the work and that only the product owner, client, 
 
 ## OQ-31 — Which success numbers are contractual beyond "matches complete"?
 
-- **Status**: open
+- **Status**: answered
 - **Raised**: 2026-11-04 by cpt-docs (project overview)
 - **Blocks**: acceptance criteria at `M3`, the M1 demo rubric
 - **Context**: The brief states the goal as "matches complete, nothing breaks" plus three measurable goals (≥ 70 %
@@ -398,7 +400,10 @@ Questions that block or shape the work and that only the product owner, client, 
   and a ladder-population bar.
 - **Assumption**: playtest ≥ 4/5 on a veteran rubric at `M1`; ≥ 200 accounts with 10+ rated matches by week 12. Both are
   proposals, not client statements.
-- **Answer**: —
+- **Answer**: `M3` passes when all five hold: **50 rooms and 400 players** served in the load target of `NFR-33`; **API p95 ≤ 400 ms**
+  (`NFR-27`); **zero open P1 defects**; **both locales and the accessibility bar** of `US-PWA-004` met; **a rollback
+  drilled** end to end (`TC-FND-902`). The playtest rubric (≥ 4/5) applies to the `M1` demo only, and the ≥ 200-account
+  ladder bar is **not** contractual — it is a wish, dropped from the acceptance set. [user, 2026-11-08, approved in chat]
 
 ## OQ-32 — Is rollback netcode in scope for v1?
 
@@ -435,14 +440,17 @@ Questions that block or shape the work and that only the product owner, client, 
 
 ## OQ-35 — Who is contacted, and how, for a production incident?
 
-- **Status**: open
+- **Status**: answered
 - **Raised**: 2026-11-04 by cpt-docs (runbook § 5)
 - **Blocks**: runbook escalation rows, `M3` go-live checklist
 - **Context**: The runbook names roles (tech lead, on-call developer, client contact) but no names, channels or phone
   numbers exist yet.
 - **Assumption**: one developer on call per week, the tech lead as SEV-1 owner, the client's project manager as the
   client contact, communication in Vietnamese over the existing team channel.
-- **Answer**: —
+- **Answer**: **Chung Pham** is the contact for every severity, reached on **Telegram**, with a one-hour response expectation inside
+  working hours (UTC+7). There is **no out-of-hours on-call** until a paying customer exists; SEV-1 outside hours is
+  handled best-effort and recorded as such in the runbook. Escalation rows name Chung Pham for both the technical and
+  the client side. [user, 2026-11-08, approved in chat]
 
 ---
 

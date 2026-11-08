@@ -99,7 +99,7 @@ docs/                ← WHAT to build (layout depends on tier; see docs/README.
 - **Stack**: Phaser 4.2 (canvas) inside React 19 + Vite 8 + TypeScript 5; Cloudflare Workers + Durable Objects + D1; Clerk (auth); Cloudflare TURN; Cloudflare Pages; pnpm workspaces
 - **Stack packs**: `react-vite`, `api`, `browser-verify` (skills `cpt-stack-<name>`; `docs/01-overview/conventions.md` overrides them)
 - **Build**: `pnpm build` (`tsc -b` + `vite build` for web, `wrangler deploy --dry-run` for the worker; `Total Upload` 184.03 KiB / 48.26 KiB gzip for the worker, verified 2026-11-08)
-- **Test**: `pnpm test` (`vitest run` over `packages/core/tests`, `apps/worker/tests`, `apps/web/tests`, `tests/meta`; 123 files / 1036 cases, verified 2026-11-08); single test: `pnpm vitest run packages/core/tests/match.test.ts`; e2e: `pnpm e2e` (`playwright test`, 16 specs / 62 cases; `E2E_WEB_PORT` picks a free Vite port and `E2E_SERVERS_EXTERNAL=1` uses servers you started yourself)
+- **Test**: `pnpm test` (`vitest run` over `packages/core/tests`, `apps/worker/tests`, `apps/web/tests`, `tests/meta`; 123 files / 1036 cases, verified 2026-11-08); single test: `pnpm vitest run packages/core/tests/match.test.ts`; e2e: `pnpm e2e` (`playwright test`, 21 specs / 73 cases; `E2E_WEB_PORT` picks a free Vite port and `E2E_SERVERS_EXTERNAL=1` uses servers you started yourself)
 - **Budget**: `pnpm budget` (gzip weight of every web chunk against `scripts/bundle-budget.json`; a ratchet behind `NFR-03`, run it after `pnpm build`)
 - **Lint / typecheck**: `pnpm lint && pnpm typecheck` (verified 2026-11-08: eslint exit 0, `tsc -b` exit 0)
 - **Run locally**: terminal 1 `pnpm dev:worker` (wrangler dev, :8787); terminal 2 `pnpm dev` (vite, :5173 — add `--port <n>` when 5173 is taken)
