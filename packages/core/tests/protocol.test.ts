@@ -121,6 +121,32 @@ describe("TC-ROOM-163: the protocol is versioned and total", () => {
     expect(accepted({ t: "loadout", items: [{ id: "item-01", qty: MAX_LOADOUT_QUANTITY }] }).t).toBe("loadout");
   });
 
+  it("TC-ROOM-163: either half of a loadout may stand alone, and a frame with neither is refused", () => {
+    // `signaling.md` § 9: each half is written only when present, so a mobile tap and an item tap never undo
+    // each other — and a frame that says nothing at all is a client bug.
+    expect(accepted({ t: "loadout", mobileId: "mbl-07" })).toEqual({ t: "loadout", mobileId: "mbl-07" });
+    expect(accepted({ t: "loadout", items: [] })).toEqual({ t: "loadout", items: [] });
+    expect(accepted({ t: "loadout", items: [{ id: "itm-blood", qty: 1 }], mobileId: "mbl-02" })).toEqual({
+      t: "loadout",
+      items: [{ id: "itm-blood", qty: 1 }],
+      mobileId: "mbl-02",
+    });
+    expect(rejected({ t: "loadout" }).code).toBe("bad-request");
+    expect(rejected({ t: "loadout", mobileId: "mbl-99" }).code).toBe("bad-request");
+  });
+
+  it("TC-ROOM-163: a loadout padded past the 1 KB budget is payload-too-large", () => {
+    const padding = Array.from({ length: 200 }, () => ({ id: "itm-blood", qty: 0 }));
+    expect(rejected({ t: "loadout", items: padding }).code).toBe("payload-too-large");
+  });
+
+  it("TC-ROOM-163: auth takes any mobile string, because a pick is what gets validated", () => {
+    // The room drops an id it no longer ships rather than failing the handshake, so a cached client can still
+    // reconnect; `loadout` is where an unknown mobile is refused (the player can be told there).
+    expect(accepted({ t: "auth", token: "abc", mobileId: "mbl-from-an-old-build" }).t).toBe("auth");
+    expect(rejected({ t: "auth", token: "abc", mobileId: 7 }).code).toBe("bad-request");
+  });
+
   it("TC-ROOM-163: a snapshot over 8 KB is snapshot-too-large and a missing seq is bad-request", () => {
     const bloated = { ...SNAPSHOT, filler: "x".repeat(9_000) };
     expect(rejected({ t: "snapshot_push", snapshot: bloated }).code).toBe("snapshot-too-large");

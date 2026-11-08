@@ -124,6 +124,14 @@ export function getMobile(mobileId: string): Mobile {
 
 export const DEFAULT_MOBILE_ID = "mbl-01";
 
+/**
+ * A mobile id is a stat line the host imports, so only a shipped `mbl-NN` may enter the roster — checked by the
+ * frame parser and by the Durable Object that stores the pick (`US-ROOM-007` AC7).
+ */
+export function isMobileId(value: string): boolean {
+  return MOBILES_BY_ID.has(value);
+}
+
 /** Balance band used by `TC-CORE-923`: damage-per-delay spread across the roster. */
 export function damagePerDelay(mobile: Mobile): number {
   // `mobiles.md` § 7: shot 1 power ÷ its own delay, so two mobiles compare on the same axis.

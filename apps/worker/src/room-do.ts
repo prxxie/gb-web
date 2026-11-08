@@ -18,7 +18,7 @@ import {
   isModeId,
   isRoomExpired,
   joinRoom,
-  MOBILES_BY_ID,
+  isMobileId,
   leaveRoom,
   markDisconnected,
   parseClientFrame,
@@ -82,11 +82,11 @@ interface SocketMeta {
   /** Last heartbeat received; three missed ones move the member to `grace` (`US-ROOM-002` AC6). */
   lastPingAt: number;
   /** Per-second frame counters, reset when the window rolls over (`signaling.md` § 5). */
-  window: { readonly startedAt: number; ping: number; signal: number; chat: number };
+  window: { readonly startedAt: number; ping: number; signal: number; chat: number; control: number };
 }
 
 /** `signaling.md` § 5: what one socket may send per second, per frame kind. */
-const BUDGETS = { ping: 10, signal: 20, chat: 2 } as const;
+const BUDGETS = { ping: 10, signal: 20, chat: 2, control: 20 } as const;
 /** How long a promoted host has to prove it is live before the next candidate is tried (`US-ROOM-005` AC3). */
 const HOST_MIGRATION_RECHECK_MS = 5_000;
 
@@ -98,11 +98,6 @@ const START_REJECTIONS: Record<NonNullable<ReturnType<typeof canStart>>, ErrorCo
   "not-enough-players": "not-enough-players",
   "teams-unbalanced": "teams-not-balanced",
 };
-
-/** A mobile id is a stat line the host imports, so only a shipped `mbl-NN` may enter the roster. */
-function isMobileId(value: string): boolean {
-  return MOBILES_BY_ID.has(value);
-}
 
 /** What `POST /api/v1/matches` answered, shaped for the `match_recorded` frame (`US-RANK-001`, `US-RANK-005`). */
 interface RecordedMatch {
@@ -279,7 +274,7 @@ export class Room implements DurableObject {
       guestId: null,
       token: null,
       lastPingAt: 0,
-      window: { startedAt: 0, ping: 0, signal: 0, chat: 0 },
+      window: { startedAt: 0, ping: 0, signal: 0, chat: 0, control: 0 },
     });
     // `request.url` here is the proxy's `https://room.internal/...` stub, so the public origin comes in
     // on a header. Storage keeps it for the alarms, which run with no request in hand.
@@ -321,7 +316,10 @@ export class Room implements DurableObject {
     // the payload is well formed (`US-NET-004` §5).
     const charged = this.charge(ws, meta, frame.t);
     if (!charged) {
-      const limit = frame.t === "ping" ? BUDGETS.ping : frame.t === "signal" ? BUDGETS.signal : BUDGETS.chat;
+      const limit = frame.t === "ping" ? BUDGETS.ping
+        : frame.t === "signal" ? BUDGETS.signal
+        : frame.t === "chat" ? BUDGETS.chat
+        : BUDGETS.control;
       this.reject(ws, "rate-limited", `more than ${limit} ${frame.t} frames in a second`);
       // One refusal, then the socket goes: flooding must not cost the room a frame per attempt, and
       // `4429` is the close code `signaling.md` documents for exactly this (`US-NET-004` §5).
@@ -384,16 +382,25 @@ export class Room implements DurableObject {
   private charge(ws: WebSocket, meta: SocketMeta, kind: "ping" | "signal" | "chat" | string): SocketMeta | null {
     const now = Date.now();
     const fresh = now - meta.window.startedAt >= 1_000;
-    const window = fresh ? { startedAt: now, ping: 0, signal: 0, chat: 0 } : { ...meta.window };
-    if (kind !== "ping" && kind !== "signal" && kind !== "chat") {
+    const window = fresh
+      ? { startedAt: now, ping: 0, signal: 0, chat: 0, control: 0 }
+      : { ...meta.window };
+    // Lobby writes share the `control` bucket: each `loadout` persists the room and broadcasts it to every seat, so
+    // an uncharged one is write amplification every member could open (`signaling.md` § Budgets, `US-NET-004` § 5).
+    // The budget is deliberately far above a hand: one frame per tap means a fast player produces a few per second,
+    // and crossing a budget here closes the socket with `4429`, which the client reads as fatal. Charge floods.
+    const bucket = kind === "ping" || kind === "signal" || kind === "chat" ? kind
+      : kind === "loadout" || kind === "room_settings" || kind === "team_assign" ? "control"
+      : null;
+    if (bucket === null) {
       this.meta.set(ws, { ...meta, window });
       return { ...meta, window };
     }
-    if (window[kind] >= BUDGETS[kind]) {
+    if (window[bucket] >= BUDGETS[bucket]) {
       this.meta.set(ws, { ...meta, window });
       return null;
     }
-    window[kind] += 1;
+    window[bucket] += 1;
     const next = { ...meta, window };
     this.meta.set(ws, next);
     return next;
@@ -547,15 +554,32 @@ export class Room implements DurableObject {
     this.broadcast({ t: "room_state", room: this.publicState() });
   }
 
-  /** Any member, lobby only; the eleven-item budget is checked by the parser (`US-ROOM-007`). */
-  private async setLoadout(ws: WebSocket, playerId: string, frame: { items: readonly LoadoutEntry[] }): Promise<void> {
+  /**
+   * Any member, lobby only; the eleven-item budget and the mobile allowlist are checked by the parser (`US-ROOM-007`).
+   * Each half is written only when the frame carries it, so a mobile tap and an item tap never undo each other. Two
+   * members may hold the same mobile — the grid shows every mobile once per team tint, not once per seat.
+   */
+  private async setLoadout(
+    ws: WebSocket,
+    playerId: string,
+    frame: { items?: readonly LoadoutEntry[] | undefined; mobileId?: string | undefined },
+  ): Promise<void> {
     if (this.room.status !== "lobby") {
       this.reject(ws, "invalid-state", "the loadout is locked once the match starts");
       return;
     }
+    // Each half is written only when the frame carries it: a mobile tap must not wipe the items a second tab built.
     this.room = this.withActivity({
       ...this.room,
-      members: this.room.members.map((member) => (member.playerId === playerId ? { ...member, loadout: frame.items } : member)),
+      members: this.room.members.map((member) =>
+        member.playerId === playerId
+          ? {
+              ...member,
+              ...(frame.items === undefined ? {} : { loadout: frame.items }),
+              ...(frame.mobileId === undefined ? {} : { mobileId: frame.mobileId }),
+            }
+          : member,
+      ),
     });
     await this.persist();
     this.broadcast({ t: "room_state", room: this.publicState() });

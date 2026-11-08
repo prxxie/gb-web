@@ -42,15 +42,43 @@ describe("TC-AUTH-162: the session never lands in localStorage", () => {
     globalThis.fetch = fetch as typeof globalThis.fetch;
 
     // Act
-    const session = await ensureSession();
+    const session = await ensureSession().finally(() => {
+      globalThis.fetch = original;
+    });
 
     // Assert
-    globalThis.fetch = original;
     expect(session.token).toBe(TOKEN);
     expect(sessionStorage.getItem("gbw.session")).toContain(TOKEN);
     expect(localStorage.length).toBe(0);
   });
 
+});
+
+describe("TC-ROOM-710: one guest identity per page load", () => {
+  it("mints one guest for a page load, however many callers ask at once", async () => {
+    // Arrange: a fresh tab, and two callers that both arrive before the first mint lands (`TC-ROOM-710`).
+    sessionStorage.clear();
+    const original = globalThis.fetch;
+    let mints = 0;
+    globalThis.fetch = (async (): Promise<Response> => {
+      mints += 1;
+      return sessionResponse();
+    }) as typeof globalThis.fetch;
+
+    // Act
+    const [first, second] = await Promise.all([ensureSession(), ensureSession()]).finally(() => {
+      globalThis.fetch = original;
+    });
+
+    // Assert
+    expect(mints).toBe(1);
+    expect(second.token).toBe(first.token);
+    expect(second.subject.guestId).toBe(first.subject.guestId);
+  });
+
+});
+
+describe("TC-AUTH-162: the stored token is readable and clearable", () => {
   it("reads it back and clears only the tab store", async () => {
     currentSession();
     sessionStorage.setItem(

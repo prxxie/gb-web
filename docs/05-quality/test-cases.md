@@ -94,7 +94,7 @@ The `covers` column names the requirement ([nonfunctional-requirements.md](../01
 | TC-ROOM-185 | US-ROOM-004 | AC3 — grace window runs out | The seat flips to `disconnected`, peers hear `peer_left {reason:"disconnected"}`, the next `room_state` shows it | worker | NFR-07 |
 | TC-ROOM-182 | US-ROOM-005 | AC6 — migration end to end on two sockets | Host socket killed mid-match: the survivor is promoted within 5 s with `hostGeneration` 2 and still pings | e2e | NFR-06 |
 | TC-ROOM-151 | US-ROOM-007 | Host selects mode, map and capacity; a non-host tries | Host writes, member is rejected, loadout caps at 11 items across two pages | e2e | `screens/lobby.md` |
-| TC-ROOM-153 | US-ROOM-007 | Two players pick the same mobile, then a guest picks one | Both are accepted in the same match, every mobile appears once in the grid, the choice survives reconnect | e2e | `data/mobiles.md` |
+| TC-ROOM-153 | US-ROOM-007 | Two players pick the same mobile, then a guest picks one | Both are accepted in the same room, every mobile appears once in the grid, the choice survives a reload | e2e | `data/mobiles.md` |
 | TC-ROOM-123 | US-ROOM-001 | AC8 — idle room for 10 minutes | Storage deleted, code reusable after 60 s | worker | `data/room-state.md` |
 | TC-ROOM-121 | US-ROOM-002 | AC2 — `auth` after 5 s, or a bad token | Close `4401`; no member created | worker | `api/signaling.md` |
 | TC-ROOM-122 | US-ROOM-002 | AC3 — ninth join to an 8-slot room | Close `4409`, roster unchanged | worker | FR-01 |
@@ -428,3 +428,9 @@ unrelated meanings), so every row below names the one thing it proves.
 | TC-ROOM-202 | US-ROOM-004 | AC1 — a socket closes mid-match | `connectionState` becomes `grace`, peers receive `peer_left {reason:"grace"}` and the 20 s alarm is armed | worker | `US-ROOM-004` AC1 |
 | TC-ROOM-203 | US-ROOM-004 | AC2 — a member reconnects with a valid token | It receives `room_state` and then the last `snapshot_state` before any new turn | worker | `US-ROOM-004` AC2 |
 | TC-ROOM-707 | US-ROOM-007 | AC1, AC3–AC6 — the host picks mode, map, capacity and a loadout; a peer changes one | The host's choice reaches every member; the peer's frame is refused | web | `US-ROOM-007` AC1–AC4 |
+| TC-ROOM-708 | US-ROOM-007 | AC7 — a `loadout` frame carries the mobile | Stored on the member, echoed in `room_state`, a duplicate pick accepted, either half standing alone without undoing the other, and an unknown id, an empty frame or one past the 1 KB budget refused | worker | `data/mobiles.md` |
+| TC-ROOM-709 | US-ROOM-007 | AC7 — the lobby's mobile grid | Every mobile once with both team tints; a pick is a `loadout` frame; the member record wins over an optimistic pick | web | `screens/lobby.md` |
+| TC-ROOM-710 | US-ROOM-007 | AC7 — one guest identity per page load | Two callers before the first mint lands share one session, so the seat and its socket agree | web | `api/accounts.md` |
+| TC-ROOM-711 | US-ROOM-007 | AC2 — a host starts a match | `match_started` carries the mode, the map and the mobile each member picked | worker | `api/signaling.md` |
+| TC-ROOM-712 | US-ROOM-007 | AC7 — lobby write budget | Eleven item taps plus a mobile tap in one second pass; a twenty-first write in one second is refused `rate-limited` and the last accepted write survives | worker | `api/signaling.md` |
+| TC-ROOM-713 | US-ROOM-007 | AC7 — one join per page load | A `StrictMode` double mount posts `join` once and opens the room socket on the seat it got | web | `api/accounts.md` |

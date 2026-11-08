@@ -4,12 +4,24 @@
  * Only the host may change them: every control is disabled for everyone else, and the page shows the
  * values the room broadcast so a joiner always sees the truth rather than a stale local copy.
  */
-import { MAPS, MODES, type ModeId, type RoomSettings } from "@gbw/core";
+import { MAPS, MODES, type Gimmick, type MapDef, type ModeId, type RoomSettings } from "@gbw/core";
 import { useLocale } from "../app/providers";
 import type { JSX } from "react";
 
 /** Capacities the lobby offers; a room created as 1v1 keeps its own value in the list. */
 const CAPACITIES = [4, 6, 8] as const;
+
+/** Filled in for every `Gimmick`, so no key is built by concatenation at runtime (`conventions.md` § i18n). */
+const GIMMICK_KEYS: Record<Gimmick, string> = {
+  force: "lobby.gimmick.force",
+  gust: "lobby.gimmick.gust",
+  electric: "lobby.gimmick.electric",
+  wind: "lobby.gimmick.wind",
+  return: "lobby.gimmick.return",
+  heal: "lobby.gimmick.heal",
+  fog: "lobby.gimmick.fog",
+  tornado: "lobby.gimmick.tornado",
+};
 
 export interface SettingsPanelProps {
   readonly settings: RoomSettings;
@@ -23,6 +35,9 @@ export function SettingsPanel({ settings, isHost, onChange }: SettingsPanelProps
   const capacities: readonly number[] = CAPACITIES.includes(settings.maxPlayers as 4 | 6 | 8)
     ? CAPACITIES
     : [settings.maxPlayers, ...CAPACITIES];
+  // No fallback: a catalogue gap must look like a gap, not like "Megalith Plain". `data-map-id` is the room's own
+  // value, so a test or a QA pass can see the divergence (`US-ROOM-007` AC5).
+  const map: MapDef | undefined = MAPS.find((entry) => entry.mapId === settings.mapId);
 
   return (
     <section className="card" data-testid="settings-panel" aria-labelledby="settings-title">
@@ -83,6 +98,21 @@ export function SettingsPanel({ settings, isHost, onChange }: SettingsPanelProps
             onChange={(event) => onChange({ isPrivate: event.target.checked })}
           />
         </label>
+      </div>
+      {/* The host picks the map; everyone else only reads it, so this preview is their view of the choice (AC5). */}
+      <div className="map-preview" data-testid="map-preview" data-map-id={settings.mapId}>
+        <span className="map-preview__name">{map?.name[locale] ?? settings.mapId}</span>
+        <span className="map-preview__gimmicks">
+          {(map?.gimmicks ?? []).length === 0 ? (
+            <span className="badge">{t("lobby.map.none")}</span>
+          ) : (
+            (map?.gimmicks ?? []).map((gimmick) => (
+              <span key={gimmick} className="badge" data-testid={`map-gimmick-${gimmick}`}>
+                {t(GIMMICK_KEYS[gimmick])}
+              </span>
+            ))
+          )}
+        </span>
       </div>
     </section>
   );

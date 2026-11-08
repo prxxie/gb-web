@@ -17,7 +17,7 @@ Runtime copy: `packages/core/src/data/mobiles.ts`, versioned by `rulesetVersion`
 | Field | Type | Meaning |
 |---|---|---|
 | `mobileId` | `TEXT` | `mbl-01` … `mbl-20` |
-| `name` | string | English display name; localised in `apps/web/src/i18n` |
+| `name` | string | English display name, rendered as-is (the roster's mobiles are proper nouns, like the maps' `id`); localising the twenty names is a follow-up, tracked on `US-ROOM-007` |
 | `archetype` | enum | `balanced`, `tank`, `sniper`, `bombardier`, `bouncer`, `support`, `glass`, `all-rounder`, `zoner`, `trickster` — exactly two mobiles each |
 | `trajectory` | enum | `standard`, `direct`, `lobber`, `mortar`, `skimmer` — the launch law the mobile starts from (§ 3) |
 | `angleMin` / `angleMax` | degrees | **this mobile's** aim window, inside its profile's band; the aim is clamped to it |

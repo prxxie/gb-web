@@ -10,6 +10,7 @@
  * tests all run the same checks.
  */
 import { MAPS_BY_ID } from "./data/maps.js";
+import { isMobileId } from "./data/mobiles.js";
 import { isChatId, isChatKind, type ChatId, type ChatKind } from "./phrases.js";
 import { isModeId } from "./data/modes.js";
 import { expandWire, isWireSnapshot } from "./snapshot.js";
@@ -97,7 +98,19 @@ export type ClientFrame =
       readonly maxPlayers?: 2 | 4 | 6 | 8 | undefined;
       readonly isPrivate?: boolean | undefined;
     }
-  | { readonly t: "loadout"; readonly items: readonly LoadoutEntry[] }
+  | {
+      /**
+       * The whole item list each time it is sent, and the mobile in the same frame when the pick is a mobile: it is
+       * the same screen and the same "once per lobby" moment (`US-ROOM-007` AC7), and a pick the room never hears
+       * about is a pick that does not survive a reconnect.
+       *
+       * Each half is optional so a frame only says what changed — a mobile tap must not overwrite the item list a
+       * second tab just built, and the item picker must not reset the mobile. At least one half must be present.
+       */
+      readonly t: "loadout";
+      readonly items?: readonly LoadoutEntry[] | undefined;
+      readonly mobileId?: string | undefined;
+    }
   | { readonly t: "move"; readonly direction: 0 | 1; readonly run: boolean }
   | { readonly t: "item"; readonly id: string }
   | { readonly t: "leave" }
@@ -346,6 +359,9 @@ function parseMatchEnd(frame: Record<string, unknown>): ParseResult<MatchEndFram
   });
 }
 
+/** The size `signaling.md` § Budgets allows the lobby writes (`loadout`, `room_settings`, `team_assign`). */
+const LOBBY_FRAME_BYTES = 1_024;
+
 /** Parse one inbound frame. `raw` is the decoded text of a single WebSocket message. */
 export function parseClientFrame(raw: string): ParseResult<ClientFrame> {
   if (utf8Bytes(raw) > MAX_SNAPSHOT_BYTES * 2) return fail("payload-too-large", "frame is larger than the socket budget");
@@ -365,6 +381,12 @@ export function parseClientFrame(raw: string): ParseResult<ClientFrame> {
       if (extra) return fail("bad-request", extra);
       if (typeof parsed["token"] !== "string" || parsed["token"].length === 0) {
         return fail("bad-request", "auth needs a token");
+      }
+      // `auth` only carries the mobile as a hint for the seat's first value, so a value this build no longer ships
+      // is dropped by the room rather than failing the handshake: a cached client would otherwise never reconnect.
+      // A later pick is a command and is refused (`loadout.mobileId`), because there the player can be told.
+      if (parsed["mobileId"] !== undefined && typeof parsed["mobileId"] !== "string") {
+        return fail("bad-request", "auth.mobileId must be a string");
       }
       return ok({
         t: "auth",
@@ -430,10 +452,28 @@ export function parseClientFrame(raw: string): ParseResult<ClientFrame> {
       });
     }
     case "loadout": {
-      const extra = onlyKeys(parsed, ["t", "items"], t);
+      const extra = onlyKeys(parsed, ["t", "items", "mobileId"], t);
       if (extra) return fail("bad-request", extra);
-      const items = parseLoadout(parsed["items"]);
-      return items.ok ? ok({ t: "loadout", items: items.frame }) : fail(items.code, items.detail);
+      // `signaling.md` § Budgets caps the lobby writes at 1 KB. Without it a loadout padded with `qty: 0` entries
+      // would ride the 16 KB socket budget into `persist()` and into every member's `room_state`.
+      if (utf8Bytes(raw) > LOBBY_FRAME_BYTES) {
+        return fail("payload-too-large", `a loadout frame must fit ${LOBBY_FRAME_BYTES} bytes`);
+      }
+      const mobileId = parsed["mobileId"];
+      if (mobileId !== undefined && (typeof mobileId !== "string" || !isMobileId(mobileId))) {
+        return fail("bad-request", "loadout.mobileId must be a shipped mobile");
+      }
+      const rawItems = parsed["items"];
+      if (rawItems === undefined && mobileId === undefined) {
+        return fail("bad-request", "loadout needs items, mobileId, or both");
+      }
+      const items = rawItems === undefined ? null : parseLoadout(rawItems);
+      if (items && !items.ok) return fail(items.code, items.detail);
+      return ok({
+        t: "loadout",
+        ...(items && items.ok ? { items: items.frame } : {}),
+        ...(mobileId === undefined ? {} : { mobileId }),
+      });
     }
     case "move": {
       const extra = onlyKeys(parsed, ["t", "direction", "run"], t);
