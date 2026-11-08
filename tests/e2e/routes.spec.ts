@@ -21,7 +21,10 @@ test.describe("route table", () => {
     test(`the ${route.screen} route (${route.path}) renders without the error boundary`, async ({ page }) => {
       await page.goto(route.path);
 
-      await expect(page.getByRole("alert")).toHaveCount(0);
+      // The boundary renders `.screen--error`; a screen's own `role="alert"` banner (the leaderboard's offline and
+      // error states, for instance) is designed behaviour, not a route falling through — asserting on `role="alert"`
+      // made this case fail whenever the API answered slowly under CI load.
+      await expect(page.locator(".screen--error")).toHaveCount(0);
       const body = page.locator("body");
       await expect(body).not.toHaveText(/^\s*$/);
       expect(await body.innerText()).not.toMatch(RAW_ERROR);

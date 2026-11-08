@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-11-08 — the production deploy stops going red after every merge
+
+- **Fixed** `deploy-production.yml`: the job arms itself only when the repository variable `PRODUCTION_READY` is `true`
+  (or on manual dispatch). Before, every green `CI` run on `main` started a deploy that died on an empty
+  `CLOUDFLARE_API_TOKEN` — a red run per merge, which is how a team learns to ignore red.
+- **Changed** the two Cloudflare environment variables to the names `wrangler` 4 reads (`CLOUDFLARE_API_TOKEN`,
+  `CLOUDFLARE_ACCOUNT_ID`); the `CF_*` pair is deprecated and warns on every run.
+- **Fixed** `01-overview/deployment.md` § 4, which described a `ci.yml` that lints the OpenAPI with `redocly` and a
+  production workflow triggered by "push to `main`, manual approval" — neither was true.
+
 ## 2026-11-08 — the five missing browser oracles, and two defects they found
 
 - **Added** the five Playwright specs the oracle tables named but the repository never had:
@@ -16,6 +26,9 @@
 - **Changed** `TC-PWA-131`/`TC-PWA-190` and the `02-reference` oracle rows to the criterion the stories actually state
   (focus moves to the route's `h1`; the "returns to the invoking control on back" clause was in no acceptance criterion
   and in no code).
+- **Fixed** `tests/e2e/routes.spec.ts`: "renders without the error boundary" asserted `role="alert"` was absent, but a
+  screen's own error banner carries that role too, so the case failed on `/leaderboard` whenever the API answered slowly
+  under CI load. It now asserts the boundary's own marker (`.screen--error`).
 - **Note** `tests/e2e/prod-smoke.spec.ts` left the oracle set for `deployment.md` § post-deploy: a check against a
   deployed environment is a release-stage check (`cpt-release` RR7), not a design oracle.
 - **Note** one gap stays on the record in `05-quality/test-plan-status.md` § 3: a route whose session could not be

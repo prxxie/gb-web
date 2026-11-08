@@ -3,6 +3,11 @@ name: Deploy production
 # `US-FND-004` AC2: on a merge to `main`, migrations run against the production D1 **before** the worker
 # deploys, and the Pages deployment is last — so the site never points at a worker whose schema is older
 # than the database. `set -e` plus separate steps means the job stops at the first failing step.
+#
+# The job only arms itself once the repository can actually deploy: `vars.PRODUCTION_READY` is `true` when the
+# Cloudflare account, the D1 database, the Pages project and the two secrets exist. Before that, a green CI run on
+# `main` used to start this job and fail on an empty `CLOUDFLARE_API_TOKEN` — a red run after every merge, which is
+# how a team learns to ignore red. The variable is set when `US-FND-004` is done; `workflow_dispatch` always runs.
 
 on:
   workflow_run:
@@ -21,14 +26,17 @@ concurrency:
 
 env:
   VITE_API_BASE: /api/v1
-  CF_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-  CF_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+  # `wrangler` reads these names; the older `CF_API_TOKEN` / `CF_ACCOUNT_ID` pair is deprecated and warns on every run.
+  CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+  CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
 jobs:
   deploy:
     name: migrations → worker → pages
     runs-on: ubuntu-latest
-    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' && vars.PRODUCTION_READY == 'true')
     environment: production
     steps:
       - uses: actions/checkout@v4
