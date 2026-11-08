@@ -93,7 +93,7 @@ outside the catalogue renders nothing and is reported once per id (`apps/web/src
 (`apps/web/tests/chat-wiring.test.tsx`), `TC-CORE-963` (`packages/core/tests/phrases.test.ts`).
 
 ```text
-Red: tests/web/chat-wiring.test.tsx
+Red: apps/web/tests/chat-wiring.test.tsx
 ```
 
 The red run named the defect that mattered: before `apps/web/src/net/chat.ts` existed, a phrase was applied

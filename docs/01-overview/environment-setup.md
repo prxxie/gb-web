@@ -91,8 +91,10 @@ local miniflare instance, so WebRTC works on `localhost` without TURN.
 ```bash
 pnpm typecheck      # tsc -b across workspaces
 pnpm lint           # eslint
-pnpm test           # vitest: packages/core/tests, apps/worker/tests, apps/web/tests
+pnpm test           # vitest: packages/core/tests, apps/worker/tests, apps/web/tests, tests/meta
 pnpm e2e            # playwright, two-browser specs
+pnpm build          # core → web bundle → worker dry-run upload
+pnpm budget         # gzip weight of each web chunk against scripts/bundle-budget.json (NFR-03)
 node .agents/scripts/verify-docs.mjs --fix
 ```
 
@@ -103,9 +105,15 @@ pnpm vitest run packages/core/tests/ballistics.test.ts
 pnpm exec playwright test tests/e2e/lobby.spec.ts
 ```
 
-All six commands were executed on 2026-11-05 on Node 22.22.2 and pass: `typecheck` and `lint` exit 0, `test` runs
-15 files / 110 cases, `e2e` runs 6 specs, `verify-docs` reports 0 errors. `pnpm build` produces the web bundle and the
-worker dry-run upload. Only `git clone` stays unavailable until `US-FND-004` adds a remote.
+All of these were executed on 2026-11-08 on Node 22.22.2 and pass: `typecheck` and `lint` exit 0, `test` runs
+123 files / 1036 cases, `e2e` runs 16 specs / 62 cases, `budget` reports every bucket inside its recorded weight,
+`verify-docs` reports 0 errors and 0 warnings. `pnpm build` produces the web bundle and the worker dry-run upload
+(184.03 KiB / 48.26 KiB gzip). Only `git clone` stays unavailable until `US-FND-004` adds a remote.
+
+`pnpm budget` is the ratchet behind `NFR-03`: it fails when a chunk's gzip weight grows past the number recorded in
+`scripts/bundle-budget.json`, so weight shows up in the diff that adds it instead of only in the production e2e run.
+Raising a number is a deliberate edit in the same change.
+
 ## 7. Test on a real phone
 
 1. Find the LAN address (`ipconfig getifaddr en0` / `hostname -I`).

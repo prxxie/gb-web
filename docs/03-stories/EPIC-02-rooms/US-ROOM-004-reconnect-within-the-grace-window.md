@@ -89,7 +89,7 @@ carrying `lastSnapshot` (the same payload the host would send), so a reconnectin
 `TC-ROOM-127`, `TC-ROOM-184`, `TC-ROOM-185`, `TC-ROOM-202`, `TC-ROOM-203`, `TC-ROOM-186`, `TC-ROOM-059`, `TC-CORE-027`, `TC-ROOM-200`,
 `TC-ROOM-201`, `TC-ROOM-174`–`TC-ROOM-177`.
 
-Red: `tests/web/host-clock.test.tsx` — the `TC-ROOM-200` cases were written against the turn-clock effect that only
+Red: `apps/web/tests/host-clock.test.tsx` — the `TC-ROOM-200` cases were written against the turn-clock effect that only
 advanced the local slot's expired turn, so a hosted match froze on a peer's deadline and an absent player held the match
 for the whole 20 s grace window.
 

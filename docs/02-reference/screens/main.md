@@ -59,4 +59,4 @@ Everyone. No account, no room membership, no rating lookup beyond the optional `
 | Create → lobby as host; join → lobby as peer | `tests/e2e/main.spec.ts` (TC-ROOM-134) |
 | Guest path works with no account and no sign-in prompt | `tests/e2e/main.spec.ts` (TC-AUTH-135) |
 | 404/410 on join shows the banner, not a crash | `tests/e2e/main.spec.ts` (TC-ROOM-136) |
-| Offline disables network actions but keeps bot play | `tests/e2e/offline.spec.ts` (TC-PWA-064) |
+| Offline disables network actions but keeps bot play | `tests/e2e/pwa-offline.spec.ts` (TC-PWA-064) |

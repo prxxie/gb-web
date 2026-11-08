@@ -78,7 +78,7 @@ Top bar: 56 px, contains the locale toggle (44×44 minimum) and the slot for the
 ## 6. Implementation notes
 
 - `Vite` + `react-router-dom` v7 data router; `Phaser` is not imported by the shell (only by the match route, lazily).
-- `apps/web/src/i18n/vi.json` and `en.json` hold the keys; a `apps/web/tests/i18n.test.ts` compares the key sets.
+- `apps/web/src/i18n/vi.json` and `en.json` hold the keys; a `apps/web/tests/i18n.test.tsx` compares the key sets.
 - The banner component is shared with the match screen's reconnect overlay but is not the same component.
 
 ## 7. Out of scope

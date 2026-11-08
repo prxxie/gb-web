@@ -82,7 +82,7 @@ changes, so it cannot answer "am I the host now?". The turn of a dead host is sk
 
 `TC-NET-908`, `TC-NET-909` (web), `TC-NET-910` (manual, two devices), `TC-ROOM-184` (reconnect inside grace).
 
-Red: `tests/web/migration-wiring.test.tsx` (TC-NET-909) — before `adoptHostChanged` existed the promoted peer
+Red: `apps/web/tests/migration-wiring.test.tsx` (TC-NET-909) — before `adoptHostChanged` existed the promoted peer
 published nothing at all (the `broadcast` spy saw zero calls after `host_changed`), and the demoted host still applied its
 own shot instead of sending an `input` frame (the `sendControlAll` spy saw zero calls).
 

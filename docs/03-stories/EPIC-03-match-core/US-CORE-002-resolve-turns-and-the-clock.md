@@ -74,7 +74,7 @@ Movement cost ([`US-CORE-008`](US-CORE-008-move-with-energy.md)), item effects
 ## 8. Test notes
 
 `TC-CORE-901`, `TC-CORE-152`, `TC-CORE-045`, `TC-CORE-027`, `TC-RANK-110`.
-Red: `tests/core/protocol.test.ts` — the `TC-CORE-937` cases were written first and failed with
+Red: `packages/core/tests/protocol.test.ts` — the `TC-CORE-937` cases were written first and failed with
 `match_end does not accept "delayTable"` until the parser took the table and the frame allowlist allowed it; the
 worker half of the same case failed on `201` where it expected `422` because the field was validated after
 `field.done()`.

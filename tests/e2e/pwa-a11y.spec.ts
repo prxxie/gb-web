@@ -1,5 +1,5 @@
 /**
- * `US-PWA-004` AC5 (`docs/03-stories/EPIC-07-pwa-i18n/US-PWA-004-accessible-shell.md`).
+ * `US-PWA-004` AC5 (`docs/03-stories/EPIC-07-pwa-i18n/US-PWA-004-meet-the-accessibility-bar.md`).
  *
  * The battlefield is a canvas, which a screen reader cannot read. So the turn and the remaining HP are
  * mirrored into one polite live region, and the canvas itself is kept out of the accessibility tree.

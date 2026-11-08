@@ -15,6 +15,7 @@
     "e2e": "playwright test",
     "lint": "eslint .",
     "typecheck": "tsc -b",
+    "budget": "node scripts/bundle-budget.mjs",
     "verify:docs": "node .agents/scripts/verify-docs.mjs"
   },
   "devDependencies": {

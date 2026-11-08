@@ -96,7 +96,7 @@ any `playerId` field in the payload.
 `apps/web/tests/diagnostics.test.tsx` (`TC-NET-012`) plus the wiring case in
 `apps/web/tests/migration-wiring.test.tsx`.
 
-Red: `tests/worker/room-reject-log.test.ts` — the log line did not exist, so all three cases failed on an empty
+Red: `apps/worker/tests/room-reject-log.test.ts` — the log line did not exist, so all three cases failed on an empty
 `console.info` capture, and `apps/web/tests/diagnostics.test.tsx` failed to load its module at all.
 
 ## 9. Open questions

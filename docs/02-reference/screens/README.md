@@ -76,6 +76,6 @@ flowchart LR
 | Contract | Checked by |
 |----------|-----------|
 | Every route renders, in both locales, at 844 × 390 and 390 × 844 | `tests/e2e/routes.spec.ts` (TC-PWA-152) |
-| Portrait shows the rotate notice | `tests/e2e/orientation.spec.ts` (TC-PWA-063) |
-| Focus moves to the `h1` and returns to the invoking control | `tests/e2e/focus.spec.ts` (TC-PWA-155) |
-| No route renders a raw error string | `tests/e2e/errors.spec.ts` |
+| Portrait shows the rotate notice | `tests/e2e/pwa-shell.spec.ts` (TC-PWA-063) |
+| Focus moves to the `h1` and returns to the invoking control | `tests/e2e/focus.spec.ts` — planned, see `05-quality/test-plan-status.md` (TC-PWA-155) |
+| No route renders a raw error string | `tests/e2e/errors.spec.ts` — planned, see `05-quality/test-plan-status.md` |
