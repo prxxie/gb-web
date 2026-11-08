@@ -208,7 +208,7 @@ export function expandWire(wire: WireSnapshot): Snapshot {
       actedSlots: [],
     },
     weather: {
-      wind: { magnitude: wire.w[0] ?? 0, sector: wire.w[1] ?? 0, directionDeg: (wire.w[1] ?? 0) * 30 },
+      wind: { magnitude: wire.w[0] ?? 0, sector: wire.w[1] ?? 0, directionDeg: (wire.w[1] ?? 0) * 180 },
       rolledAtRound: wire.t[3] ?? 1,
     },
     players: wire.p.map((row) => ({

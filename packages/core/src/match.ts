@@ -198,8 +198,9 @@ function mobileOf(player: PlayerState): Mobile {
   return getMobile(player.mobileId);
 }
 
-function gravityFor(mobile: Mobile, map: MapDef): number {
-  return mobile.gravity * map.gravityModifier;
+/** One gravity for the whole roster, bent only by the map (`tunables.md` § 1.1). */
+function gravityFor(map: MapDef): number {
+  return TUNABLES.gravity * map.gravityModifier;
 }
 
 interface Flight {
@@ -209,12 +210,11 @@ interface Flight {
 }
 
 /** Precompute the whole flight so the client can animate exactly what the host resolved. */
-export function flightPath(state: MatchState, projectile: ReturnType<typeof launch>, mobile: Mobile, map: MapDef): Flight {
+export function flightPath(state: MatchState, projectile: ReturnType<typeof launch>, map: MapDef): Flight {
   const terrain = terrainOf(state);
   const context = {
     wind: state.weather.wind,
-    gravity: gravityFor(mobile, map),
-    mass: mobile.mass,
+    gravity: gravityFor(map),
     stepMs: TUNABLES.stepMs,
     forceX: map.gimmicks.includes("force") ? FORCE_FIELD : 0,
   };
@@ -313,7 +313,7 @@ function launchFor(
     powerMultiplier,
     bunge: effects.bungeNext,
   });
-  const flight = flightPath(state, projectile, mobile, getMap(state.mapId));
+  const flight = flightPath(state, projectile, getMap(state.mapId));
 
   return { weapon, projectile, flight, angle: clampedAngle, force: clampedForce };
 }

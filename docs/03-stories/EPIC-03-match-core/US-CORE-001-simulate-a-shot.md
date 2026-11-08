@@ -33,7 +33,7 @@ class in `packages/core/src/data/mobiles.ts` resolves to one of seven behaviours
 
 | # | Given | When | Then |
 |---|---|---|---|
-| AC1 | `mbl-01` (`g 100`, `mass 168`, `standard` band) and no wind | the shot is fired with angle 45, force 98 | it lands at 1,988 ± 1 units after 6.3 s, the golden sample `TC-CORE-020` records |
+| AC1 | `mbl-01` (`standard` band) and no wind | the shot is fired with angle 45, force 98 | it lands at 3,680 ± 1 units after 8.6 s, the golden sample `TC-CORE-020` records |
 | AC2 | `tunables.json` `gravity = 100 u/s²`, `stepMs = 50` | the projectile is stepped 100 times (5 s) | vertical speed grew by exactly `100 × 5 = 500 u/s` and no step mutates shared state (`TC-CORE-020`) |
 | AC3 | force 0 | the shot is fired | the projectile drops inside 2 s and the turn ends (`TC-CORE-029`) |
 | AC4 | the same shot on `mbl-03` (`mass 169`) and on `mbl-13` (`mass 118`), wind `m = 26`, `sector 0` | each is stepped | drift equals `½ · (42 × 26 / mass) · t²`, so `mbl-13` drifts ~50 % further than `mbl-03` (`TC-CORE-023`, `TC-CORE-925`) |

@@ -139,7 +139,10 @@ describe("modes", () => {
   });
 
   it("TC-CORE-917: a kill transfers the victim's jewels to the killer's team", () => {
-    const state = withJewels(match(undefined, { mode: "jewel" }), [1, null, null]);
+    const rolled = withJewels(match(undefined, { mode: "jewel" }), [1, null, null]);
+    // The property is the jewel transfer on a kill, not the weather: a point-blank shot has no power to
+    // fight a wind that no longer divides by mass, so the fixture is pinned to calm and lands where aimed.
+    const state: MatchState = { ...rolled, weather: { ...rolled.weather, wind: { magnitude: 0, directionDeg: 0, sector: 0 } } };
     const terrain = createTerrain(state.mapId);
     const placed: MatchState = {
       ...state,

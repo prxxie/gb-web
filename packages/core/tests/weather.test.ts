@@ -6,7 +6,15 @@ import { createRng } from "../src/rng.js";
 import { decodeSnapshot, encodeSnapshot, snapshotBytes, toSnapshot } from "../src/snapshot.js";
 import { TUNABLES } from "../src/tuning.js";
 import type { Rng, Wind } from "../src/types.js";
-import { describeWind, isCalm, newerWeather, rollWeather, rollWind, weatherSequence } from "../src/weather.js";
+import {
+  describeWind,
+  isCalm,
+  newerWeather,
+  rollWeather,
+  rollWind,
+  sectorLabel,
+  weatherSequence,
+} from "../src/weather.js";
 
 const NOW = 1_700_000_000_000;
 
@@ -50,30 +58,46 @@ function stubRng(ints: readonly number[]): Rng {
 }
 
 /**
- * A flat probe map, wide enough that a full-power `mbl-01` shot still lands inside it: the real
- * `map-01` is 2,000 units wide and the calm shot already lands at ~1,986.
+ * A flat probe under the whole flight path.
+ *
+ * `simulateFlight` stops at `mapBounds`, and the rebalance put a full-power shell far outside the real 2,000-unit
+ * map: on a 4,000-unit probe the wind shot used to report where it *left* the probe (3,680 + 52 units) instead of
+ * where it landed. Every drift here is therefore measured on a flat 120,000-unit plane with 120,000-unit bounds.
  */
-const flat = (width = 4_000) => ({
+const PROBE_WIDTH = 120_000;
+const BOUNDS = { width: PROBE_WIDTH, height: TUNABLES.mapHeight };
+const flat = (width = PROBE_WIDTH) => ({
   step: TUNABLES.terrainStep,
   heights: new Float64Array(Math.floor(width / TUNABLES.terrainStep) + 1).fill(820),
   width,
 });
 
 const CALM: Wind = { magnitude: 0, directionDeg: 0, sector: 0 };
+/** Sector 0 = east (`directionDeg 0`). */
+const EAST = (magnitude: number): Wind => ({ magnitude, directionDeg: 0, sector: 0 });
+/** Sector 1 = west (`directionDeg 180`). */
+const WEST = (magnitude: number): Wind => ({ magnitude, directionDeg: 180, sector: 1 });
 
-function shoot(wind: Wind) {
+/**
+ * `mbl-01` shot 1 at 45°, force 98 — the calibration shot — unless a shorter shot is asked for. A short shot is
+ * what a drift can be read from: at force 98 and wind 26 the shell lands ~100,000 units downrange.
+ *
+ * `fromX` moves the muzzle: a westward shot has to start well inside the plane, because terrain only exists for
+ * `x ≥ 0` and a shell blown west of the world edge falls through it instead of landing on it.
+ */
+function shoot(wind: Wind, force = 98, fromX = 8) {
   const mobile = getMobile("mbl-01");
   const projectile = launch({
     id: 1,
     ownerSlot: 0,
     weaponSlot: 0,
     weapon: mobile.weapons[0],
-    from: { x: 8, y: 820 },
+    from: { x: fromX, y: 820 },
     facing: 1,
     angle: 45,
-    force: 98,
+    force,
   });
-  return simulateFlight(projectile, { wind, gravity: mobile.gravity, mass: mobile.mass }, flat());
+  return simulateFlight(projectile, { wind, gravity: TUNABLES.gravity }, flat(), BOUNDS);
 }
 
 describe("weather (US-CORE-015)", () => {
@@ -87,18 +111,25 @@ describe("weather (US-CORE-015)", () => {
     expect(Number.isInteger(wind.magnitude)).toBe(true);
     expect(wind.magnitude).toBeGreaterThanOrEqual(0);
     expect(wind.magnitude).toBeLessThanOrEqual(TUNABLES.windMax);
+    // GB's wind is horizontal: two sectors, `directionDeg` is 0° (east) or 180° (west), never a free angle.
+    expect(TUNABLES.windSectors).toBe(2);
     expect(Number.isInteger(wind.sector)).toBe(true);
     expect(wind.sector).toBeGreaterThanOrEqual(0);
     expect(wind.sector).toBeLessThan(TUNABLES.windSectors);
-    expect(wind.directionDeg).toBe(wind.sector * 30);
+    expect(wind.directionDeg).toBe(wind.sector * 180);
+    expect([0, 180]).toContain(wind.directionDeg);
+    expect(sectorLabel(wind.sector)).toBe(wind.sector === 0 ? "E" : "W");
 
-    // The RNG boundary: 0…26 magnitude and 0…11 sectors, never a free angle.
+    // The RNG boundary: 0…26 magnitude and 0…1 sectors, never a free angle.
     expect(rollWind(stubRng([TUNABLES.windMax, TUNABLES.windSectors - 1]))).toEqual({
       magnitude: 26,
-      directionDeg: 330,
-      sector: 11,
+      directionDeg: 180,
+      sector: 1,
     });
     expect(rollWind(stubRng([0, 0]))).toEqual({ magnitude: 0, directionDeg: 0, sector: 0 });
+
+    // The dial's whole vocabulary is east and west, and it wraps rather than running off the end.
+    expect([0, 1, 2, 3, -1].map((sector) => sectorLabel(sector))).toEqual(["E", "W", "E", "W", "W"]);
   });
 
   it("TC-CORE-926: the wind is constant inside a round and re-rolls once when the queue wraps", () => {
@@ -139,6 +170,10 @@ describe("weather (US-CORE-015)", () => {
     expect(weatherSequence(7, 4)).toEqual(sequence);
     expect(weatherSequence(8, 4)).not.toEqual(sequence);
 
+    // Either side is reachable from a real seed, and nothing else is.
+    const directions = new Set(weatherSequence(7, 40).map((weather) => weather.wind.directionDeg));
+    expect([...directions].sort((a, b) => a - b)).toEqual([0, 180]);
+
     // The roll depends on the seed alone, never on `Math.random()`.
     expect(rollWind(createRng(99))).toEqual(rollWind(createRng(99)));
     expect(rollWind(createRng(99))).not.toEqual(rollWind(createRng(100)));
@@ -149,7 +184,8 @@ describe("weather (US-CORE-015)", () => {
     expect(isCalm(calmWeather)).toBe(true);
     expect(describeWind(CALM)).toBe("calm");
 
-    const acceleration = windAcceleration(CALM, getMobile("mbl-01").mass);
+    // No `mass` argument any more: the push is the weather's alone, so a calm roll is zero for every mobile.
+    const acceleration = windAcceleration(CALM);
     expect(acceleration.ax).toBe(0);
     // A zero magnitude leaves the vertical term as `-0`: numerically no acceleration either way.
     expect(acceleration.ay).toBeCloseTo(0);
@@ -158,53 +194,59 @@ describe("weather (US-CORE-015)", () => {
     const calmRoll = rollWeather(0, 1);
     expect(isCalm(calmRoll)).toBe(true);
     expect(calmRoll.wind.magnitude).toBe(0);
-    expect(calmRoll.wind.directionDeg).toBe(calmRoll.wind.sector * 30);
+    expect(calmRoll.wind.directionDeg).toBe(calmRoll.wind.sector * 180);
     expect(describeWind(calmRoll.wind)).toBe("calm");
   });
 
   it("TC-CORE-926 / AC7: an out-of-order weather frame never wins", () => {
-  const fresh = rollWeather(7, 4);
-  const stale = rollWeather(7, 3);
+    const fresh = rollWeather(7, 4);
+    const stale = rollWeather(7, 3);
 
-  // Equal or older round: the weather in hand stands, so a late frame cannot rewind the wind.
-  expect(newerWeather(fresh, stale)).toBe(fresh);
-  expect(newerWeather(fresh, fresh)).toBe(fresh);
-  // A later round is the only thing allowed to replace it.
-  expect(newerWeather(stale, fresh)).toBe(fresh);
-});
+    // Equal or older round: the weather in hand stands, so a late frame cannot rewind the wind.
+    expect(newerWeather(fresh, stale)).toBe(fresh);
+    expect(newerWeather(fresh, fresh)).toBe(fresh);
+    // A later round is the only thing allowed to replace it.
+    expect(newerWeather(stale, fresh)).toBe(fresh);
+  });
 
-it("TC-CORE-023: drift equals ½·a_x·t² for the shot's own flight time", () => {
-    const calm = shoot(CALM);
-    const east = shoot({ magnitude: 26, directionDeg: 0, sector: 0 });
-    const west = shoot({ magnitude: 26, directionDeg: 180, sector: 6 });
-    const mass = getMobile("mbl-01").mass;
+  it("TC-CORE-023: drift equals ½·a_x·t² for the shot's own flight time", () => {
+    // Force 40 rather than the calibration shot: at 3.5 s of hang time the shell still lands inside the probe, so
+    // the drift is a landing difference and not the point where a 100,000-unit push left the map.
+    const calm = shoot(CALM, 40);
+    const east = shoot(EAST(26), 40);
     const seconds = calm.flightMs / 1000;
-    const expected = 0.5 * windAcceleration({ magnitude: 26, directionDeg: 0, sector: 0 }, mass).ax * seconds ** 2;
+    const expected = 0.5 * windAcceleration(EAST(26)).ax * seconds ** 2;
 
+    // The closed form is the reference: `a_x = 0.8 × 26 = 20.8 u/s²`, `t = 3.55 s` → 131 units, and the
+    // integrator measures 127 of them. Quantising the position to 0.1 per step costs the rest; a drift that
+    // stops tracking `½·a·t²` at all is the regression this catches.
+    expect(expected).toBeCloseTo(127.4, 0);
     const drift = east.landingX - calm.landingX;
-
-    // The closed form is the reference. Positions are quantised to 0.1 per step (`TUNABLES.roundTo`), so
-    // the agreement is within a few percent, not exact; a drift that stops tracking `½·a·t²` at all is the
-    // regression this catches (it did: rounding `vx` to 0.1 lost 11 % of the push and made it non-linear).
-    expect(expected).toBeGreaterThan(100);
-    // The bound is set by the 0.1 position quantum, not by the force: over 126 steps a systematic 0.05 per
-    // step is 6 units on a 130-unit drift (4.6 %), which is what the integrator actually loses. A drift that
-    // breaks this band means the wind is being quantised again (it was: rounding `vx` lost 11 %).
+    expect(drift).toBeGreaterThan(expected * 0.95);
+    expect(drift).toBeLessThanOrEqual(expected * 1.05);
     expect(drift / expected).toBeGreaterThan(0.95);
     expect(drift / expected).toBeLessThanOrEqual(1.05);
 
-    // Wind is a vector: the same magnitude from the west lands symmetrically on the other side. The
-    // 8.7-unit slack is the landing interpolation, which samples the crossing from whichever side the
-    // projectile arrives at, not physics.
-    expect(west.landingX - calm.landingX).toBeLessThan(0);
-    expect(Math.abs((west.landingX - calm.landingX + drift) / drift)).toBeLessThan(0.1);
+    // Horizontal only: the vertical term is zero, so the wind changes where the shell lands and never when. A
+    // vertical wind component would stretch or shorten this hang time (that is the old 12-sector behaviour).
+    expect(east.flightMs).toBe(calm.flightMs);
+
+    // Wind is a vector: the same magnitude from the west lands symmetrically on the other side. Measured from a
+    // muzzle well inside the plane — terrain only exists for `x ≥ 0`, so a shell blown past the world edge would
+    // fall through it instead of landing on it.
+    const westMuzzle = 20_000;
+    const westCalm = shoot(CALM, 40, westMuzzle);
+    const westDrift = shoot(WEST(26), 40, westMuzzle).landingX - westCalm.landingX;
+    expect(westDrift).toBeLessThan(0);
+    expect(Math.abs((westDrift + drift) / drift)).toBeLessThan(0.05);
 
     // Doubling the magnitude doubles the drift (the term is linear in `magnitude`).
-    const half = shoot({ magnitude: 13, directionDeg: 0, sector: 0 });
+    const half = shoot(EAST(13), 40);
     expect(Math.abs(((half.landingX - calm.landingX) * 2 - drift) / drift)).toBeLessThan(0.05);
 
-    // The mass division itself is `windAcceleration`'s contract and is unit-tested there; a second
-    // mobile's trajectory depends on its own weapon as well, so it is not a cleaner oracle here.
+    // And it is not the mobile's business: the mass division is gone from `windAcceleration`'s contract, so the
+    // same shot in another mobile lands in exactly the same place (asserted roster-wide in `ballistics.test.ts`).
+    expect(windAcceleration(EAST(26)).ax).toBe(TUNABLES.windCoefficient * 26);
   });
 
   it("TC-CORE-928: an eight-player mid-round snapshot carries the weather under 800 bytes", () => {
@@ -213,21 +255,36 @@ it("TC-CORE-023: drift equals ½·a_x·t² for the shot's own flight time", () =
     expect(snapshotBytes(state, 1)).toBeLessThanOrEqual(TUNABLES.snapshotMaxBytes);
 
     const decoded = decodeSnapshot(encodeSnapshot(snapshot));
+    // The whole wind rides the wire, `directionDeg` included: the integrator reads the angle, so a peer that decodes a
+    // different one simulates a different shot. The decode side rebuilds it as `sector * 180` — the 12-sector `* 30`
+    // formula outlived `windSectors = 2` for one pass and turned a west roll into 30°.
     expect(decoded.weather).toEqual(state.weather);
+    expect(decoded.weather.wind.directionDeg).toBe(decoded.weather.wind.sector * 180);
     expect(decoded.turn.round).toBe(state.turn.round);
     expect(decoded.weather.rolledAtRound).toBe(state.turn.round);
   });
 });
 
-describe("TC-CORE-960: a full-force shot moves about one ruler division in a 26/0 wind (US-CORE-015 AC6)", () => {
-  it("lands ~129 units downwind, in the sector's direction", () => {
+describe("TC-CORE-960: full wind (26) bends the full-force shot by a sixth of the map (US-CORE-015 AC6)", () => {
+  it("pushes the calibration shot ~763 units downrange — six ruler divisions, a fifth of gravity", () => {
     const calm = shoot(CALM);
-    const pushed = shoot({ magnitude: 26, directionDeg: 0, sector: 0 });
+    const pushed = shoot(EAST(26));
     const drift = pushed.landingX - calm.landingX;
 
-    // One ruler division is 125 units on a 1000-unit window; the documented figure is ~129, and the
-    // integrator's 0.1 position quantum costs a few units either way.
-    expect(drift).toBeGreaterThan(100);
-    expect(drift).toBeLessThan(160);
+    // Measured on the calibration shot: `mbl-01` shot 1, 45°, force 98 hangs 8.6 s and the wind push is
+    // `a_x = 0.8 × 26 = 20.8 u/s²`, so `½·a·t² = 769` and the integrator lands 760 units further on.
+    expect(calm.landingX).toBeCloseTo(3_680.3, 1);
+    expect(pushed.landingX).toBeCloseTo(4_440.2, 1);
+    expect(drift).toBeCloseTo(760, 0);
+    expect(drift / (0.5 * windAcceleration(EAST(26)).ax * (calm.flightMs / 1000) ** 2)).toBeCloseTo(1, 2);
+
+    // The scale, stated plainly: six 125-unit ruler divisions, a sixth of the map, and a fifth of gravity sideways.
+    // The first pass at the mass-free formula used the old 105 coefficient and threw the same shot 100,130 units —
+    // 50 map widths — which is why the coefficient is the number that has to be re-derived, not the formula.
+    expect(drift / TUNABLES.rulerUnitTarget).toBeGreaterThan(5);
+    expect(drift / TUNABLES.rulerUnitTarget).toBeLessThan(7);
+    expect(windAcceleration(EAST(26)).ax / TUNABLES.gravity).toBeCloseTo(0.208, 3);
+    expect(drift / TUNABLES.mapWidth).toBeGreaterThan(0.3);
+    expect(drift / TUNABLES.mapWidth).toBeLessThan(0.45);
   });
 });

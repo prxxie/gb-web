@@ -273,12 +273,19 @@ describe("items", () => {
   });
 
   it("TC-CORE-910: Bunge returns the shell to the caster", () => {
-    const state = match([seat(0, "A", "mbl-01", { "itm-bunge": 1 }), seat(1, "B")]);
+    // TODO(next stage): Bunge becomes GunBound's Bunge Shot (+25 % terrain carved) instead of bringing the
+    // shell home — this test then needs rewriting for that behaviour. Today it still pins the come-home rule.
+    const field = match([seat(0, "A", "mbl-01", { "itm-bunge": 1 }), seat(1, "B")]);
+    // The property is the shell's return, not the weather: with no mass dividing it the rolled wind
+    // out-pushes gravity and blows the shell off the map, so the field is pinned to calm.
+    const state: MatchState = { ...field, weather: { ...field.weather, wind: { magnitude: 0, directionDeg: 0, sector: 0 } } };
     const caster = state.players[0]!;
     const armed = use(state, 0, "itm-bunge").state;
     expect(armed.effects.bungeNext).toBe(true);
 
-    const shot = shotOf(fire(armed, 0, 0, 45, 98).events);
+    // 45° / force 40 is a shot that flies ~615 units un-bunge'd; with the item the shell turns at 350 ms and
+    // detonates on its own muzzle. At the old force 98 it out-runs the bunge pull and leaves the map instead.
+    const shot = shotOf(fire(armed, 0, 0, 45, 40).events);
     expect(shot.impact).not.toBeNull();
     const landing = shot.impact ?? shot.path.at(-1);
     expect(landing).toBeDefined();

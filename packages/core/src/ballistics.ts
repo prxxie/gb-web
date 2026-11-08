@@ -8,22 +8,22 @@ export interface WindAcceleration {
 }
 
 /**
- * Wind enters the integrator as an acceleration divided by the mobile's mass (`tunables.md` § 1.1):
+ * Wind enters the integrator as a plain acceleration (`tunables.md` § 1.1):
  *
  * ```
- * ax =  windCoefficient × magnitude × cos θ / mass
- * ay = −windCoefficient × magnitude × sin θ / mass      // added to gravity
+ * ax = windCoefficient × magnitude × cos θ
+ * ay = −windCoefficient × magnitude × sin θ      // zero for GB's horizontal wind, added to gravity otherwise
  * ```
  *
- * `θ = sector × 30`, `0°` = east. A wind blowing upwards therefore *reduces* effective gravity, which
- * is what makes a lobbed shot hang.
+ * `θ` is `0°` (east) or `180°` (west): the genre's wind is horizontal, so the vertical term stays zero in play and the
+ * formula keeps the general shape for a map gimmick that ever needs it. There is **no mass term** — in GB the wind
+ * pushes every mobile by the same amount, which is what makes a wind reading transferable between mobiles.
  */
-export function windAcceleration(wind: Wind, mass: number, coefficient: number = TUNABLES.windCoefficient): WindAcceleration {
-  if (mass <= 0) throw new RangeError("mass must be positive");
+export function windAcceleration(wind: Wind, coefficient: number = TUNABLES.windCoefficient): WindAcceleration {
   const radians = (wind.directionDeg * Math.PI) / 180;
   return {
-    ax: (coefficient * wind.magnitude * Math.cos(radians)) / mass,
-    ay: (-coefficient * wind.magnitude * Math.sin(radians)) / mass,
+    ax: coefficient * wind.magnitude * Math.cos(radians),
+    ay: -coefficient * wind.magnitude * Math.sin(radians),
   };
 }
 
@@ -74,8 +74,8 @@ export function launch(options: LaunchOptions): Projectile {
 
 export interface StepContext {
   readonly wind: Wind;
+  /** `TUNABLES.gravity` × the map's modifier — one value for the whole roster. */
   readonly gravity: number;
-  readonly mass: number;
   readonly stepMs?: number;
   /** Constant sideways acceleration a `force` map adds, in units/s² (`TC-CORE-918`). */
   readonly forceX?: number;
@@ -87,7 +87,7 @@ export interface StepContext {
  */
 export function stepProjectile(projectile: Projectile, context: StepContext): Projectile {
   const dt = (context.stepMs ?? TUNABLES.stepMs) / 1000;
-  const wind = windAcceleration(context.wind, context.mass);
+  const wind = windAcceleration(context.wind);
   // A bunge shell turns around a third of a second into the flight and is pulled back to its muzzle, so it
   // lands on the side it was fired from (`itm-bunge`, US-CORE-009). The pull is a force, not a teleport, so
   // it still collides with anything in the way home.

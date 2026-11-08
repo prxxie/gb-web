@@ -7,14 +7,15 @@ import { OrientationGate } from "../src/components/OrientationGate";
 import { defaultWindow, rollWeather } from "@gbw/core";
 
 describe("TC-MATCH-923: wind dial", () => {
-  it("draws twelve sector ticks and prints the magnitude 0–26", () => {
+  it("draws two sector ticks — east and west — and prints the magnitude 0–26", () => {
     const weather = rollWeather(42, 3);
     const { container } = render(<WindDial weather={weather} label="Gió" />);
-    expect(container.querySelectorAll("line")).toHaveLength(13);
+    // Two ticks, plus a needle whenever the roll is not calm.
+    expect(container.querySelectorAll("line")).toHaveLength(weather.wind.magnitude === 0 ? 2 : 3);
     expect(screen.getByTestId("wind-value").textContent).toBe(String(weather.wind.magnitude));
     expect(weather.wind.magnitude).toBeGreaterThanOrEqual(0);
     expect(weather.wind.magnitude).toBeLessThanOrEqual(26);
-    expect(weather.wind.directionDeg % 30).toBe(0);
+    expect([0, 180]).toContain(weather.wind.directionDeg);
   });
 
   it("TC-CORE-926: the same seed and round always give the same weather", () => {

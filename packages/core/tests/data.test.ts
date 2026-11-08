@@ -4,6 +4,8 @@ import { MAPS, getMap, MAP_BOUNDS } from "../src/data/maps.js";
 import { ITEMS, ITEMS_BY_ID, LOADOUT_CAP, loadoutTotal } from "../src/data/items.js";
 import { MODES, getMode } from "../src/data/modes.js";
 import { AVATAR_PARTS, avatarBonus, bonusMultipliers, AVATAR_CAPS } from "../src/data/avatars.js";
+import { launch, simulateFlight } from "../src/ballistics.js";
+import { createTerrain } from "../src/terrain.js";
 import { TUNABLES } from "../src/tuning.js";
 
 describe("TC-CORE-905: the roster", () => {
@@ -19,16 +21,81 @@ describe("TC-CORE-905: the roster", () => {
     }
   });
 
-  it("gives every mobile its own ballistics, aim window and movement budget", () => {
-    const pairs = new Set(MOBILES.map((mobile) => `${mobile.gravity}/${mobile.mass}`));
-    expect(pairs.size).toBeGreaterThan(10);
-    const windows = new Set(MOBILES.map((mobile) => `${mobile.angleMin}:${mobile.angleMax}`));
-    expect(windows.size).toBeGreaterThan(3);
+  it("gives the roster one shared gravity and per-mobile identity through the envelope, stats, budget and shells", () => {
+    // GB parity: gravity is a rule, not a mobile stat — no row carries its own gravity or mass, so the same angle
+    // and force draw the same parabola on every mobile (`mobiles.md` § 4, `TC-CORE-935`).
     for (const mobile of MOBILES) {
+      expect("gravity" in mobile).toBe(false);
+      expect("mass" in mobile).toBe(false);
+    }
+    const flat = () => {
+      const terrain = createTerrain("map-01");
+      terrain.heights.fill(820);
+      return { ...terrain, width: 60_000 };
+    };
+    const flight = (mobileId: string) => {
+      const mobile = getMobile(mobileId);
+      return simulateFlight(
+        launch({
+          id: 1,
+          ownerSlot: 0,
+          weaponSlot: 0,
+          weapon: mobile.weapons[0],
+          from: { x: 8, y: 820 },
+          facing: 1,
+          angle: 40,
+          force: 90,
+        }),
+        { wind: { magnitude: 0, directionDeg: 0, sector: 0 }, gravity: TUNABLES.gravity },
+        flat(),
+        { width: 60_000, height: 4000 },
+        { firstGroundImpact: true },
+      );
+    };
+    const a = flight("mbl-01");
+    const b = flight("mbl-16");
+    expect([b.landingX, b.flightMs]).toEqual([a.landingX, a.flightMs]);
+
+    // Identity is carried by the aim envelope: no two mobiles share a window, and the window is a real restriction.
+    expect(new Set(MOBILES.map((mobile) => `${mobile.angleMin}:${mobile.angleMax}`)).size).toBe(MOBILES.length);
+    expect(MOBILES.filter((mobile) => mobile.angleMin <= 40 && 40 <= mobile.angleMax)).toHaveLength(11);
+    expect(new Set(MOBILES.map((mobile) => mobile.maxPower)).size).toBeGreaterThanOrEqual(8);
+
+    // …and by the stats, the movement budget and the three shells.
+    for (const field of ["maxHp", "defense", "energy", "maxPower", "moveDistance", "maxMovesPerTurn"] as const) {
+      for (const mobile of MOBILES) expect(mobile[field], `${mobile.mobileId} ${field}`).toBeDefined();
+    }
+    expect(new Set(MOBILES.map((mobile) => mobile.maxHp)).size).toBeGreaterThanOrEqual(10);
+    expect(new Set(MOBILES.map((mobile) => mobile.defense)).size).toBeGreaterThanOrEqual(10);
+    expect(new Set(MOBILES.map((mobile) => mobile.energy)).size).toBeGreaterThanOrEqual(10);
+    expect(
+      new Set(MOBILES.map((mobile) => `${mobile.moveDistance}:${mobile.maxMovesPerTurn}:${mobile.runMultiplier}:${mobile.moveEnergy}`)).size,
+    ).toBeGreaterThanOrEqual(10);
+    expect(new Set(MOBILES.map((mobile) => mobile.weapons.map((weapon) => weapon.shotClass).join("/"))).size).toBe(
+      MOBILES.length,
+    );
+    for (const mobile of MOBILES) {
+      expect(mobile.weapons).toHaveLength(3);
       expect(mobile.moveDistance).toBeGreaterThan(0);
       expect(mobile.maxMovesPerTurn).toBeGreaterThanOrEqual(1);
       expect(mobile.runMultiplier).toBeGreaterThan(1);
     }
+
+    // The whole identity is unique, which is what a roster pick is choosing between.
+    const identities = new Set(
+      MOBILES.map((mobile) =>
+        [
+          mobile.angleMin,
+          mobile.angleMax,
+          mobile.maxPower,
+          mobile.maxHp,
+          mobile.defense,
+          mobile.energy,
+          mobile.weapons.map((weapon) => `${weapon.shotClass}/${weapon.power}/${weapon.radius}`).join("|"),
+        ].join("/"),
+      ),
+    );
+    expect(identities.size).toBe(MOBILES.length);
   });
 
   it("TC-CORE-923: the archetype pairs stay inside the balance band", () => {

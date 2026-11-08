@@ -42,7 +42,7 @@ text here (`NFR-16`).
 | AC5 | A player at HP 0 | The snapshot applies | Their roster entry shows `0` and an eliminated marker, still present in the strip |
 | AC8 | The roster strip | It is rendered | Each seat shows its delay the way GunBound does: absolute for the active player, signed relative for the others (`TC-MATCH-903`) |
 | AC6 | `weather.wind.magnitude = 0` | It is rendered | A hollow grey arrow and the number `0`, not "no wind" text |
-| AC9 | 12 sectors of 30° and magnitudes 0–26 | the dial renders | 12 ticks with longer ticks at `0/90/180/270`, cardinal labels, the arrow at `directionDeg`, the magnitude as a whole number beside it (`TC-MATCH-923`) |
+| AC9 | east-or-west and magnitudes 0–26 | the dial renders | 2 ticks (east, west) with the sector's tick highlighted, the needle on the horizontal axis at `directionDeg`, the magnitude as a whole number beside it (`TC-MATCH-923`) |
 | AC10 | `weather.rolledAtRound` changes | a new round starts | The 1.5 s banner `match.weather.changed` appears once, shows magnitude and direction in degrees, and any tap dismisses it without blocking input (`TC-MATCH-923`) |
 | AC7 | The app at 200 % text size | The HUD renders | No number is clipped and the canvas keeps its aspect ratio (`TC-PWA-159`) |
 | AC11 | A match on an 844×390 phone | The HUD is laid out | The four-way pad rings **this client's mobile** — the active one on the player's own turn (one button-gap from the hull, icon-only buttons at 80 % opacity), is clamped inside the viewport, and never covers the mobile it belongs to (`TC-MATCH-930`) |

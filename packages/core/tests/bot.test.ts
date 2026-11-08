@@ -27,13 +27,30 @@ function openField(mobileId = "mbl-01", botX = 300, targetX = 1_300, loadout: Re
 
 /** A wall the arc classes cannot clear but a `piercing` shot passes through (`US-CORE-007`). */
 function wallBetween(mobileId: string): MatchState {
+  return walledField(mobileId);
+}
+
+/**
+ * Flat ground with a full-height pillar (`from…to`) between the two mobiles.
+ *
+ * Nothing an arc shell fires at its own height crosses the pillar: the short shots stop on its face and a
+ * lob that does clear it comes down again a long way behind it, so the pillar cuts the reachable set in two.
+ */
+function walledField(
+  mobileId: string,
+  botX = 300,
+  targetX = 1_300,
+  from = 650,
+  to = 950,
+  loadout: Record<string, number> = {},
+): MatchState {
   const terrain = createTerrain("map-01");
   terrain.heights.fill(820);
   for (let index = 0; index < terrain.heights.length; index += 1) {
     const x = index * terrain.step;
-    if (x >= 650 && x <= 950) terrain.heights[index] = 0;
+    if (x >= from && x <= to) terrain.heights[index] = 0;
   }
-  return place(terrain, mobileId, 300, 1_300);
+  return place(terrain, mobileId, botX, targetX, loadout);
 }
 
 function place(
@@ -83,7 +100,7 @@ function landingError(state: MatchState, angle: number, force: number, weaponSlo
   });
   const flight = simulateFlight(
     projectile,
-    { wind: state.weather.wind, gravity: mobile.gravity * map.gravityModifier, mass: mobile.mass, stepMs: TUNABLES.stepMs },
+    { wind: state.weather.wind, gravity: TUNABLES.gravity * map.gravityModifier, stepMs: TUNABLES.stepMs },
     terrainOf(state),
   );
   return Math.abs(flight.landingX - state.players[1]!.x);
@@ -181,10 +198,12 @@ describe("bot (US-CORE-005)", () => {
   });
 
   it("TC-CORE-927: a bot holding Power up spends it instead of settling for an unreachable shot", () => {
-    // `mbl-02` reaches about 1,530 units at full power on flat ground; the target is 1,900 units away, so
-    // the far side is only reachable with the item. An item is its own input in the engine, so the bot
+    // A full-height pillar 250 units ahead of the bot cuts the reachable set in two: the short shots stop on
+    // its face, and the lobs that clear it come down no further than ~1,460, so a target at 1,800 is behind
+    // the pillar's far side and out of reach for every shot in `mbl-02`'s envelope — the item is the only way
+    // to gain the 20 power that would close the gap. An item is its own input in the engine, so the bot
     // returns the item prior to the shot rather than an `item` field the engine would ignore.
-    const state = openField("mbl-02", 100, 1_900, { "itm-power-up": 1 });
+    const state = walledField("mbl-02", 100, 1_800, 350, 700, { "itm-power-up": 1 });
     // `botTurnPlan` plays the active slot, so the fixture must actually make the bot the one to act.
     const active: MatchState = { ...state, turn: { ...state.turn, activeSlot: 0 } };
     const plan = botTurnPlan(active, createRng(5), { ...PERFECT, itemUseChance: 1 });
@@ -199,7 +218,7 @@ describe("bot (US-CORE-005)", () => {
     expect(botTurnPlan(active, createRng(5), { ...PERFECT, itemUseChance: 1 })).toEqual(plan);
 
     // With nothing in the bag, or with the coin flip against it, the bot just fires.
-    expect(botTurnPlan(openField("mbl-02", 100, 1_900), createRng(5), { ...PERFECT, itemUseChance: 1 })).toHaveLength(1);
+    expect(botTurnPlan(walledField("mbl-02", 100, 1_800, 350, 700), createRng(5), { ...PERFECT, itemUseChance: 1 })).toHaveLength(1);
     expect(botTurnPlan(active, createRng(5), { ...PERFECT, itemUseChance: 0 })).toHaveLength(1);
   });
 });

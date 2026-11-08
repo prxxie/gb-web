@@ -7,6 +7,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { resetLimits } from "../src/lib/ratelimit";
 import { createRig, seedProfile, type Rig } from "./support/fake-env";
+import { TUNABLES } from "@gbw/core";
 
 const STARTED = "2026-11-05T10:00:00.000Z";
 const ENDED = "2026-11-05T10:10:00.000Z";
@@ -37,7 +38,7 @@ function submission(overrides: Record<string, unknown> = {}): Record<string, unk
   return {
     matchId: "match-0001",
     roomCode: "ABCD23",
-    rulesetVersion: "2026-11-05",
+    rulesetVersion: TUNABLES.rulesetVersion,
     startedAt: STARTED,
     endedAt: ENDED,
     winnerTeam: "A",

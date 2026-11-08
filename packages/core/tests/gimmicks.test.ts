@@ -239,11 +239,18 @@ describe("gimmicks", () => {
     expect(returnsOffMapShots(getMap("map-09"))).toBe(true);
     expect(returnsOffMapShots(getMap("map-01"))).toBe(false);
 
-    const control = firstOf(fire(atRightEdge(match("map-01")), 0, 0, 45, 98).events, "shot");
+    // The property is the `return` gimmick, not the weather: with no mass dividing it any rolled wind
+    // out-pushes gravity, so both matches are pinned to calm and the shot's flight is the gimmick's alone.
+    const calmMatch = (mapId: string): MatchState => {
+      const state = match(mapId);
+      return { ...state, weather: { ...state.weather, wind: { magnitude: 0, directionDeg: 0, sector: 0 } } };
+    };
+
+    const control = firstOf(fire(atRightEdge(calmMatch("map-01")), 0, 0, 45, 98).events, "shot");
     expect(control.impact).toBeNull();
     expect(Math.max(...control.path.map((point) => point.x))).toBeGreaterThan(TUNABLES.mapWidth);
 
-    const returned = firstOf(fire(atRightEdge(match("map-09")), 0, 0, 45, 98).events, "shot");
+    const returned = firstOf(fire(atRightEdge(calmMatch("map-09")), 0, 0, 45, 98).events, "shot");
     expect(returned.impact).not.toBeNull();
     const landing = returned.impact ?? returned.path.at(-1);
     expect(Math.abs(landing?.x ?? 0)).toBeLessThanOrEqual(TUNABLES.mapWidth);

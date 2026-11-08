@@ -2,7 +2,7 @@
  * The ruleset constants (`tunables.md` § 1.2). One object, imported everywhere, versioned by
  * `rulesetVersion`: a match recorded under one version is never rated under another.
  */
-export const RULESET_VERSION = "2026-11-05";
+export const RULESET_VERSION = "2026-11-08";
 
 export const TUNABLES = {
   rulesetVersion: RULESET_VERSION,
@@ -12,12 +12,27 @@ export const TUNABLES = {
   turnDurationMs: 20_000,
   /** One extension per turn. */
   turnGraceMs: 20_000,
+  /**
+   * The one gravity every mobile falls under, u/s² (`tunables.md` § 1.1).
+   *
+   * GB has a single gravity for the whole roster: at the same angle and power every mobile draws the same parabola, and
+   * what makes them feel different is the firing envelope and the shell, not the arc. Per-mobile gravity made the angle
+   * and power tables untransferable between mobiles, which is the opposite of the genre.
+   */
+  gravity: 100,
   /** `v0 = force * speedK` for every mobile. */
-  speedK: 4.55,
-  /** `a = windCoefficient * magnitude * dir / mass`. */
-  windCoefficient: 42,
+  speedK: 6.2,
+  /**
+   * `a = windCoefficient * magnitude * (cos θ, sin θ)` — no mass term: GB's wind pushes every mobile alike.
+   *
+   * `0.8 × 26 = 20.8 u/s²` at full wind, a fifth of gravity: on the ~5.7 s hang of an aimed shot that is a ~340-unit
+   * correction, a sixth of the map — decisive, which is what a full-wind reading has to be, and still short of the
+   * 27 × gravity that the mass-free coefficient first produced.
+   */
+  windCoefficient: 0.8,
   windMax: 26,
-  windSectors: 12,
+  /** GB's wind is horizontal: east or west, nothing else. */
+  windSectors: 2,
   /** Blast tiers as a fraction of the radius. */
   tierInner: 0.4,
   tierMid: 0.7,

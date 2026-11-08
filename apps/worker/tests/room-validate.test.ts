@@ -7,6 +7,7 @@
  */
 import { describe, expect, it } from "vitest";
 import { ROOM_CODE, ROOM_ORIGIN, RoomHarness, makeSnapshot, type FakeSocket } from "./support/room-harness";
+import { TUNABLES } from "@gbw/core";
 
 interface Opened {
   readonly harness: RoomHarness;
@@ -257,7 +258,7 @@ describe("start_match (host, lobby + guards)", () => {
     // Assert — the client never chooses the ruleset it is ranked under (`US-ROOM-003` AC4)
     expect(harness.state().status).toBe("playing");
     const [started] = peer.framesOf("match_started");
-    expect(started?.["rulesetVersion"]).toBe("2026-11-05");
+    expect(started?.["rulesetVersion"]).toBe(TUNABLES.rulesetVersion);
     expect(started?.["hostPlayerId"]).toBe(hostId);
     expect(started?.["seed"]).toBeTypeOf("number");
     expect(started?.["assignments"]).toHaveLength(4);
