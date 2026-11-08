@@ -16,11 +16,15 @@
  */
 import { expect, test } from "@playwright/test";
 
+import { ownAddress } from "./support";
+
 test("TC-ROOM-046: a guest that reloads inside the grace window keeps its seat and team", async ({ browser }) => {
   const host = await browser.newContext();
   const guest = await browser.newContext();
   const hostPage = await host.newPage();
   const guestPage = await guest.newPage();
+  await ownAddress(hostPage);
+  await ownAddress(guestPage);
 
   await hostPage.goto("/");
   await hostPage.getByTestId("create-room").click();

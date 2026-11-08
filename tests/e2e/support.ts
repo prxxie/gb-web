@@ -9,6 +9,23 @@ import { expect, type Browser, type BrowserContext, type Page } from "@playwrigh
 /** The room-code alphabet of `US-ROOM-001`: no `I`, `O`, `0` or `1`. */
 export const ROOM_CODE = /^[A-HJ-NP-Z2-9]{6}$/;
 
+/**
+ * Give this page's context its own source address.
+ *
+ * `playwright.config.ts` sets one `cf-connecting-ip` for the whole run so the per-address limits of `NFR-25`
+ * (`sessionsPerIp` 30/min, `roomsPerIp` 10/min) are not spent once for every spec. The value there is computed
+ * once when the config loads, so in truth the whole run shares one address: under three CI workers a burst of
+ * specs reached 30 sessions in a minute, `POST /sessions` answered `429`, and the page never got a session — the
+ * `create-room` button stayed disabled until the test timed out at 90 s. The address is therefore re-rolled here,
+ * per page, before the first navigation.
+ */
+let addressCounter = 0;
+export async function ownAddress(page: Page): Promise<void> {
+  addressCounter += 1;
+  const octet = 1 + ((Date.now() + addressCounter * 37) % 250);
+  await page.context().setExtraHTTPHeaders({ "cf-connecting-ip": `198.51.100.${octet}` });
+}
+
 /** A second player needs its own context: a session is per tab, not per browser. */
 export async function newPlayer(browser: Browser): Promise<{ context: BrowserContext; page: Page }> {
   const context = await browser.newContext();
@@ -39,6 +56,7 @@ export async function sessionOf(page: Page): Promise<StoredSession> {
 
 /** Create a room on the main menu and return its code (`US-ROOM-001`). */
 export async function createRoom(page: Page): Promise<string> {
+  await ownAddress(page);
   await page.goto("/");
   await page.getByTestId("create-room").click();
   const heading = page.getByTestId("room-code");
@@ -50,6 +68,7 @@ export async function createRoom(page: Page): Promise<string> {
 
 /** Join an existing room from the main menu. */
 export async function joinRoom(page: Page, code: string): Promise<void> {
+  await ownAddress(page);
   await page.goto("/");
   await page.getByTestId("room-code-input").fill(code);
   await page.getByTestId("join-room").click();
@@ -58,6 +77,7 @@ export async function joinRoom(page: Page, code: string): Promise<void> {
 
 /** Start a bot match from the main menu and wait for the battlefield. */
 export async function openBotMatch(page: Page): Promise<void> {
+  await ownAddress(page);
   await page.goto("/");
   await page.getByTestId("play-bot").click();
   await expect(page.getByTestId("match-screen")).toBeVisible();
