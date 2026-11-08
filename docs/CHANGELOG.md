@@ -29,6 +29,7 @@ not: the game was unplayable in practice. Every finding below came from playing 
   asks now.
 - **Graphics**: the sky is a dusk ramp with a horizon glow, the terrain has a lit surface band over three depth bands
   and a crisp rim, and impacts leave scorch marks that fade.
+- **The ratchet moved with the weight**: `match` 386 → 388 KiB gzip and `css` 3 → 4 KiB gzip (total 543 → 546), recorded in `scripts/bundle-budget.json` with the reason — the shot animation and the sky/terrain pass cost 1.5 KiB gzip on the Phaser route and 0.3 KiB on the stylesheet.
 - **Also fixed while verifying**: the heading no longer draws the browser's focus ring (the route focus is programmatic,
   so the title looked like a text input), and the landscape rule that hid the menu tagline no longer hides the result
   screen's "could not record" line (`TC-RANK-157`).
