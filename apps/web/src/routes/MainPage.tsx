@@ -99,7 +99,7 @@ export function MainPage(): JSX.Element {
     <div className="screen">
       <header className="card">
         <h1>{t("app.title")}</h1>
-        <p className="muted">{t("app.tagline")}</p>
+        <p className="muted menu__tagline">{t("app.tagline")}</p>
         <div className="row">
           <span className="badge">{session?.subject.kind === "account" ? session.subject.displayName : t("signIn.guest")}</span>
           {session?.subject.kind !== "account" ? (

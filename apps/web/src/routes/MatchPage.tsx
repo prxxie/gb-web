@@ -126,14 +126,30 @@ export function MatchPage(): JSX.Element {
 
   const [state, setState] = useState<MatchState | null>(null);
   const [feed, setFeed] = useState<readonly MatchEvent[]>([]);
+  /** The events of the step that produced the current state, handed to the renderer once (`shot` carries the path). */
+  const pendingEvents = useRef<readonly MatchEvent[]>([]);
   const [power, setPower] = useState(0);
   /** The "drag to aim" hint, shown once per match (`US-MATCH-002` AC4). */
   const [hint, setHint] = useState<string | null>(null);
   const hintShown = useRef(false);
   const [aimDelta, setAimDelta] = useState(0);
+  /** The angle the finger is currently pulling at (`US-MATCH-002` AC2). The pad only nudges it. */
+  const [pullAngle, setPullAngle] = useState(45);
   const aimDeltaRef = useRef(0);
   /** The barrel's resting angle: the gesture angle is added to this at release (`US-MATCH-006` AC4/AC5). */
-  const aimAngle = 45 + aimDelta;
+  /** The mobile this client is driving, from the state when it exists and from the plan before that. */
+  const aimMobile = useMemo(() => {
+    const slot = plan?.localSlot ?? 0;
+    const player = state?.players.find((candidate) => candidate.slot === slot);
+    const seat = plan?.seats.find((candidate) => candidate.slot === slot);
+    return getMobile(player?.mobileId ?? seat?.mobileId ?? "mbl-01");
+  }, [plan, state]);
+  // The number the player aims with: the pull's own angle (or the rest angle) plus the pad's nudge, clamped to the
+  // mobile's barrel window — the same expression `shotAngle` applies to the shot itself.
+  const aimAngle = Math.max(
+    aimMobile.angleMin,
+    Math.min(aimMobile.angleMax, Math.round((power > 0 ? pullAngle : 45) + aimDelta)),
+  );
   const [camera, setCamera] = useState<CameraWindow>(() => defaultWindow(16 / 9));
   /** Where the renderer last drew this client's mobile, in CSS pixels (`US-MATCH-003` AC11). */
   const [focus, setFocus] = useState<{ readonly x: number; readonly y: number } | null>(null);
@@ -293,6 +309,7 @@ export function MatchPage(): JSX.Element {
   const commit = useCallback(
     (next: MatchState, events: readonly MatchEvent[] = []) => {
       stateRef.current = next;
+      pendingEvents.current = events;
       setState(next);
       if (events.length > 0) setFeed((previous) => [...previous, ...events].slice(-6));
       if (next.status === "ended") finish(next);
@@ -330,8 +347,9 @@ export function MatchPage(): JSX.Element {
       callbacks: {
         // The pad rings the mobile the player is shooting (`US-MATCH-003` AC11).
         onFocus: (point) => setFocus(point),
-        onPull: (value) => {
+        onPull: (value, angle) => {
           setPower(value);
+          setPullAngle(angle);
         },
         onRelease: (value, nextAngle) => {
           const current = stateRef.current;
@@ -414,7 +432,10 @@ export function MatchPage(): JSX.Element {
   }, [aimDelta]);
 
   useEffect(() => {
-    if (battle.current && state) battle.current.setState(state, plan?.localSlot ?? 0);
+    if (battle.current && state) {
+      battle.current.setState(state, plan?.localSlot ?? 0, pendingEvents.current);
+      pendingEvents.current = [];
+    }
   }, [state, plan?.localSlot]);
 
   // The hint says its piece once and goes away on its own (`US-MATCH-002` AC4).
@@ -826,8 +847,22 @@ export function MatchPage(): JSX.Element {
   // either changes, throttled to one update per second. The canvas is `aria-hidden`, so this text is the
   // only way a screen reader learns the state of the battlefield.
   const activePlayer = state ? state.players.find((player) => player.slot === state.turn.activeSlot) ?? null : null;
+  // The polite region carries the last thing that happened, not just whose turn it is: a screen-reader player has to
+  // hear the shot land (`US-MATCH-003` AC10). A shot's hits are the engine's own numbers.
+  const lastShot = [...feed].reverse().find((event) => event.kind === "shot");
   const announcement = useLiveAnnouncement(
-    activePlayer ? t("match.announce.turn", { name: activePlayer.displayName, hp: activePlayer.hp }) : "",
+    lastShot && lastShot.kind === "shot"
+      ? lastShot.hits.length > 0
+        ? t("match.announce.hit", {
+            name: state?.players.find((player) => player.slot === lastShot.slot)?.displayName ?? "",
+            damage: Math.round(lastShot.hits.reduce((total, hit) => total + Number((hit as { damage?: number }).damage ?? 0), 0)),
+          })
+        : t("match.announce.miss", {
+            name: state?.players.find((player) => player.slot === lastShot.slot)?.displayName ?? "",
+          })
+      : activePlayer
+        ? t("match.announce.turn", { name: activePlayer.displayName, hp: activePlayer.hp })
+        : "",
   );
 
   if (!plan || !state) {

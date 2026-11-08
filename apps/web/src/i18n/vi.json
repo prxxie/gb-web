@@ -219,5 +219,7 @@
   "errors.generic": "Không xử lý được phản hồi của máy chủ.",
   "match.disconnected": "Mất kết nối với phòng.",
   "errors.reference": "Mã lỗi: {id}",
-  "profile.deleted": "Đã xoá tài khoản."
+  "profile.deleted": "Đã xoá tài khoản.",
+  "match.announce.hit": "Bắn trúng! {name} gây {damage} sát thương.",
+  "match.announce.miss": "{name} bắn nhưng không trúng ai."
 }

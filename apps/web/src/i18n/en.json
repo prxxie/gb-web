@@ -219,5 +219,7 @@
   "errors.generic": "The server response could not be handled.",
   "match.disconnected": "Lost the room connection.",
   "errors.reference": "Error reference: {id}",
-  "profile.deleted": "Your account has been deleted."
+  "profile.deleted": "Your account has been deleted.",
+  "match.announce.hit": "Hit! {name} dealt {damage} damage.",
+  "match.announce.miss": "{name} fired and hit nobody."
 }

@@ -67,6 +67,32 @@ export function windowOn(
 /** How far below the target's feet the frame extends, as a fraction of the window height. */
 const GROUND_MARGIN = 0.3;
 
+/**
+ * The frame that holds **both** mobiles a turn involves (`US-MATCH-007`).
+ *
+ * `windowOn` follows the shooter, which in a 1v1 on a 2,000-unit map puts the target 1,640 units away — off screen,
+ * so the player aims at a number instead of at an opponent. This frames the pair instead: the width is the span
+ * between them plus a margin on each side, the height keeps the 600 units of sky the screen reference asks for, and
+ * `clampWindow` keeps the result inside the map and inside the zoom limits.
+ */
+export function windowOnBoth(
+  firstX: number,
+  secondX: number,
+  aspect: number,
+  groundY: number = TUNABLES.mapHeight,
+): CameraWindow {
+  const span = Math.abs(secondX - firstX);
+  const margin = Math.max(TUNABLES.viewDefaultWidth * 0.18, span * 0.12);
+  const height = Math.min(TUNABLES.mapHeight, TUNABLES.viewDefaultHeight);
+  const width = Math.min(
+    TUNABLES.mapWidth,
+    Math.max(TUNABLES.viewDefaultWidth, height * safeAspect(aspect), span + margin * 2),
+  );
+  const centre = (firstX + secondX) / 2;
+  const bottom = Math.min(TUNABLES.mapHeight, groundY + height * GROUND_MARGIN);
+  return clampWindow({ x: centre - width / 2, y: bottom - height, width, height });
+}
+
 /** Zoom is expressed as a window width: 250 (closest) … 2,000 (whole map). */
 export function windowFromZoom(zoomWidth: number, aspect: number, anchorX: number, anchorY: number): CameraWindow {
   const width = clamp(zoomWidth, TUNABLES.zoomMaxWidth, TUNABLES.mapWidth);
