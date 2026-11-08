@@ -522,8 +522,8 @@ td {
   height: 56px;
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 0 calc(10px + var(--safe-right)) calc(6px + var(--safe-bottom)) calc(78px + var(--safe-left));
+  gap: 6px;
+  padding: 0 calc(6px + var(--safe-right)) calc(6px + var(--safe-bottom)) calc(70px + var(--safe-left));
   background: linear-gradient(180deg, rgba(11, 18, 32, 0.55), rgba(11, 18, 32, 0.94));
   border-top: 1px solid rgba(120, 160, 220, 0.16);
 }
@@ -531,7 +531,12 @@ td {
 /* A hairline between groups instead of air: the bar carries six of them and padding alone reads as one long smear. */
 .match__bottom > * + * {
   border-left: 1px solid rgba(120, 160, 220, 0.14);
-  padding-left: 10px;
+  padding-left: 6px;
+}
+
+.match__stats {
+  min-width: 0;
+  flex-shrink: 1;
 }
 
 .match__turnline {
@@ -1164,8 +1169,8 @@ td {
   display: flex;
   align-items: center;
   gap: 1px;
-  min-width: 30px;
-  padding: 2px 4px;
+  min-width: 24px;
+  padding: 2px 3px;
   border-radius: 6px;
   background: rgba(16, 26, 46, 0.85);
   border: 1px solid #24324c;
@@ -1180,7 +1185,7 @@ td {
 }
 
 .match__team {
-  padding: 2px 6px;
+  padding: 2px 4px;
   border-radius: 6px;
   font-size: 0.62rem;
   font-variant-numeric: tabular-nums;
@@ -1200,7 +1205,7 @@ td {
   display: flex;
   align-items: center;
   gap: 3px;
-  padding: 2px 6px;
+  padding: 2px 4px;
   border-radius: 6px;
   font-size: 0.62rem;
   font-variant-numeric: tabular-nums;
@@ -1211,13 +1216,13 @@ td {
 
 .match__items {
   display: grid;
-  grid-template-columns: repeat(6, 40px);
+  grid-template-columns: repeat(6, 34px);
   gap: 4px;
 }
 
 .match__item {
   position: relative;
-  width: 40px;
+  width: 34px;
   height: 44px;
   padding: 0;
   display: flex;
