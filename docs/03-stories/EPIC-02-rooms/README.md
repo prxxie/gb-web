@@ -29,6 +29,7 @@ Generated from story frontmatter — run `node .agents/scripts/verify-docs.mjs -
 | [US-ROOM-005](US-ROOM-005-elect-a-new-host-when-the-host-leaves.md) | Elect a new host within five seconds when the host disappears | P0 | M | done | US-ROOM-004 |
 | [US-ROOM-006](US-ROOM-006-relay-signaling-and-issue-turn-credentials.md) | Relay peer signaling and issue TURN credentials | P0 | M | done | US-ROOM-002 |
 | [US-ROOM-007](US-ROOM-007-pick-mode-map-and-loadout.md) | Pick the mode, the map and the loadout | P0 | M | done | US-ROOM-002, US-CORE-010, US-CORE-012 |
+| [US-ROOM-008](US-ROOM-008-split-the-room-object.md) | Split the room object into collaborators | P2 | L | ready | US-ROOM-003, US-ROOM-005, US-ROOM-006, US-ROOM-007, US-RANK-001 |
 <!-- /cpt:epic-stories -->
 
 ## Out of scope

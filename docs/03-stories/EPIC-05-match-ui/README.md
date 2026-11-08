@@ -29,6 +29,7 @@ Generated from story frontmatter — run `node .agents/scripts/verify-docs.mjs -
 | [US-MATCH-005](US-MATCH-005-pick-a-weapon-and-use-items.md) | Pick a weapon slot and use items | P0 | M | done | US-MATCH-001, US-CORE-007, US-CORE-009 |
 | [US-MATCH-006](US-MATCH-006-move-with-touch-controls.md) | Move and angle with the four-way pad | P1 | S | done | US-MATCH-002, US-CORE-008 |
 | [US-MATCH-007](US-MATCH-007-zoom-and-pan-the-battlefield.md) | Fullscreen window with pinch zoom and a measuring ruler | P0 | M | done | US-MATCH-001 |
+| [US-MATCH-008](US-MATCH-008-split-the-match-page.md) | Split the match page into hooks and panels | P2 | L | ready | US-MATCH-001, US-MATCH-003, US-MATCH-005, US-MATCH-007 |
 <!-- /cpt:epic-stories -->
 
 ## Out of scope

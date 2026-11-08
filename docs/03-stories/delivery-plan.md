@@ -1,10 +1,10 @@
 # Delivery plan
 
-53 stories across nine epics, sequenced in dependency waves. Sizes use S = 1, M = 2.5, L = 4.5 story-days.
+55 stories across nine epics, sequenced in dependency waves. Sizes use S = 1, M = 2.5, L = 4.5 story-days.
 
 | Fact | Value |
 |---|---|
-| Backlog size | 114.5 story-days across 53 stories |
+| Backlog size | 123.5 story-days across 55 stories (two of them refactors queued after `M3`, § Deferred) |
 | Capacity assumption | 2 developers + a part-time reviewer ≈ 130 dev-days over 17 weeks (`OQ-15` is still open on team size) |
 | Utilisation | ≈ 88 % (114.5 of 130 dev-days) — the remaining 12 % covers review, the two-phone matrix and the gates |
 | Milestones | `M1` demo week 4 · `M2` UAT week 11 · `M3` go-live week 17 (`OQ-25`, `OQ-36`) |
@@ -30,6 +30,7 @@ order, then priority. Each wave lists the **gates** — open questions that must
 | Item | Decision | Effect |
 |------|----------|--------|
 | Art pass — sprites, map tilesets, SFX | `ADR-0006`: the vector renderer ships through `M2`; the art wave runs weeks 11–13, and it cannot start while `OQ-20` (AI-asset policy, disclosure, provenance) is unanswered | `M1` and `M2` are judged on gameplay and readability, not art; `OQ-20` is a **release blocker for `M3`** |
+| Two refactors: `US-MATCH-008` (the match page) and `US-ROOM-008` (the room object) | the 2026-11-08 review recorded them as debt, not defects: both files work and are commented, but they are where the next feature hurts | queued after `M3`; they change no contract and their acceptance criterion is "the existing suite passes unchanged", so they can be scheduled in any quiet week |
 
 ## Critical path
 
