@@ -29,6 +29,7 @@ import { LocaleToggle } from "../app/Shell";
 import { mountBattle, type BattleHandle } from "../game/scene";
 import { canAim, fireFromPull, RING_RADIUS } from "../game/aim";
 import { DirectionPad, type PadAction } from "../components/DirectionPad";
+import { MatchStats } from "../components/MatchStats";
 import { PhrasePicker, type ChatKind } from "../components/PhrasePicker";
 import { Ruler } from "../components/Ruler";
 import { ItemTray } from "../components/ItemTray";
@@ -916,6 +917,11 @@ export function MatchPage(): JSX.Element {
           })}
         />
         <div className="match__top">
+          {/* The wind sits dead centre at the top: it is read before every shot and it belongs to the whole table, not to
+              one player's corner (owner's layout, 2026-11-08). */}
+          <div className="match__wind">
+            <WindDial weather={state.weather} label={t("match.wind")} />
+          </div>
           <Roster
             players={state.players}
             activeSlot={state.turn.activeSlot}
@@ -990,7 +996,6 @@ export function MatchPage(): JSX.Element {
                   name: state?.players.find((player) => player.slot === state.turn.activeSlot)?.displayName ?? "…",
                 })}
           </div>
-          <WindDial weather={state.weather} label={t("match.wind")} />
           <div className="match__loadout">
           <WeaponStrip
             weapons={mobile.weapons}
@@ -1039,6 +1044,27 @@ export function MatchPage(): JSX.Element {
           onSkip={onSkip}
           onChat={onChat}
         />
+          <MatchStats
+            seed={state.seed}
+            round={state.turn.round}
+            rounds={4}
+            teams={(["A", "B"] as const).map((team) => {
+              const members = state.players.filter((player) => player.team === team);
+              return {
+                team,
+                hp: members.reduce((total, player) => total + (player.eliminated ? 0 : player.hp), 0),
+                maxHp: members.reduce((total, player) => total + getMobile(player.mobileId).maxHp, 0),
+                alive: members.filter((player) => !player.eliminated).length,
+                members: members.length,
+              };
+            })}
+            gold={localPlayer?.damageDealt ?? 0}
+            labels={{
+              weather: t("match.forecast"),
+              gold: t("match.gold"),
+              health: t("match.teamHealth"),
+            }}
+          />
         </div>
 
         {status === "reconnecting" ? <div className="overlay">{t("match.reconnecting")}</div> : null}

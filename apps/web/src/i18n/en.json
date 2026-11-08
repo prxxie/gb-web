@@ -224,5 +224,8 @@
   "match.announce.miss": "{name} fired and hit nobody.",
   "match.aid.show": "Aim aid",
   "match.aid.hide": "Aim aid: on",
-  "match.aid.hint": "Show the predicted trajectory"
+  "match.aid.hint": "Show the predicted trajectory",
+  "match.forecast": "Wind next rounds",
+  "match.gold": "Gold earned",
+  "match.teamHealth": "Team health"
 }

@@ -1123,3 +1123,80 @@ td {
     overflow-y: auto;
   }
 }
+
+/* --- The match bar, per the owner's layout (2026-11-08): S1 S2 SS · skip · six item slots · the wind to come · the
+   teams' health and the gold earned, in that order, left to right. ------------------------------------------------ */
+.match__wind {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  transform: translateX(-50%);
+}
+
+.weapon-strip__key {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  font-variant-numeric: tabular-nums;
+}
+
+.match__stats {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.match__forecast {
+  display: flex;
+  gap: 3px;
+}
+
+.match__forecast-cell {
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  min-width: 30px;
+  padding: 2px 4px;
+  border-radius: 6px;
+  background: rgba(16, 26, 46, 0.85);
+  border: 1px solid #24324c;
+  font-size: 0.62rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-dim);
+}
+
+.match__teams {
+  display: flex;
+  gap: 4px;
+}
+
+.match__team {
+  padding: 2px 6px;
+  border-radius: 6px;
+  font-size: 0.62rem;
+  font-variant-numeric: tabular-nums;
+  background: rgba(16, 26, 46, 0.85);
+  border: 1px solid #24324c;
+}
+
+.match__team--a {
+  border-color: #2f6fd0;
+}
+
+.match__team--b {
+  border-color: #b04a2f;
+}
+
+.match__gold {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 6px;
+  border-radius: 6px;
+  font-size: 0.62rem;
+  font-variant-numeric: tabular-nums;
+  color: #f0c65a;
+  background: rgba(16, 26, 46, 0.85);
+  border: 1px solid #3a3423;
+}

@@ -224,5 +224,8 @@
   "match.announce.miss": "{name} bắn nhưng không trúng ai.",
   "match.aid.show": "Trợ ngắm",
   "match.aid.hide": "Trợ ngắm: bật",
-  "match.aid.hint": "Bật để xem trước đường đạn"
+  "match.aid.hint": "Bật để xem trước đường đạn",
+  "match.forecast": "Gió các vòng tới",
+  "match.gold": "Vàng kiếm được",
+  "match.teamHealth": "Máu còn lại của đội"
 }

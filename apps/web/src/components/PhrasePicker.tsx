@@ -59,10 +59,13 @@ export function PhrasePicker({
         type="button"
         className="match__skip"
         data-testid="match-skip"
+        aria-label={labels.skip}
+        title={labels.skip}
         disabled={!skipEnabled}
         onClick={onSkip}
       >
-        {labels.skip}
+        {/* An icon, not a sentence: the bar is six groups wide and "Bỏ lượt" cost 97 px of it. */}
+        <span aria-hidden="true">⏭</span>
       </button>
       <button
         type="button"

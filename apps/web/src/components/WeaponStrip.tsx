@@ -25,19 +25,12 @@ export interface WeaponStripProps {
   readonly onSelect: (slot: WeaponSlot) => void;
 }
 
+/** The three slots as the player names them. */
+const SLOT_KEY = ["S1", "S2", "SS"] as const;
+
 const SLOTS: readonly WeaponSlot[] = [0, 1, 2];
 
 /** A static glyph per shot class — no GunBound art (`OQ-18`). */
-const GLYPH: Record<Weapon["shotClass"], string> = {
-  arc: "⌒",
-  flat: "→",
-  lob: "◠",
-  bounce: "⌁",
-  cluster: "⁂",
-  piercing: "⇢",
-  beam: "≡",
-};
-
 export function WeaponStrip({
   weapons,
   active,
@@ -68,11 +61,15 @@ export function WeaponStrip({
             disabled={disabled || !usable}
             onClick={() => onSelect(slot)}
           >
-            <span className="weapon-strip__icon" aria-hidden="true">
-              {GLYPH[weapon.shotClass]}
+            {/* The slot is named, not described: S1 / S2 / SS, the genre's own shorthand. The icon and the "ready"
+                badge were two more things to read in a bar that has to fit six groups (owner's layout, 2026-11-08). */}
+            <span className="weapon-strip__key" aria-hidden="true">
+              {SLOT_KEY[slot]}
             </span>
-            <span>{names[slot]}</span>
-            <span className="badge" data-testid={`weapon-charge-${slot}`}>
+            {/* The name and the charge state are still announced, they are just not printed: the bar is six groups wide
+                and "Đạn 1 · Sẵn sàng" was 90 px of it per slot (owner's layout, 2026-11-08). */}
+            <span className="sr-only">{names[slot]}</span>
+            <span className="sr-only" data-testid={`weapon-charge-${slot}`}>
               {chargeLabels[slot]}
             </span>
           </button>
