@@ -26,7 +26,11 @@ export interface DirectionPadProps {
   /** Accepted for compatibility: the pad is pinned to the match bar's corner now, so it no longer follows the mobile. */
   readonly focus?: FocusPoint | null;
   readonly viewport?: ViewportSize;
-  readonly labels: Readonly<Record<PadAction, string>>;
+  readonly labels: Readonly<Record<PadAction, string>> & {
+    /** What the number beside the arrows counts (`bước`), and what the energy is called. */
+    readonly steps: string;
+    readonly energy: string;
+  };
   readonly onAction: (action: PadAction) => void;
   readonly onRepeat: (action: PadAction, times: number) => void;
 }
@@ -113,11 +117,15 @@ export function DirectionPad({
       data-testid="direction-pad"
       data-focus="corner"
     >
-      <span className="match__pad-budget" data-testid="pad-moves-left">
-        {movesLeft}
+      {/* Two bare digits sat here and read as buttons (owner's question, 2026-11-08): they are the steps left this turn
+          and the movement energy, so the first one now says what it counts and the second one is spoken, not printed —
+          energy is a threshold, not a number a player needs to read mid-turn. */}
+      <span className="match__pad-steps" data-testid="pad-moves-left" title={labels.steps}>
+        <span className="match__pad-count">{movesLeft}</span>
+        <span className="match__pad-unit">{labels.steps}</span>
       </span>
-      <span className="match__pad-budget match__pad-budget--energy" data-testid="pad-energy">
-        {energy}
+      <span className="sr-only" data-testid="pad-energy">
+        {labels.energy}: {energy}
       </span>
       {(["left", "right"] as const).map((slot) => (
         <button

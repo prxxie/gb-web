@@ -227,5 +227,7 @@
   "match.aid.hint": "Bật để xem trước đường đạn",
   "match.forecast": "Gió các vòng tới",
   "match.gold": "Vàng kiếm được",
-  "match.teamHealth": "Máu còn lại của đội"
+  "match.teamHealth": "Máu còn lại của đội",
+  "match.move.steps": "bước",
+  "match.move.energy": "Năng lượng"
 }

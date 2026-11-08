@@ -1177,20 +1177,30 @@ td {
   color: var(--ink);
 }
 
-.match__pad-budget {
-  /* A chip, not loose digits: the move count and the energy sat as naked text beside the arrows. */
+.match__pad-steps {
+  /* `1 bước`, not `1`: the digits were unlabelled and read as another pair of buttons (owner's question, 2026-11-08). */
   display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 22px;
-  height: 24px;
-  padding: 0 5px;
+  align-items: baseline;
+  gap: 3px;
+  height: 26px;
+  padding: 0 7px;
   border-radius: 6px;
   background: rgba(16, 26, 46, 0.9);
   border: 1px solid #24324c;
-  font-variant-numeric: tabular-nums;
-  font-size: 0.64rem;
   color: var(--ink-dim);
+  white-space: nowrap;
+}
+
+.match__pad-count {
+  font-variant-numeric: tabular-nums;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.match__pad-unit {
+  font-size: 0.6rem;
+  letter-spacing: 0.02em;
 }
 
 /* --- the three weapon slots ------------------------------------------------------------------------------------- */

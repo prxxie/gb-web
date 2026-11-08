@@ -227,5 +227,7 @@
   "match.aid.hint": "Show the predicted trajectory",
   "match.forecast": "Wind next rounds",
   "match.gold": "Gold earned",
-  "match.teamHealth": "Team health"
+  "match.teamHealth": "Team health",
+  "match.move.steps": "steps",
+  "match.move.energy": "Energy"
 }

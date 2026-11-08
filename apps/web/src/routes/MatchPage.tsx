@@ -998,6 +998,8 @@ export function MatchPage(): JSX.Element {
                 down: t("match.angle.down"),
                 left: t("match.move.left"),
                 right: t("match.move.right"),
+                steps: t("match.move.steps"),
+                energy: t("match.move.energy"),
               }}
               onAction={onPad}
               onRepeat={onRepeat}
