@@ -188,14 +188,13 @@ export interface ProfileResponse {
   readonly deletionScheduledFor: string | null;
 }
 
+/** `screens/leaderboard.md` § Fields: no account id and no rating history travel on the public list. */
 export interface LeaderboardEntry {
   readonly rank: number;
-  readonly accountId: string;
   readonly displayName: string;
   readonly avatarId: string;
   readonly rating: number;
   readonly ratedMatches: number;
-  readonly isNew: boolean;
 }
 
 export interface LeaderboardResponse {
