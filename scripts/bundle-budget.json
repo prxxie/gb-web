@@ -1,12 +1,24 @@
 {
   "measured": "2026-11-08",
   "unit": "KiB gzip",
-  "note": "A ratchet: `pnpm budget` fails when a bucket grows past its number. Raise the number in the same change that adds the weight, so the diff shows what the payload cost. `shell` is what every route pays (the entry plus its vendor chunk); `match` is the Phaser route, which the service worker precaches but a cold load never fetches.",
+  "note": "A ratchet: `pnpm budget` fails when a bucket grows past its number. Raise the number in the same change that adds the weight, so the diff shows what the payload cost. `shell` is what every route pays (the entry plus its vendor chunk); `match` is the Phaser route, which the service worker precaches but a cold load never fetches. Raised on 2026-11-08 for the shot animation and the terrain/sky pass: match 386 \u2192 388 KiB gzip, css 3 \u2192 4, total 543 \u2192 546.",
   "buckets": {
-    "shell": { "chunks": "^index-.*\\.js$", "maxKiB": 153 },
-    "match": { "chunks": "^MatchPage-.*\\.js$", "maxKiB": 386 },
-    "signin": { "chunks": "^SignInPage-.*\\.js$", "maxKiB": 1 },
-    "css": { "chunks": ".*\\.css$", "maxKiB": 3 }
+    "shell": {
+      "chunks": "^index-.*\\.js$",
+      "maxKiB": 153
+    },
+    "match": {
+      "chunks": "^MatchPage-.*\\.js$",
+      "maxKiB": 388
+    },
+    "signin": {
+      "chunks": "^SignInPage-.*\\.js$",
+      "maxKiB": 1
+    },
+    "css": {
+      "chunks": ".*\\.css$",
+      "maxKiB": 4
+    }
   },
-  "totalMaxKiB": 543
+  "totalMaxKiB": 546
 }
