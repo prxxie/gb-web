@@ -55,7 +55,9 @@ A blast resolves at a point, against every player within its radius:
 2. each target's distance from the blast selects its ring — Inner, Mid or Outer;
 3. damage is `power × tierPower / defense`, absorbed by shield first, then HP;
 4. the victim enters a short **shock** state (a hit reaction) rather than acting as if nothing happened;
-5. terrain is carved where the shell landed (`US-CORE-006`).
+5. terrain is carved where the shell landed (`US-CORE-006`);
+6. the weapon's **damage type meets the victim's armour class** before `defense` — the genre's counter-pick rule, so a
+   roster is a matchup chart and not a list of bars (`TC-CORE-933`).
 
 ## 5. Items
 
