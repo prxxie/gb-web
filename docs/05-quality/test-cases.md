@@ -384,6 +384,8 @@ unrelated meanings), so every row below names the one thing it proves.
 | TC-FND-133 | US-FND-003 | AC6 — 844×390 and 1024×768 | No horizontal scroll and every control at least 44 px outside the canvas | e2e | NFR-17 |
 | TC-FND-131 | US-FND-003 | AC1, AC2, AC5 — a direct URL (`/lobby/ABC234`, `/match/ABC234`) renders the shell and the locale toggle | Shell renders without a 404 and the toggle switches VI↔EN | web | `US-FND-003` AC1, AC2, AC5 |
 | TC-MATCH-914 | US-MATCH-002 | Drag distance maps to the power ring radius | Radius grows with the pull and stops at the maximum | web | `US-MATCH-002` §4 |
+| TC-MATCH-190 | US-MATCH-008 | AC1 — the match page fits the size rule | `apps/web/src/routes/MatchPage.tsx` ≤ 400 lines and no file under `apps/web/src/routes/` > 500, asserted by `tests/meta/file-size.test.ts` | web | NFR-16 |
+| TC-MATCH-191 | US-MATCH-008 | AC2 — the split changes no behaviour | The whole Vitest and Playwright suites pass with no edit to an assertion | web | NFR-16 |
 | TC-NET-045 | US-NET-004 | A peer sends `team_assign`; the host sends it after the start | `not-host` while a peer, `invalid-state` once playing; the roster is unchanged | worker | `US-NET-004` §2 roster |
 | TC-NET-066 | US-NET-004 | A socket signals itself, then signals a seated member with no socket | `bad-request`, then `peer-not-connected`; no frame is relayed | worker | `US-NET-004` §3 `signal` |
 | TC-NET-067 | US-NET-004 | AC2 — Fire from a non-active slot | Ignored + `error unsupported-message` | worker | FR-02 |
@@ -435,3 +437,5 @@ unrelated meanings), so every row below names the one thing it proves.
 | TC-ROOM-711 | US-ROOM-007 | AC2 — a host starts a match | `match_started` carries the mode, the map and the mobile each member picked | worker | `api/signaling.md` |
 | TC-ROOM-712 | US-ROOM-007 | AC7 — lobby write budget | Eleven item taps plus a mobile tap in one second pass; a twenty-first write in one second is refused `rate-limited` and the last accepted write survives | worker | `api/signaling.md` |
 | TC-ROOM-713 | US-ROOM-007 | AC7 — one join per page load | A `StrictMode` double mount posts `join` once and opens the room socket on the seat it got | web | `api/accounts.md` |
+| TC-ROOM-700 | US-ROOM-008 | AC1 — the room object fits the size rule | `apps/worker/src/room-do.ts` ≤ 400 lines, with budgets, election and recording in their own modules under `apps/worker/src/room/` | worker | NFR-16 |
+| TC-ROOM-701 | US-ROOM-008 | AC2 — the split changes no behaviour | Every `apps/worker/tests/room-*.ts` file passes unchanged | worker | NFR-16 |
