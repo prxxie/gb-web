@@ -982,6 +982,7 @@ export function MatchPage(): JSX.Element {
 
         {/* The bar is a three-cell grid: walking · shooting · the table's state. */}
         <div className="match__bottom">
+          <div className="match__row match__row--controls">
           <div className="match__zone match__zone--move">
 
             <DirectionPad
@@ -1049,10 +1050,12 @@ export function MatchPage(): JSX.Element {
             onChat={onChat}
           />
           </div>
+          </div>
+          <div className="match__row match__row--state">
           <MatchStats
             seed={state.seed}
             round={state.turn.round}
-            rounds={3}
+            rounds={4}
             teams={(["A", "B"] as const).map((team) => {
               const members = state.players.filter((player) => player.team === team);
               return {
@@ -1070,6 +1073,7 @@ export function MatchPage(): JSX.Element {
               health: t("match.teamHealth"),
             }}
           />
+          </div>
         </div>
 
         {status === "reconnecting" ? <div className="overlay">{t("match.reconnecting")}</div> : null}

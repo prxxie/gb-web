@@ -493,21 +493,38 @@ td {
  * here so the middle of the screen is battlefield and nothing else.
  */
 .match__bottom {
-  /* Three cells, one row: walking on the left, the shooting controls in the middle, the table's state on the right.
-     An explicit grid instead of `space-between` — the hint sentence used to sit in this row and pushed the loadout into
-     the stats, so three groups landed on top of each other (owner's report, 2026-11-08). */
+  /* One bar, two aligned rows. Twenty 44 px controls (`NFR-17`) do not fit across 844 px on one line: squeezed into one
+     row they overflowed and the six item slots were drawn underneath the stats (owner's report, 2026-11-08).
+     Row 1 walks and shoots; row 2 states the table's condition. */
   position: absolute;
   left: 0;
   right: 0;
   bottom: 0;
-  height: 64px;
-  display: grid;
-  grid-template-columns: auto 1fr auto;
-  align-items: center;
-  gap: 14px;
+  height: 92px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
   padding: 0 calc(8px + var(--safe-right)) calc(8px + var(--safe-bottom)) calc(8px + var(--safe-left));
   background: linear-gradient(180deg, rgba(11, 18, 32, 0.6), rgba(11, 18, 32, 0.96));
   border-top: 1px solid rgba(120, 160, 220, 0.16);
+}
+
+.match__row {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.match__row--controls {
+  gap: 10px;
+}
+
+.match__row--state {
+  justify-content: flex-end;
+  gap: 10px;
+  padding-top: 4px;
+  border-top: 1px solid rgba(120, 160, 220, 0.1);
 }
 
 /* A hairline between groups instead of air: the bar carries six of them and padding alone reads as one long smear. */
@@ -1121,20 +1138,6 @@ td {
    passes stacked absolute overlays on top of a flex row and three groups ended up on the same pixels.
    =================================================================================================================== */
 
-.match__bottom {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 64px;
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 10px;
-  padding: 0 calc(8px + var(--safe-right)) calc(8px + var(--safe-bottom)) calc(12px + var(--safe-left));
-  background: linear-gradient(180deg, rgba(11, 18, 32, 0.6), rgba(11, 18, 32, 0.96));
-  border-top: 1px solid rgba(120, 160, 220, 0.16);
-}
 
 .match__zone {
   display: flex;
@@ -1237,13 +1240,13 @@ td {
 
 .match__items {
   display: grid;
-  grid-template-columns: repeat(6, 36px);
-  gap: 4px;
+  grid-template-columns: repeat(6, 44px);
+  gap: 6px;
 }
 
 .match__item {
   position: relative;
-  width: 36px;
+  width: 44px;
   height: 44px;
   padding: 0;
   display: flex;
@@ -1326,11 +1329,10 @@ td {
   display: inline-flex;
   align-items: baseline;
   justify-content: center;
-  gap: 1px;
-  min-width: 36px;
-  height: 32px;
-  padding: 0 5px;
-  overflow: visible;
+  gap: 2px;
+  min-width: 40px;
+  height: 28px;
+  padding: 0 6px;
   border-radius: 8px;
   border: 1px solid #24324c;
   background: rgba(16, 26, 46, 0.85);
@@ -1348,8 +1350,8 @@ td {
 .match__team {
   display: inline-flex;
   align-items: center;
-  height: 32px;
-  padding: 0 6px;
+  height: 28px;
+  padding: 0 8px;
   border-radius: 8px;
   border: 1px solid #24324c;
   background: rgba(16, 26, 46, 0.85);
@@ -1369,7 +1371,7 @@ td {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  height: 32px;
+  height: 28px;
   padding: 0 8px;
   border-radius: 8px;
   border: 1px solid #3a3423;
