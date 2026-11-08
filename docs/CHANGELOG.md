@@ -1,5 +1,24 @@
 # Changelog
 
+## 2026-11-08 — the roster becomes a matchup chart
+
+The last piece of the GB-parity audit. The genre gives every weapon type a bonus against one armour class and a penalty
+against another, which is what makes picking a mobile a counter-pick instead of a stat check; we had neither field.
+
+- **`Mobile.armor`** — `plated` (tanks, bombardiers), `bionic` (glass, snipers, tricksters, bouncers) or `warded`
+  (support, balanced, all-rounders, zoners) — on all twenty mobiles, in the roster table and in the data tests.
+- **`ARMOR_MATRIX`** in `combat.ts`: the damage type is the mobile's own `effect`, so a loadout shares one matchup.
+  Explosive beats `plated` (1.15) and is soft against `bionic` (0.90); impact the reverse; laser beats `warded` (1.15) and
+  is soft against `bionic`; electric beats `plated` (1.20) and is soft against `warded`. Every row is one counter, one
+  weakness and one neutral, and every class is countered and soft to something — a damage type is a choice, never an
+  upgrade (`TC-CORE-933`).
+- The multiplier sits in `damageAt` between the blast tier and `defense`, so it reaches every blast — including the
+  Thunder item's, which now strikes with the caster's own damage type.
+- Docs: `mobiles.md` § 1 and a new § 5 (the matrix and the reasoning), `tunables.md` § 2, `reference-gunbound.md` § 4.
+
+The GB-parity audit is closed except for one known gap: `itm-teleport` still blinks 150 px instead of teleporting to where
+the shot lands, which needs the shot-then-teleport flow rather than a rename.
+
 ## 2026-11-08 — the tempo goes back to GunBound's
 
 The second half of the GB-parity audit: the physics was fixed in the change below, and this one fixes what the game

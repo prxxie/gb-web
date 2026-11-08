@@ -508,7 +508,13 @@ function resolveShot(
     hits = applyBlast(
       players,
       { x: flight.impact.x, y: flight.impact.y, radius: weapon.radius, power: weapon.power, ownerSlot: slot },
-      { defenseOf: (victim) => mobileOf(victim).defense, attack: player.attack, bloodBonus: effects.bloodNext ? 1.33 : 1 },
+      {
+        defenseOf: (victim) => mobileOf(victim).defense,
+        armorOf: (victim) => mobileOf(victim).armor,
+        damageType: mobileOf(player).effect,
+        attack: player.attack,
+        bloodBonus: effects.bloodNext ? 1.33 : 1,
+      },
     );
     const damagedSomeoneElse = hits.some((hit) => hit.player.slot !== slot);
     // GB charges the super-shot gauge from the fighting: dealing fills it twice as fast as being hit, so a player who
@@ -707,7 +713,11 @@ function applyItem(state: MatchState, slot: number, itemId: ItemId, now: number)
           const results = applyBlast(
             players,
             { x: victim.x, y: victim.y, radius: 220, power: 150, ownerSlot: slot },
-            { defenseOf: (candidate) => mobileOf(candidate).defense },
+            {
+              defenseOf: (candidate) => mobileOf(candidate).defense,
+              armorOf: (candidate) => mobileOf(candidate).armor,
+              damageType: mobileOf(caster).effect,
+            },
           );
           players = mergeHits(players, results);
         }

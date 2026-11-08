@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { applyBlast, damageAt, mergeHits, teamStatus, tierOf, tierMultiplier } from "../src/combat.js";
-import { getMobile } from "../src/data/mobiles.js";
+import { ARMOR_MATRIX, applyBlast, armorMultiplier, damageAt, mergeHits, teamStatus, tierOf, tierMultiplier } from "../src/combat.js";
+import { MOBILES, getMobile } from "../src/data/mobiles.js";
 import { createMatch } from "../src/match.js";
 import { toSnapshot } from "../src/snapshot.js";
 import type { PlayerState } from "../src/types.js";
@@ -24,7 +24,7 @@ function player(overrides: Partial<PlayerState> = {}): PlayerState {
     damageDealt: 0,
     shotsFired: 0,
     hits: 0,
-    superShotUsed: false,
+    ssCharge: 0,
     items: {},
     ...overrides,
   };
@@ -138,5 +138,61 @@ describe("combat", () => {
     const roster = mergeHits([owner, enemy], hits);
     expect(roster[0]?.damageDealt).toBeGreaterThan(0);
     expect(roster[1]?.damageDealt).toBe(0);
+  });
+});
+
+describe("TC-CORE-933: the weapon-type matchup (US-CORE-003 AC6)", () => {
+  it("gives every damage type one armour it beats and one it is soft against, and none of them a free lunch", () => {
+    const types = Object.keys(ARMOR_MATRIX) as (keyof typeof ARMOR_MATRIX)[];
+    expect(types.sort()).toEqual(["electric", "explosion", "impact", "laser"]);
+    for (const type of types) {
+      const row = ARMOR_MATRIX[type];
+      const values = Object.values(row);
+      expect(values.filter((value) => value >= 1.15), `${type} counter`).toHaveLength(1);
+      expect(values.filter((value) => value <= 0.95), `${type} weakness`).toHaveLength(1);
+      // The spread is the same everywhere: a damage type is a choice, not an upgrade.
+      const mean = values.reduce((total, value) => total + value, 0) / values.length;
+      expect(Math.abs(mean - 1), `${type} mean`).toBeLessThanOrEqual(0.05);
+    }
+    // Every armour class is countered by something and soft to something.
+    for (const armor of ["plated", "bionic", "warded"] as const) {
+      const column = types.map((type) => ARMOR_MATRIX[type][armor]);
+      expect(Math.max(...column), `${armor} best`).toBeGreaterThanOrEqual(1.15);
+      expect(Math.min(...column), `${armor} worst`).toBeLessThanOrEqual(0.95);
+    }
+  });
+
+  it("is the only new factor in the damage formula, and unknown sides are neutral", () => {
+    const base = { power: 240, distance: 0, radius: 80, defense: 1 };
+    const neutral = damageAt({ ...base, armorMultiplier: 1 });
+    expect(damageAt(base)).toBe(neutral);
+    expect(damageAt({ ...base, armorMultiplier: 1.15 })).toBe(Math.round(neutral * 1.15));
+    expect(damageAt({ ...base, armorMultiplier: 0.9 })).toBe(Math.round(neutral * 0.9));
+    // A missing type or a missing class is `1`, never `NaN` and never zero damage.
+    expect(armorMultiplier(undefined, "plated")).toBe(1);
+    expect(armorMultiplier("explosion", undefined)).toBe(1);
+  });
+
+  it("reaches the blast: an explosive shell hurts a plated hull more than a bionic one", () => {
+    // Same target mobile and same distance, so the only difference is the armour class the blast is told about.
+    const plated = player({ slot: 1, x: 0, y: 0 });
+    const bionic = player({ slot: 2, x: 0, y: 0, team: "B" });
+    const owner = player({ slot: 0, team: "A", x: 400, y: 0 });
+    const hits = applyBlast([owner, plated, bionic], blast, {
+      damageType: "explosion",
+      armorOf: (victim) => (victim.slot === 1 ? "plated" : "bionic"),
+    });
+    const toPlated = hits.find((hit) => hit.player.slot === 1)!.damage;
+    const toBionic = hits.find((hit) => hit.player.slot === 2)!.damage;
+    expect(toPlated).toBeGreaterThan(toBionic);
+    expect(toPlated / toBionic).toBeCloseTo(ARMOR_MATRIX.explosion.plated / ARMOR_MATRIX.explosion.bionic, 1);
+  });
+
+  it("gives every mobile in the roster a class, and all three are used", () => {
+    const classes = new Set(MOBILES.map((mobile) => mobile.armor));
+    expect([...classes].sort()).toEqual(["bionic", "plated", "warded"]);
+    for (const mobile of MOBILES) {
+      expect(["plated", "bionic", "warded"]).toContain(mobile.armor);
+    }
   });
 });

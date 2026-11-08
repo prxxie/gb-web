@@ -160,7 +160,8 @@ Health in this genre reads in the hundreds-to-thousands, so we use a
 | `defense` | per mobile `0.85–1.15` | defense power | `TC-CORE-026` |
 | `power` per weapon | **180–580** (Inner tier) | weapon `power` field | `TC-CORE-024` |
 | blast tiers | **Inner / Mid / Outer** at `0.4` / `0.7` / `1.0` of radius, power `1.0` / `0.6` / `0.3` | three-tier blast model | `TC-CORE-024` |
-| damage | `round(power × tierPower / defense)`; shield absorbs first | falls off across rings | `TC-CORE-903` |
+| damage | `round(power × tierPower × attack × blood × matchup / defense)`; shield absorbs first | falls off across rings, and the weapon type meets the hull class | `TC-CORE-903` |
+| weapon-type matchup | `ARMOR_MATRIX`: one armour class at `+15…20 %`, one at `−10 %`, one neutral per damage type (`data/mobiles.md` § 5) | weapon type vs armour class | `TC-CORE-933` |
 | friendly fire | on | on (unverified) | `TC-CORE-027` |
 | death | HP 0 → `eliminated`, skipped by the queue | yes | `TC-CORE-027` |
 

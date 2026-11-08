@@ -22,6 +22,7 @@ Runtime copy: `packages/core/src/data/mobiles.ts`, versioned by `rulesetVersion`
 | `name` | string | English display name, rendered as-is (the roster's mobiles are proper nouns, like the maps' `id`); localising the twenty names is a follow-up, tracked on `US-ROOM-007` |
 | `archetype` | enum | `balanced`, `tank`, `sniper`, `bombardier`, `bouncer`, `support`, `glass`, `all-rounder`, `zoner`, `trickster` — exactly two mobiles each |
 | `trajectory` | enum | `standard`, `direct`, `lobber`, `mortar`, `skimmer` — the launch law the mobile starts from (§ 3) |
+| `armor` | `plated` \| `bionic` \| `warded` | the hull class the weapon-type matchup reads (§ 5) — a counter-pick, not a stat | `TC-CORE-933` |
 | `angleMin` / `angleMax` | degrees | **this mobile's** aim window, inside its profile's band; the aim is clamped to it |
 | `maxHp` | int 900–1200 | health pool |
 | `maxShield` | int 0–300 | shield pool, absorbs before HP |
@@ -41,28 +42,28 @@ Runtime copy: `packages/core/src/data/mobiles.ts`, versioned by `rulesetVersion`
 
 ## 1. Stats
 
-| Id | Name | Archetype | HP | Shield | Regen | Def | Energy | Delay | Max power | Effect |
-|---|---|---|---|---|---|---|---|---|---|---|
-| `mbl-01` | Stone Sentinel | balanced | 1,050 | 150 | 20 | 1.00 | 105 | 100 | 98 | explosion |
-| `mbl-02` | River Warden | support | 1,000 | 300 | 40 | 0.90 | 100 | 110 | 94 | impact |
-| `mbl-03` | Iron Tortoise | tank | 1,200 | 200 | 20 | 1.15 | 80 | 120 | 92 | explosion |
-| `mbl-04` | Glacier Mammoth | tank | 1,150 | 250 | 30 | 1.12 | 85 | 118 | 90 | impact |
-| `mbl-05` | Storm Falcon | sniper | 925 | 0 | 0 | 0.90 | 120 | 95 | 100 | laser |
-| `mbl-06` | Silver Ibex | sniper | 950 | 50 | 0 | 0.92 | 125 | 93 | 100 | laser |
-| `mbl-07` | Ash Behemoth | bombardier | 1,100 | 100 | 0 | 1.00 | 90 | 115 | 96 | explosion |
-| `mbl-08` | Volcano Toad | bombardier | 1,075 | 150 | 10 | 0.98 | 88 | 113 | 95 | explosion |
-| `mbl-09` | Moon Hare | bouncer | 975 | 100 | 10 | 0.95 | 115 | 105 | 98 | impact |
-| `mbl-10` | Coral Crab | bouncer | 990 | 120 | 10 | 0.96 | 112 | 103 | 97 | laser |
-| `mbl-11` | Pale Stag | all-rounder | 1,020 | 280 | 40 | 0.92 | 102 | 108 | 94 | impact |
-| `mbl-12` | Sacred Crane | support | 980 | 260 | 30 | 0.90 | 104 | 106 | 95 | laser |
-| `mbl-13` | Cinder Fox | glass | 900 | 0 | 0 | 0.85 | 130 | 90 | 100 | explosion |
-| `mbl-14` | Sky Serpent | glass | 920 | 0 | 0 | 0.86 | 128 | 92 | 100 | laser |
-| `mbl-15` | Jade Dragon | balanced | 1,050 | 150 | 20 | 1.05 | 105 | 100 | 98 | explosion |
-| `mbl-16` | Sun Lion | all-rounder | 1,060 | 180 | 20 | 1.06 | 103 | 101 | 97 | explosion |
-| `mbl-17` | Sand Wyrm | zoner | 1,025 | 150 | 10 | 1.00 | 100 | 110 | 95 | impact |
-| `mbl-18` | Frost Hydra | zoner | 1,040 | 120 | 10 | 1.02 | 98 | 112 | 96 | impact |
-| `mbl-19` | Shadow Cat | trickster | 950 | 100 | 10 | 0.95 | 125 | 95 | 96 | electric |
-| `mbl-20` | Mist Raven | trickster | 940 | 80 | 10 | 0.94 | 128 | 93 | 95 | electric |
+| Id | Name | Archetype | Armor | HP | Shield | Regen | Def | Energy | Delay | Max power | Effect |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| `mbl-01` | Stone Sentinel | balanced | warded | 1,050 | 150 | 20 | 1.00 | 105 | 100 | 98 | explosion |
+| `mbl-02` | River Warden | support | warded | 1,000 | 300 | 40 | 0.90 | 100 | 110 | 94 | impact |
+| `mbl-03` | Iron Tortoise | tank | plated | 1,200 | 200 | 20 | 1.15 | 80 | 120 | 92 | explosion |
+| `mbl-04` | Glacier Mammoth | tank | plated | 1,150 | 250 | 30 | 1.12 | 85 | 118 | 90 | impact |
+| `mbl-05` | Storm Falcon | sniper | bionic | 925 | 0 | 0 | 0.90 | 120 | 95 | 100 | laser |
+| `mbl-06` | Silver Ibex | sniper | bionic | 950 | 50 | 0 | 0.92 | 125 | 93 | 100 | laser |
+| `mbl-07` | Ash Behemoth | bombardier | plated | 1,100 | 100 | 0 | 1.00 | 90 | 115 | 96 | explosion |
+| `mbl-08` | Volcano Toad | bombardier | plated | 1,075 | 150 | 10 | 0.98 | 88 | 113 | 95 | explosion |
+| `mbl-09` | Moon Hare | bouncer | bionic | 975 | 100 | 10 | 0.95 | 115 | 105 | 98 | impact |
+| `mbl-10` | Coral Crab | bouncer | bionic | 990 | 120 | 10 | 0.96 | 112 | 103 | 97 | laser |
+| `mbl-11` | Pale Stag | all-rounder | warded | 1,020 | 280 | 40 | 0.92 | 102 | 108 | 94 | impact |
+| `mbl-12` | Sacred Crane | support | warded | 980 | 260 | 30 | 0.90 | 104 | 106 | 95 | laser |
+| `mbl-13` | Cinder Fox | glass | bionic | 900 | 0 | 0 | 0.85 | 130 | 90 | 100 | explosion |
+| `mbl-14` | Sky Serpent | glass | bionic | 920 | 0 | 0 | 0.86 | 128 | 92 | 100 | laser |
+| `mbl-15` | Jade Dragon | balanced | warded | 1,050 | 150 | 20 | 1.05 | 105 | 100 | 98 | explosion |
+| `mbl-16` | Sun Lion | all-rounder | warded | 1,060 | 180 | 20 | 1.06 | 103 | 101 | 97 | explosion |
+| `mbl-17` | Sand Wyrm | zoner | plated | 1,025 | 150 | 10 | 1.00 | 100 | 110 | 95 | impact |
+| `mbl-18` | Frost Hydra | zoner | plated | 1,040 | 120 | 10 | 1.02 | 98 | 112 | 96 | impact |
+| `mbl-19` | Shadow Cat | trickster | bionic | 950 | 100 | 10 | 0.95 | 125 | 95 | 96 | electric |
+| `mbl-20` | Mist Raven | trickster | bionic | 940 | 80 | 10 | 0.94 | 128 | 93 | 95 | electric |
 
 ## 2. Aim window and movement — per mobile
 
@@ -105,25 +106,25 @@ adds. A shell carries no weight of its own: there is no per-shell mass, no mobil
 
 | Id | Name | Shot 1 | Shot 2 | Super shot |
 |---|---|---|---|---|
-| `mbl-01` | Stone Sentinel | arc 240/80 d100 | flat 220/70 d110 | arc 500/110 d200 |
+| `mbl-01` | Stone Sentinel | arc 240/80 d100 | warded | flat 220/70 d110 | arc 500/110 d200 |
 | `mbl-02` | River Warden | arc 220/85 d100 | lob 210/95 d115 | cluster 460/120 d200 |
-| `mbl-03` | Iron Tortoise | arc 250/90 d105 | bounce 240/80 d120 | arc 520/120 d200 |
+| `mbl-03` | Iron Tortoise | arc 250/90 d105 | plated | bounce 240/80 d120 | arc 520/120 d200 |
 | `mbl-04` | Glacier Mammoth | lob 250/95 d112 | bounce 230/82 d118 | arc 510/118 d200 |
-| `mbl-05` | Storm Falcon | flat 260/60 d100 | piercing 280/55 d115 | beam 480/40 d200 |
+| `mbl-05` | Storm Falcon | flat 260/60 d100 | bionic | piercing 280/55 d115 | beam 480/40 d200 |
 | `mbl-06` | Silver Ibex | flat 250/58 d98 | arc 270/65 d112 | beam 490/42 d198 |
-| `mbl-07` | Ash Behemoth | lob 260/100 d110 | cluster 240/90 d120 | lob 550/130 d200 |
+| `mbl-07` | Ash Behemoth | lob 260/100 d110 | plated | cluster 240/90 d120 | lob 550/130 d200 |
 | `mbl-08` | Volcano Toad | lob 250/98 d112 | bounce 230/85 d122 | cluster 540/128 d200 |
-| `mbl-09` | Moon Hare | bounce 240/80 d100 | flat 220/65 d110 | bounce 500/110 d200 |
+| `mbl-09` | Moon Hare | bounce 240/80 d100 | bionic | flat 220/65 d110 | bounce 500/110 d200 |
 | `mbl-10` | Coral Crab | bounce 230/78 d102 | arc 220/70 d112 | beam 470/45 d198 |
-| `mbl-11` | Pale Stag | arc 230/85 d100 | flat 200/70 d110 | cluster 460/120 d200 |
+| `mbl-11` | Pale Stag | arc 230/85 d100 | warded | flat 200/70 d110 | cluster 460/120 d200 |
 | `mbl-12` | Sacred Crane | arc 210/82 d102 | beam 260/40 d120 | cluster 450/118 d200 |
-| `mbl-13` | Cinder Fox | flat 300/60 d95 | arc 280/70 d110 | arc 580/90 d195 |
+| `mbl-13` | Cinder Fox | flat 300/60 d95 | bionic | arc 280/70 d110 | arc 580/90 d195 |
 | `mbl-14` | Sky Serpent | flat 290/58 d96 | cluster 270/85 d118 | beam 560/44 d196 |
-| `mbl-15` | Jade Dragon | arc 250/80 d100 | piercing 270/60 d118 | arc 510/115 d200 |
+| `mbl-15` | Jade Dragon | arc 250/80 d100 | warded | piercing 270/60 d118 | arc 510/115 d200 |
 | `mbl-16` | Sun Lion | arc 250/82 d100 | bounce 230/78 d116 | cluster 500/122 d200 |
-| `mbl-17` | Sand Wyrm | lob 240/95 d108 | piercing 260/60 d120 | cluster 500/125 d200 |
+| `mbl-17` | Sand Wyrm | lob 240/95 d108 | plated | piercing 260/60 d120 | cluster 500/125 d200 |
 | `mbl-18` | Frost Hydra | lob 240/96 d110 | arc 250/80 d112 | lob 530/130 d200 |
-| `mbl-19` | Shadow Cat | bounce 230/70 d98 | cluster 220/85 d116 | arc 460/100 d195 |
+| `mbl-19` | Shadow Cat | bounce 230/70 d98 | bionic | cluster 220/85 d116 | arc 460/100 d195 |
 | `mbl-20` | Mist Raven | bounce 220/70 d98 | beam 250/42 d118 | beam 450/38 d196 |
 
 No two mobiles share the same class triple, and every super shot hits harder than that mobile's shot 1 (1.8–2.0× power) at
@@ -148,25 +149,25 @@ shot 763 units, six ruler divisions, and a `10` bends it by a sixth of that.
 
 | Id | Name | Range at max power | Hang time | Drift at wind +10 |
 |---|---|---|---|---|
-| `mbl-01` | Stone Sentinel | **3,680 units** at 45° | 8.6 s | 290 units |
+| `mbl-01` | Stone Sentinel | **3,680 units** at 45° | warded | 8.6 s | 290 units |
 | `mbl-02` | River Warden | **3,386 units** at 45° | 8.2 s | 271 units |
-| `mbl-03` | Iron Tortoise | **3,150 units** at 38° | 7.0 s | 193 units |
+| `mbl-03` | Iron Tortoise | **3,150 units** at 38° | plated | 7.0 s | 193 units |
 | `mbl-04` | Glacier Mammoth | **3,097 units** at 45° | 7.8 s | 253 units |
-| `mbl-05` | Storm Falcon | **2,930 units** at 25° | 5.2 s | 109 units |
+| `mbl-05` | Storm Falcon | **2,930 units** at 25° | bionic | 5.2 s | 109 units |
 | `mbl-06` | Silver Ibex | **3,300 units** at 30° | 6.2 s | 158 units |
-| `mbl-07` | Ash Behemoth | **3,519 units** at 45° | 8.4 s | 288 units |
+| `mbl-07` | Ash Behemoth | **3,519 units** at 45° | plated | 8.4 s | 288 units |
 | `mbl-08` | Volcano Toad | **3,453 units** at 45° | 8.3 s | 280 units |
-| `mbl-09` | Moon Hare | **3,680 units** at 45° | 8.6 s | 290 units |
+| `mbl-09` | Moon Hare | **3,680 units** at 45° | bionic | 8.6 s | 290 units |
 | `mbl-10` | Coral Crab | **3,576 units** at 42° | 8.0 s | 264 units |
-| `mbl-11` | Pale Stag | **3,369 units** at 42° | 7.8 s | 235 units |
+| `mbl-11` | Pale Stag | **3,369 units** at 42° | warded | 7.8 s | 235 units |
 | `mbl-12` | Sacred Crane | **3,453 units** at 45° | 8.3 s | 280 units |
-| `mbl-13` | Cinder Fox | **3,176 units** at 28° | 5.8 s | 132 units |
+| `mbl-13` | Cinder Fox | **3,176 units** at 28° | bionic | 5.8 s | 132 units |
 | `mbl-14` | Sky Serpent | **3,438 units** at 32° | 6.5 s | 171 units |
-| `mbl-15` | Jade Dragon | **3,680 units** at 45° | 8.6 s | 290 units |
+| `mbl-15` | Jade Dragon | **3,680 units** at 45° | warded | 8.6 s | 290 units |
 | `mbl-16` | Sun Lion | **3,613 units** at 45° | 8.5 s | 281 units |
-| `mbl-17` | Sand Wyrm | **3,436 units** at 48° | 8.7 s | 305 units |
+| `mbl-17` | Sand Wyrm | **3,436 units** at 48° | plated | 8.7 s | 305 units |
 | `mbl-18` | Frost Hydra | **3,519 units** at 45° | 8.4 s | 288 units |
-| `mbl-19` | Shadow Cat | **3,526 units** at 44° | 8.3 s | 275 units |
+| `mbl-19` | Shadow Cat | **3,526 units** at 44° | bionic | 8.3 s | 275 units |
 | `mbl-20` | Mist Raven | **3,237 units** at 35° | 6.7 s | 184 units |
 
 The roster spans a factor of 1.26 in reach — `mbl-01`, `mbl-09` and `mbl-15` reach **3,680 units** at 45° where
@@ -179,25 +180,25 @@ the eleven mobiles whose window reaches 45° land at the same distance whenever 
 
 | Id | Name | Mythic motif | Silhouette | Palette |
 |---|---|---|---|---|
-| `mbl-01` | Stone Sentinel | Megalithic guardian (Mediterranean) | broad shoulders, stone plated torso, single glowing eye slit | sandstone, moss green, iron grey |
+| `mbl-01` | Stone Sentinel | Megalithic guardian (Mediterranean) | warded | broad shoulders, stone plated torso, single glowing eye slit | sandstone, moss green, iron grey |
 | `mbl-02` | River Warden | Water guardian spirit (Vietnamese) | slim figure wrapped in flowing water ribbons | jade, pale gold, river blue |
-| `mbl-03` | Iron Tortoise | World-bearing turtle (Chinese) | low dome shell, stubby legs, heavy cannon on the shell | iron, bronze, dark red |
+| `mbl-03` | Iron Tortoise | World-bearing turtle (Chinese) | plated | low dome shell, stubby legs, heavy cannon on the shell | iron, bronze, dark red |
 | `mbl-04` | Glacier Mammoth | Frozen colossus (Norse) | huge shaggy mass, tusks of ice, snow-capped back | ice white, slate, deep blue |
-| `mbl-05` | Storm Falcon | Thunder bird (North American) | narrow wings, lightning-tipped beak, feather blades | storm grey, electric blue, white |
+| `mbl-05` | Storm Falcon | Thunder bird (North American) | bionic | narrow wings, lightning-tipped beak, feather blades | storm grey, electric blue, white |
 | `mbl-06` | Silver Ibex | Mountain climber (Alpine) | spiral horns, lean frame, hooves of polished silver | silver, charcoal, ice blue |
-| `mbl-07` | Ash Behemoth | Volcanic beast (Mesopotamian) | hunched back splitting into vents, glowing cracks | ash grey, ember orange, black |
+| `mbl-07` | Ash Behemoth | Volcanic beast (Mesopotamian) | plated | hunched back splitting into vents, glowing cracks | ash grey, ember orange, black |
 | `mbl-08` | Volcano Toad | Fire-bellied toad (Mesoamerican) | wide squat body, throat sac, lava-veined skin | lava red, obsidian, sulphur yellow |
-| `mbl-09` | Moon Hare | Lunar hare (East Asian) | long ears as stabilisers, spring-loaded legs | moon white, lilac, pearl grey |
+| `mbl-09` | Moon Hare | Lunar hare (East Asian) | bionic | long ears as stabilisers, spring-loaded legs | moon white, lilac, pearl grey |
 | `mbl-10` | Coral Crab | Sea-shell walker (Pacific) | wide carapace, one heavy claw cannon, barnacle armour | coral pink, teal, sand |
-| `mbl-11` | Pale Stag | White stag (Celtic) | antlers carrying hanging lanterns, slender legs | bone white, forest green, gold |
+| `mbl-11` | Pale Stag | White stag (Celtic) | warded | antlers carrying hanging lanterns, slender legs | bone white, forest green, gold |
 | `mbl-12` | Sacred Crane | Longevity crane (Japanese) | long neck, folded wings, halo ring behind the head | vermilion, porcelain white, ink black |
-| `mbl-13` | Cinder Fox | Nine-tailed fox (Korean) | multiple tails fanning out, low profile, flame tips | cinder orange, charcoal, cream |
+| `mbl-13` | Cinder Fox | Nine-tailed fox (Korean) | bionic | multiple tails fanning out, low profile, flame tips | cinder orange, charcoal, cream |
 | `mbl-14` | Sky Serpent | Feathered serpent (Mesoamerican) | coiled body, plume crest, wing-fins | turquoise, jade, obsidian |
-| `mbl-15` | Jade Dragon | Oriental dragon (Vietnamese) | long sinuous body, whiskers, pearl orb on the forehead | jade green, imperial gold, ivory |
+| `mbl-15` | Jade Dragon | Oriental dragon (Vietnamese) | warded | long sinuous body, whiskers, pearl orb on the forehead | jade green, imperial gold, ivory |
 | `mbl-16` | Sun Lion | Solar lion (Egyptian) | mane as a sun disc, straight forelegs, kohl markings | sun gold, lapis, terracotta |
-| `mbl-17` | Sand Wyrm | Serpent of the dunes (South Asian) | hooded head, segmented body half-buried | ochre, burnt sienna, bone |
+| `mbl-17` | Sand Wyrm | Serpent of the dunes (South Asian) | plated | hooded head, segmented body half-buried | ochre, burnt sienna, bone |
 | `mbl-18` | Frost Hydra | Many-headed serpent (Slavic) | three necks, icicle spines, frozen scales | frost blue, white, steel |
-| `mbl-19` | Shadow Cat | Night cat (West African) | sleek low body, tail with a blade, glowing eyes | charcoal, violet, copper |
+| `mbl-19` | Shadow Cat | Night cat (West African) | bionic | sleek low body, tail with a blade, glowing eyes | charcoal, violet, copper |
 | `mbl-20` | Mist Raven | Messenger raven (Northern European) | folded wings, scattered feathers, a mask-like face | slate, mist grey, ink |
 
 Art rules: readable at 64 px, one dominant mass plus one silhouette hook (horns, shell, wings, tail, mane), palette of

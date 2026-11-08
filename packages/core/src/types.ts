@@ -40,6 +40,15 @@ export type Archetype =
 
 export type Effect = "explosion" | "laser" | "impact" | "electric";
 
+/**
+ * The armour class a mobile wears (`mobiles.md` § 1, `US-CORE-003`).
+ *
+ * The genre's counter-pick rule: a weapon type does more damage to one class and less to another, so the roster is a
+ * matchup chart and not just a list of bars. The classes and the multipliers are ours (`[assumption: OQ-19]`); the rule
+ * is the genre's.
+ */
+export type ArmorClass = "plated" | "bionic" | "warded";
+
 export interface Weapon {
   /** Wire/JSON id, e.g. `mbl-01-s1`. */
   readonly id: string;
@@ -58,6 +67,8 @@ export interface Mobile {
   readonly name: string;
   readonly archetype: Archetype;
   readonly trajectory: TrajectoryProfile;
+  /** What its hull is made of: the other half of the weapon-type matchup (`combat.ts`). */
+  readonly armor: ArmorClass;
   readonly angleMin: number;
   readonly angleMax: number;
   readonly maxHp: number;

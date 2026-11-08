@@ -1,4 +1,4 @@
-import type { PlayerState, Team } from "./types.js";
+import type { ArmorClass, Effect, PlayerState, Team } from "./types.js";
 import { TUNABLES, clamp } from "./tuning.js";
 
 /**
@@ -12,6 +12,37 @@ import { TUNABLES, clamp } from "./tuning.js";
  * | `d > R` | none | `0` |
  */
 export type Tier = "inner" | "mid" | "outer" | "none";
+
+/**
+ * The weapon-type matchup (`mobiles.md` § 5, `US-CORE-003` AC6).
+ *
+ * The genre's rule: a weapon type hits one armour class harder and another one softer, so a player counter-picks and the
+ * roster is a chart rather than a list of bars. The classes are ours and so are the numbers (`[assumption: OQ-19]`);
+ * what comes from the genre is that the rule exists and that it is published.
+ *
+ * ```
+ *               plated  bionic  warded
+ * explosive      1.15    0.90    1.00
+ * impact         0.90    1.15    1.00
+ * laser          1.00    0.90    1.15
+ * electric       1.20    1.00    0.90
+ * ```
+ *
+ * Every row is one class at `+15…20 %`, one at `−10 %` and one neutral, and every class is countered by something and
+ * soft to something — so a damage type is a choice, never an upgrade.
+ */
+export const ARMOR_MATRIX: Readonly<Record<Effect, Readonly<Record<ArmorClass, number>>>> = {
+  explosion: { plated: 1.15, bionic: 0.9, warded: 1 },
+  impact: { plated: 0.9, bionic: 1.15, warded: 1 },
+  laser: { plated: 1, bionic: 0.9, warded: 1.15 },
+  electric: { plated: 1.2, bionic: 1, warded: 0.9 },
+};
+
+/** The multiplier a damage type gets against one armour class, `1` when either side is unknown. */
+export function armorMultiplier(damageType: Effect | undefined, armor: ArmorClass | undefined): number {
+  if (!damageType || !armor) return 1;
+  return ARMOR_MATRIX[damageType]?.[armor] ?? 1;
+}
 
 export function tierOf(distance: number, radius: number): Tier {
   if (radius <= 0) return "none";
@@ -42,8 +73,10 @@ export interface DamageOptions {
   readonly defense: number;
   /** Attacker's avatar attack multiplier, `1.0` by default. */
   readonly attack?: number;
-  /** `itm-blood`: +25 % on the next shot. */
+  /** `itm-blood`: +33 % on the next shot. */
   readonly bloodBonus?: number;
+  /** The weapon-type matchup against the victim's armour class (`ARMOR_MATRIX`). */
+  readonly armorMultiplier?: number;
 }
 
 /** `round(power × tierPower / defense)`, never below zero. */
@@ -53,7 +86,8 @@ export function damageAt(options: DamageOptions): number {
   if (multiplier === 0) return 0;
   const attack = options.attack ?? 1;
   const blood = options.bloodBonus ?? 1;
-  const raw = (options.power * multiplier * attack * blood) / clamp(options.defense, 0.5, 2);
+  const matchup = options.armorMultiplier ?? 1;
+  const raw = (options.power * multiplier * attack * blood * matchup) / clamp(options.defense, 0.5, 2);
   return Math.max(0, Math.round(raw));
 }
 
@@ -72,7 +106,15 @@ export interface HitResult {
 export function applyBlast(
   players: readonly PlayerState[],
   blast: { readonly x: number; readonly y: number; readonly radius: number; readonly power: number; readonly ownerSlot: number },
-  options: { readonly defenseOf?: (player: PlayerState) => number; readonly attack?: number; readonly bloodBonus?: number } = {},
+  options: {
+    readonly defenseOf?: (player: PlayerState) => number;
+    /** The armour class of each victim, for the weapon-type matchup. */
+    readonly armorOf?: (player: PlayerState) => ArmorClass | undefined;
+    /** The blast's damage type, i.e. the firing weapon's `effect`. */
+    readonly damageType?: Effect;
+    readonly attack?: number;
+    readonly bloodBonus?: number;
+  } = {},
 ): readonly HitResult[] {
   const results: HitResult[] = [];
   /** Damage this blast dealt to someone else, credited to the shooter at the end (`TC-CORE-915`). */
@@ -89,6 +131,7 @@ export function applyBlast(
       defense: options.defenseOf ? options.defenseOf(player) : 1,
       attack: options.attack ?? 1,
       bloodBonus: options.bloodBonus ?? 1,
+      armorMultiplier: armorMultiplier(options.damageType, options.armorOf?.(player)),
     });
     if (damage <= 0) continue;
     const absorbed = Math.min(player.shield, damage);
