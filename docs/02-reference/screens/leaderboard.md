@@ -73,3 +73,4 @@ Public ranking by Elo. No auth, cursor-paginated. An anonymous page is cached fo
 | Cursor pagination keeps `rank` continuous across pages and rejects a forged cursor | `apps/worker/tests/leaderboard.test.ts` (TC-RANK-104) |
 | A name containing `<script>` renders as text | `tests/e2e/leaderboard.spec.ts` (TC-RANK-146) |
 | Public access — no auth, no redirect, no `/me` | `tests/e2e/leaderboard.spec.ts` (TC-RANK-147) |
+| Offline shows the banner and its retry, with no stale page | `tests/e2e/pwa-offline.spec.ts` (TC-PWA-064) |
