@@ -72,9 +72,12 @@ export function PhrasePicker({
         className="match__skip"
         data-testid="chat-toggle"
         aria-expanded={open}
+        aria-label={labels.phrases}
+        title={labels.phrases}
         onClick={() => setOpen((was) => !was)}
       >
-        {labels.phrases}
+        {/* The bar is one row of icons: "Câu nói nhanh" as a sentence cost 129 px of it. */}
+        <span aria-hidden="true">💬</span>
       </button>
       {/*
         The grid opens on demand: twenty-four 60 px targets cannot sit over a battlefield that a one-finger

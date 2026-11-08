@@ -27,6 +27,7 @@ vi.mock("../src/game/scene", () => ({
       setAimAllowed: vi.fn(),
       setWeaponSlot: vi.fn(),
       setAimDelta: vi.fn(),
+      setAimAid: vi.fn(),
       destroy: vi.fn(),
     };
   },
@@ -122,8 +123,10 @@ function roomState(): ServerMessage {
 
 describe("TC-MATCH-949: a phrase travels as an id (US-MATCH-004 AC3, AC5, AC6, AC7)", () => {
   beforeEach(() => {
+    // `localStorage` is absent in an opaque-origin jsdom; the match no longer needs it to render, so a missing store
+    // must not fail the wiring check.
     sessionStorage.clear();
-    localStorage.clear();
+    globalThis.localStorage?.clear();
     broadcast.mockClear();
     sendControl.mockClear();
     sendControlAll.mockClear();

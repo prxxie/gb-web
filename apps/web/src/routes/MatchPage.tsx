@@ -10,6 +10,8 @@ import { useNavigate, useParams } from "react-router-dom";
 import {
   TUNABLES,
   applyInput,
+  EMOTE_IDS,
+  PHRASE_IDS,
   botTurn,
   createMatch,
   createRng,
@@ -18,8 +20,6 @@ import {
   isItemId,
   ITEMS_BY_ID,
   toSnapshot,
-  EMOTE_IDS,
-  PHRASE_IDS,
   type ChatId,
   type MatchEvent,
   type MatchState,
@@ -29,17 +29,17 @@ import { LocaleToggle } from "../app/Shell";
 import { mountBattle, type BattleHandle } from "../game/scene";
 import { canAim, fireFromPull, RING_RADIUS } from "../game/aim";
 import { DirectionPad, type PadAction } from "../components/DirectionPad";
+import type { ChatKind } from "@gbw/core";
+import { ItemSlots } from "../components/ItemSlots";
+import { PhrasePicker } from "../components/PhrasePicker";
 import { MatchStats } from "../components/MatchStats";
-import { PhrasePicker, type ChatKind } from "../components/PhrasePicker";
-import { Ruler } from "../components/Ruler";
-import { ItemTray } from "../components/ItemTray";
 import { Roster } from "../components/Roster";
 import { WeatherBanner } from "../components/WeatherBanner";
 import { winConditionOf } from "../lib/outcome";
 import { clockSeconds } from "../lib/clock";
 import { WeaponStrip, type WeaponSlot } from "../components/WeaponStrip";
 import { WindDial } from "../components/WindDial";
-import { defaultWindow, type CameraWindow } from "@gbw/core";
+import { type CameraWindow } from "@gbw/core";
 import { useLocale } from "../app/providers";
 import { useLiveAnnouncement } from "../app/useLiveAnnouncement";
 import { translate, type Locale } from "../i18n";
@@ -165,7 +165,8 @@ export function MatchPage(): JSX.Element {
     aimMobile.angleMin,
     Math.min(aimMobile.angleMax, Math.round((power > 0 ? pullAngle : 45) + aimDelta)),
   );
-  const [camera, setCamera] = useState<CameraWindow>(() => defaultWindow(16 / 9));
+  // The camera window still drives the scene; the ruler that printed it is gone (`screens/match.md` § 8).
+  const [, setCamera] = useState<CameraWindow | null>(null);
   /** Where the renderer last drew this client's mobile, in CSS pixels (`US-MATCH-003` AC11). */
   const [focus, setFocus] = useState<{ readonly x: number; readonly y: number } | null>(null);
   const [status, setStatus] = useState<"connecting" | "live" | "reconnecting" | "ended">("connecting");
@@ -843,14 +844,9 @@ export function MatchPage(): JSX.Element {
 
   // A phrase carries an id, never a string the player typed (AC7), so every receiver renders it in
   // its own locale (AC5). It is not a match input: it changes no state, so it never spends a `seq`.
-  const onChat = useCallback(
-    (kind: ChatKind, id: ChatId) => {
-      if (!plan) return;
-      setChat({ slot: plan.localSlot, kind, id });
-      mesh.current?.sendControlAll(chatFrame(kind, id));
-    },
-    [plan],
-  );
+  // The quick-chat button is gone (owner's call): the phrase channel stays for the chat log, which is the next piece.
+  // Quick chat is gone with its button (owner's call); the chat log will reintroduce a sender.
+;
 
   useEffect(() => {
     if (!chat) return;
@@ -891,6 +887,16 @@ export function MatchPage(): JSX.Element {
       : activePlayer
         ? t("match.announce.turn", { name: activePlayer.displayName, hp: activePlayer.hp })
         : "",
+  );
+
+  // The chat sender the phrase grid calls (`US-MATCH-004`): only the id crosses the wire, never text.
+  const onChat = useCallback(
+    (kind: ChatKind, id: ChatId) => {
+      if (!plan) return;
+      setChat({ slot: plan.localSlot, kind, id });
+      mesh.current?.sendControlAll(chatFrame(kind, id));
+    },
+    [plan],
   );
 
   if (!plan || !state) {
@@ -943,8 +949,6 @@ export function MatchPage(): JSX.Element {
           </div>
         </div>
 
-        <Ruler window={camera} unitLabel={t("match.ruler.unit")} />
-
         <button
           type="button"
           className={aimAid ? "match__aid match__aid--on" : "match__aid"}
@@ -989,13 +993,6 @@ export function MatchPage(): JSX.Element {
               {hint}
             </div>
           )}
-          <div className="match__turnline" data-testid="turn-line">
-            {isMyTurn
-              ? t("match.yourTurn")
-              : t("match.waitingTurn", {
-                  name: state?.players.find((player) => player.slot === state.turn.activeSlot)?.displayName ?? "…",
-                })}
-          </div>
           <div className="match__loadout">
           <WeaponStrip
             weapons={mobile.weapons}
@@ -1013,37 +1010,34 @@ export function MatchPage(): JSX.Element {
             disabled={!isMyTurn || lockedTurn === state.turn.number}
             onSelect={selectWeapon}
           />
-          <ItemTray
+          <ItemSlots
             items={Object.entries(localPlayer?.items ?? {}).map(([id, qty]) => ({
               id,
               qty,
               delay: ITEMS_BY_ID.get(id)?.delayCost ?? 0,
+              name: ITEMS_BY_ID.get(id)?.name ?? id,
             }))}
-            labels={{
-              toggle: t("match.item.tray"),
-              empty: t("match.item.empty"),
-              quantity: t("match.item.quantity"),
-              delay: t("match.item.delay"),
-            }}
             enabled={isMyTurn}
+            label={t("match.item.tray")}
+            quantityLabel={t("match.item.quantity")}
+            delayLabel={t("match.item.delay")}
             onUse={onUseItem}
           />
           </div>
-
-        <PhrasePicker
-          skipEnabled={isMyTurn}
-          phraseIds={PHRASE_IDS}
-          emoteIds={EMOTE_IDS}
-          labels={{
-            skip: t("match.skip"),
-            phrases: t("match.phrases.title"),
-            emotes: t("match.emotes.title"),
-          }}
-          phraseText={(id) => t(`match.phrase.${id}`)}
-          emoteText={(id) => t(`match.emote.${id}`)}
-          onSkip={onSkip}
-          onChat={onChat}
-        />
+          <PhrasePicker
+            skipEnabled={isMyTurn}
+            phraseIds={PHRASE_IDS}
+            emoteIds={EMOTE_IDS}
+            labels={{
+              skip: t("match.skip"),
+              phrases: t("match.phrases.title"),
+              emotes: t("match.emotes.title"),
+            }}
+            phraseText={(id) => t(`match.phrase.${id}`)}
+            emoteText={(id) => t(`match.emote.${id}`)}
+            onSkip={onSkip}
+            onChat={onChat}
+          />
           <MatchStats
             seed={state.seed}
             round={state.turn.round}

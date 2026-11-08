@@ -13,16 +13,17 @@ test.describe("solo demo path", () => {
     await expect(page.getByTestId("match-screen")).toBeVisible();
     await expect(page.getByTestId("turn-clock")).toBeVisible();
     await expect(page.getByTestId("wind-dial")).toBeVisible();
-    // The ruler count is `clamp(round(8 × visibleWidth / 1000), 8, 16)`, so it is 8 on a 5:3 screen and more on a
-    // landscape phone, where the camera window keeps its 600 units of height and gains width (`US-MATCH-007`).
-    const segments = Number(await page.getByTestId("ruler").getAttribute("data-segments"));
-    expect(segments).toBeGreaterThanOrEqual(8);
-    expect(segments).toBeLessThanOrEqual(16);
-    // One division is always ~125 units, and every division is labelled, so the strip measures the window.
-    const ticks = page.getByTestId("ruler").locator(".ruler__tick");
-    await expect(ticks).toHaveCount(segments + 1);
-    const last = Number(await ticks.last().innerText());
-    expect(Math.abs(last / segments - 125)).toBeLessThan(6);
+    // The bottom ruler is gone (owner's call): the bar carries S1/S2/SS, the skip icon, the six item slots, the wind to
+    // come, the teams' health and the gold, all on one line — that row is what a player reads instead of a scale.
+    const bar = page.locator(".match__bottom");
+    await expect(bar).toBeVisible();
+    await expect(page.getByTestId("weapon-0")).toBeVisible();
+    await expect(page.getByTestId("weapon-2")).toBeVisible();
+    await expect(page.getByTestId("match-skip")).toBeVisible();
+    await expect(page.getByTestId("item-slots")).toBeVisible();
+    await expect(page.getByTestId("weather-forecast")).toBeVisible();
+    await expect(page.getByTestId("gold")).toBeVisible();
+    await expect(page.getByTestId("ruler")).toHaveCount(0);
   });
 
   test("TC-MATCH-902: a one-finger pull raises the power readout", async ({ page }) => {
