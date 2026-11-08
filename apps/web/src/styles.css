@@ -637,6 +637,26 @@ td {
   background: linear-gradient(180deg, rgba(11, 18, 32, 0), rgba(11, 18, 32, 0.85));
 }
 
+/* The aim aid is a training wheel and looks like one: small, quiet, and it sits above the ruler rather than in the
+   thumb's way. 44 px of tap target is the floor (`NFR-17`, `TC-FND-133`). */
+.match__aid {
+  position: absolute;
+  right: 8px;
+  bottom: calc(38px + var(--safe-bottom));
+  min-height: 44px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: rgba(11, 18, 32, 0.72);
+  color: var(--ink-dim);
+  font-size: 0.7rem;
+}
+
+.match__aid--on {
+  border-color: var(--accent);
+  color: var(--ink);
+}
+
 .ruler__tick {
   font-variant-numeric: tabular-nums;
   opacity: 0.7;

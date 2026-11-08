@@ -24,6 +24,7 @@ const flat = (y = 820) => ({
 
 const CALM: Wind = { magnitude: 0, directionDeg: 0, sector: 0 };
 /** Sector 0 = east (`directionDeg 0`), GB's only two wind directions. */
+const SEPARATION = 1_640; // map-01's spawn separation
 const EAST = (magnitude: number): Wind => ({ magnitude, directionDeg: 0, sector: 0 });
 /** Sector 1 = west (`directionDeg 180`). */
 const WEST = (magnitude: number): Wind => ({ magnitude, directionDeg: 180, sector: 1 });
@@ -52,17 +53,17 @@ function shoot(mobileId: string, angle: number, force: number, wind: Wind = CALM
 }
 
 describe("ballistics", () => {
-  it("TC-CORE-020: mbl-01 shot 1 at 45°, force 98, no wind lands at ~3,680 units in 8.55 s", () => {
+  it("TC-CORE-020: mbl-01 shot 1 at 45°, force 98, no wind lands at ~2,182 units in 5.35 s", () => {
     // Measured, not guessed: `v0 = 98 × 6.2 = 607.6` and `range = v0² / g = 3,692` before the 0.1 position
     // quantum takes its few units. The pre-rebalance pin was 1,986 units in 6.3 s (`speedK 4.55`, `g 105`).
     const flight = shoot("mbl-01", 45, 98);
-    expect(flight.landingX).toBeCloseTo(3_680.3, 1);
-    expect(flight.flightMs).toBe(8_550);
-    expect(flight.steps).toBe(171);
+    expect(flight.landingX).toBeCloseTo(2_182.4, 1);
+    expect(flight.flightMs).toBe(5_350);
+    expect(flight.steps).toBe(107);
     expect(flight.offMap).toBe(false);
 
-    // One gravity, so the step is the same for every shell: `vy` grows by exactly `g × dt = 5 u/s` per 50 ms.
-    expect(TUNABLES.gravity).toBe(100);
+    // One gravity, so the step is the same for every shell: `vy` grows by exactly `g × dt = 7.6 u/s` per 50 ms.
+    expect(TUNABLES.gravity).toBe(152);
     const mobile = getMobile("mbl-01");
     const projectile = launch({
       id: 1,
@@ -75,7 +76,7 @@ describe("ballistics", () => {
       force: 98,
     });
     const stepped = stepProjectile(projectile, { wind: CALM, gravity: TUNABLES.gravity });
-    expect(stepped.vy - projectile.vy).toBeCloseTo(5, 10);
+    expect(stepped.vy - projectile.vy).toBeCloseTo(7.6, 10);
 
     // Run-to-run identity: the same inputs draw the same parabola.
     expect(shoot("mbl-01", 45, 98)).toEqual(flight);
@@ -105,14 +106,14 @@ describe("ballistics", () => {
     const heavy = "mbl-03"; // the old mass-169 mobile
     const calmLight = shoot(light, 20, 60);
     const calmHeavy = shoot(heavy, 20, 60);
-    expect(calmLight.landingX).toBe(883);
+    expect(calmLight.landingX).toBe(521.7);
     expect(calmHeavy.landingX).toBe(calmLight.landingX);
     expect(calmHeavy.flightMs).toBe(calmLight.flightMs);
 
-    // Same wind, same drift: 65.3 units for both, whatever their angle window and shell.
+    // Same wind, same drift: 32.4 units for both, whatever their angle window and shell.
     const driftLight = shoot(light, 20, 60, EAST(26)).landingX - calmLight.landingX;
     const driftHeavy = shoot(heavy, 20, 60, EAST(26)).landingX - calmHeavy.landingX;
-    expect(driftLight).toBeCloseTo(65.3, 1);
+    expect(driftLight).toBeCloseTo(32.4, 1);
     expect(driftHeavy).toBeCloseTo(driftLight, 6);
 
     // The property is roster-wide: every mobile that may fire at 20° with a plain shell lands in the same spot and
@@ -126,10 +127,10 @@ describe("ballistics", () => {
     expect(plain.length).toBeGreaterThanOrEqual(8);
     for (const mobile of plain) {
       const still = shoot(mobile.mobileId, 20, 60);
-      expect(still.landingX, `${mobile.mobileId} calm`).toBe(883);
-      expect(still.flightMs, `${mobile.mobileId} hang time`).toBe(2_500);
+      expect(still.landingX, `${mobile.mobileId} calm`).toBe(521.7);
+      expect(still.flightMs, `${mobile.mobileId} hang time`).toBe(1_550);
       const windy = shoot(mobile.mobileId, 20, 60, EAST(26));
-      expect(windy.landingX - still.landingX, `${mobile.mobileId} drift`).toBeCloseTo(65.3, 1);
+      expect(windy.landingX - still.landingX, `${mobile.mobileId} drift`).toBeCloseTo(32.4, 1);
     }
   });
 
@@ -137,9 +138,9 @@ describe("ballistics", () => {
     // `windAcceleration(wind, coefficient?)` lost its `mass` parameter: one wind reading is one push for the whole
     // roster (`tunables.md` § 1.1), which is what makes a wind count transferable between mobiles in GB.
     // `0.8 × 26 = 20.8 u/s²` — a fifth of gravity, and no divisor anywhere in the formula.
-    expect(windAcceleration(EAST(26)).ax).toBeCloseTo(20.8, 10);
+    expect(windAcceleration(EAST(26)).ax).toBeCloseTo(26, 10);
     expect(windAcceleration(EAST(26)).ay).toBeCloseTo(0, 10); // `-0` for a horizontal wind, i.e. no vertical term
-    expect(windAcceleration(WEST(26)).ax).toBeCloseTo(-20.8, 10);
+    expect(windAcceleration(WEST(26)).ax).toBeCloseTo(-26, 10);
     expect(windAcceleration(WEST(26)).ay).toBeCloseTo(0, 10);
 
     // Horizontal only: neither direction touches `vy`, so wind can never make a shell hang. The general formula
@@ -147,7 +148,7 @@ describe("ballistics", () => {
     expect(windAcceleration({ magnitude: 26, directionDeg: 270, sector: 0 }).ay).toBeGreaterThan(0);
 
     // The coefficient is the only scale factor: half of it is half the push.
-    expect(windAcceleration(EAST(26), TUNABLES.windCoefficient / 2).ax).toBeCloseTo(10.4, 10);
+    expect(windAcceleration(EAST(26), TUNABLES.windCoefficient / 2).ax).toBeCloseTo(13, 10);
   });
 
   it("TC-CORE-011: a different tunables file produces a different trajectory", () => {
@@ -172,9 +173,10 @@ describe("ballistics", () => {
   });
 
   it("TC-CORE-029: a shot that leaves the map never lands", () => {
-    // The real `map-01` bounds, not the probe: at full power with wind the shell is past the 2,000-unit map long
-    // before it comes down, and the turn resolves as a miss (`maxFlightMs` fallback).
-    const flight = shoot("mbl-01", 45, 98, EAST(26), { bounds: MAP_BOUNDS });
+    // The real `map-01` bounds, not the probe. After the retune a mobile's own `maxPower` no longer throws the shell
+    // out of the window (`TC-CORE-924`), so the case fires past it on purpose: the miss path still has to resolve the
+    // turn instead of hanging on `maxFlightMs`.
+    const flight = shoot("mbl-01", 45, 200, EAST(26), { bounds: MAP_BOUNDS });
     expect(flight.offMap).toBe(true);
     expect(flight.impact).toBeNull();
   });
@@ -218,11 +220,11 @@ describe("ballistics", () => {
     for (const mobile of MOBILES) {
       const angle = Math.min(mobile.angleMax, Math.max(mobile.angleMin, 45));
       const flight = shoot(mobile.mobileId, angle, mobile.maxPower);
-      // One gravity and one power law, so the roster's spread comes from the aim band alone: every mobile clears a
-      // whole 2,000-unit map at full power and none of them throws the shell past two (`speedK 6.2`), i.e. "full
-      // power leaves the map" — the genre's own ceiling, and the reason the last part of the bar is a real choice.
-      expect(flight.landingX, mobile.mobileId).toBeGreaterThan(TUNABLES.mapWidth);
-      expect(flight.landingX, mobile.mobileId).toBeLessThan(TUNABLES.mapWidth * 2.2);
+      // One gravity and one power law, so the roster's spread comes from the aim band alone. The genre's own ceiling
+      // is that full power overshoots the enemy without leaving the map: every mobile throws at least 1.05× the
+      // spawn separation and none more than 2.2×, so the top of the bar is a real choice and not the only option.
+      expect(flight.landingX, mobile.mobileId).toBeGreaterThan(SEPARATION * 1.05);
+      expect(flight.landingX, mobile.mobileId).toBeLessThan(SEPARATION * 2.2);
       for (const weapon of mobile.weapons) {
         expect(weapon.power, `${mobile.mobileId} power`).toBeGreaterThanOrEqual(150);
         expect(weapon.power, `${mobile.mobileId} power`).toBeLessThanOrEqual(650);
@@ -249,7 +251,7 @@ describe("ballistics", () => {
     expect(Math.abs(stepped.x * 10 - Math.round(stepped.x * 10))).toBeLessThan(1e-6);
     expect(Math.abs(stepped.y * 10 - Math.round(stepped.y * 10))).toBeLessThan(1e-6);
     // …but `vx` takes the whole 1.04 u/s of this step's wind (`20.8 × 0.05`) instead of being snapped.
-    expect(stepped.vx).toBeCloseTo(projectile.vx + 1.04, 9);
+    expect(stepped.vx).toBeCloseTo(projectile.vx + 1.3, 9);
     expect(stepped.ageMs).toBe(50);
   });
 });

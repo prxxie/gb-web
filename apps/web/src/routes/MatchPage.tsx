@@ -71,6 +71,18 @@ export type { PlannedMatch };
  * (`US-RANK-005` AC6). The round trip is one D1 batch; a room that has not answered in five seconds is
  * better shown as "not recorded yet" than a screen that never appears.
  */
+/** The aim aid is a training wheel: off unless the player turned it on, and remembered per device. */
+const AIM_AID_KEY = "gb.aimAid";
+
+function readAimAid(): boolean {
+  try {
+    return window.localStorage.getItem(AIM_AID_KEY) === "1";
+  } catch {
+    // Private mode throws on `localStorage`: the aid is a preference, not a feature.
+    return false;
+  }
+}
+
 const RECORD_TIMEOUT_MS = 5_000;
 
 /**
@@ -131,6 +143,7 @@ export function MatchPage(): JSX.Element {
   const [power, setPower] = useState(0);
   /** The "drag to aim" hint, shown once per match (`US-MATCH-002` AC4). */
   const [hint, setHint] = useState<string | null>(null);
+  const [aimAid, setAimAid] = useState(readAimAid);
   const hintShown = useRef(false);
   const [aimDelta, setAimDelta] = useState(0);
   /** The angle the finger is currently pulling at (`US-MATCH-002` AC2). The pad only nudges it. */
@@ -461,6 +474,17 @@ export function MatchPage(): JSX.Element {
       }),
     );
   }, [state, plan?.localSlot, lockedTurn]);
+
+  // The trajectory aid is opt-in (`US-MATCH-005` AC2): the scene keeps it off until the player asks, and the choice
+  // survives a reload because re-learning an arc every session is not the point.
+  useEffect(() => {
+    battle.current?.setAimAid(aimAid);
+    try {
+      window.localStorage.setItem(AIM_AID_KEY, aimAid ? "1" : "0");
+    } catch {
+      // Private mode: the toggle still works for this match.
+    }
+  }, [aimAid]);
 
   // Bot opponent: think for a moment, then shoot.
   useEffect(() => {
@@ -912,6 +936,17 @@ export function MatchPage(): JSX.Element {
         </div>
 
         <Ruler window={camera} unitLabel={t("match.ruler.unit")} />
+
+        <button
+          type="button"
+          className={aimAid ? "match__aid match__aid--on" : "match__aid"}
+          data-testid="aim-aid"
+          aria-pressed={aimAid}
+          title={t("match.aid.hint")}
+          onClick={() => setAimAid((current) => !current)}
+        >
+          {aimAid ? t("match.aid.hide") : t("match.aid.show")}
+        </button>
 
         <div
           className={focus ? "match__power match__power--on-ring" : "match__power"}

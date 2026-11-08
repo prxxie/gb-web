@@ -221,5 +221,8 @@
   "errors.reference": "Mã lỗi: {id}",
   "profile.deleted": "Đã xoá tài khoản.",
   "match.announce.hit": "Bắn trúng! {name} gây {damage} sát thương.",
-  "match.announce.miss": "{name} bắn nhưng không trúng ai."
+  "match.announce.miss": "{name} bắn nhưng không trúng ai.",
+  "match.aid.show": "Trợ ngắm",
+  "match.aid.hide": "Trợ ngắm: bật",
+  "match.aid.hint": "Bật để xem trước đường đạn"
 }

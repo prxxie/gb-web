@@ -32,7 +32,7 @@ Each mobile carries shot 1, shot 2 and one super shot (`data/mobiles.md`), and a
 | # | Given | When | Then |
 |---|---|---|---|
 | AC1 | a mobile with three weapons | the match renders | the weapon strip shows all three with class icons and the super shot's charge state (`TC-MATCH-906`) |
-| AC2 | the player taps weapon 2 (slot index 1) | the strip updates | the next shot carries that slot and the aim aid redraws for it: the flight that slot's weapon really takes and its blast radius (`TC-MATCH-906`, `TC-MATCH-941`, `TC-MATCH-944`; the look of it on a device is `TC-MATCH-943`) |
+| AC2 | the player taps weapon 2 (slot index 1) | the strip updates | the next shot carries that slot and the aim aid redraws for it: the flight that slot's weapon really takes and its blast radius (`TC-MATCH-906`, `TC-MATCH-941`, `TC-MATCH-944`; the look of it on a device is `TC-MATCH-943`). The aid itself is **opt-in**: off on a fresh device, because the genre gives the player an angle number and a power bar and reading the arc is the skill (`TC-MATCH-908`) |
 | AC3 | the super shot is spent | the strip renders | slot 2 is disabled for the rest of the match (`TC-CORE-922`) |
 | AC4 | the item tray | it is opened | items are shown with quantity, delay cost and a 44 px target; the count never exceeds the loadout (`TC-MATCH-006`) |
 | AC5 | an item is tapped | it is used | the tray closes, the delay cost is displayed, and the effect is visible on the battlefield (`TC-CORE-906`) |
