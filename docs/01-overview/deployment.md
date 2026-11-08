@@ -57,9 +57,9 @@ flowchart LR
 
 | Workflow | Trigger | Steps |
 |----------|---------|-------|
-| `ci.yml` | every push, every PR | `pnpm install --frozen-lockfile`, `pnpm typecheck`, `pnpm lint`, `pnpm test`, `pnpm e2e`, the docs verification listed in `AGENTS.md` § PROJECT, `npx @redocly/cli lint docs/02-reference/api/openapi.yaml` |
+| `ci.yml` | every push, every PR | Job *checks*: `pnpm install --frozen-lockfile`, `pnpm typecheck`, `pnpm lint`, `pnpm test`, `pnpm build`, `pnpm budget`, `node .agents/scripts/verify-docs.mjs`. Job *playwright*: install, `playwright install --with-deps chromium`, a dummy `apps/worker/.dev.vars`, both servers, `pnpm e2e`. The OpenAPI document is checked by `tests/meta/openapi.test.ts`, not by a linter step |
 | `deploy-preview.yml` | PR opened/updated, same-repo branches only | Build with preview env, `wrangler d1 migrations apply --remote --env preview`, `wrangler versions upload --env preview`, Pages deploy `--branch pr-<n>` |
-| `deploy-production.yml` | push to `main`, manual approval | Migrate, deploy Worker, deploy Pages, run smoke, post the release record (`cpt-release`) |
+| `deploy-production.yml` | a green `CI` run on `main`, or manual dispatch | Migrate, deploy Worker, deploy Pages, verify the deployed sha, post the release record (`cpt-release`). The job only arms when the repository variable `PRODUCTION_READY` is `true`; before `US-FND-004` it would otherwise fail on an empty token after every merge |
 
 CI needs: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `VITE_CLERK_PUBLISHABLE_KEY`, and the worker secrets mirrored
 for the deploy step. A PR from a fork does not get secrets and therefore does not deploy.
