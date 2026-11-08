@@ -27,16 +27,27 @@ describe("TC-PWA-130: locale tables", () => {
 describe("TC-MATCH-915/916: gestures", () => {
   const shorter = 390;
 
-  it("turns a one-finger pull into power 0–4 and an angle inside the window", () => {
+  it("turns a one-finger pull into power 0–4, and the vertical travel into an angle", () => {
     let pointers = addPointer(clearPointers(), { id: 1, x: 200, y: 300 });
-    pointers = movePointer(pointers, { id: 1, x: 120, y: 160 });
-    const gesture = classify(pointers, { origin: { id: 1, x: 200, y: 300 }, facing: 1, fullPowerDistance: shorter, previousSpread: null });
+    pointers = movePointer(pointers, { id: 1, x: 320, y: 160 });
+    const gesture = classify(pointers, { origin: { id: 1, x: 200, y: 300 }, facing: 1, fullPowerDistance: shorter, baseAngle: 45, previousSpread: null });
     expect(gesture.kind).toBe("pull");
     if (gesture.kind !== "pull") return;
     expect(gesture.power).toBeGreaterThan(0);
     expect(gesture.power).toBeLessThanOrEqual(4);
-    expect(gesture.angle).toBeGreaterThanOrEqual(-90);
-    expect(gesture.angle).toBeLessThanOrEqual(90);
+    // Power is the distance from the centre; the angle is a rotation of the barrel from its base, so a drag that goes
+    // 140 px up raises it by 140 × ANGLE_DEG_PER_PX (35°) and never depends on how far out the finger went.
+    expect(gesture.angle).toBeCloseTo(45 + 140 * 0.25, 5);
+    // Sideways is unsigned: a left-facing mobile drags left and must read the same power as a right-facing one.
+    const mirrored = movePointer(clearPointers(), { id: 1, x: 80, y: 160 });
+    const other = classify(mirrored, {
+      origin: { id: 1, x: 200, y: 300 },
+      facing: -1,
+      fullPowerDistance: shorter,
+      baseAngle: 45,
+      previousSpread: null,
+    });
+    if (other.kind === "pull") expect(other.power).toBeCloseTo(gesture.power, 5);
   });
 
   it("TC-MATCH-902: two fingers pan instead of firing", () => {
@@ -45,7 +56,7 @@ describe("TC-MATCH-915/916: gestures", () => {
     pointers = addPointer(pointers, { id: 2, x: 220, y: 100 });
     pointers = movePointer(pointers, { id: 1, x: 130, y: 100 });
     pointers = movePointer(pointers, { id: 2, x: 250, y: 100 });
-    const gesture = classify(pointers, { origin: null, facing: 1, fullPowerDistance: shorter, previousSpread: 120 });
+    const gesture = classify(pointers, { origin: null, facing: 1, fullPowerDistance: shorter, baseAngle: 45, previousSpread: 120 });
     expect(["pan", "zoom"]).toContain(gesture.kind);
     expect(gesture.kind).not.toBe("pull");
   });

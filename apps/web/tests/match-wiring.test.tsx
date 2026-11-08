@@ -60,7 +60,7 @@ function mount(): void {
   );
 }
 
-describe("TC-MATCH-944: the weapon slot and the pad's nudge reach the renderer (US-MATCH-005 AC2)", () => {
+describe("TC-MATCH-944: the weapon slot reaches the renderer (US-MATCH-005 AC2)", () => {
   beforeEach(() => {
     sessionStorage.clear();
     setWeaponSlot.mockClear();
@@ -80,19 +80,25 @@ describe("TC-MATCH-944: the weapon slot and the pad's nudge reach the renderer (
     expect(setWeaponSlot).toHaveBeenCalled();
   });
 
-  it("hands the pad's nudge to the scene, starting from zero and following every change", async () => {
+  it("never nudges the barrel from the pad, because the pad only walks", async () => {
     mount();
     await waitFor(() => expect(callbacks).not.toBeNull());
 
-    // The page pushes the nudge on mount, so a scene that boots after a pad press is not left on the old angle.
+    // The page still hands the renderer a zero nudge on mount, so a scene that boots late is not left on an old offset.
     expect(setAimDelta).toHaveBeenCalledWith(0);
+    setAimDelta.mockClear();
 
-    const up = screen.getByTestId("direction-pad").querySelector('[data-slot="up"]') as HTMLButtonElement | null;
-    expect(up).not.toBeNull();
-    // A bot match may open on the bot's turn, when the pad is disabled: then only the handover is observable here.
-    if (up!.disabled) return;
-    fireEvent.pointerDown(up!);
-    await waitFor(() => expect(setAimDelta).toHaveBeenLastCalledWith(1));
+    // The ▲ ▼ buttons are gone: the barrel is rotated by the held gesture (`TC-MATCH-915`), and walking must never move
+    // it. Pressing every button the pad has must leave the renderer's nudge untouched.
+    const pad = screen.getByTestId("direction-pad");
+    expect(pad.querySelector('[data-slot="up"]')).toBeNull();
+    expect(pad.querySelector('[data-slot="down"]')).toBeNull();
+    for (const slot of ["left", "right"] as const) {
+      const control = pad.querySelector(`[data-slot="${slot}"]`) as HTMLButtonElement | null;
+      expect(control).not.toBeNull();
+      if (control && !control.disabled) fireEvent.pointerDown(control);
+    }
+    expect(setAimDelta).not.toHaveBeenCalled();
   });
 });
 

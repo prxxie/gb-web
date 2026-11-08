@@ -127,6 +127,21 @@ class BattleScene extends Phaser.Scene {
   private origin: Point | null = null;
   /** One finger either pans the camera or arms a shot; `hold.ts` owns which (`US-MATCH-002`). */
   private hold: HoldState = IDLE;
+  /**
+   * The barrel's angle. A pull rotates it from where the last shot left it (owner's call, 2026-11-08): the mobile does
+   * not re-centre between turns, so a player can keep a known angle and only adjust the power.
+   */
+  private barrelAngle = 45;
+  /** The first pull of a match starts mid-window so the barrel can go both ways; after that it keeps the last angle. */
+  private barrelSeeded = false;
+
+  /** The middle of the aiming mobile's own barrel window (`angleMin`…`angleMax`). */
+  private midWindowAngle(): number {
+    const player = this.state.players.find((candidate) => candidate.slot === this.localSlot);
+    if (!player) return this.barrelAngle;
+    const mobile = getMobile(player.mobileId);
+    return (mobile.angleMin + mobile.angleMax) / 2;
+  }
   private previousSpread: number | null = null;
   private pullPower = 0;
   private pullAngle = 0;
@@ -338,6 +353,7 @@ class BattleScene extends Phaser.Scene {
           origin: this.origin,
           facing: this.facing(),
           fullPowerDistance: this.fullPowerDistance(),
+          baseAngle: this.barrelAngle,
           previousSpread: null,
         });
         const power = gesture.kind === "pull" ? gesture.power : this.pullPower;
@@ -390,11 +406,13 @@ class BattleScene extends Phaser.Scene {
       origin: this.origin,
       facing: this.facing(),
       fullPowerDistance: this.fullPowerDistance(),
+      baseAngle: this.barrelAngle,
       previousSpread: this.previousSpread,
     });
     if (gesture.kind === "pull") {
       this.pullPower = gesture.power;
       this.pullAngle = gesture.angle;
+      this.barrelAngle = gesture.angle;
       this.callbacks.onPull(gesture.power, gesture.angle);
       return;
     }
@@ -424,6 +442,10 @@ class BattleScene extends Phaser.Scene {
       this.hold = armed;
       // Only a player who may shoot gets a ring; everyone else keeps panning (`AC7`).
       this.origin = this.aimAllowed && armed.origin ? { id: 0, x: armed.origin.x, y: armed.origin.y } : null;
+      if (this.origin && !this.barrelSeeded) {
+        this.barrelAngle = this.midWindowAngle();
+        this.barrelSeeded = true;
+      }
     } else if (armed !== this.hold) {
       this.hold = armed;
     }

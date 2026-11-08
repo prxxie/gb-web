@@ -1,9 +1,11 @@
 // @vitest-environment jsdom
 /**
- * TC-MATCH-907: the four-way pad (`US-MATCH-006`).
+ * TC-MATCH-907: the move pad (`US-MATCH-006`).
  *
- * A tap is one step, a hold repeats through `stepHold` (the same function the engine uses), and a
- * spent budget disables only the two walking directions — the barrel still aims.
+ * The pad walks the mobile and nothing else. The barrel's up/down buttons are gone: the angle is set by the held
+ * gesture (vertical travel rotates it, `TC-MATCH-915`), so the pad is two cells and sits in the match bar's left end.
+ * A tap is one step, a hold repeats through `stepHold` (the same function the engine uses), and a spent budget disables
+ * both walking directions.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
@@ -34,15 +36,15 @@ function button(name: string): HTMLElement {
   return screen.getByRole("button", { name });
 }
 
-describe("TC-MATCH-907: the pad's four controls", () => {
-  it("renders ◀ ▶ ▲ ▼ with their Vietnamese names", () => {
+describe("TC-MATCH-907: the pad's two controls", () => {
+  it("renders ◀ ▶ only — the barrel is a gesture now, not a button", () => {
     pad();
-    expect(screen.getAllByRole("button")).toHaveLength(4);
-    for (const name of Object.values(LABELS)) expect(button(name)).toBeInTheDocument();
-    expect(button(LABELS.left)).toHaveTextContent("◀");
-    expect(button(LABELS.right)).toHaveTextContent("▶");
-    expect(button(LABELS.up)).toHaveTextContent("▲");
-    expect(button(LABELS.down)).toHaveTextContent("▼");
+    expect(screen.getAllByRole("button")).toHaveLength(2);
+    expect(button(LABELS.left)).toBeEnabled();
+    expect(button(LABELS.right)).toBeEnabled();
+    // Nothing in the pad can reach the angle: pressing a direction sends a move and never a tilt.
+    expect(screen.queryByRole("button", { name: LABELS.up })).toBeNull();
+    expect(screen.queryByRole("button", { name: LABELS.down })).toBeNull();
   });
 
   it("a tap on ▶ asks for one step and repeats nothing yet (AC2)", () => {
@@ -52,14 +54,6 @@ describe("TC-MATCH-907: the pad's four controls", () => {
     expect(onAction).toHaveBeenCalledWith("right");
     expect(onRepeat).not.toHaveBeenCalled();
     fireEvent.pointerUp(button(LABELS.right), { pointerId: 1 });
-  });
-
-  it("a tap on ▲ tilts the barrel exactly one degree-step (AC4)", () => {
-    const { onAction } = pad();
-    fireEvent.pointerDown(button(LABELS.up), { pointerId: 1 });
-    expect(onAction).toHaveBeenCalledWith("up");
-    expect(onAction).toHaveBeenCalledTimes(1);
-    fireEvent.pointerUp(button(LABELS.up), { pointerId: 1 });
   });
 });
 
@@ -99,25 +93,13 @@ describe("TC-MATCH-907: holding a direction", () => {
     const after = onRepeat.mock.calls.reduce((sum, [, times]) => sum + times, 0);
     expect(after).toBe(before);
   });
-
-  it("rotates the barrel at 10°/s while ▲ is held (AC5)", () => {
-    const { onRepeat } = pad();
-    const up = button(LABELS.up);
-    fireEvent.pointerDown(up, { pointerId: 1 });
-    vi.advanceTimersByTime(500);
-    const delivered = onRepeat.mock.calls.reduce((sum, [, times]) => sum + times, 0);
-    expect(delivered).toBe(stepHold(500, 4, 60) - 1);
-    fireEvent.pointerUp(up, { pointerId: 1 });
-  });
 });
 
 describe("TC-MATCH-907: a spent budget", () => {
-  it("disables ◀ ▶ but keeps ▲ ▼ aiming (AC6)", () => {
+  it("disables both walking directions (AC6)", () => {
     pad({ canMove: false });
     expect(button(LABELS.left)).toBeDisabled();
     expect(button(LABELS.right)).toBeDisabled();
-    expect(button(LABELS.up)).toBeEnabled();
-    expect(button(LABELS.down)).toBeEnabled();
   });
 
   it("sends no move when a disabled direction is pressed (AC6)", () => {
@@ -128,38 +110,35 @@ describe("TC-MATCH-907: a spent budget", () => {
 
   it("disables every control outside the player's turn (AC1)", () => {
     const { onAction } = pad({ enabled: false });
-    for (const name of Object.values(LABELS)) expect(button(name)).toBeDisabled();
-    fireEvent.pointerDown(button(LABELS.up), { pointerId: 1 });
+    for (const name of [LABELS.left, LABELS.right]) expect(button(name)).toBeDisabled();
+    fireEvent.pointerDown(button(LABELS.right), { pointerId: 1 });
     expect(onAction).not.toHaveBeenCalled();
   });
 
   it("shows the remaining move budget beside the pad (AC2/AC6)", () => {
-    // The pad's contract carries `movesLeft` and `energy` because AC2 decrements a badge and AC6
-    // shows `0`; the shipped component takes neither, so there is no number to read.
     const { root } = pad({ canMove: false });
     expect(within(root).queryAllByText(/^\d+$/)).not.toHaveLength(0);
   });
 });
 
-describe("TC-MATCH-939: the pad honours the barrel window and the turn end (US-MATCH-006 AC5, AC8)", () => {
-  it("dims ▲ at angleMax and ▼ at angleMin, and keeps the other live", () => {
+describe("TC-MATCH-939: the pad is a corner control and does not aim (US-MATCH-006 AC5, AC7, AC8)", () => {
+  it("ignores the barrel window, because it no longer tilts the barrel (AC5)", () => {
+    // The window used to dim ▲ at `angleMax` and ▼ at `angleMin`. There is no ▲ or ▼ any more: the gesture clamps the
+    // angle against the same window (`TC-MATCH-915`), so the pad has nothing to dim and must stay live.
     pad({ angle: 80, angleWindow: { min: 10, max: 80 } });
-    expect(button(LABELS.up)).toBeDisabled();
-    expect(button(LABELS.down)).toBeEnabled();
-    cleanup();
-    pad({ angle: 10, angleWindow: { min: 10, max: 80 } });
-    expect(button(LABELS.down)).toBeDisabled();
-    expect(button(LABELS.up)).toBeEnabled();
+    expect(button(LABELS.left)).toBeEnabled();
+    expect(button(LABELS.right)).toBeEnabled();
   });
 
-  it("follows the renderer's focus point, so a pan or zoom keeps it on the mobile (AC7)", () => {
+  it("stays in the bar's corner even when the renderer reports a focus point (AC7)", () => {
+    // It used to ring the active mobile; the owner moved it into the match bar, where it must not jump around.
     pad({ focus: { x: 120, y: 200 }, viewport: { width: 844, height: 390 } });
     const box = screen.getByTestId("direction-pad");
-    expect(box.getAttribute("data-focus")).toBe("mobile");
-    expect(box.style.left).not.toBe("");
+    expect(box.getAttribute("data-focus")).toBe("corner");
+    expect(box.style.left).toBe("");
     cleanup();
     pad({ focus: { x: 640, y: 120 }, viewport: { width: 844, height: 390 } });
-    expect(screen.getByTestId("direction-pad").style.left).not.toBe(box.style.left);
+    expect(screen.getByTestId("direction-pad").getAttribute("data-focus")).toBe("corner");
   });
 
   it("stops a hold when the turn ends, so no stray move is sent (AC8)", () => {

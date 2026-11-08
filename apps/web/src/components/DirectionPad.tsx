@@ -1,12 +1,13 @@
 /**
- * Four-way pad (`US-MATCH-006`).
+ * The move pad (`US-MATCH-006`).
  *
- * Left and right walk the mobile, up and down tilt the barrel one degree per step. Holding repeats
- * — the repeat count comes from `stepHold`, so the same rule is testable without a browser.
+ * Left and right walk the mobile. The up/down buttons that tilted the barrel are gone: the barrel is set by the held
+ * gesture now (vertical travel rotates it), so the pad is two cells and lives in the match bar's left end. Holding
+ * repeats — the repeat count comes from `stepHold`, so the same rule is testable without a browser.
  */
 import { useEffect, useRef } from "react";
 import { stepHold } from "@gbw/core";
-import { padLayout, PAD_BOX, type FocusPoint, type ViewportSize } from "./pad-layout";
+import type { FocusPoint, ViewportSize } from "./pad-layout";
 import type { JSX } from "react";
 
 export type PadAction = "left" | "right" | "up" | "down";
@@ -19,11 +20,11 @@ export interface DirectionPadProps {
   /** Remaining movement energy, shown beside the step count (`US-MATCH-006` AC2/AC6). */
   readonly energy?: number;
   /** The barrel's current angle and the mobile's own window: at either bound the matching control dims (`AC5`). */
+  /** Accepted for compatibility; the barrel is a gesture now, so the pad no longer reads either. */
   readonly angle?: number;
   readonly angleWindow?: { readonly min: number; readonly max: number };
-  /** Where the active mobile is on screen (`US-MATCH-003` AC11): the pad rings it instead of hiding in a corner. */
+  /** Accepted for compatibility: the pad is pinned to the match bar's corner now, so it no longer follows the mobile. */
   readonly focus?: FocusPoint | null;
-  /** Defaults to the window; a test passes its own. */
   readonly viewport?: ViewportSize;
   readonly labels: Readonly<Record<PadAction, string>>;
   readonly onAction: (action: PadAction) => void;
@@ -39,10 +40,10 @@ export function DirectionPad({
   canMove,
   movesLeft = 0,
   energy = 0,
-  angle,
-  angleWindow,
-  focus = null,
-  viewport,
+  angle: _angle,
+  angleWindow: _angleWindow,
+  focus: _focus = null,
+  viewport: _viewport,
   labels,
   onAction,
   onRepeat,
@@ -103,16 +104,14 @@ export function DirectionPad({
 
   // The viewport is the visible window: the match screen fills it, so clamping against it is what keeps the bottom
   // row of buttons reachable. A test passes its own so the geometry stays a unit test.
-  const placement = padLayout(focus, viewport ?? { width: window.innerWidth, height: window.innerHeight });
 
   return (
     <div
-      className={`match__pad${placement ? " match__pad--on-mobile" : ""}`}
+      className="match__pad"
       role="group"
       aria-label={labels.left}
       data-testid="direction-pad"
-      data-focus={placement ? "mobile" : "corner"}
-      style={placement ? { left: `${placement.left}px`, top: `${placement.top}px`, width: `${PAD_BOX}px`, height: `${PAD_BOX}px` } : undefined}
+      data-focus="corner"
     >
       <span className="match__pad-budget" data-testid="pad-moves-left">
         {movesLeft}
@@ -120,18 +119,13 @@ export function DirectionPad({
       <span className="match__pad-budget match__pad-budget--energy" data-testid="pad-energy">
         {energy}
       </span>
-      {(["up", "left", "right", "down"] as const).map((slot) => (
+      {(["left", "right"] as const).map((slot) => (
         <button
           key={slot}
           type="button"
           data-slot={slot}
           aria-label={labels[slot]}
-          disabled={
-            !enabled ||
-            ((slot === "left" || slot === "right") && !canMove) ||
-            (slot === "up" && angle !== undefined && angleWindow !== undefined && angle >= angleWindow.max) ||
-            (slot === "down" && angle !== undefined && angleWindow !== undefined && angle <= angleWindow.min)
-          }
+          disabled={!enabled || !canMove}
           onPointerDown={(event) => {
             event.currentTarget.setPointerCapture?.(event.pointerId);
             start(slot);
@@ -140,7 +134,7 @@ export function DirectionPad({
           onPointerCancel={stop}
           onPointerLeave={stop}
         >
-          {slot === "up" ? "▲" : slot === "down" ? "▼" : slot === "left" ? "◀" : "▶"}
+          {slot === "left" ? "◀" : "▶"}
         </button>
       ))}
     </div>

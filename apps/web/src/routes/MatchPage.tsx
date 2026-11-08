@@ -964,8 +964,13 @@ export function MatchPage(): JSX.Element {
           className={focus ? "match__power match__power--on-ring" : "match__power"}
           style={focus ? { left: focus.x, top: focus.y - RING_RADIUS - 18 } : undefined}
         >
+          {/* The ring's centre carries the angle: the gesture sets both, and the angle is the number a player reads
+              while pulling (owner's layout, 2026-11-08). The power keeps its own chip and the ring's own arc. */}
           <div className="match__power-value" data-testid="power-value">
-            {power.toFixed(2)}
+            <span className="match__power-angle" data-testid="ring-angle">
+              {Math.round(aimAngle)}°
+            </span>
+            <span className="match__power-number">{power.toFixed(2)}</span>
           </div>
         </div>
 

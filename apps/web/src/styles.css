@@ -258,11 +258,7 @@ td {
 .match__hud .match__power,
 .match__hud .match__actions,
 .match__hud .match__loadout,
-.match__hud .match__pad,
-.match__hud .match__weather-banner {
-  pointer-events: auto;
-}
-
+.match__hud 
 .match__weather-banner {
   position: absolute;
   left: 50%;
@@ -394,17 +390,16 @@ td {
 }
 
 .match__pad {
+  /* Two 44 px cells in the bar's left end (owner's layout): the barrel is a gesture now, so only walking is a button. */
   position: absolute;
-  right: calc(8px + var(--safe-right));
-  bottom: calc(66px + var(--safe-bottom));
-  display: grid;
-  /* 3 × 44 px + gaps = 140 px, down from 192: the pad only nudges the angle now that a finger can pan the window
-     (`NFR-17` keeps every cell at the 44 px tap floor). */
-  grid-template-columns: repeat(3, 44px);
-  grid-template-rows: repeat(3, 44px);
+  left: calc(6px + var(--safe-left));
+  bottom: calc(6px + var(--safe-bottom));
+  display: flex;
   gap: 4px;
-  /* Light enough to read the battlefield through the buttons, on the owner's instruction (`US-MATCH-003` AC11). */
-  opacity: 0.8;
+  align-items: center;
+  opacity: 0.92;
+  pointer-events: auto;
+  z-index: 3;
 }
 
 /*
@@ -430,12 +425,15 @@ td {
 }
 
 .match__pad button {
+  width: 44px;
   min-width: 44px;
+  height: 44px;
   min-height: 44px;
   padding: 0;
-  font-size: 1rem;
-  border-radius: 12px;
+  font-size: 0.95rem;
+  border-radius: 8px;
   background: rgba(22, 33, 58, 0.92);
+  border: 1px solid #2b3b58;
 }
 
 .match__pad button[data-slot="up"] {
@@ -522,8 +520,8 @@ td {
   height: 56px;
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 0 calc(6px + var(--safe-right)) calc(6px + var(--safe-bottom)) calc(70px + var(--safe-left));
+  gap: 5px;
+  padding: 0 calc(6px + var(--safe-right)) calc(6px + var(--safe-bottom)) calc(102px + var(--safe-left));
   background: linear-gradient(180deg, rgba(11, 18, 32, 0.55), rgba(11, 18, 32, 0.94));
   border-top: 1px solid rgba(120, 160, 220, 0.16);
 }
@@ -703,9 +701,12 @@ td {
 /* The aim aid is a training wheel and looks like one: small, quiet, and it sits above the ruler rather than in the
    thumb's way. 44 px of tap target is the floor (`NFR-17`, `TC-FND-133`). */
 .match__aid {
+  /* All four offsets, not just right/bottom: a shared rule was pinning `left`/`top` too, so the pill stretched across the
+     battlefield and swallowed every pull that started near the middle of the screen. */
   position: absolute;
-  right: 8px;
-  bottom: calc(66px + var(--safe-bottom));
+  inset: auto 8px calc(66px + var(--safe-bottom)) auto;
+  width: max-content;
+  height: 44px;
   min-height: 44px;
   padding: 6px 12px;
   border-radius: 999px;
@@ -1169,8 +1170,8 @@ td {
   display: flex;
   align-items: center;
   gap: 1px;
-  min-width: 24px;
-  padding: 2px 3px;
+  min-width: 22px;
+  padding: 2px 2px;
   border-radius: 6px;
   background: rgba(16, 26, 46, 0.85);
   border: 1px solid #24324c;
@@ -1216,13 +1217,13 @@ td {
 
 .match__items {
   display: grid;
-  grid-template-columns: repeat(6, 34px);
+  grid-template-columns: repeat(6, 32px);
   gap: 4px;
 }
 
 .match__item {
   position: relative;
-  width: 34px;
+  width: 32px;
   height: 44px;
   padding: 0;
   display: flex;
@@ -1307,4 +1308,23 @@ td {
   height: 26px;
   display: inline-flex;
   align-items: center;
+}
+
+.match__power-value {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1.05;
+}
+
+.match__power-angle {
+  font-size: 1.05rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.match__power-number {
+  font-size: 0.62rem;
+  color: var(--ink-dim);
+  font-variant-numeric: tabular-nums;
 }

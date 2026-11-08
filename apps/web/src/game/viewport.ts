@@ -8,6 +8,9 @@
  */
 import { powerFromDrag, angleFromPull, pinchTo, panBy, type CameraWindow } from "@gbw/core";
 
+/** Vertical travel that turns the barrel one degree: 180 px of drag sweeps 45°, a comfortable thumb arc. */
+export const ANGLE_DEG_PER_PX = 0.25;
+
 export interface Point {
   readonly id: number;
   readonly x: number;
@@ -65,6 +68,12 @@ export function classify(
      * full power a 175 px throw, so the aimed band lived in the first third of the gesture and every pull read as "max".
      */
     readonly fullPowerDistance: number;
+    /**
+     * The angle the barrel already had — the previous shot's angle, so the barrel stays where it was left. A held
+     * gesture *rotates* it: drag up to raise the barrel, down to lower it (`ANGLE_DEG_PER_PX`). Power comes from the
+     * forward travel alone, so pulling further right never changes the angle and raising the barrel never adds power.
+     */
+    readonly baseAngle: number;
     readonly previousSpread: number | null;
   },
 ): Gesture {
@@ -75,8 +84,12 @@ export function classify(
     const dx = first.x - context.origin.x;
     const dy = first.y - context.origin.y;
     const travelled = Math.hypot(dx, dy);
-    const power = powerFromDrag(travelled, context.fullPowerDistance);
-    const angle = angleFromPull(dx, dy, context.facing);
+    // The two axes are independent: power is how far the finger travelled *sideways* from the touch centre, and the
+    // angle is how far it travelled up or down. Sideways is unsigned on purpose — half the roster faces left, and a
+    // player dragging towards their own barrel must still get power (the engine aims away from the hull regardless).
+    const power = powerFromDrag(Math.abs(dx), context.fullPowerDistance);
+    // Up is negative in screen space, so subtracting dy raises the barrel.
+    const angle = context.baseAngle - dy * ANGLE_DEG_PER_PX;
     return { kind: "pull", power, angle, distance: travelled };
   }
   const spread = distance(first, second);

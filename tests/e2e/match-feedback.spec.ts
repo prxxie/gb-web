@@ -58,7 +58,8 @@ test("TC-MATCH-900: the live region says a shot happened", async ({ page }) => {
   // The turn announcement is what a screen reader hears first.
   await expect(region).toContainText(/Lượt của|turn/i);
 
-  await pull(page, -70, -62);
+  // Power counts the forward travel only, so the drag goes right (and up, which raises the barrel).
+  await pull(page, 90, -62);
   // Fired and missed, or fired and hit: either way the region reports the shot rather than staying on the turn.
   await expect(region).toContainText(/bắn|trúng|fired|hit/i, { timeout: 5_000 });
 });
