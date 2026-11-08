@@ -131,7 +131,7 @@ a drag. All pad and button targets are ≥ 60 × 60 logical px (`NFR-17`).
 | An eliminated mobile is drawn as a faded wreck in place and keeps its roster cell, ordered by slot | `apps/web/tests/interpolate.test.tsx` (TC-MATCH-924, the wreck) and `apps/web/tests/roster.test.tsx` (TC-MATCH-925, the strip) |
 | Landscape launch, safe-area insets respected, no fullscreen launch flag | `tests/e2e/smoke.spec.ts` (TC-PWA-063) |
 | Turn clock starts at 20 s, skips on timeout, does not drift > 1 s | `packages/core/tests/turn.test.ts` (TC-CORE-152) |
-| Wind re-rolled once per round, dial shows 12 sectors and 0–26 | `packages/core/tests/weather.test.ts` (TC-CORE-926), `apps/web/tests/wind-dial.test.tsx` (TC-MATCH-923) |
+| Wind re-rolled once per round, dial shows east-or-west and 0–26 | `packages/core/tests/weather.test.ts` (TC-CORE-926), `apps/web/tests/wind-dial.test.tsx` (TC-MATCH-923) |
 | Blast damage, friendly fire, elimination, team-loss detection | `packages/core/tests/combat.test.ts`, `packages/core/tests/match.test.ts` (TC-CORE-020…TC-CORE-028) |
 | Snapshot apply is idempotent and duck-types by `seq` | `packages/core/tests/snapshot.test.ts` (TC-CORE-040) |
 | Reconnect overlay countdown matches the 20 s grace | `apps/web/tests/reconnect.test.tsx` (TC-ROOM-174…TC-ROOM-177) |

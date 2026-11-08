@@ -97,20 +97,38 @@ build without changing the mobile. Ours: cosmetic-first, bonus-capped, and never
 
 ## 10. The physics model we chose
 
-A **constant-acceleration** integrator with **per-mobile gravity and mass** — no drag, because a drag term makes the
-arc feel mushy and hides the wind. It is the shape that produces the genre's readable shot: a long parabola, a visible
-wind drift, and a mobile that feels heavy or floaty by its own numbers.
+A **constant-acceleration** integrator with **one gravity for the whole roster** and a **wind term with no mass in it**
+— no drag, because a drag term makes the arc feel mushy and hides the wind. It is the shape that produces the genre's
+readable shot: every mobile draws the **same parabola** at the same angle and power, so a range learned on one mobile
+reads on the next, and the wind is a single number a player corrects against rather than a per-mobile handicap.
 
 ```
-v0 = force × speedK                          // one power law for every mobile
-ax =  windCoefficient × m × cos θ / mass
-ay = −gravity + windCoefficient × m × sin θ / mass
+v0 = force × speedK                        // one power law for every mobile; speedK 6.2
+vx =  cos(angle) × v0 × facing
+vy = −sin(angle) × v0
+ax =  windCoefficient × m × cos θ          // 105 × m — no divisor
+ay =  windCoefficient × m × sin θ          // 0 in play: GB's wind is horizontal, θ ∈ {0°, 180°}
+vy += (gravity + ay) × dt                  // gravity 100 u/s² for all twenty, ×0.95–1.05 by map
 ```
 
-Fixed **50 ms** step, positions rounded to 0.1, no `Math.random()` in the core (`NFR-28`). Calibration:
-`force 98` at `45°`, `gravity 100`, `mass 168`, no wind → **1,988 units in 6.3 s** — one map width. Full wind
-(`m = 26`, `sector 0`) moves that landing point **~129 units**, one ruler division. Values, units and the full parameter
-table: [`tunables.md`](tunables.md) § 1.
+Two deliberate departures from what this project shipped before, both of them *towards* the genre:
+
+- **Gravity is a rule, not a mobile stat.** It used to be `84–128 u/s²` per mobile, which made the same angle and power
+  land anywhere in a 1.37× spread — the opposite of the genre, where the arc is common knowledge and the mobile only
+  decides which angles and shells you get. `Mobile.gravity` and `Mobile.mass` are gone.
+- **The wind push is mass-independent.** It used to be `42 × m / mass`, so the drift was a per-mobile property (62–191
+  units at full wind). In GB the wind moves every mobile alike — the gauge is a *weather* reading, not a mobile reading —
+  and with the divisor gone the only mobile-side input is hang time. `windAcceleration` lost its `mass` argument.
+- **The wind is horizontal.** Two directions, east (`sector 0`, `directionDeg 0`) and west (`sector 1`, `180`), because a
+  shell in the genre never hangs because the weather blew upwards. Twelve 30° sectors were our own invention.
+
+Fixed **50 ms** step, positions rounded to 0.1, no `Math.random()` in the core (`NFR-28`). Calibration, measured on the
+real integrator: `force 98` at `45°`, `gravity 100`, no wind → **3,680 units in 8.55 s**, i.e. 1.84 map widths at full
+power — the genre's "full power leaves the map" ceiling. Full wind (`m = 26`, `sector 0`) puts `a_x = 2,730 u/s²` — 27 ×
+gravity — on that shot and moves the landing point **100,131 units**: the mass-free coefficient has **not been retuned
+yet** and is currently far past playable, which `tunables.md` § 1.1 records openly. Values, units and the full parameter
+table: [`tunables.md`](tunables.md) § 1; the per-mobile reach and drift table is [`data/mobiles.md`](../data/mobiles.md)
+§ 4.
 
 **Why not something else** — the alternatives and the reasons they lost are in
 [`ADR-0005`](../../04-decisions/adr/ADR-0005-gb-physics-replica.md): a general physics engine (non-deterministic across
@@ -131,4 +149,4 @@ devices, +300 KB against `NFR-03`), server-side authority (the 10 ms CPU limit o
 | Stage gimmicks | `US-CORE-011` | [`tunables.md`](tunables.md) § 6 |
 | Eleven maps | `US-CORE-012` | [`tunables.md`](tunables.md) § 5 |
 | Avatar bonuses | `US-CORE-013` | [`tunables.md`](tunables.md) § 8 |
-| Weather per round, 12-sector wind | `US-CORE-015` | [`tunables.md`](tunables.md) § 1.3 |
+| Weather per round, east-or-west wind | `US-CORE-015` | [`tunables.md`](tunables.md) § 1.3 |

@@ -481,9 +481,10 @@ Questions that block or shape the work and that only the product owner, client, 
   by definition, and the acceptance criteria must be written against observable behaviour (arc height, wind drift, flat vs
   lobbed shots, bouncing, crater carving), not against numbers nobody can verify.
 - **Assumption**: our integrator is a constant-acceleration model we derived and tuned — fixed 50 ms step, one power law
-  (`v0 = force × 4.55`), per-mobile `gravity` 84–128 u/s² and `mass` 118–169, wind acceleration `÷ mass` (with a vertical
-  term), no drag, seven shot classes, terrain carving, restitution 0.6 — and one calibration shot (`force 98`, 45° → 1,988
-  units in 6.3 s) plus playtest fixes the absolute scale.
+  (`v0 = force × 6.2`), **one gravity for the roster** (100 u/s², bent by the map), wind acceleration `0.8 × wind` on the
+  horizontal axis with no mass divisor, no drag, seven shot classes, terrain carving, restitution 0.6 — and one
+  calibration shot (`force 98`, 45° → 3,680 units in 8.6 s) plus playtest fixes the absolute scale. *Revised 2026-11-08:
+  the per-mobile `gravity`/`mass` pair and the vertical wind term were dropped for GB parity.*
 - **Answer**: accepted with that definition of fidelity — a **playtested behavioural replica**, never a claim of numeric
   parity; the limit is stated in `docs/02-reference/gameplay/tunables.md` § 10 and in `ADR-0005`.
 
@@ -532,9 +533,9 @@ Questions that block or shape the work and that only the product owner, client, 
   round, announced once.
 - **Answer**: as assumed [user, 2026-11-05]. `wind = { magnitude 0–26, directionDeg = sector × 30, sector 0–11 }`,
   `weather = { wind, rolledAtRound }`; the host rolls when `turn.round` increments (every player has acted once),
-  deterministically from the match seed (`tunables.md` § 1.3). `windCoefficient = 42`, so `m = 26` reproduces the push
-  the earlier `±10` model was tuned to (~129 units at 6.3 s ≈ one ruler division). The dial has 12 ticks so direction is
-  readable to ±15°.
+  deterministically from the match seed (`tunables.md` § 1.3). `windCoefficient = 0.8`, so `m = 26` bends the
+  calibration shot 760 units — six ruler divisions, a sixth of the map, a reading a player has to respect. *Revised
+  2026-11-08: the wind is east or west only — GB's wind is horizontal — so the dial has two ticks, not twelve.*
 
 ## OQ-42 — Do accounts own avatar parts, and does the match record keep the bonus totals?
 

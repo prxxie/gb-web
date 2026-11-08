@@ -60,10 +60,6 @@ export interface Mobile {
   readonly trajectory: TrajectoryProfile;
   readonly angleMin: number;
   readonly angleMax: number;
-  /** This mobile's gravity, u/s². */
-  readonly gravity: number;
-  /** Divides the wind push. */
-  readonly mass: number;
   readonly maxHp: number;
   readonly maxShield: number;
   /** Shield refilled at the start of this mobile's turn. */
@@ -141,7 +137,11 @@ export interface Mode {
 
 export type Team = "A" | "B";
 
-/** Wind is polar: `directionDeg` is always `sector * 30` (`OQ-41`). */
+/** Wind is horizontal: `directionDeg` is `sector * 180`, i.e. 0° east or 180° west (`OQ-41`). */
+/**
+ * GB's wind is a horizontal vector: a magnitude on `0…26` and one of two directions (`sector 0` = east, `1` = west,
+ * `directionDeg 0` / `180`). There is no vertical wind in the genre — a shell does not hang because the wind blows up.
+ */
 export interface Wind {
   readonly magnitude: number;
   readonly directionDeg: number;

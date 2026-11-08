@@ -1,5 +1,34 @@
 # Changelog
 
+## 2026-11-08 — the physics goes back to GunBound's
+
+An audit of the integrator against the genre found the model had invented two things GB does not have and scaled a third
+wrong. All three are gone; the numbers below are measured on the engine, not estimated.
+
+- **One gravity for the roster.** Each mobile carried its own `gravity` (84–128 u/s²) and `mass` (118–169), so the same
+  angle and power drew a different parabola per mobile (1,610–2,199 units at 45°/full power) and a range learned on one
+  mobile did not transfer. GB gives every mobile the same gravity: `TUNABLES.gravity = 100`, bent only by the map's
+  `gravityModifier`, and the `gravity`/`mass` fields are gone from the mobile record, the doc tables and the tests. What
+  separates the twenty mobiles is now the firing envelope and the shell — which is the genre's design.
+- **A wind that is horizontal and mass-free.** The wind was a 12-sector polar vector divided by mass, so it had a vertical
+  term that made shells hang and a push that varied per mobile. GB's wind is east or west and pushes every mobile alike:
+  `ax = 0.8 × magnitude`, `ay = 0`, `windSectors = 2`, and the dial draws two ticks instead of twelve. At full wind (26)
+  the calibration shot bends 760 units — six ruler divisions, a sixth of the map — where it used to bend 129.
+- **`speedK` 4.55 → 6.2, so the power bar is usable.** A shot to the 1,640-unit spawn gap on `map-01` needed force 86–99
+  of 100 (3.44–3.97 of 4 bars) and two mobiles could not reach the enemy at all; it now needs ~65 (2.6 bars), and full
+  power clears a whole map width, as it does in GB.
+- **A decode bug the rebalance exposed**: `snapshot.ts` rebuilt `directionDeg` as `sector * 30` while the engine rolled
+  `sector * 180`, so a west wind came back from the wire as 30° and a peer simulated a different shot (`TC-CORE-928`).
+- The health endpoint and the worker fixtures now read `TUNABLES.rulesetVersion` instead of a literal, and
+  `RULESET_VERSION` moved to `2026-11-08` — the `!` change `NFR-23` asks for.
+- Docs rewritten in the same change: `tunables.md` § 1.1–1.3, `mobiles.md` § 1 and § 4 (regenerated table, no `g`/`mass`
+  columns), `reference-gunbound.md` § 10, `ADR-0005`, `OQ-41`, and the four stories whose acceptance criteria quoted the
+  old numbers.
+
+Still on the GB-parity list, in the next change: the delay a player pays for thinking (`+10/s`), item delay costs at GB's
+ratios, the super shot recharging from energy instead of once per match, and Bunge Shot carving 25 % more ground instead
+of returning to the caster.
+
 ## 2026-11-08 — the play-through: the match could not be played, and now it can
 
 A real bot match, driven in a landscape browser at 844 × 390, exposed what 1036 unit cases and 73 browser cases could

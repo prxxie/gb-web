@@ -16,7 +16,7 @@ refs: [02-reference/gameplay/tunables.md, 02-reference/api/signaling.md, 02-refe
 ## 1. Story
 
 **As a** player
-**I want** the wind to change once per round and be drawn as a magnitude on a 12-sector dial
+**I want** the wind to change once per round and be drawn as a magnitude with an east-or-west direction
 **so that** I can read it at a glance and correct a shot by a known amount instead of guessing.
 
 ## 2. Context
@@ -41,7 +41,7 @@ constant a player can compute against. The dial has 12 ticks of 30°, which is t
 | AC3 | the queue wraps to the next round | `turn.round` increments | exactly one new roll happens, `rolledAtRound` follows, and a `weather` message goes out on `control` before the first snapshot of the round (`TC-CORE-926`) |
 | AC4 | the same match `seed` and round number | the roll is repeated in a replay | the same `magnitude` and `sector` are produced — no `Math.random()` in `core` (`NFR-28`, `TC-CORE-926`) |
 | AC5 | `magnitude = 0` | the round starts | it is a legal roll: the dial shows a hollow arrow, the integrator applies no wind term at all (`TC-MATCH-923`) |
-| AC6 | `magnitude = 26`, `sector = 0` | a `mbl-01` shot is fired at 45°, force 98 | the landing point moves ~129 units — one ruler division — and the sign follows the sector (`TC-CORE-023`) |
+| AC6 | `magnitude = 26`, `sector = 0` | a `mbl-01` shot is fired at 45°, force 98 | the landing point moves ~760 units — six ruler divisions, a sixth of the map — and the sign follows the sector (`TC-CORE-023`) |
 | AC7 | a `weather` message arrives out of order (older `rolledAtRound`) | it is received | it is dropped; the newer `rolledAtRound` always wins (`TC-CORE-926`) |
 | AC8 | an 8-player snapshot taken mid-round | it is encoded | it carries `weather` and `turn.round` and still fits 800 B (`TC-CORE-041`, `TC-CORE-942`) |
 
@@ -86,7 +86,7 @@ Red: none — the rule was already implemented and green; this pass added the ca
 
 ## 9. Open questions
 
-- **OQ-41** (answered) — magnitude 0–26, 12 sectors of 30°, re-rolled once per round.
+- **OQ-41** (answered, revised 2026-11-08) — magnitude 0–26, east or west only (GB's wind is horizontal), re-rolled once per round.
 
 <!-- delivery:2026-11-06 -->
 

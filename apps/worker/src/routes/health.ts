@@ -1,3 +1,5 @@
+import { TUNABLES } from "@gbw/core";
+
 import type { Env } from "../lib/db.js";
 
 /**
@@ -12,7 +14,7 @@ export function health(env: Env, requestId: string, version: string): Response {
       status: "ok",
       version,
       environment: env.ENVIRONMENT,
-      ruleset: "2026-11-05",
+      ruleset: TUNABLES.rulesetVersion,
       request_id: requestId,
     },
     { headers: { "cache-control": "no-store", "x-request-id": requestId } },

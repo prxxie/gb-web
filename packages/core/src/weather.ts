@@ -9,10 +9,16 @@ import { createRng } from "./rng.js";
  * can plan while others act — and it is derived from `seed + round`, so a replay reproduces the same
  * sequence without shipping a weather log.
  */
+/**
+ * A wind roll: a magnitude on `0…26` and one of two directions.
+ *
+ * GB's wind is horizontal — east or west — and it re-rolls **every turn**, which is why a player reads the gauge again
+ * after each shot. `sector 0` = east, `1` = west.
+ */
 export function rollWind(rng: Rng): Wind {
   const magnitude = rng.int(0, TUNABLES.windMax);
   const sector = rng.int(0, TUNABLES.windSectors - 1);
-  return { magnitude, directionDeg: sector * 30, sector };
+  return { magnitude, directionDeg: sector * 180, sector };
 }
 
 export function rollWeather(seed: number, round: number): Weather {
@@ -46,8 +52,7 @@ export function describeWind(wind: Wind): string {
   return `${wind.magnitude} @ ${wind.directionDeg}°`;
 }
 
-/** The 12 sectors, clockwise from east, for the dial (`TC-MATCH-923`). */
+/** The two directions the dial shows (`TC-MATCH-923`): east or west, the genre's whole wind vocabulary. */
 export function sectorLabel(sector: number): string {
-  const labels = ["E", "ENE", "NNE", "N", "NNW", "WNW", "W", "WSW", "SSW", "S", "SSE", "ESE"];
-  return labels[((sector % 12) + 12) % 12] ?? "E";
+  return ((sector % 2) + 2) % 2 === 0 ? "E" : "W";
 }

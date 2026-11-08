@@ -13,6 +13,7 @@ import { launch, simulateFlight } from "../src/ballistics.js";
 import { getMap } from "../src/data/maps.js";
 import { getMobile } from "../src/data/mobiles.js";
 import { applyInput, createMatch, terrainOf, type Seat } from "../src/match.js";
+import type { MatchState } from "../src/types.js";
 import { TUNABLES } from "../src/tuning.js";
 
 const NOW = 1_700_000_000_000;
@@ -109,7 +110,9 @@ describe("terrain carving", () => {
       force: 60,
     });
 
-    const flight = simulateFlight(projectile, { wind: CALM, gravity: mobile.gravity, mass: mobile.mass }, terrain);
+    // One gravity for the whole roster (`tunables.md` § 1.1), so the flight context no longer carries a
+    // per-mobile gravity or a mass for the wind to fight.
+    const flight = simulateFlight(projectile, { wind: CALM, gravity: TUNABLES.gravity }, terrain);
 
     expect(flight.impact).not.toBeNull();
     if (!flight.impact) return;
@@ -134,7 +137,7 @@ describe("terrain carving", () => {
         angle: 10,
         force: 90,
       });
-    const context = { wind: CALM, gravity: mobile.gravity, mass: mobile.mass };
+    const context = { wind: CALM, gravity: TUNABLES.gravity };
     const arc = simulateFlight(launchAt("arc"), context, ridge);
     const piercing = simulateFlight(launchAt("piercing"), context, ridge);
 
@@ -144,7 +147,7 @@ describe("terrain carving", () => {
   });
 
   it("TC-CORE-914: a crater under a unit re-grounds it to the new surface when the shot ends the turn", () => {
-    const state = createMatch({
+    const rolled = createMatch({
       matchId: "m-terrain",
       roomCode: "ABC234",
       seed: 7,
@@ -153,6 +156,9 @@ describe("terrain carving", () => {
       seats: [seat(0, "A", "mbl-01"), seat(1, "B", "mbl-13")],
       now: NOW,
     });
+    // The property here is the crater re-grounding a unit, not the weather: with no mass dividing it any
+    // rolled wind dominates a lobbed aim, so the wind is pinned to calm and the shot is aimable again.
+    const state: MatchState = { ...rolled, weather: { ...rolled.weather, wind: CALM } };
     const shooter = state.players[0];
     const target = state.players[1];
     expect(shooter).toBeDefined();
@@ -161,7 +167,7 @@ describe("terrain carving", () => {
 
     const mobile = getMobile(shooter.mobileId);
     const weapon = mobile.weapons[0];
-    const gravity = mobile.gravity * getMap(state.mapId).gravityModifier;
+    const gravity = TUNABLES.gravity * getMap(state.mapId).gravityModifier;
     const terrain = terrainOf(state);
 
     // Aim the shot so it lands on the target's own ground.
@@ -176,7 +182,7 @@ describe("terrain carving", () => {
         angle: 45,
         force,
       });
-      const flight = simulateFlight(projectile, { wind: state.weather.wind, gravity, mass: mobile.mass }, terrain);
+      const flight = simulateFlight(projectile, { wind: state.weather.wind, gravity }, terrain);
       return Math.abs((flight.impact?.x ?? flight.landingX) - target.x);
     };
     let bestForce = 1;

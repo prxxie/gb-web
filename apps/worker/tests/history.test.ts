@@ -7,6 +7,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { resetLimits } from "../src/lib/ratelimit";
 import { createRig, seedProfile, type Rig } from "./support/fake-env";
+import { TUNABLES } from "@gbw/core";
 
 const BASE = Date.parse("2026-11-05T10:00:00.000Z");
 
@@ -16,7 +17,7 @@ function submission(matchId: string, startOffsetMinutes: number, overrides: Reco
   return {
     matchId,
     roomCode: "ABCD23",
-    rulesetVersion: "2026-11-05",
+    rulesetVersion: TUNABLES.rulesetVersion,
     startedAt,
     endedAt,
     winnerTeam: "A",
@@ -113,7 +114,7 @@ describe("GET /me/matches", () => {
       team: "A",
       opponents: expect.any(Array),
       ratingDelta: 16,
-      rulesetVersion: "2026-11-05",
+      rulesetVersion: TUNABLES.rulesetVersion,
     });
     rig.db.close();
   });

@@ -76,7 +76,7 @@ export function botShot(
     heights: Float64Array.from(state.terrain),
     width: TUNABLES.mapWidth,
   };
-  const gravity = mobile.gravity * map.gravityModifier;
+  const gravity = TUNABLES.gravity * map.gravityModifier;
   const wind = state.weather.wind;
 
   const bestFor = (weaponSlot: 0 | 1 | 2): Aim => {
@@ -97,7 +97,7 @@ export function botShot(
         });
         const flight = simulateFlight(
           projectile,
-          { wind, gravity, mass: mobile.mass, stepMs: 50, forceX: stage.forceX },
+          { wind, gravity, stepMs: 50, forceX: stage.forceX },
           terrain,
           undefined,
           { returnOffMap: stage.returnsOffMap },
@@ -188,8 +188,8 @@ export function botItemUse(
     }),
     {
       wind: state.weather.wind,
-      gravity: mobile.gravity * map.gravityModifier,
-      mass: mobile.mass,
+      gravity: TUNABLES.gravity * map.gravityModifier,
+
       stepMs: TUNABLES.stepMs,
       forceX: map.gimmicks.includes("force") ? FORCE_FIELD : 0,
     },

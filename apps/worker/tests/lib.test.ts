@@ -1,3 +1,4 @@
+import { TUNABLES } from "@gbw/core";
 import { describe, expect, it } from "vitest";
 import { problemBody, ProblemError, problemResponse, type FieldError } from "../src/lib/problem";
 import { decideCors, preflight } from "../src/lib/cors";
@@ -120,6 +121,6 @@ describe("TC-FND-001: health", () => {
     const response = health(env() as never, "req-9", "abc123");
     expect(response.status).toBe(200);
     const body = (await response.json()) as Record<string, unknown>;
-    expect(body).toMatchObject({ status: "ok", version: "abc123", environment: "test", ruleset: "2026-11-05" });
+    expect(body).toMatchObject({ status: "ok", version: "abc123", environment: "test", ruleset: TUNABLES.rulesetVersion });
   });
 });

@@ -11,9 +11,10 @@ parameter tuned by playtest.
 ## 1. Integrator — our ballistics model
 
 A shot is **angle + power**; the simulation turns that into a trajectory. We chose a **constant-acceleration parabola
-with per-mobile gravity and mass, wind divided by mass, and no drag term** (`ADR-0005`): no drag keeps the arc readable
-and makes mass the only thing wind fights, and a fixed step keeps it deterministic across devices (`NFR-28`). Four
-parameter families (§ 4.3) spread the twenty mobiles across the feel range, from flat-and-long to slow-and-lobby.
+with one gravity for the whole roster, a wind term with no mass in it, and no drag** (`ADR-0005`): every mobile draws the
+same parabola at the same angle and power — which is the genre's point, a range learned on one mobile transfers to the
+next — and a fixed step keeps it deterministic across devices (`NFR-28`). What separates the twenty mobiles is the
+**firing envelope** (the angle band and the `maxPower` cap, § 4.2) and the shell in the slot, not the arc.
 
 Units are **world units and seconds**; the world is `2,000 × 1,200`.
 
@@ -22,26 +23,28 @@ Units are **world units and seconds**; the world is `2,000 × 1,200`.
 Launch, at the unit's muzzle (`t = 0`) — **one power law for every mobile**, as in GB:
 
 ```
-v0 = force × speedK                      // force 0…maxPower (90–100); speedK 4.55 everywhere
+v0 = force × speedK                      // force 0…maxPower (90–100); speedK 6.2 everywhere
 vx =  cos(angle) × v0 × facing
 vy = −sin(angle) × v0
 
-ax =  windCoefficient × m × cos θ / mass          // GB:  a = wind / mass, resolved on both axes
-ay = −gravity + windCoefficient × m × sin θ / mass //      g_eff = g − wind × sin(dir) / mass
+ax =  windCoefficient × m × cos θ        // 105 × m, no divisor: 2,730 u/s² at full wind
+ay =  windCoefficient × m × sin θ        // 0 for GB's horizontal wind
+vy += (gravity + ay) × dt                // gravity 100 u/s² for every mobile, towards +y (down)
 ```
 
-Wind is **polar**, drawn as the genre draws it: a magnitude `m` on `0…26` and a direction `θ` quantised to **12 sectors
-of 30°** (`θ = sector × 30`, `0°` = east/right, counter-clockwise, so `90°` = north/up). A wind blowing straight up
-therefore *reduces* effective gravity, a wind blowing down adds to it — the vertical term is what makes a lobbed shot
-hang or drop, and it is why the dial shows direction and not just strength.
+Wind is **horizontal only**, drawn as the genre draws it: a magnitude `m` on `0…26` and one of **two directions**,
+`θ = sector × 180` — `sector 0` = east (`0°`), `sector 1` = west (`180°`), and the dial shows `E` or `W`. The genre has
+no vertical wind: a lobbed shot never hangs because the weather blew upwards, so `ay` is `0` in play and the formula
+keeps its general shape only for a map gimmick that would ever need it. The push carries **no mass divisor** — in GB
+the wind moves every mobile alike, so one wind reading means one correction whatever the mobile.
 
 One step, fixed `stepMs = 50` — 20 Hz, the rate the genre runs at and a step small enough that a fast shell cannot tunnel
-through terrain — and **no drag**: shell weight is expressed through `mass` alone (a heavy shell drifts less, it is not
-slowed more):
+through terrain — and **no drag**: a shell carries no weight of its own, so two shots of the same class differ by power
+alone:
 
 ```
-vx += ax × dt;   vy += ay × dt
-x  += vx × dt;   y  += vy × dt
+vx += (ax + forceX) × dt;   vy += (gravity + ay) × dt
+x  += vx × dt;              y  += vy × dt
 ```
 
 The genre quantities, mapped onto ours:
@@ -50,9 +53,9 @@ The genre quantities, mapped onto ours:
 |---|---|---|
 | screen parts | ~8 parts across a screen, 1 part ≈ 100 px | 1 unit = 1 px, ruler division 125 units |
 | power bar | `0 … 4.0` | `force 0 … maxPower`, `v0 = force × speedK`, shown as power `0.0–4.0` |
-| gravity | per mobile, so mobiles fly differently at the same power | per mobile `84 … 128 u/s²` |
-| mass | per mobile, dividing the wind push | per mobile `118 … 169` |
-| wind | magnitude `0…26` + direction angle (12 sectors), `a = wind / mass` | `windCoefficient × m × (cos θ, sin θ) / mass`, `windCoefficient = 42` |
+| gravity | one value for the roster, so the same angle and power land in the same place in every mobile | **`100 u/s²`** for all twenty, `×0.95–1.05` by map (`gravityModifier`) |
+| mass | not a flight term in the genre: the wind pushes every mobile alike | **removed** — no `mass` field, no wind divisor (`TC-CORE-023`, `TC-CORE-925`) |
+| wind | magnitude `0…26`, **horizontal only** (east or west), no mass term | `windCoefficient × m × (cos θ, sin θ)`, `windCoefficient = 105`, `θ = sector × 180` |
 | drag | **none** | **none** (`density` and `dragK` removed in `CR-2026-11-04-gb-constant-acceleration`) |
 
 Impact — the segment `(x₀,y₀)→(x,y)` is intersected with the terrain polyline. On a hit the shell detonates (or bounces
@@ -68,36 +71,47 @@ shield absorbs first:  shield -= min(shield, damage);  hp -= damage − absorbed
 Determinism (`NFR-28`): fixed step, integer-truncated trig inputs, no `Math.random()` in `core`, positions rounded to
 `0.1` (`TC-CORE-040`).
 
-**Calibration.** `force 98` at `45°`, `gravity 100`, `mass 168`, no wind → **1,988 units in 6.3 s**: one map width at
-full power, with the long readable hang time GB shows. **Full wind (`m = 26`) at `θ = 0`** moves that landing point
-**~129 units** — almost exactly one ruler division (`tunables.md` § 9), which is why the ruler and the wind dial belong
-together: a player reads "full wind, one tick" and corrects by one division. Across the roster the drift at full wind is
-**62–191 units** — Jade Dragon (`mass 118`) drifts most, Iron Tortoise (`169`) least — 3–10 % of the map: felt, still
-aimable. A light-gravity mobile outranges a heavy one by ~50 % at the same power (`mbl-14` 2,162 vs `mbl-03` 1,441).
+**Calibration.** `force 98` at `45°`, `gravity 100`, no wind → **3,680 units in 8.55 s** (measured on the real
+integrator; `v0 = 98 × 6.2 = 607.6` and `v0² / g = 3,692` before the 0.1 position quantum): **1.84 map widths**, the
+genre's "full power leaves the map" ceiling, with the long readable hang time GB shows. Every mobile draws exactly that
+parabola at that angle and power (`TC-CORE-023`).
+
+**Full wind (`m = 26`, `θ = 0°`) moves that landing point 760 units** — six ruler divisions, a sixth of the map —
+because `a_x = 0.8 × 26 = 20.8 u/s²` (a fifth of gravity) and `½·a·t² = 769` over the 8.6 s hang. The coefficient is the
+one number the mass-free model had to re-derive: the first pass kept the old `105`, which with no divisor meant
+`2,730 u/s²` — 27 × gravity, and a calibration shot thrown 100,131 units. A wind reading a player has to respect is a
+sixth of the map, not fifty of them. The two figures a player feels are both measured and pinned by
+`TC-CORE-960` / `TC-CORE-023`, so the retune cannot land silently. For reference, `drift ≈ ½ · windCoefficient · m · t²`,
+so restoring a **one-ruler-division** full-wind correction (`125 units`) on the new 8.55 s hang time needs
+`windCoefficient ≈ 2 × 125 / (26 × 8.55²) ≈ 0.13`; ~5 % of a map (`100 units`) lands in the same order of magnitude.
+Wind also no longer varies by mobile: the drift column of [`data/mobiles.md`](../data/mobiles.md) § 4 spreads
+`14,331–38,510 units` at a `10`-unit wind, and the *only* input is hang time — `mbl-17` hangs 8.7 s, `mbl-05` 5.2 s.
 
 > **What is measured and what is ours.** Nothing here is copied from another product: the structure is a textbook
 > parabola and every number is a design target fixed by the calibration point above and by playtest (`OQ-37`). The spread
-> across the twenty mobiles is deliberate — it is what makes one mobile feel heavy and another floaty.
+> across the twenty mobiles is deliberate — but it comes from the firing envelope and the shell, not from gravity: one
+> gravity is what lets a player carry a learned angle/power pair from one mobile to the next.
 
 > **Conflict in the source, recorded not hidden.** `gbw-spec.md#6.3` pairs `force × 512/100` with `gravity 0.35` on a
 > 2,000-unit map. Taken per tick, `0.35 × 20 = 7 u/s²`, which throws a full-force 45° shot ~37,000 units — 18× the map.
-> We keep the usual speed law of the genre (`v0 = force × speedK`, `speedK` tuned to `4.55` so a full-force shot lands inside a 2,000-unit map) and express gravity in `u/s²` (`100`), because the pair as
-> written cannot both be true (`OQ-19`).
+> We keep the usual speed law of the genre (`v0 = force × speedK`, `speedK 6.2`, which throws a full-force shot 1.84 map
+> widths — "full power leaves the map", the genre's own ceiling) and express gravity in `u/s²` (`100`), because the pair
+> as written cannot both be true (`OQ-19`).
 
 ### 1.2 Tunables
 
 | Tunable | v1 value | Notes | Oracle |
 |---|---|---|---|
 | `stepMs` | `50` | fixed simulation step, chosen so the flight of a shot is reproducible on every device; rendering interpolates at 60 FPS (`NFR-01`, `NFR-28`) | `TC-CORE-020` |
-| `gravity` | **per mobile `84–128 u/s²`** (`data/mobiles.md`); map modifier `×0.95–1.05` | the per-mobile feel knob | `TC-CORE-020` |
-| `mass` | **per mobile `118–169`** | divides wind push; the heavier the mobile, the less it drifts | `TC-CORE-925` |
-| `speedK` | `4.55` for every mobile | one power law, as in GB | `TC-CORE-924` |
-| `windCoefficient` | `42` | `a = 42 × m × (cos θ, sin θ) / mass`; scaled so `m = 26` reproduces the previously tuned maximum push | `TC-CORE-023` |
+| `gravity` | **`100 u/s²` for the whole roster**; map modifier `×0.95–1.05` | one gravity, so the same angle and power draw the same parabola in every mobile — a learned range transfers (`TC-CORE-023`) | `TC-CORE-020` |
+| ~~`mass`~~ | **removed** | was per mobile `118–169` and divided the wind push; GB's wind is mass-independent, and with it went `Mobile.mass` and `StepContext.mass` (`TC-CORE-925`) | `TC-CORE-925` |
+| `speedK` | `6.2` for every mobile | one power law, as in GB; full power flies 1.84 map widths | `TC-CORE-924` |
+| `windCoefficient` | `105` | `a = 105 × m × (cos θ, sin θ)`, **no divisor**: `m = 26` is `2,730 u/s²`, 27 × gravity, and the coefficient is still to be retuned against the 8.55 s hang time (§ 1.1) | `TC-CORE-023` |
 | `windMagnitude` | `0…26` integers | rolled per round (§ 1.3); `0` = no wind, `26` = full | `TC-CORE-926` |
-| `windSectors` | `12` | `directionDeg` is always a multiple of 30; `sector` 0–11 (`OQ-41`) | `TC-CORE-926` |
+| `windSectors` | `2` | **east or west only**: `directionDeg = sector × 180` (`0` / `180`), `sector` 0–1, `sectorLabel` → `E`/`W` (`OQ-41`) | `TC-CORE-926` |
 | `turnDurationMs` | `20 000` | the turn clock (`OQ-03`) | `TC-CORE-152` |
 | `weatherRerollPerRound` | `true` | new wind after every full pass through the turn queue | `TC-CORE-926` |
-| ~~`dragK`, `density` on a weapon~~ | **removed** | GB has no drag; weight is `mass` (`CR-2026-11-04-gb-constant-acceleration`) | `TC-CORE-023` |
+| ~~`dragK`, `density` on a weapon~~ | **removed** | GB has no drag, and a shell carries no weight of its own (`CR-2026-11-04-gb-constant-acceleration`) | `TC-CORE-023` |
 | `force` | `0…maxPower` (90–100 per mobile) | `v0 = force × speedK` | `TC-CORE-021` |
 | `angle` | clamped to the profile envelope (§ 4.2) | per mobile | `TC-CORE-022` |
 | `bounceRestitution` | `0.6` | `bounce` class only; others detonate on impact | `TC-CORE-913` |
@@ -117,7 +131,7 @@ The wind is the weather, and it changes once per **round**: when the turn queue 
 
 ```
 magnitude = rng.int(0, 26)
-sector    = rng.int(0, 11)          // directionDeg = sector × 30
+sector    = rng.int(0, 1)           // directionDeg = sector × 180: 0° east, 180° west
 ```
 
 then broadcasts `weather { wind: { magnitude, directionDeg, sector }, rolledAtRound }` on the `control` channel and in
@@ -130,8 +144,9 @@ every snapshot until the next roll. Rules:
 - **Announced once**: a 1.5 s banner (`match.weather.changed`), the number and the dial arrow animating to the new sector;
   dismissible by any tap (`US-MATCH-003`).
 - **`m = 0` is legal** — a dead-calm round is a legitimate roll and the dial must read `0` with a hollow arrow.
-- The dial has **12 ticks** (30° each) so a player can judge direction to ±15° and, with the ruler, correct a shot to
-  within one division; direction is *never* a free angle — the dial shows the sector, not a hidden continuous value.
+- The dial has **two halves**, `E` and `W` — GB's whole wind vocabulary. Direction is *never* a free angle: the dial
+  shows which side the weather is on, and the `0…26` number beside it is what a player corrects with, against the ruler
+  (§ 9) for a small wind and by degrees of angle once the push is large.
 
 ## 2. Health model — the 1,000 scale
 
@@ -183,40 +198,40 @@ Each mobile carries three weapons (`data/mobiles.md`). The classes below are the
 
 ### 4.2 Trajectory profiles — the angle envelope, not the speed
 
-GB gives every mobile the *same* power law and differentiates them with `gravity` and `mass` (§ 1.1). We do the same: the
-profile now fixes only the **aim band** — the angular territory the mobile is allowed to work in — and the arc itself comes
-from the mobile's own `gravity`/`mass` pair.
+GB gives every mobile the *same* power law and the *same* gravity (§ 1.1). We do the same: the profile fixes only the
+**aim band** — the angular territory the mobile is allowed to work in — and the arc is identical for all twenty at the
+same angle and power, so the band and the shell are what is left to tell mobiles apart.
 
 | Profile | Band | `speedK` | Reads as | Mobiles |
 |---|---|---|---|---|
-| `standard` | −10 … 45 | 4.55 | the baseline GB arc, 45°-friendly, `g` near 100 | Stone Sentinel, Jade Dragon, Pale Stag, Sacred Crane, Sun Lion |
-| `direct` | −20 … 25 | 4.55 | flat and fast — low `g`, light, needs line of sight | Storm Falcon, Silver Ibex, Cinder Fox, Sky Serpent, Mist Raven |
-| `lobber` | 35 … 85 | 4.55 | high arc that clears walls, `g` 112–115 | River Warden, Glacier Mammoth |
-| `mortar` | 45 … 88 | 4.55 | plunging fire, heaviest `g` (122–128) and most mass | Ash Behemoth, Volcano Toad, Sand Wyrm, Frost Hydra |
-| `skimmer` | −5 … 40 | 4.55 | low and bouncy, ricochets on terrain | Iron Tortoise, Moon Hare, Coral Crab, Shadow Cat |
+| `standard` | −10 … 45 | 6.2 | the baseline GB arc, 45°-friendly | Stone Sentinel, Jade Dragon, Pale Stag, Sacred Crane, Sun Lion |
+| `direct` | −20 … 25 | 6.2 | flat and fast — the tightest band, so no 45° reference shot | Storm Falcon, Silver Ibex, Cinder Fox, Sky Serpent, Mist Raven |
+| `lobber` | 35 … 85 | 6.2 | high arc that clears walls | River Warden, Glacier Mammoth |
+| `mortar` | 45 … 88 | 6.2 | plunging fire, no low-angle answer | Ash Behemoth, Volcano Toad, Sand Wyrm, Frost Hydra |
+| `skimmer` | −5 … 40 | 6.2 | low and bouncy, ricochets on terrain | Iron Tortoise, Moon Hare, Coral Crab, Shadow Cat |
 
 The band is the *outer* limit; each mobile declares its own `angleMin`/`angleMax` inside it (`data/mobiles.md` § 2) —
 `Storm Falcon` stops at 25°, `Jade Dragon` reaches 50°, `Cinder Fox` fires from −18°. The clamp always uses the mobile's
 window, never the profile's.
 
-Every mobile therefore has its own arc, and the spread is large: `mbl-14` Sky Serpent lands **2,162 units** in 5.8 s,
-`mbl-01` Stone Sentinel **1,988 units** in 6.3 s, `mbl-03` Iron Tortoise only **1,441 units** in 4.4 s
-(`data/mobiles.md` § 3 prints all twenty from the real integrator).
+**One arc, twenty bands.** At 45° and `force 98` every mobile lands on the same spot — **3,680 units in 8.55 s** — and
+what the band changes is which angles it may fire at all: a mobile capped at 25° cannot use the 45° reference shot, so it
+reaches 2,930 units at full power where a 45°-capable one reaches 3,680. [`data/mobiles.md`](../data/mobiles.md) § 4
+prints all twenty from the real integrator.
 
-### 4.3 Four parameter families
+### 4.3 What separates the twenty mobiles
 
-Our twenty mobiles are grouped into four parameter families, because a single family makes every mobile feel like the
-same vehicle with different paint:
+There are no per-mobile flight parameters left: one `gravity`, one `speedK`, one `windCoefficient`. The roster is
+differentiated by the **aim band** (§ 4.2), the **shell** in each slot (`data/mobiles.md` § 3), and the health/defense/
+movement profile (`data/mobiles.md` § 1–2). That is deliberate — the spread the genre has is in what a mobile may *do*,
+not in how a shell falls, which is what makes an angle/power table learned on one mobile readable on the next.
 
-| Family | Mobiles | Note |
+| Lever | Range across the roster | Note |
 |---|---|---|
-| `light-fast` | the baseline family: `g 100 / m 168` | the reference arc every other family is compared against |
-| `mid` | the wide middle: per-mobile `g` and `m` from the same closed form | 12 of the 20 mobiles |
-| `wind-sensitive` | its arc changes most when the weather rolls | two mobiles, low `mass` |
-| `heavy-lobber` | high `mass`, high `g`, short reach | one archetype pair, the Ash Behemoth family |
-
-Our mobiles are spread across that family range (`g` 84–128 in our units, `mass` 118–169), so the roster covers a
-light-and-far pair, a heavy-arc pair, a mid-range pair and a defensive pair without any two sharing a triple.
+| aim band | `−20…25` (`direct`) to `45…88` (`mortar`) | decides which angles exist for that mobile |
+| `maxPower` | 90–100 | the middle of the roster's 1.26× reach spread |
+| `maxHp` / `defense` | 900–1,200 / 0.85–1.15 | how many hits it survives |
+| shell classes | three per mobile, no two triples alike | arc / flat / lob / bounce / cluster / piercing / beam |
 
 ### 4.4 Movement — per turn, paid in energy and delay
 
@@ -252,7 +267,8 @@ buys position with tempo. See `data/mobiles.md` § 2 for the twenty values and `
 
 ## 6. Maps and gimmicks
 
-Eleven maps in `packages/core/src/data/maps.ts`, each with a `gravityModifier` of `0.95–1.05` applied to the mobile's own gravity (`§ 1.2`), a `seed` and its `gimmicks[]`.
+Eleven maps in `packages/core/src/data/maps.ts`, each with a `gravityModifier` of `0.95–1.05` applied to the one
+`TUNABLES.gravity` (`§ 1.2`), a `seed` and its `gimmicks[]`.
 
 | Gimmick | Effect | Oracle |
 |---|---|---|
