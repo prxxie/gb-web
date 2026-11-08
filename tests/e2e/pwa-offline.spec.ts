@@ -1,5 +1,5 @@
 /**
- * `US-PWA-001` §5 (`docs/03-stories/EPIC-07-pwa-i18n/US-PWA-001-offline-shell.md`).
+ * `US-PWA-001` §5 (`docs/03-stories/EPIC-07-pwa-i18n/US-PWA-001-install-and-play-offline.md`).
  *
  * With the network gone the shell still renders and still explains itself: the bot match stays available and
  * every action that needs the server is disabled with a sentence saying why.
@@ -33,6 +33,11 @@ test.describe("offline shell", () => {
 
     await page.getByRole("link", { name: "Bảng xếp hạng" }).click();
 
-    await expect(page.getByTestId("leaderboard-error")).toHaveText("Bạn đang ngoại tuyến — chỉ chơi được với máy.");
+    // The banner is the leaderboard's own copy key (`leaderboard.offline`, `02-reference/screens/leaderboard.md`
+    // § Offline) with `common.retry` beside it — not the menu's `main.offline` line. The element holds both the
+    // sentence and the retry button, so the text is a containment rather than an exact match.
+    const banner = page.getByTestId("leaderboard-error");
+    await expect(banner).toContainText("Bạn đang ngoại tuyến — cần kết nối mạng để xem bảng xếp hạng.");
+    await expect(banner.getByRole("button", { name: "Thử lại" })).toBeVisible();
   });
 });
