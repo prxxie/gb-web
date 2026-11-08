@@ -30,7 +30,7 @@ describe("TC-MATCH-915/916: gestures", () => {
   it("turns a one-finger pull into power 0–4 and an angle inside the window", () => {
     let pointers = addPointer(clearPointers(), { id: 1, x: 200, y: 300 });
     pointers = movePointer(pointers, { id: 1, x: 120, y: 160 });
-    const gesture = classify(pointers, { origin: { id: 1, x: 200, y: 300 }, facing: 1, screenShorterEdge: shorter, previousSpread: null });
+    const gesture = classify(pointers, { origin: { id: 1, x: 200, y: 300 }, facing: 1, fullPowerDistance: shorter, previousSpread: null });
     expect(gesture.kind).toBe("pull");
     if (gesture.kind !== "pull") return;
     expect(gesture.power).toBeGreaterThan(0);
@@ -45,7 +45,7 @@ describe("TC-MATCH-915/916: gestures", () => {
     pointers = addPointer(pointers, { id: 2, x: 220, y: 100 });
     pointers = movePointer(pointers, { id: 1, x: 130, y: 100 });
     pointers = movePointer(pointers, { id: 2, x: 250, y: 100 });
-    const gesture = classify(pointers, { origin: null, facing: 1, screenShorterEdge: shorter, previousSpread: 120 });
+    const gesture = classify(pointers, { origin: null, facing: 1, fullPowerDistance: shorter, previousSpread: 120 });
     expect(["pan", "zoom"]).toContain(gesture.kind);
     expect(gesture.kind).not.toBe("pull");
   });

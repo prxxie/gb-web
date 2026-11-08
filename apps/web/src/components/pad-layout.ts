@@ -12,10 +12,11 @@ export interface FocusPoint {
   readonly y: number;
 }
 
-/** Button edge, from `screens/match.md` § 8 (`60×60` for the four move controls). */
-export const PAD_BUTTON = 60;
+/** Button edge: the 44 px tap floor (`NFR-17`, `TC-FND-133`) — the pad is 140 px square, not 192, now that a finger can
+ * pan the window and the pad only nudges the angle. */
+export const PAD_BUTTON = 44;
 /** Gap between buttons, from `screens/match.md` § 8 (`gaps ≥ 8 px`, drawn at 6 px inside the grid). */
-export const PAD_GAP = 6;
+export const PAD_GAP = 4;
 /** Keep the pad this far from the viewport edge so a thumb does not fight the browser's back gesture. */
 export const PAD_MARGIN = 8;
 

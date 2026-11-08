@@ -39,6 +39,8 @@ async function pull(page: Page, dx: number, dy: number): Promise<{ power: string
   const startY = box.y + box.height * 0.5;
   await page.mouse.move(startX, startY);
   await page.mouse.down();
+  // A press has to be held before it arms a shot (`HOLD_MS` 300 ms, `TC-MATCH-911`); a drag on its own pans.
+  await page.waitForTimeout(400);
   await page.mouse.move(startX + dx, startY + dy, { steps: 12 });
   await expect(page.getByTestId("power-value")).not.toHaveText("0.00", { timeout: 4_000 });
   await page.waitForTimeout(200);
@@ -100,6 +102,8 @@ test("TC-MATCH-909: the HUD stays reachable after the match goes fullscreen", as
   // The first pull is what arms the fullscreen request (`US-MATCH-007` AC1).
   await page.mouse.move(box.x + box.width * 0.62, box.y + box.height * 0.55);
   await page.mouse.down();
+  // A press has to be held before it arms a shot (`HOLD_MS` 300 ms, `TC-MATCH-911`); a drag on its own pans.
+  await page.waitForTimeout(400);
   await page.mouse.move(box.x + box.width * 0.68, box.y + box.height * 0.39, { steps: 10 });
   await page.mouse.up();
   await page.waitForTimeout(600);

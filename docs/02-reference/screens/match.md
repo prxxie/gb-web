@@ -159,3 +159,22 @@ counter appears for each team (`TC-CORE-917`). Fog maps shorten the aim arc and 
 The match renders **without the app bar**: it is the one route where the shared header (product name + language toggle)
 costs real field. At 844×390 the bar took 77 px, and the canvas is now the whole viewport (`TC-MATCH-910`). The language
 toggle lives in the match HUD beside the turn clock so the control is still one tap away; every other route keeps the bar.
+
+## 8. Controls
+
+The battlefield is a **gesture surface**, not a canvas with buttons on it:
+
+- **One finger, dragged** — pans the window. The finger drags the world, so moving right shows what is to the left. Panning
+  has room only when the camera is zoomed in (`pinchTo`): the default window already spans the spawn gap.
+- **One finger, held still for `HOLD_MS` (300 ms)** — arms the shot. The ring around the mobile and the power number appear,
+  and from then on the finger is aiming: distance from the press point is the power (full power at 45 % of the screen
+  **width**, ≈380 px on an 844 px screen, not the 175 px the shorter edge gave) and the direction is the angle. The camera
+  holds still while a shot is armed, so the arc and the ring mean what they say.
+- **A second finger during a pull cancels it.** Aiming is a one-finger, one-thought act: a stray thumb must not silently
+  change a shot already being measured. A target off the screen is the player's problem to have measured beforehand — that
+  is the skill the genre asks for, not an inconvenience to engineer away.
+- **The four-way pad** is a 140 px square of 44 px cells (`NFR-17`) hanging near the active mobile; it nudges the angle and
+  moves the mobile, and is the fallback when a gesture is not wanted.
+- **The bottom strip** (56 px) holds the shot's own inputs — wind dial, weapon slots, item tray, skip, phrases — and the
+  power chip. Nothing else floats over the middle of the field: the skip/phrase buttons used to sit at `(346, 190)`, dead
+  centre, where every pull starts.

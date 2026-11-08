@@ -60,7 +60,11 @@ export function classify(
   context: {
     readonly origin: Point | null;
     readonly facing: 1 | -1;
-    readonly screenShorterEdge: number;
+    /**
+     * How far a finger must travel for full power. Width-based, not the shorter edge: at 844×390 the shorter edge made
+     * full power a 175 px throw, so the aimed band lived in the first third of the gesture and every pull read as "max".
+     */
+    readonly fullPowerDistance: number;
     readonly previousSpread: number | null;
   },
 ): Gesture {
@@ -71,7 +75,7 @@ export function classify(
     const dx = first.x - context.origin.x;
     const dy = first.y - context.origin.y;
     const travelled = Math.hypot(dx, dy);
-    const power = powerFromDrag(travelled, context.screenShorterEdge);
+    const power = powerFromDrag(travelled, context.fullPowerDistance);
     const angle = angleFromPull(dx, dy, context.facing);
     return { kind: "pull", power, angle, distance: travelled };
   }

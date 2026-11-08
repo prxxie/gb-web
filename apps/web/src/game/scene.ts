@@ -23,6 +23,7 @@ import {
   type MatchState,
   type PlayerState,
 } from "@gbw/core";
+import { advance, drag, IDLE, lift, liftsAsShot, press, type HoldState } from "./hold";
 import { addPointer, classify, clearPointers, movePointer, removePointer, screenConstant, screenToWorld, viewportFor, worldToScreen, type Point, type PointerState } from "./viewport";
 import {
   INTERPOLATION_MS,
@@ -35,6 +36,7 @@ import {
 import { RING_RADIUS, RING_START, ringColor, ringSweep } from "./aim";
 import { armFullscreen } from "../lib/fullscreen";
 import { aimPreview } from "./preview";
+
 
 export interface BattleCallbacks {
   readonly onPull: (power: number, angle: number) => void;
@@ -123,6 +125,8 @@ class BattleScene extends Phaser.Scene {
   private lastDrawn: readonly UnitPose[] | null = null;
   private pointers: PointerState = clearPointers();
   private origin: Point | null = null;
+  /** One finger either pans the camera or arms a shot; `hold.ts` owns which (`US-MATCH-002`). */
+  private hold: HoldState = IDLE;
   private previousSpread: number | null = null;
   private pullPower = 0;
   private pullAngle = 0;
@@ -296,14 +300,18 @@ class BattleScene extends Phaser.Scene {
       canvas.setPointerCapture?.(event.pointerId);
       this.pointers = addPointer(this.pointers, toPoint(event));
       if (this.pointers.pointers.length === 1) {
-        // Not this client's turn (or it already fired in it): the finger never becomes a pull, so no ring is drawn and
-        // `up` finds no origin to release (`US-MATCH-002` AC7/AC8).
-        this.origin = this.aimAllowed ? toPoint(event) : null;
+        // A press is ambiguous: it may become a pan or a shot. `hold.ts` decides, and `origin` stays null until the hold
+        // fires — so a drag that never arms cannot fire on release (`US-MATCH-002` AC7/AC8).
+        this.hold = press(toPoint(event), now());
+        this.origin = null;
         this.pullPower = 0;
         this.pullAngle = 0;
       } else {
+        // A second finger cancels the shot, by design: aiming is a one-finger, one-thought act and a stray thumb must
+        // not silently change the angle of a shot already being measured (product decision, 2026-11-08).
         this.previousSpread = this.spread();
         this.origin = null;
+        this.hold = lift();
         this.callbacks.onCancel("gesture");
       }
     };
@@ -311,17 +319,25 @@ class BattleScene extends Phaser.Scene {
       const point = toPoint(event);
       if (!this.pointers.pointers.some((candidate) => candidate.id === point.id)) return;
       this.pointers = movePointer(this.pointers, point);
+      const stepped = drag(this.hold, point);
+      this.hold = stepped.state;
+      if (stepped.pan) {
+        // One finger drags the world: the camera follows the hand and stays where it is put until the player moves it.
+        this.window = panBy(this.window, stepped.pan.dx, stepped.pan.dy, this.scale.width);
+        this.callbacks.onCamera(this.window);
+        return;
+      }
       this.interpret(point);
     };
     const up = (event: PointerEvent): void => {
       const point = toPoint(event);
       const wasSingle = this.pointers.pointers.length === 1;
       this.pointers = removePointer(this.pointers, point.id);
-      if (wasSingle && this.origin) {
+      if (wasSingle && this.origin && liftsAsShot(this.hold)) {
         const gesture = classify(this.pointers, {
           origin: this.origin,
           facing: this.facing(),
-          screenShorterEdge: Math.min(this.scale.width, this.scale.height),
+          fullPowerDistance: this.fullPowerDistance(),
           previousSpread: null,
         });
         const power = gesture.kind === "pull" ? gesture.power : this.pullPower;
@@ -333,6 +349,7 @@ class BattleScene extends Phaser.Scene {
       this.pullPower = 0;
       this.pullAngle = 0;
       this.origin = null;
+      this.hold = lift();
       this.previousSpread = null;
       if (this.pointers.pointers.length === 0) this.pointers = clearPointers();
     };
@@ -349,6 +366,15 @@ class BattleScene extends Phaser.Scene {
     }
   }
 
+  /**
+   * The edge `powerFromDrag` measures against. It multiplies by `TUNABLES.powerDragFullRatio` (0.45) itself, so passing
+   * the **width** puts full power at 380 px on an 844 px screen — a throw the thumb can hold a number inside, instead of
+   * the 175 px flick the shorter edge gave.
+   */
+  private fullPowerDistance(): number {
+    return this.scale.width;
+  }
+
   private spread(): number {
     const [a, b] = this.pointers.pointers;
     return a && b ? Math.hypot(b.x - a.x, b.y - a.y) : 0;
@@ -363,7 +389,7 @@ class BattleScene extends Phaser.Scene {
     const gesture = classify(this.pointers, {
       origin: this.origin,
       facing: this.facing(),
-      screenShorterEdge: Math.min(this.scale.width, this.scale.height),
+      fullPowerDistance: this.fullPowerDistance(),
       previousSpread: this.previousSpread,
     });
     if (gesture.kind === "pull") {
@@ -392,6 +418,15 @@ class BattleScene extends Phaser.Scene {
   }
 
   override update(): void {
+    // The hold timer lives here because only the frame loop knows time passed without a move.
+    const armed = advance(this.hold, now());
+    if (armed.phase === "pulling" && this.hold.phase === "pending") {
+      this.hold = armed;
+      // Only a player who may shoot gets a ring; everyone else keeps panning (`AC7`).
+      this.origin = this.aimAllowed && armed.origin ? { id: 0, x: armed.origin.x, y: armed.origin.y } : null;
+    } else if (armed !== this.hold) {
+      this.hold = armed;
+    }
     const graphics = this.graphics;
     graphics.clear();
     const width = this.scale.width;

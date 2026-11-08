@@ -108,7 +108,7 @@ describe("TC-MATCH-916: pinch", () => {
   });
 });
 
-describe("TC-MATCH-916 / NFR-17: what a thumb taps is at least 60 × 60", () => {
+describe("TC-MATCH-916 / NFR-17: what a thumb taps clears the 44 px floor", () => {
   function size(selector: string): { width: number; height: number } {
     const element = document.querySelector(selector);
     expect(element, `${selector} is rendered`).not.toBeNull();
@@ -116,7 +116,7 @@ describe("TC-MATCH-916 / NFR-17: what a thumb taps is at least 60 × 60", () => 
     return { width: Number.parseFloat(style.minWidth), height: Number.parseFloat(style.minHeight) };
   }
 
-  it("the pad, the skip and the phrase buttons declare a 60 px target", () => {
+  it("the pad, the skip and the phrase buttons declare a target a thumb can hit", () => {
     const css = readFileSync("apps/web/src/styles.css", "utf8");
     const style = document.createElement("style");
     style.textContent = css;
@@ -152,12 +152,18 @@ describe("TC-MATCH-916 / NFR-17: what a thumb taps is at least 60 × 60", () => 
     const toggle = document.querySelector('[data-testid="chat-toggle"]');
     expect(toggle, "the chat toggle is rendered").not.toBeNull();
     fireEvent.click(toggle as Element);
-    const targets = [".match__pad button", ".match__skip"];
-    targets.push(".match__phrases button");
-    for (const selector of targets) {
+    // The pad only nudges the angle now that a finger pans the window, so it sits at the `NFR-17` 44 px floor
+    // instead of 60; the skip and phrase buttons keep their larger targets, which is what the thumb hits
+    // most often under time pressure.
+    const floors: Array<[selector: string, floor: number]> = [
+      [".match__pad button", 44],
+      [".match__skip", 60],
+      [".match__phrases button", 60],
+    ];
+    for (const [selector, floor] of floors) {
       const { width, height } = size(selector);
-      expect(width, `${selector} width`).toBeGreaterThanOrEqual(60);
-      expect(height, `${selector} height`).toBeGreaterThanOrEqual(60);
+      expect(width, `${selector} width`).toBeGreaterThanOrEqual(floor);
+      expect(height, `${selector} height`).toBeGreaterThanOrEqual(floor);
     }
     document.head.removeChild(style);
   });

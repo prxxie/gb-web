@@ -395,12 +395,14 @@ td {
 
 .match__pad {
   position: absolute;
-  right: calc(12px + var(--safe-right));
-  bottom: calc(12px + var(--safe-bottom));
+  right: calc(8px + var(--safe-right));
+  bottom: calc(96px + var(--safe-bottom));
   display: grid;
-  grid-template-columns: repeat(3, 60px);
-  grid-template-rows: repeat(3, 60px);
-  gap: 6px;
+  /* 3 × 44 px + gaps = 140 px, down from 192: the pad only nudges the angle now that a finger can pan the window
+     (`NFR-17` keeps every cell at the 44 px tap floor). */
+  grid-template-columns: repeat(3, 44px);
+  grid-template-rows: repeat(3, 44px);
+  gap: 4px;
   /* Light enough to read the battlefield through the buttons, on the owner's instruction (`US-MATCH-003` AC11). */
   opacity: 0.8;
 }
@@ -428,10 +430,10 @@ td {
 }
 
 .match__pad button {
-  min-width: 60px;
-  min-height: 60px;
+  min-width: 44px;
+  min-height: 44px;
   padding: 0;
-  font-size: 1.2rem;
+  font-size: 1rem;
   border-radius: 12px;
   background: rgba(22, 33, 58, 0.92);
 }
@@ -452,8 +454,11 @@ td {
   grid-area: 3 / 2;
 }
 
-.match__power--on-ring {
-  /* The number sits at the top of the power ring, exactly where `screens/match.md` puts it (`US-MATCH-002` AC2). */
+.match__power.match__power--on-ring {
+  /* The number sits at the top of the power ring, exactly where `screens/match.md` puts it (`US-MATCH-002` AC2).
+     `bottom: auto` is load-bearing: with the base rule's `bottom` still set, the inline `top` stretched the chip into a
+     163 px column. */
+  bottom: auto;
   left: 0;
   top: 0;
   transform: translate(-50%, -50%);
@@ -478,34 +483,63 @@ td {
 }
 
 .match__power {
+  /* A chip, not a panel: the ring around the mobile is the gauge, the number only labels it. At 171×152 it was 20 % of
+     the screen for a value that is only meaningful while a finger is down (`US-MATCH-002` AC2). */
   position: absolute;
-  left: calc(12px + var(--safe-left));
-  bottom: calc(12px + var(--safe-bottom));
+  left: calc(8px + var(--safe-left));
+  bottom: calc(40px + var(--safe-bottom));
   display: flex;
-  gap: 10px;
+  gap: 8px;
   align-items: center;
+  z-index: 2;
 }
 
 .match__power-value {
-  font-size: 1.6rem;
+  font-size: 1rem;
   font-variant-numeric: tabular-nums;
-  width: 84px;
+  min-width: 52px;
   text-align: center;
-  padding: 8px 0;
-  border-radius: 12px;
+  padding: 3px 8px;
+  border-radius: 8px;
   background: rgba(16, 26, 46, 0.9);
   border: 1px solid #24324c;
 }
 
 /* Weapon strip + item tray (`US-MATCH-005`) -------------------------------- */
 
-.match__loadout {
+/*
+ * One strip along the bottom for the shot's own inputs — wind, weapon, item, phrase — instead of three floating panels.
+ * The power gauge stays on the mobile (the ring) and the aim pad stays where the thumb already is; everything else lives
+ * here so the middle of the screen is battlefield and nothing else.
+ */
+.match__bottom {
   position: absolute;
-  left: calc(12px + var(--safe-left));
-  bottom: calc(96px + var(--safe-bottom));
+  left: 0;
+  right: 0;
+  bottom: calc(34px + var(--safe-bottom));
+  height: 56px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  /* The left inset clears the power chip, which sits at the strip's left edge. */
+  padding: 0 calc(8px + var(--safe-right)) 0 calc(72px + var(--safe-left));
+  background: linear-gradient(180deg, rgba(11, 18, 32, 0), rgba(11, 18, 32, 0.82));
+}
+
+.match__turnline {
+  font-size: 0.66rem;
+  line-height: 1.15;
+  color: var(--ink-dim);
+  max-width: 108px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.match__loadout {
   display: flex;
   gap: 8px;
-  align-items: flex-end;
+  align-items: center;
 }
 
 .weapon-strip {
@@ -577,12 +611,10 @@ td {
 /* Skip + preset chat (`US-MATCH-004`) -------------------------------------- */
 
 .match__actions {
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
-  bottom: calc(40px + var(--safe-bottom));
+  /* It used to float in the dead centre of the battlefield — two 60 px buttons at (346,190), which is exactly where a
+     thumb starts a pull. The finger never reached the canvas and the shot silently never happened. It is a row inside
+     the bottom strip now. */
   display: flex;
-  flex-direction: column;
   gap: 6px;
   align-items: center;
 }
@@ -598,7 +630,8 @@ td {
    60 px targets laid over the battlefield would sit exactly where the pull gesture starts. */
 .match__chat {
   position: absolute;
-  bottom: calc(108px + var(--safe-bottom));
+  /* Above the strip, never over the middle: the grid is 24 targets and the pull gesture lives underneath it. */
+  bottom: calc(96px + var(--safe-bottom));
   left: 50%;
   transform: translateX(-50%);
   display: flex;
@@ -659,7 +692,7 @@ td {
 .match__aid {
   position: absolute;
   right: 8px;
-  bottom: calc(38px + var(--safe-bottom));
+  bottom: calc(96px + var(--safe-bottom));
   min-height: 44px;
   padding: 6px 12px;
   border-radius: 999px;

@@ -166,5 +166,7 @@ export async function pullAim(page: Page): Promise<void> {
   const startY = box.y + box.height * AIM_START.y;
   await page.mouse.move(startX, startY);
   await page.mouse.down();
+  // A press has to be held before it arms a shot (`HOLD_MS` 300 ms, `TC-MATCH-911`); a drag on its own pans.
+  await page.waitForTimeout(400);
   await page.mouse.move(startX + 90, startY + 70, { steps: 12 });
 }

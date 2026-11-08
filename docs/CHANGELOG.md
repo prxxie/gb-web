@@ -1,5 +1,22 @@
 # Changelog
 
+## 2026-11-08 — one finger pans, a held finger aims
+
+The battlefield is now a gesture surface: a drag moves the camera, a press held still for 300 ms arms the shot. The rule is
+one pure state machine (`apps/web/src/game/hold.ts`, `TC-MATCH-911`) instead of logic buried in the Phaser scene, which is
+where the angle readout silently ignored the gesture for weeks.
+
+- **Hold to aim.** `HOLD_MS` 300 ms, `HOLD_SLOP_PX` 10 px: a press that travels past the slop before the timer fires is a
+  pan and can never fire. Once armed, the finger aims and the camera stops — a target off the screen is measured, not
+  chased. A second finger still cancels the shot, by product decision: a stray thumb must not move a shot being measured.
+- **Full power is a real throw.** `powerFromDrag` now measures against the screen **width** (0.45 × 844 = 380 px) instead of
+  the shorter edge (175 px), so the aimed band sits mid-gesture. Measured: 200 px → **2.10 bars**, 380 px → **4.00**.
+- **The skip and phrase buttons were sitting dead centre.** `.match__actions` floated at `(346, 190)` — a 152 × 126 box
+  exactly where a thumb starts a pull — so a press there pressed *Bỏ lượt* and the shot never happened. They are a row in the
+  bottom strip now, and `elementFromPoint` at the centre of the field returns the canvas.
+- **One bottom strip** for the shot's inputs (wind, weapon, item, skip, phrases, power chip) replaces three floating panels.
+  The aim pad drops from 192 px to 140 px (44 px cells), the power panel from 171 × 152 to a 52 × 30 chip on the ring.
+
 ## 2026-11-08 — the battlefield gets its screen back
 
 The shared app bar (product name + language toggle) sat above every route, and in a match it cost **77 of 390 px** of a

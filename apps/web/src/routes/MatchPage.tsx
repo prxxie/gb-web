@@ -926,7 +926,6 @@ export function MatchPage(): JSX.Element {
             <div className="match__angle" data-testid="angle-value">
             {Math.round(aimAngle)}°
           </div>
-          <WindDial weather={state.weather} label={t("match.wind")} />
             <div className="match__round" data-testid="turn-round">
               {t("match.round", { round: state.turn.round })}
             </div>
@@ -958,18 +957,6 @@ export function MatchPage(): JSX.Element {
           <div className="match__power-value" data-testid="power-value">
             {power.toFixed(2)}
           </div>
-          {hint && (
-            <div className="match__hint" data-testid="pull-hint">
-              {hint}
-            </div>
-          )}
-          <div className="muted">
-            {isMyTurn
-              ? t("match.yourTurn")
-              : t("match.waitingTurn", {
-                  name: state?.players.find((player) => player.slot === state.turn.activeSlot)?.displayName ?? "…",
-                })}
-          </div>
         </div>
 
         <DirectionPad
@@ -990,7 +977,21 @@ export function MatchPage(): JSX.Element {
           onRepeat={onRepeat}
         />
 
-        <div className="match__loadout">
+        <div className="match__bottom">
+          {hint && (
+            <div className="match__hint" data-testid="pull-hint">
+              {hint}
+            </div>
+          )}
+          <div className="match__turnline" data-testid="turn-line">
+            {isMyTurn
+              ? t("match.yourTurn")
+              : t("match.waitingTurn", {
+                  name: state?.players.find((player) => player.slot === state.turn.activeSlot)?.displayName ?? "…",
+                })}
+          </div>
+          <WindDial weather={state.weather} label={t("match.wind")} />
+          <div className="match__loadout">
           <WeaponStrip
             weapons={mobile.weapons}
             active={weaponSlot}
@@ -1022,7 +1023,7 @@ export function MatchPage(): JSX.Element {
             enabled={isMyTurn}
             onUse={onUseItem}
           />
-        </div>
+          </div>
 
         <PhrasePicker
           skipEnabled={isMyTurn}
@@ -1038,6 +1039,7 @@ export function MatchPage(): JSX.Element {
           onSkip={onSkip}
           onChat={onChat}
         />
+        </div>
 
         {status === "reconnecting" ? <div className="overlay">{t("match.reconnecting")}</div> : null}
 
