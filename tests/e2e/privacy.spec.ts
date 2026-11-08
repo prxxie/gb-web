@@ -10,7 +10,7 @@
  */
 import { expect, test } from "@playwright/test";
 
-import { bridgeRoomSockets, createRoom, joinRoom } from "./support";
+import { createRoom, joinRoom } from "./support";
 
 const MARKER = "tc-room-052-marker";
 
@@ -19,8 +19,6 @@ test("TC-ROOM-052: no TURN credential reaches storage, a cookie or the DOM", asy
   const guest = await browser.newContext();
   const hostPage = await host.newPage();
   const guestPage = await guest.newPage();
-  await bridgeRoomSockets(hostPage);
-  await bridgeRoomSockets(guestPage);
 
   const stub = async (page: typeof hostPage): Promise<void> => {
     await page.route("**/api/v1/turn-credentials", (route) =>
