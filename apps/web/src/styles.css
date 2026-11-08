@@ -155,6 +155,16 @@ h1 {
   margin: 0;
 }
 
+/*
+ * The route focus lands on the heading so a screen reader starts at the top of the new screen (`US-PWA-004` AC7).
+ * That is a programmatic focus, not a keyboard one: drawing the browser's ring around a heading made the title look
+ * like a text input with a focus outline. Interactive elements keep their own ring.
+ */
+h1:focus,
+h1:focus-visible {
+  outline: none;
+}
+
 h2 {
   font-size: 1.1rem;
   margin: 0;
@@ -230,7 +240,26 @@ td {
   pointer-events: none;
 }
 
+/*
+ * Only a control takes the press. The HUD's own containers — `.match__top` above all — span the width of the screen,
+ * and letting them take events made the top third of the battlefield a dead zone: a pull that started there never
+ * reached the canvas, so the power readout stayed at 0.00 and the shot was cancelled as a dead-zone release.
+ */
 .match__hud > * {
+  pointer-events: none;
+}
+
+.match__hud button,
+.match__hud a,
+.match__hud input,
+.match__hud select,
+.match__hud [role="button"],
+.match__hud .match__player,
+.match__hud .match__power,
+.match__hud .match__actions,
+.match__hud .match__loadout,
+.match__hud .match__pad,
+.match__hud .match__weather-banner {
   pointer-events: auto;
 }
 
@@ -921,4 +950,87 @@ td {
   background: rgba(255, 255, 255, 0.12);
   font-size: 0.75rem;
   font-variant-numeric: tabular-nums;
+}
+
+/*
+ * Landscape phones are the target (`screens/match.md` § 5) and their viewport is short: the menu measured 1,028 px and
+ * the lobby 1,685 px against 390 px of height, so the first card's call to action sat below the fold. Two columns put
+ * the screens side by side instead of stacking them. Tap targets keep their 44 px floor (`NFR-17`): only padding,
+ * gaps and type shrink here.
+ */
+@media (orientation: landscape) and (max-height: 520px) {
+  .screen {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-content: start;
+    align-items: start;
+    gap: 8px;
+    padding: calc(8px + var(--safe-top)) calc(8px + var(--safe-right)) calc(8px + var(--safe-bottom))
+      calc(8px + var(--safe-left));
+  }
+
+  .screen > header,
+  .screen > h1,
+  .screen > .row:first-of-type {
+    grid-column: 1 / -1;
+  }
+
+  .card {
+    padding: 10px;
+    gap: 8px;
+  }
+
+  /* The header becomes one row: the title, the identity chip and the three links on a single line. */
+  .screen > header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 10px;
+    padding: 8px 10px;
+  }
+
+  .screen > header h1 {
+    font-size: 1rem;
+  }
+
+  /*
+   * The one-line pitch is the first thing to go when the viewport is 390 px tall and the play button must be seen.
+   * Scoped to the menu's own paragraph: `.screen > header > p` also matched the result screen's "could not record"
+   * line and hid it (`TC-RANK-157`).
+   */
+  .menu__tagline {
+    display: none;
+  }
+
+  .screen > header > .row {
+    margin-left: auto;
+  }
+
+  /*
+   * The links in the header row keep the 44 px tap floor (`NFR-17`, `TC-FND-133`): shrinking them to save height is
+   * what the a11y case catches, so only the type size moves.
+   */
+  .screen > header > .row a,
+  .screen > header > .row .badge {
+    font-size: 0.78rem;
+  }
+
+  h1 {
+    font-size: 1.1rem;
+  }
+
+  h2 {
+    font-size: 0.9rem;
+  }
+
+  .muted {
+    font-size: 0.78rem;
+  }
+
+  /* A leaderboard or a history table scrolls inside its own column rather than growing the page. */
+  .screen table,
+  .screen ul {
+    max-height: 44vh;
+    overflow-y: auto;
+  }
 }

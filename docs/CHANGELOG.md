@@ -1,5 +1,42 @@
 # Changelog
 
+## 2026-11-08 — the play-through: the match could not be played, and now it can
+
+A real bot match, driven in a landscape browser at 844 × 390, exposed what 1036 unit cases and 73 browser cases could
+not: the game was unplayable in practice. Every finding below came from playing it, not from reading it.
+
+- **The enemy was never on screen.** The camera followed the shooter (`windowOn`) and the two mobiles spawn 1 640 units
+  apart on a 2 000-unit map, so the target sat outside the window: the player aimed at a number. `windowOnBoth` frames
+  the pair, `clampWindow` keeps it inside the map, and the frame is nudged off the HUD cluster on the player's own side.
+- **The shell was never drawn.** The scene drew sky, terrain, tanks and the aim ring, and nothing for the shot itself —
+  the engine resolves a shot in one step, so the state jumped from "before" to "after". The `shot` event already carries
+  the resolved `path`, `flightMs`, `impact` and `hits`, so the scene now animates exactly that: a shell with a trail
+  along the engine's own path, a muzzle flash, an impact burst with smoke, a scorch mark, a frame shake, and the damage
+  numbers over the target.
+- **The angle readout ignored the gesture.** `aimAngle` was `45 + aimDelta`, the pad's nudge only; the pull's own angle
+  went to `fireFromPull` and never to the screen. It now reads the pull, clamped to the barrel window — the same
+  expression the shot uses.
+- **The HUD swallowed the aim gesture.** `.match__hud > *` was `pointer-events: auto`, so `.match__top` — a band across
+  the whole width — took every press: a pull that started there never reached the canvas, the power readout stayed at
+  `0.00` and the release was cancelled as a dead zone. Containers are now transparent to pointers; only controls take
+  a press.
+- **The polite live region never said a shot happened.** It announced the turn and nothing else, so a screen-reader
+  player never heard a shell land. It now announces the shot's own numbers (`match.announce.hit` / `match.announce.miss`).
+- **The menu did not fit a landscape phone.** 1 028 px of content in 390 px of height put the play button below the
+  fold; the lobby measured 1 685 px. A two-column layout at short landscape heights puts the play button at y=289, the
+  header on one row, and the pitch line away — tap targets keep their 44 px floor (`NFR-17`).
+- **A guest asked `/me` and logged two 401s** on every visit to `/profile` before the redirect. Only an account session
+  asks now.
+- **Graphics**: the sky is a dusk ramp with a horizon glow, the terrain has a lit surface band over three depth bands
+  and a crisp rim, and impacts leave scorch marks that fade.
+- **Also fixed while verifying**: the heading no longer draws the browser's focus ring (the route focus is programmatic,
+  so the title looked like a text input), and the landscape rule that hid the menu tagline no longer hides the result
+  screen's "could not record" line (`TC-RANK-157`).
+
+New oracle: `tests/e2e/match-feedback.spec.ts` (`TC-MATCH-900`). The canvas parts — pair framing, the flying shell, the
+damage numbers — are recorded as hand-verified evidence in `05-quality/test-plan-status.md` § 3, with the reason the
+angle case is not automated: Playwright's mobile emulation does not deliver the drag to the canvas the way a finger does.
+
 ## 2026-11-08 — the production deploy stops going red after every merge
 
 - **Fixed** `deploy-production.yml`: the job arms itself only when the repository variable `PRODUCTION_READY` is `true`

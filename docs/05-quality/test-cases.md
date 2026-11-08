@@ -386,6 +386,7 @@ unrelated meanings), so every row below names the one thing it proves.
 | TC-MATCH-914 | US-MATCH-002 | Drag distance maps to the power ring radius | Radius grows with the pull and stops at the maximum | web | `US-MATCH-002` §4 |
 | TC-MATCH-190 | US-MATCH-008 | AC1 — the match page fits the size rule | `apps/web/src/routes/MatchPage.tsx` ≤ 400 lines and no file under `apps/web/src/routes/` > 500, asserted by `tests/meta/file-size.test.ts` | web | NFR-16 |
 | TC-MATCH-191 | US-MATCH-008 | AC2 — the split changes no behaviour | The whole Vitest and Playwright suites pass with no edit to an assertion | web | NFR-16 |
+| TC-MATCH-900 | US-MATCH-003 | AC10 — the live region reports the shot, not only the turn | After a fired pull the polite region contains a shot sentence (`match.announce.hit`/`miss`), not the turn announcement it opened with | e2e | NFR-17 |
 | TC-NET-045 | US-NET-004 | A peer sends `team_assign`; the host sends it after the start | `not-host` while a peer, `invalid-state` once playing; the roster is unchanged | worker | `US-NET-004` §2 roster |
 | TC-NET-066 | US-NET-004 | A socket signals itself, then signals a seated member with no socket | `bad-request`, then `peer-not-connected`; no frame is relayed | worker | `US-NET-004` §3 `signal` |
 | TC-NET-067 | US-NET-004 | AC2 — Fire from a non-active slot | Ignored + `error unsupported-message` | worker | FR-02 |

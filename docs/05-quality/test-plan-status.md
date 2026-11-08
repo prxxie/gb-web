@@ -13,8 +13,8 @@ The list is a snapshot taken by hand as files land; `verify-docs.mjs` does not g
 
 ## 1. Written
 
-**123 Vitest files (1036 cases)** across the four suites and **21 Playwright specs (73 cases)**, green on 2026-11-08
-(`pnpm test`, `pnpm e2e`). `tests/meta/traceability.test.ts` reports **295 of 355 documented cases** with an automated
+**123 Vitest files (1036 cases)** across the four suites and **22 Playwright specs (74 cases)**, green on 2026-11-08
+(`pnpm test`, `pnpm e2e`). `tests/meta/traceability.test.ts` reports **296 of 360 documented cases** with an automated
 test; the floor it enforces is `tests/meta/traceability-baseline.txt`.
 
 | Area | Files |
@@ -23,7 +23,7 @@ test; the floor it enforces is `tests/meta/traceability-baseline.txt`.
 | Worker and Durable Object | `apps/worker/tests/accounts.test.ts`, `apps/worker/tests/api-contract.test.ts`, `apps/worker/tests/auth.test.ts`, `apps/worker/tests/authz.test.ts`, `apps/worker/tests/deletion.test.ts`, `apps/worker/tests/display-name.test.ts`, `apps/worker/tests/elo.test.ts`, `apps/worker/tests/env.test.ts`, `apps/worker/tests/health.test.ts`, `apps/worker/tests/history.test.ts`, `apps/worker/tests/leaderboard.test.ts`, `apps/worker/tests/lib.test.ts`, `apps/worker/tests/logging.test.ts`, `apps/worker/tests/matches.test.ts`, `apps/worker/tests/metrics.test.ts`, `apps/worker/tests/migrations.test.ts`, `apps/worker/tests/privacy.test.ts`, `apps/worker/tests/profile.test.ts`, `apps/worker/tests/purge.test.ts`, `apps/worker/tests/ratelimit.test.ts`, `apps/worker/tests/room-auth.test.ts`, `apps/worker/tests/room-election.test.ts`, `apps/worker/tests/room-forfeit.test.ts`, `apps/worker/tests/room-host.test.ts`, `apps/worker/tests/room-membership.test.ts`, `apps/worker/tests/room-reject-log.test.ts`, `apps/worker/tests/room-relay.test.ts`, `apps/worker/tests/room-rules.test.ts`, `apps/worker/tests/room-settings.test.ts`, `apps/worker/tests/room-validate.test.ts`, `apps/worker/tests/room.test.ts`, `apps/worker/tests/rooms.test.ts`, `apps/worker/tests/schema-whitelist.test.ts`, `apps/worker/tests/sessions.test.ts`, `apps/worker/tests/signaling.test.ts`, `apps/worker/tests/snapshot-push.test.ts`, `apps/worker/tests/state-machine.test.ts`, `apps/worker/tests/turn.test.ts` |
 | Web UI | `apps/web/tests/aim.test.tsx`, `apps/web/tests/aim-fire.test.tsx`, `apps/web/tests/aim-preview.test.tsx`, `apps/web/tests/camera.test.tsx`, `apps/web/tests/channels.test.tsx`, `apps/web/tests/chat.test.tsx`, `apps/web/tests/chat-wiring.test.tsx`, `apps/web/tests/clock.test.tsx`, `apps/web/tests/diagnostics.test.tsx`, `apps/web/tests/direction-pad.test.tsx`, `apps/web/tests/errors.test.tsx`, `apps/web/tests/fullscreen.test.tsx`, `apps/web/tests/gestures.test.tsx`, `apps/web/tests/host-clock.test.tsx`, `apps/web/tests/hud.test.tsx`, `apps/web/tests/i18n.test.tsx`, `apps/web/tests/input.test.tsx`, `apps/web/tests/install-prompt.test.tsx`, `apps/web/tests/interpolate.test.tsx`, `apps/web/tests/leaderboard.test.tsx`, `apps/web/tests/live-announcement.test.tsx`, `apps/web/tests/lobby-gating.test.tsx`, `apps/web/tests/lobby-join.test.tsx`, `apps/web/tests/lobby-mobile.test.tsx`, `apps/web/tests/lobby-rename.test.tsx`, `apps/web/tests/lobby-settings.test.tsx`, `apps/web/tests/manifest.test.tsx`, `apps/web/tests/match-controls.test.tsx`, `apps/web/tests/match-end.test.tsx`, `apps/web/tests/match-record.test.tsx`, `apps/web/tests/match-wiring.test.tsx`, `apps/web/tests/mesh.test.tsx`, `apps/web/tests/migration.test.tsx`, `apps/web/tests/migration-wiring.test.tsx`, `apps/web/tests/netplay.test.tsx`, `apps/web/tests/netplay-wiring.test.tsx`, `apps/web/tests/orientation.test.tsx`, `apps/web/tests/outcome.test.tsx`, `apps/web/tests/pad-layout.test.tsx`, `apps/web/tests/phrases.test.tsx`, `apps/web/tests/power-ring.test.tsx`, `apps/web/tests/profile.test.tsx`, `apps/web/tests/reconnect.test.tsx`, `apps/web/tests/results-outcome.test.tsx`, `apps/web/tests/results-screen.test.tsx`, `apps/web/tests/resync.test.tsx`, `apps/web/tests/roster.test.tsx`, `apps/web/tests/route-focus.test.tsx`, `apps/web/tests/ruler.test.tsx`, `apps/web/tests/service-worker.test.tsx`, `apps/web/tests/session-storage.test.tsx`, `apps/web/tests/shell.test.tsx`, `apps/web/tests/update-prompt.test.tsx`, `apps/web/tests/weapon-strip.test.tsx`, `apps/web/tests/weather-banner.test.tsx`, `apps/web/tests/wind-dial.test.tsx` |
 | Repository | `tests/meta/bundle-secrets.test.ts`, `tests/meta/openapi.test.ts`, `tests/meta/slo-snapshot.test.ts`, `tests/meta/story-evidence.test.ts`, `tests/meta/traceability.test.ts`, `tests/meta/workspace.test.ts` |
-| Browser flows | `tests/e2e/a11y.spec.ts`, `tests/e2e/bundle.spec.ts`, `tests/e2e/leaderboard.spec.ts`, `tests/e2e/lobby.spec.ts`, `tests/e2e/lobby-mobile.spec.ts`, `tests/e2e/main.spec.ts`, `tests/e2e/migration.spec.ts`, `tests/e2e/pwa-a11y.spec.ts`, `tests/e2e/pwa-i18n.spec.ts`, `tests/e2e/pwa-offline.spec.ts`, `tests/e2e/pwa-prod.spec.ts`, `tests/e2e/pwa-shell.spec.ts`, `tests/e2e/results.spec.ts`, `tests/e2e/routes.spec.ts`, `tests/e2e/signin.spec.ts`, `tests/e2e/smoke.spec.ts`, `tests/e2e/errors.spec.ts`, `tests/e2e/focus.spec.ts`, `tests/e2e/privacy.spec.ts`, `tests/e2e/profile.spec.ts`, `tests/e2e/reconnect.spec.ts` |
+| Browser flows | `tests/e2e/a11y.spec.ts`, `tests/e2e/bundle.spec.ts`, `tests/e2e/errors.spec.ts`, `tests/e2e/focus.spec.ts`, `tests/e2e/leaderboard.spec.ts`, `tests/e2e/lobby-mobile.spec.ts`, `tests/e2e/lobby.spec.ts`, `tests/e2e/main.spec.ts`, `tests/e2e/match-feedback.spec.ts`, `tests/e2e/migration.spec.ts`, `tests/e2e/privacy.spec.ts`, `tests/e2e/profile.spec.ts`, `tests/e2e/pwa-a11y.spec.ts`, `tests/e2e/pwa-i18n.spec.ts`, `tests/e2e/pwa-offline.spec.ts`, `tests/e2e/pwa-prod.spec.ts`, `tests/e2e/pwa-shell.spec.ts`, `tests/e2e/reconnect.spec.ts`, `tests/e2e/results.spec.ts`, `tests/e2e/routes.spec.ts`, `tests/e2e/signin.spec.ts`, `tests/e2e/smoke.spec.ts` |
 
 Each `apps/worker/tests/room-*.ts` file drives the real `Room` object through
 `apps/worker/tests/support/room-harness.ts` (a Hibernation-API fake) or the real route through
@@ -37,6 +37,25 @@ asserts the same SQL that production runs.
 left it for a different reason: a check that runs against a deployed environment is a release-stage check
 (`deployment.md` § post-deploy, `cpt-release` RR7), not a design-baseline oracle, so `01-overview/deployment.md` no
 longer claims it as one. It gets written with `US-FND-004`.
+
+### Found by playing, not by testing (2026-11-08)
+
+A browser play-through of a bot match found what the suites could not: the match could not really be played even with
+1036 unit cases and 73 browser cases green — the enemy was never on screen, the shell was never drawn, and the number the
+player aims with ignored the gesture. What changed, and how each part is verified:
+
+| Fix | Verified by |
+|---|---|
+| The camera frames both mobiles (`windowOnBoth`) instead of only the shooter | by hand, screenshots of a landscape session show the enemy in frame; the maths is unit-tested in `packages/core/tests/camera.test.ts` |
+| The shell flies along the engine's own `shot.path`, with a muzzle flash, an impact burst, a scorch and damage numbers | by hand, screenshots at release, mid-flight and impact |
+| The angle readout carries the pull's angle, clamped to the barrel window | by hand: a right-and-up drag reads 41–45°, a flat one reads the −10° clamp. **Not automated**: Playwright's mobile emulation delivers the drag differently and reads the clamp every time, so `TC-MATCH-903` was dropped rather than made to pass for the wrong reason |
+| The HUD no longer swallows the gesture (`.match__hud > *` is `pointer-events: none`) | by hand: a pull that starts over the HUD band moves the power readout |
+| The menu fits a landscape phone: the play button sits at y=289 of 390 instead of below the fold | by hand, measured with `boundingBox` in the same session |
+| A guest no longer asks `/me`, so `/profile` logs no 401 | by hand, the console is clean |
+
+Still open from the same session: the engagement distance on `map-01` (1 640 units) leaves a narrow power window for a
+1v1 — the aim preview makes it workable, but a hit still needs the ring on the target — and the bot lands roughly one
+shot in six, so a match against it runs long.
 
 ## 3. Gaps a `done` story still carries
 

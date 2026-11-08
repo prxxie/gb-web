@@ -54,8 +54,11 @@ export function ProfilePage(): JSX.Element {
   // The token is the identity of the session; the provider hands out a fresh object on every
   // `refresh()`, and keying the load on it would wipe a name the player is still typing.
   const token = session?.token ?? null;
+  // A guest session has no account, so `/me` answers 401 and the browser logs an error on every visit to a screen
+  // the guest is about to be redirected away from (`TC-AUTH-143`). Only an account session asks.
+  const isAccount = session?.subject.kind === "account";
   const load = useCallback(async () => {
-    if (!token) return;
+    if (!token || !isAccount) return;
     try {
       const me = await api.me(token);
       setProfile(me);
@@ -67,7 +70,7 @@ export function ProfilePage(): JSX.Element {
     } catch {
       setError(t("common.retry"));
     }
-  }, [token, t]);
+  }, [token, isAccount, t]);
 
   useEffect(() => {
     void load();

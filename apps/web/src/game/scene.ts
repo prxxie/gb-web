@@ -4,17 +4,22 @@
  * Phaser owns pixels and nothing else: state arrives from the host (or the local engine in a bot
  * match), and this scene draws whatever it is given. No rule lives here, so a re-render can never
  * change the outcome (`NFR-22`, `ADR-0004`).
+ *
+ * What the shot does on screen comes from the engine's own `shot` event — its `path`, its `flightMs` and its `hits` —
+ * so the shell the player watches is the shell that was resolved, never a second simulation that could disagree.
  */
 import Phaser from "phaser";
 import {
   TUNABLES,
   defaultWindow,
-  windowOn,
+  windowOnBoth,
+  clampWindow,
   panBy,
   pinchTo,
   rulerLayout,
   getMobile,
   type CameraWindow,
+  type MatchEvent,
   type MatchState,
   type PlayerState,
 } from "@gbw/core";
@@ -45,7 +50,11 @@ export interface BattleCallbacks {
 }
 
 export interface BattleHandle {
-  setState(state: MatchState, localSlot: number): void;
+  /**
+   * Push a new state. `events` are the engine's own events for that step: a `shot` event carries the resolved path, so
+   * the shell can be animated from the numbers that decided the damage.
+   */
+  setState(state: MatchState, localSlot: number, events?: readonly MatchEvent[]): void;
   /**
    * Whether this client may aim right now (`US-MATCH-002` AC7/AC8): the scene refuses to start a pull, draw the ring
    * or hand a release to `onRelease` while it is false. The camera keeps working — panning is not aiming.
@@ -63,12 +72,35 @@ function now(): number {
   return typeof performance === "undefined" ? Date.now() : performance.now();
 }
 
+/** How long an impact flash and its scorch mark stay on screen after the shell lands. */
+const IMPACT_MS = 420;
+const SCORCH_MS = 6_000;
+
+interface FlyingShot {
+  readonly path: readonly { readonly x: number; readonly y: number }[];
+  readonly startedAt: number;
+  readonly flightMs: number;
+  readonly impact: { readonly x: number; readonly y: number } | null;
+  readonly radius: number;
+  readonly hits: readonly { readonly slot: number; readonly amount: number }[];
+}
+
+interface Scorch {
+  readonly x: number;
+  readonly y: number;
+  readonly radius: number;
+  readonly at: number;
+}
+
 interface Options {
   readonly parent: HTMLElement;
   readonly state: MatchState;
   readonly localSlot: number;
   readonly callbacks: BattleCallbacks;
 }
+
+/** A sky band colour ramp, top to horizon: dusk over a dark map, drawn as bands so no gradient API is needed. */
+const SKY: readonly number[] = [0x070d1a, 0x0b1220, 0x101a2e, 0x152238, 0x1a2a44, 0x21324f, 0x283a58, 0x2e405f];
 
 class BattleScene extends Phaser.Scene {
   private state: MatchState;
@@ -99,7 +131,12 @@ class BattleScene extends Phaser.Scene {
   private pointerHandlers: Array<{ type: string; handler: (event: PointerEvent) => void }> = [];
   /** The one-shot fullscreen request armed on the canvas (`US-MATCH-007` AC1). */
   private disarmFullscreen: () => void = () => undefined;
-
+  /** Shells in the air, keyed by nothing: they are independent and short-lived. */
+  private flying: FlyingShot[] = [];
+  private scorches: Scorch[] = [];
+  /** Muzzle flashes: where and when a shot left. */
+  private flashes: { readonly x: number; readonly y: number; readonly at: number }[] = [];
+  private shakeUntil = 0;
 
   constructor(state: MatchState, localSlot: number, callbacks: BattleCallbacks) {
     super("battle");
@@ -132,7 +169,7 @@ class BattleScene extends Phaser.Scene {
     }
   }
 
-  setState(state: MatchState, localSlot: number): void {
+  setState(state: MatchState, localSlot: number, events: readonly MatchEvent[] = []): void {
     const previousActiveSlot = this.state.turn.activeSlot;
     // Start the segment where the screen actually is, so a state that lands mid-blend continues from the drawn
     // pixel instead of teleporting the rest of the way (`US-MATCH-001` AC2).
@@ -140,9 +177,31 @@ class BattleScene extends Phaser.Scene {
     this.fromAt = now();
     this.state = state;
     this.localSlot = localSlot;
-    // The camera follows whoever is shooting until the player pans; a shot that never leaves the screen
-    // does not exist, so the view settles on the active mobile at the start of each turn.
-    if (state.turn.activeSlot !== previousActiveSlot) this.frameOn(state.turn.activeSlot, state);
+    for (const event of events) this.playEvent(event);
+    // A turn change re-frames on the pair; a move re-frames when it takes someone out of the window. Panning by hand
+    // still wins until the next turn, which is what `US-MATCH-007` § 5 promises.
+    const moved = events.some((event) => event.kind === "move");
+    if (state.turn.activeSlot !== previousActiveSlot || moved) this.frameOn(state.turn.activeSlot, state);
+  }
+
+  /** Turn the engine's own events into pixels: the shell, the flash, the numbers. */
+  private playEvent(event: MatchEvent): void {
+    if (event.kind !== "shot") return;
+    const startedAt = now();
+    const hits = event.hits.map((hit) => ({
+      slot: hit.slot,
+      amount: Number((hit as { damage?: number; amount?: number }).damage ?? (hit as { amount?: number }).amount ?? 0),
+    }));
+    this.flying.push({
+      path: event.path,
+      startedAt,
+      flightMs: Math.max(220, Math.min(2_600, event.flightMs || 700)),
+      impact: event.impact,
+      radius: 70,
+      hits,
+    });
+    const from = event.path[0];
+    if (from) this.flashes.push({ x: from.x, y: from.y, at: startedAt });
   }
 
   /** Tell the page where this client's mobile landed; a 2 px threshold keeps React out of every frame. */
@@ -176,17 +235,33 @@ class BattleScene extends Phaser.Scene {
     return (now() - this.fromAt) / INTERPOLATION_MS;
   }
 
-  /** Centre horizontally on the active mobile and keep the ground line anchored. */
+  /**
+   * Frame the turn: the shooter **and** the opponent it is shooting at.
+   *
+   * Following only the shooter left the target 1,640 units away on a 2,000-unit map — off screen — so the player was
+   * aiming at a number with no enemy to aim at. `windowOnBoth` keeps the pair in frame and `clampWindow` keeps the
+   * result inside the map.
+   */
   private frameOn(slot: number, state: MatchState): void {
-    const player = state.players.find((candidate) => candidate.slot === slot);
-    if (!player) return;
-    this.window = windowOn(player.x, this.scale.width / Math.max(1, this.scale.height), player.y);
+    const shooter = state.players.find((candidate) => candidate.slot === slot);
+    if (!shooter) return;
+    const opponents = state.players.filter((candidate) => candidate.team !== shooter.team && !candidate.eliminated);
+    const target = opponents[0] ?? state.players.find((candidate) => candidate.slot !== shooter.slot);
+    const aspect = this.scale.width / Math.max(1, this.scale.height);
+    const framed = target
+      ? windowOnBoth(shooter.x, target.x, aspect, Math.min(shooter.y, target.y))
+      : windowOnBoth(shooter.x, shooter.x, aspect, shooter.y);
+    // The loadout strip and the power readout hang on the left of the HUD, over the team-A spawn: nudge the frame so
+    // this client's own mobile sits clear of them instead of behind them.
+    const local = state.players.find((candidate) => candidate.slot === this.localSlot);
+    const nudge = local && local.x < framed.x + framed.width / 2 ? -framed.width * 0.07 : framed.width * 0.07;
+    this.window = clampWindow({ ...framed, x: framed.x + nudge });
   }
 
   create(): void {
     this.frameOn(this.state.turn.activeSlot, this.state);
     this.graphics = this.add.graphics();
-    this.cameras.main.setBackgroundColor("#0b1220");
+    this.cameras.main.setBackgroundColor("#070d1a");
     this.attachPointerHandlers();
     // Fullscreen needs a gesture, so it is armed on the canvas rather than requested at mount (`US-MATCH-007` AC1).
     this.disarmFullscreen = armFullscreen(this.game.canvas);
@@ -304,39 +379,24 @@ class BattleScene extends Phaser.Scene {
     const graphics = this.graphics;
     graphics.clear();
     const width = this.scale.width;
-    const height = this.scale.height;
     const scale = width / this.window.width;
     this.screenScale = scale;
     this.cameras.main.setZoom(scale);
     this.cameras.main.centerOn(this.window.x + this.window.width / 2, this.window.y + this.window.height / 2);
-
-    // Sky and sea-level band.
-    graphics.fillStyle(0x12203a, 1);
-    graphics.fillRect(this.window.x, this.window.y, this.window.width, this.window.height);
-
-    // Terrain: one polygon from the height field.
-    const step = this.state.terrainStep;
-    const heights = this.state.terrain;
-    graphics.fillStyle(0x3f2d1d, 1);
-    graphics.beginPath();
-    graphics.moveTo(0, TUNABLES.mapHeight);
-    for (let index = 0; index < heights.length; index += 1) {
-      graphics.lineTo(index * step, heights[index] ?? TUNABLES.mapHeight);
+    // A landed shell nudges the frame; it never moves the window itself, so the ruler stays honest.
+    const time = now();
+    if (time < this.shakeUntil) {
+      const left = (this.shakeUntil - time) / IMPACT_MS;
+      this.cameras.main.setScroll(
+        this.cameras.main.scrollX + Math.sin(time / 18) * 6 * left,
+        this.cameras.main.scrollY + Math.cos(time / 14) * 4 * left,
+      );
     }
-    graphics.lineTo(TUNABLES.mapWidth, TUNABLES.mapHeight);
-    graphics.closePath();
-    graphics.fillPath();
-    graphics.lineStyle(2, 0x8f6a3c, 1);
-    graphics.strokePath();
 
-    // Ruler ticks along the bottom edge of the visible window.
-    const ruler = rulerLayout(this.window);
-    graphics.lineStyle(1, 0x6b7a90, 0.6);
-    for (let index = 0; index <= ruler.segments; index += 1) {
-      const tickX = this.window.x + index * ruler.unitsPerDivision;
-      const tickHeight = index % 2 === 0 ? 14 : 7;
-      graphics.lineBetween(tickX, this.window.y + this.window.height - tickHeight, tickX, this.window.y + this.window.height);
-    }
+    this.drawSky(graphics);
+    this.drawTerrain(graphics);
+    this.drawScorches(graphics, time);
+    this.drawRuler(graphics);
 
     const frames = unitFrames(this.fromPose, this.state, this.progress());
     this.lastDrawn = poseOfFrames(frames);
@@ -346,8 +406,186 @@ class BattleScene extends Phaser.Scene {
       if (frame) this.drawPlayer(graphics, player, frame);
     });
     this.drawAim(graphics, frames);
+    this.drawFlashes(graphics, time);
+    this.drawShells(graphics, time);
     this.emitFocus(frames);
-    void height;
+  }
+
+  /** Dusk sky, drawn as bands: no gradient API to depend on, and the horizon stays where the terrain meets it. */
+  private drawSky(graphics: Phaser.GameObjects.Graphics): void {
+    const { x, y, width, height } = this.window;
+    const bandHeight = height / SKY.length;
+    SKY.forEach((colour, index) => {
+      graphics.fillStyle(colour, 1);
+      graphics.fillRect(x, y + index * bandHeight, width, bandHeight + 1);
+    });
+    // A low sun glow on the horizon, so the sky is not a flat ramp.
+    graphics.fillStyle(0x3a4a6b, 0.35);
+    graphics.fillEllipse(x + width * 0.62, y + height * 0.86, width * 0.55, height * 0.22);
+    graphics.fillStyle(0x5a6f96, 0.18);
+    graphics.fillEllipse(x + width * 0.62, y + height * 0.86, width * 0.3, height * 0.12);
+  }
+
+  /** Terrain from the height field, with a lit surface band so the ground reads as ground. */
+  private drawTerrain(graphics: Phaser.GameObjects.Graphics): void {
+    const step = this.state.terrainStep;
+    const heights = this.state.terrain;
+    const surface = (): void => {
+      graphics.beginPath();
+      graphics.moveTo(0, TUNABLES.mapHeight);
+      for (let index = 0; index < heights.length; index += 1) {
+        graphics.lineTo(index * step, heights[index] ?? TUNABLES.mapHeight);
+      }
+      graphics.lineTo(TUNABLES.mapWidth, TUNABLES.mapHeight);
+      graphics.closePath();
+    };
+    graphics.fillStyle(0x2b1f14, 1);
+    surface();
+    graphics.fillPath();
+    // Three lighter bands just under the surface line: cheap depth without a texture.
+    const bands: readonly [number, number, number][] = [
+      [14, 0x6b4f2f, 0.55],
+      [34, 0x4a3620, 0.5],
+      [70, 0x38281a, 0.4],
+    ];
+    for (const [offset, colour, alpha] of bands) {
+      graphics.lineStyle(offset, colour, alpha);
+      graphics.beginPath();
+      for (let index = 0; index < heights.length; index += 1) {
+        const px = index * step;
+        const py = (heights[index] ?? TUNABLES.mapHeight) + offset / 2;
+        if (index === 0) graphics.moveTo(px, py);
+        else graphics.lineTo(px, py);
+      }
+      graphics.strokePath();
+    }
+    graphics.lineStyle(3, 0x9a7442, 0.95);
+    graphics.beginPath();
+    for (let index = 0; index < heights.length; index += 1) {
+      const px = index * step;
+      const py = heights[index] ?? TUNABLES.mapHeight;
+      if (index === 0) graphics.moveTo(px, py);
+      else graphics.lineTo(px, py);
+    }
+    graphics.strokePath();
+  }
+
+  private drawRuler(graphics: Phaser.GameObjects.Graphics): void {
+    const ruler = rulerLayout(this.window);
+    graphics.lineStyle(1, 0x6b7a90, 0.6);
+    for (let index = 0; index <= ruler.segments; index += 1) {
+      const tickX = this.window.x + index * ruler.unitsPerDivision;
+      const tickHeight = index % 2 === 0 ? 14 : 7;
+      graphics.lineBetween(tickX, this.window.y + this.window.height - tickHeight, tickX, this.window.y + this.window.height);
+    }
+  }
+
+  private drawScorches(graphics: Phaser.GameObjects.Graphics, time: number): void {
+    this.scorches = this.scorches.filter((scorch) => time - scorch.at < SCORCH_MS);
+    for (const scorch of this.scorches) {
+      const age = (time - scorch.at) / SCORCH_MS;
+      graphics.fillStyle(0x120b06, 0.5 * (1 - age));
+      graphics.fillEllipse(scorch.x, scorch.y, scorch.radius * 1.6, scorch.radius * 0.5);
+    }
+  }
+
+  private drawFlashes(graphics: Phaser.GameObjects.Graphics, time: number): void {
+    this.flashes = this.flashes.filter((flash) => time - flash.at < 160);
+    for (const flash of this.flashes) {
+      const age = (time - flash.at) / 160;
+      graphics.fillStyle(0xffd27a, 0.9 * (1 - age));
+      graphics.fillCircle(flash.x, flash.y, 10 + age * 18);
+      graphics.fillStyle(0xffffff, 0.6 * (1 - age));
+      graphics.fillCircle(flash.x, flash.y, 5 + age * 8);
+    }
+  }
+
+  /**
+   * The shell, along the engine's own path, then the impact: a flash, a shock ring, the scorch and the numbers.
+   *
+   * This is the whole reason the shot is animated from the event rather than from a guess — `path` and `flightMs` come
+   * out of `resolveShot`, so what the player watches is what the resolver did.
+   */
+  private drawShells(graphics: Phaser.GameObjects.Graphics, time: number): void {
+    const landed: FlyingShot[] = [];
+    for (const shot of this.flying) {
+      const progress = (time - shot.startedAt) / shot.flightMs;
+      if (progress < 1) {
+        const last = shot.path.length - 1;
+        const at = Math.max(0, Math.min(last, Math.floor(progress * last)));
+        const point = shot.path[at];
+        if (point) {
+          // A short trail behind the shell, so a fast shot still reads as motion.
+          for (let back = 1; back <= 4; back += 1) {
+            const previous = shot.path[Math.max(0, at - back * 2)];
+            if (!previous) continue;
+            graphics.fillStyle(0xffc46b, 0.35 / back);
+            graphics.fillCircle(previous.x, previous.y, 5 - back * 0.7);
+          }
+          graphics.fillStyle(0xffe0a3, 1);
+          graphics.fillCircle(point.x, point.y, 5);
+          graphics.fillStyle(0xffffff, 0.85);
+          graphics.fillCircle(point.x, point.y, 2.4);
+        }
+        continue;
+      }
+      const since = time - shot.startedAt - shot.flightMs;
+      if (since > IMPACT_MS) {
+        landed.push(shot);
+        continue;
+      }
+      const burst = since / IMPACT_MS;
+      if (shot.impact) {
+        graphics.fillStyle(0xffb347, 0.8 * (1 - burst));
+        graphics.fillCircle(shot.impact.x, shot.impact.y, shot.radius * (0.5 + burst));
+        graphics.fillStyle(0xfff1c2, 0.9 * (1 - burst));
+        graphics.fillCircle(shot.impact.x, shot.impact.y, shot.radius * 0.35 * (1 - burst));
+        graphics.lineStyle(3, 0xffffff, 0.5 * (1 - burst));
+        graphics.strokeCircle(shot.impact.x, shot.impact.y, shot.radius * (0.8 + burst * 1.8));
+        // Smoke: three puffs that rise and fade.
+        for (let puff = 0; puff < 3; puff += 1) {
+          graphics.fillStyle(0x8a8f99, 0.25 * (1 - burst));
+          graphics.fillCircle(
+            shot.impact.x + (puff - 1) * 22,
+            shot.impact.y - 18 - burst * (24 + puff * 12),
+            10 + burst * 12,
+          );
+        }
+      }
+    }
+    for (const shot of landed) {
+      this.flying = this.flying.filter((candidate) => candidate !== shot);
+      if (!shot.impact) continue;
+      this.scorches.push({ x: shot.impact.x, y: shot.impact.y, radius: shot.radius, at: time });
+      this.shakeUntil = Math.max(this.shakeUntil, time + IMPACT_MS);
+      this.spawnNumbers(shot);
+    }
+  }
+
+  /** Damage numbers, as text objects in world space scaled back to a constant screen size. */
+  private spawnNumbers(shot: FlyingShot): void {
+    if (!shot.impact) return;
+    shot.hits.forEach((hit, index) => {
+      if (hit.amount <= 0) return;
+      const label = this.add
+        .text(shot.impact!.x + (index - 0.5) * 34, shot.impact!.y - 46, `-${Math.round(hit.amount)}`, {
+          fontFamily: "system-ui, sans-serif",
+          fontSize: "18px",
+          color: "#ffd9a0",
+          stroke: "#1b0f06",
+          strokeThickness: 4,
+        })
+        .setOrigin(0.5)
+        .setScale(1 / Math.max(0.2, this.screenScale));
+      this.tweens.add({
+        targets: label,
+        y: label.y - 46,
+        alpha: 0,
+        duration: 900,
+        ease: "Quad.easeOut",
+        onComplete: () => label.destroy(),
+      });
+    });
   }
 
   /**
@@ -510,7 +748,7 @@ export function mountBattle(options: Options): BattleHandle {
     parent: options.parent,
     width: options.parent.clientWidth,
     height: options.parent.clientHeight,
-    backgroundColor: "#0b1220",
+    backgroundColor: "#070d1a",
     scene,
     scale: { mode: Phaser.Scale.RESIZE, autoCenter: Phaser.Scale.CENTER_BOTH },
     input: { activePointers: 2 },
@@ -521,7 +759,7 @@ export function mountBattle(options: Options): BattleHandle {
   };
   window.addEventListener("resize", resize);
   return {
-    setState: (state, localSlot) => scene.setState(state, localSlot),
+    setState: (state, localSlot, events) => scene.setState(state, localSlot, events),
     setAimAllowed: (allowed) => scene.setAimAllowed(allowed),
     setWeaponSlot: (slot) => scene.setWeaponSlot(slot),
     setAimDelta: (delta) => scene.setAimDelta(delta),
@@ -531,4 +769,3 @@ export function mountBattle(options: Options): BattleHandle {
     },
   };
 }
-
