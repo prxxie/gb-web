@@ -23,13 +23,13 @@ Units are **world units and seconds**; the world is `2,000 × 1,200`.
 Launch, at the unit's muzzle (`t = 0`) — **one power law for every mobile**, as in GB:
 
 ```
-v0 = force × speedK                      // force 0…maxPower (90–100); speedK 6.2 everywhere
+v0 = force × speedK                      // force 0…maxPower (90–100); speedK 5.9 everywhere
 vx =  cos(angle) × v0 × facing
 vy = −sin(angle) × v0
 
-ax =  windCoefficient × m × cos θ        // 105 × m, no divisor: 2,730 u/s² at full wind
+ax =  windCoefficient × m × cos θ        // 1.0 × m, no divisor: 26 u/s² at full wind
 ay =  windCoefficient × m × sin θ        // 0 for GB's horizontal wind
-vy += (gravity + ay) × dt                // gravity 100 u/s² for every mobile, towards +y (down)
+vy += (gravity + ay) × dt                // gravity 152 u/s² for every mobile, towards +y (down)
 ```
 
 Wind is **horizontal only**, drawn as the genre draws it: a magnitude `m` on `0…26` and one of **two directions**,
@@ -71,21 +71,27 @@ shield absorbs first:  shield -= min(shield, damage);  hp -= damage − absorbed
 Determinism (`NFR-28`): fixed step, integer-truncated trig inputs, no `Math.random()` in `core`, positions rounded to
 `0.1` (`TC-CORE-040`).
 
-**Calibration.** `force 98` at `45°`, `gravity 100`, no wind → **3,680 units in 8.55 s** (measured on the real
-integrator; `v0 = 98 × 6.2 = 607.6` and `v0² / g = 3,692` before the 0.1 position quantum): **1.84 map widths**, the
-genre's "full power leaves the map" ceiling, with the long readable hang time GB shows. Every mobile draws exactly that
+**Calibration.** `force 98` at `45°`, `gravity 152`, no wind → **2,182 units in 5.35 s** (measured on the real
+integrator; `v0 = 98 × 5.9 = 578.2` and `v0² / g = 2,199` before the 0.1 position quantum): **1.33 map widths** at full
+power, so the bar overshoots the enemy without throwing the shell off the world. Every mobile draws exactly that
 parabola at that angle and power (`TC-CORE-023`).
 
-**Full wind (`m = 26`, `θ = 0°`) moves that landing point 760 units** — six ruler divisions, a sixth of the map —
-because `a_x = 0.8 × 26 = 20.8 u/s²` (a fifth of gravity) and `½·a·t² = 769` over the 8.6 s hang. The coefficient is the
+**Why these two constants and not others.** The pair is solved from two feel targets, not picked: a full-power 45° shot
+should carry **~2,300 units** and hang **~5.5 s**. Range is `v0²/g = (100 · speedK)² / gravity` and hang is
+`2 · v0 · sin45 / gravity`, so `speedK ≈ 5.9` and `gravity ≈ 152` satisfy both. That pair also puts the shot a player
+actually takes — the 1,640-unit spawn separation — at **3.4 bars** with a **4.7 s** hang, which is where the genre's
+players live: a bar with usable room above the shot, and a turn that resolves in about five seconds. The previous pair
+(`gravity 100`, `speedK 6.2`) needed only **2.2–2.6 bars** for the same shot and hung **5.8–10 s**, so the top half of
+the bar was dead and every turn was a wait.
+
+**Full wind (`m = 26`, `θ = 0°`) moves that landing point 378 units** — three ruler divisions, a fifth of the map —
+because `a_x = 1.0 × 26 = 26 u/s²` (a sixth of gravity) and `½·a·t² = 372` over the 5.35 s hang. The coefficient is the
 one number the mass-free model had to re-derive: the first pass kept the old `105`, which with no divisor meant
-`2,730 u/s²` — 27 × gravity, and a calibration shot thrown 100,131 units. A wind reading a player has to respect is a
-sixth of the map, not fifty of them. The two figures a player feels are both measured and pinned by
-`TC-CORE-960` / `TC-CORE-023`, so the retune cannot land silently. For reference, `drift ≈ ½ · windCoefficient · m · t²`,
-so restoring a **one-ruler-division** full-wind correction (`125 units`) on the new 8.55 s hang time needs
-`windCoefficient ≈ 2 × 125 / (26 × 8.55²) ≈ 0.13`; ~5 % of a map (`100 units`) lands in the same order of magnitude.
+`2,730 u/s²` — 18 × gravity, and a calibration shot thrown 100,131 units. A wind reading a player has to respect is a
+fifth of the map, not fifty of them. The figures a player feels are measured and pinned by `TC-CORE-960` /
+`TC-CORE-023`, so the retune cannot land silently. For reference, `drift ≈ ½ · windCoefficient · m · t²`.
 Wind also no longer varies by mobile: the drift column of [`data/mobiles.md`](../data/mobiles.md) § 4 spreads
-`14,331–38,510 units` at a `10`-unit wind, and the *only* input is hang time — `mbl-17` hangs 8.7 s, `mbl-05` 5.2 s.
+`55–147 units` at a `10`-unit wind, and the *only* input is hang time — `mbl-17` hangs 5.5 s, `mbl-05` 3.3 s.
 
 > **What is measured and what is ours.** Nothing here is copied from another product: the structure is a textbook
 > parabola and every number is a design target fixed by the calibration point above and by playtest (`OQ-37`). The spread
@@ -94,7 +100,7 @@ Wind also no longer varies by mobile: the drift column of [`data/mobiles.md`](..
 
 > **Conflict in the source, recorded not hidden.** `gbw-spec.md#6.3` pairs `force × 512/100` with `gravity 0.35` on a
 > 2,000-unit map. Taken per tick, `0.35 × 20 = 7 u/s²`, which throws a full-force 45° shot ~37,000 units — 18× the map.
-> We keep the usual speed law of the genre (`v0 = force × speedK`, `speedK 6.2`, which throws a full-force shot 1.84 map
+> We keep the usual speed law of the genre (`v0 = force × speedK`, `speedK 5.9`, which throws a full-force shot 1.33 map
 > widths — "full power leaves the map", the genre's own ceiling) and express gravity in `u/s²` (`100`), because the pair
 > as written cannot both be true (`OQ-19`).
 
@@ -106,7 +112,7 @@ Wind also no longer varies by mobile: the drift column of [`data/mobiles.md`](..
 | `gravity` | **`100 u/s²` for the whole roster**; map modifier `×0.95–1.05` | one gravity, so the same angle and power draw the same parabola in every mobile — a learned range transfers (`TC-CORE-023`) | `TC-CORE-020` |
 | ~~`mass`~~ | **removed** | was per mobile `118–169` and divided the wind push; GB's wind is mass-independent, and with it went `Mobile.mass` and `StepContext.mass` (`TC-CORE-925`) | `TC-CORE-925` |
 | `speedK` | `6.2` for every mobile | one power law, as in GB; full power flies 1.84 map widths | `TC-CORE-924` |
-| `windCoefficient` | `105` | `a = 105 × m × (cos θ, sin θ)`, **no divisor**: `m = 26` is `2,730 u/s²`, 27 × gravity, and the coefficient is still to be retuned against the 8.55 s hang time (§ 1.1) | `TC-CORE-023` |
+| `windCoefficient` | `1.0` | `a = 1.0 × m × (cos θ, sin θ)`, **no divisor**: `m = 26` is `26 u/s²`, a sixth of gravity, and 378 units of correction on the calibration shot |he 8.55 s hang time (§ 1.1) | `TC-CORE-023` |
 | `windMagnitude` | `0…26` integers | rolled per round (§ 1.3); `0` = no wind, `26` = full | `TC-CORE-926` |
 | `windSectors` | `2` | **east or west only**: `directionDeg = sector × 180` (`0` / `180`), `sector` 0–1, `sectorLabel` → `E`/`W` (`OQ-41`) | `TC-CORE-926` |
 | `turnDurationMs` | `20 000` | the turn clock (`OQ-03`) | `TC-CORE-152` |
@@ -217,9 +223,9 @@ The band is the *outer* limit; each mobile declares its own `angleMin`/`angleMax
 `Storm Falcon` stops at 25°, `Jade Dragon` reaches 50°, `Cinder Fox` fires from −18°. The clamp always uses the mobile's
 window, never the profile's.
 
-**One arc, twenty bands.** At 45° and `force 98` every mobile lands on the same spot — **3,680 units in 8.55 s** — and
+**One arc, twenty bands.** At 45° and `force 98` every mobile lands on the same spot — **2,182 units in 5.35 s** — and
 what the band changes is which angles it may fire at all: a mobile capped at 25° cannot use the 45° reference shot, so it
-reaches 2,930 units at full power where a 45°-capable one reaches 3,680. [`data/mobiles.md`](../data/mobiles.md) § 4
+reaches 1,725 units at full power where a 45°-capable one reaches 2,174. [`data/mobiles.md`](../data/mobiles.md) § 4
 prints all twenty from the real integrator.
 
 ### 4.3 What separates the twenty mobiles

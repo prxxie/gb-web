@@ -199,9 +199,10 @@ describe("bot (US-CORE-005)", () => {
 
   it("TC-CORE-927: a bot spends Power up to finish a target it can already hit", () => {
     // GB's Power up is a damage multiplier, not extra range (`data/items.md`), so the condition inverted with the
-    // item: the bot spends it on a shot that lands and whose extra third is what kills. The target is placed inside
-    // the blast so the best shot is on target and its bar is under one boosted shot.
-    const state = walledField("mbl-02", 100, 900, 350, 700, { "itm-power-up": 1 });
+    // item: the bot spends it on a shot that lands and whose extra third is what kills. Open ground, so the best shot
+    // is genuinely on target — in a trench the shell lands in the pit and the bot keeps the item for a shot it can
+    // actually take.
+    const state = openField("mbl-02", 300, 1_300, { "itm-power-up": 1 });
     const active: MatchState = { ...state, turn: { ...state.turn, activeSlot: 0 } };
     const wounded: MatchState = {
       ...active,

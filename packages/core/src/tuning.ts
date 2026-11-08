@@ -19,7 +19,7 @@ export const TUNABLES = {
    * what makes them feel different is the firing envelope and the shell, not the arc. Per-mobile gravity made the angle
    * and power tables untransferable between mobiles, which is the opposite of the genre.
    */
-  gravity: 100,
+  gravity: 152,
   /**
    * The delay a player pays for thinking (`tunables.md` § 2).
    *
@@ -33,7 +33,7 @@ export const TUNABLES = {
   ssChargeDealt: 0.25,
   ssChargeTaken: 0.12,
   /** `v0 = force * speedK` for every mobile. */
-  speedK: 6.2,
+  speedK: 5.9,
   /**
    * `a = windCoefficient * magnitude * (cos θ, sin θ)` — no mass term: GB's wind pushes every mobile alike.
    *
@@ -41,7 +41,7 @@ export const TUNABLES = {
    * correction, a sixth of the map — decisive, which is what a full-wind reading has to be, and still short of the
    * 27 × gravity that the mass-free coefficient first produced.
    */
-  windCoefficient: 0.8,
+  windCoefficient: 1,
   windMax: 26,
   /** GB's wind is horizontal: east or west, nothing else. */
   windSectors: 2,
@@ -54,7 +54,7 @@ export const TUNABLES = {
   bounceRestitution: 0.6,
   /** Crater radius as a fraction of the blast radius. */
   terrainCarveRatio: 0.6,
-  maxFlightMs: 10_000,
+  maxFlightMs: 12_000,
   /**
    * `itm-bunge` — GB's Bunge Shot: the same shell, 25 % more ground carved out of it (`US-CORE-009`). It is not a
    * returning shell; the boomerang arc belongs to a mobile, not to an item.

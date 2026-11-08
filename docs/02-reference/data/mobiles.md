@@ -143,32 +143,37 @@ at 45° or the nearest angle its window allows, in dead calm, on a flat probe, m
 the probe being 60,000 units wide so the shell lands instead of being clamped at the map edge — a `bounce` shell
 rebounds afterwards, so its total travel is longer than the range below. The drift column is the same shot in a
 `10`-unit wind on sector 0 (east): GB's wind carries no mass term, so the only mobile-side input is the hang time —
-two mobiles fired at the same angle and force drift by exactly the same amount. At the shipped `windCoefficient` (0.8)
-that is `0.5 × 8 × t²` units, so the column is simply the hang time squared: a full wind (26) bends the calibration
-shot 763 units, six ruler divisions, and a `10` bends it by a sixth of that.
+two mobiles fired at the same angle and force drift by exactly the same amount. At the shipped `windCoefficient` (1.0)
+that is `0.5 × 10 × t²` units, so the column is simply the hang time squared: a full wind (26) bends the calibration
+shot 378 units, three ruler divisions, and a `10` bends it by a sixth of that.
+
+Read the range column against the **1,640-unit spawn separation**: at full power every mobile throws between 1.12× and
+1.33× that separation, which is the genre's ceiling — full power overshoots the enemy without leaving the map. The bar a
+player actually shoots at sits around **3.4** for the whole roster (not at the bottom of the scale), and the hang time at
+that force is **4.7 s**, so a turn resolves in about five seconds.
 
 | Id | Name | Range at max power | Hang time | Drift at wind +10 |
 |---|---|---|---|---|
-| `mbl-01` | Stone Sentinel | **3,680 units** at 45° | warded | 8.6 s | 290 units |
-| `mbl-02` | River Warden | **3,386 units** at 45° | 8.2 s | 271 units |
-| `mbl-03` | Iron Tortoise | **3,150 units** at 38° | plated | 7.0 s | 193 units |
-| `mbl-04` | Glacier Mammoth | **3,097 units** at 45° | 7.8 s | 253 units |
-| `mbl-05` | Storm Falcon | **2,930 units** at 25° | bionic | 5.2 s | 109 units |
-| `mbl-06` | Silver Ibex | **3,300 units** at 30° | 6.2 s | 158 units |
-| `mbl-07` | Ash Behemoth | **3,519 units** at 45° | plated | 8.4 s | 288 units |
-| `mbl-08` | Volcano Toad | **3,453 units** at 45° | 8.3 s | 280 units |
-| `mbl-09` | Moon Hare | **3,680 units** at 45° | bionic | 8.6 s | 290 units |
-| `mbl-10` | Coral Crab | **3,576 units** at 42° | 8.0 s | 264 units |
-| `mbl-11` | Pale Stag | **3,369 units** at 42° | warded | 7.8 s | 235 units |
-| `mbl-12` | Sacred Crane | **3,453 units** at 45° | 8.3 s | 280 units |
-| `mbl-13` | Cinder Fox | **3,176 units** at 28° | bionic | 5.8 s | 132 units |
-| `mbl-14` | Sky Serpent | **3,438 units** at 32° | 6.5 s | 171 units |
-| `mbl-15` | Jade Dragon | **3,680 units** at 45° | warded | 8.6 s | 290 units |
-| `mbl-16` | Sun Lion | **3,613 units** at 45° | 8.5 s | 281 units |
-| `mbl-17` | Sand Wyrm | **3,436 units** at 48° | plated | 8.7 s | 305 units |
-| `mbl-18` | Frost Hydra | **3,519 units** at 45° | 8.4 s | 288 units |
-| `mbl-19` | Shadow Cat | **3,526 units** at 44° | bionic | 8.3 s | 275 units |
-| `mbl-20` | Mist Raven | **3,237 units** at 35° | 6.7 s | 184 units |
+| `mbl-01` | Stone Sentinel | **2,174 units** at 45° | 5.3 s | 147 units |
+| `mbl-02` | River Warden | **2,003 units** at 45° | 5.2 s | 133 units |
+| `mbl-03` | Iron Tortoise | **1,860 units** at 38° | 4.3 s | 94 units |
+| `mbl-04` | Glacier Mammoth | **1,840 units** at 45° | 4.9 s | 120 units |
+| `mbl-05` | Storm Falcon | **1,725 units** at 25° | 3.3 s | 55 units |
+| `mbl-06` | Silver Ibex | **1,957 units** at 30° | 3.9 s | 76 units |
+| `mbl-07` | Ash Behemoth | **2,088 units** at 45° | 5.3 s | 141 units |
+| `mbl-08` | Volcano Toad | **2,046 units** at 45° | 5.2 s | 136 units |
+| `mbl-09` | Moon Hare | **2,174 units** at 45° | 5.3 s | 147 units |
+| `mbl-10` | Coral Crab | **2,125 units** at 42° | 5.0 s | 122 units |
+| `mbl-11` | Pale Stag | **1,992 units** at 42° | 4.8 s | 119 units |
+| `mbl-12` | Sacred Crane | **2,046 units** at 45° | 5.2 s | 136 units |
+| `mbl-13` | Cinder Fox | **1,869 units** at 28° | 3.6 s | 68 units |
+| `mbl-14` | Sky Serpent | **2,033 units** at 32° | 4.1 s | 85 units |
+| `mbl-15` | Jade Dragon | **2,174 units** at 45° | 5.3 s | 147 units |
+| `mbl-16` | Sun Lion | **2,132 units** at 45° | 5.3 s | 145 units |
+| `mbl-17` | Sand Wyrm | **2,041 units** at 48° | 5.5 s | 145 units |
+| `mbl-18` | Frost Hydra | **2,088 units** at 45° | 5.3 s | 141 units |
+| `mbl-19` | Shadow Cat | **2,093 units** at 44° | 5.2 s | 129 units |
+| `mbl-20` | Mist Raven | **1,924 units** at 35° | 4.2 s | 85 units |
 
 The roster spans a factor of 1.26 in reach — `mbl-01`, `mbl-09` and `mbl-15` reach **3,680 units** at 45° where
 `mbl-05` reaches **2,930** at 25° — and the `maxPower` cap (90–100) accounts for the middle of that spread. Drift spans

@@ -105,12 +105,12 @@ readable shot: every mobile draws the **same parabola** at the same angle and po
 reads on the next, and the wind is a single number a player corrects against rather than a per-mobile handicap.
 
 ```
-v0 = force × speedK                        // one power law for every mobile; speedK 6.2
+v0 = force × speedK                        // one power law for every mobile; speedK 5.9
 vx =  cos(angle) × v0 × facing
 vy = −sin(angle) × v0
 ax =  windCoefficient × m × cos θ          // 105 × m — no divisor
 ay =  windCoefficient × m × sin θ          // 0 in play: GB's wind is horizontal, θ ∈ {0°, 180°}
-vy += (gravity + ay) × dt                  // gravity 100 u/s² for all twenty, ×0.95–1.05 by map
+vy += (gravity + ay) × dt                  // gravity 152 u/s² for all twenty, ×0.95–1.05 by map
 ```
 
 Two deliberate departures from what this project shipped before, both of them *towards* the genre:
@@ -125,7 +125,7 @@ Two deliberate departures from what this project shipped before, both of them *t
   shell in the genre never hangs because the weather blew upwards. Twelve 30° sectors were our own invention.
 
 Fixed **50 ms** step, positions rounded to 0.1, no `Math.random()` in the core (`NFR-28`). Calibration, measured on the
-real integrator: `force 98` at `45°`, `gravity 100`, no wind → **3,680 units in 8.55 s**, i.e. 1.84 map widths at full
+real integrator: `force 98` at `45°`, `gravity 152`, no wind → **2,182 units in 5.35 s**, i.e. 1.33 map widths at full
 power — the genre's "full power leaves the map" ceiling. Full wind (`m = 26`, `sector 0`) puts `a_x = 2,730 u/s²` — 27 ×
 gravity — on that shot and moves the landing point **100,131 units**: the mass-free coefficient has **not been retuned
 yet** and is currently far past playable, which `tunables.md` § 1.1 records openly. Values, units and the full parameter

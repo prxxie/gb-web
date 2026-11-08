@@ -221,5 +221,8 @@
   "errors.reference": "Error reference: {id}",
   "profile.deleted": "Your account has been deleted.",
   "match.announce.hit": "Hit! {name} dealt {damage} damage.",
-  "match.announce.miss": "{name} fired and hit nobody."
+  "match.announce.miss": "{name} fired and hit nobody.",
+  "match.aid.show": "Aim aid",
+  "match.aid.hide": "Aim aid: on",
+  "match.aid.hint": "Show the predicted trajectory"
 }

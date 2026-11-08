@@ -64,6 +64,11 @@ export interface BattleHandle {
   setWeaponSlot(slot: 0 | 1 | 2): void;
   /** The angle the pad has nudged the shot by, so the aim aid matches the shot that will be sent. */
   setAimDelta(delta: number): void;
+  /**
+   * The trajectory aid (`US-MATCH-005` AC2). Off by default: the genre gives the player an angle number and a power
+   * bar, and reading the arc is the skill. The aid is a training wheel, not the game.
+   */
+  setAimAid(enabled: boolean): void;
   destroy(): void;
 }
 
@@ -126,6 +131,8 @@ class BattleScene extends Phaser.Scene {
   private weaponSlot: 0 | 1 | 2 = 0;
   /** The pad's angle nudge, mirrored from the page: the preview must carry the angle the shot will carry. */
   private aimDelta = 0;
+  /** Whether the trajectory preview is drawn; off unless the player asks for it (`setAimAid`). */
+  private aimAid = false;
   /** World units per CSS pixel, recomputed every frame: the HUD parts of the canvas stay screen-sized at any zoom. */
   private screenScale = 1;
   private pointerHandlers: Array<{ type: string; handler: (event: PointerEvent) => void }> = [];
@@ -156,6 +163,10 @@ class BattleScene extends Phaser.Scene {
   setWeaponSlot(slot: 0 | 1 | 2): void {
     if (this.weaponSlot === slot) return;
     this.weaponSlot = slot;
+  }
+
+  setAimAid(enabled: boolean): void {
+    this.aimAid = enabled;
   }
 
   setAimAllowed(allowed: boolean): void {
@@ -710,15 +721,16 @@ class BattleScene extends Phaser.Scene {
       graphics.lineStyle(px(2), ringColor(this.pullPower), 0.45);
       graphics.strokeCircle(frame.x, centerY, px(RING_RADIUS + 8));
       // The resolver's own flight, sampled: the same code that will resolve the shot, so it cannot promise a
-      // landing the engine will not honour (`US-MATCH-005` AC2).
-      const preview = aimPreview({
+      // landing the engine will not honour (`US-MATCH-005` AC2). Only drawn when the player turned the aid on — the
+      // ring alone is the genre's feedback.
+      const preview = this.aimAid ? aimPreview({
         state: this.state,
         localSlot: this.localSlot,
         weaponSlot: this.weaponSlot,
         angle: this.pullAngle,
         power: this.pullPower,
         aimDelta: this.aimDelta,
-      });
+      }) : null;
       if (preview) {
         graphics.fillStyle(0xffffff, 0.4);
         for (const dot of preview.path) graphics.fillCircle(dot.x, dot.y, px(2));
@@ -763,6 +775,7 @@ export function mountBattle(options: Options): BattleHandle {
     setAimAllowed: (allowed) => scene.setAimAllowed(allowed),
     setWeaponSlot: (slot) => scene.setWeaponSlot(slot),
     setAimDelta: (delta) => scene.setAimDelta(delta),
+    setAimAid: (enabled) => scene.setAimAid(enabled),
     destroy: () => {
       window.removeEventListener("resize", resize);
       game.destroy(true);

@@ -22,22 +22,22 @@ We must therefore own an integrator that *behaves* the way the genre does, and b
 `reference-gunbound.md` § 10:
 
 1. a fixed **50 ms** step — GunBound's own battle tick — stepped semi-implicitly, rendered with interpolation;
-2. **one power law for every mobile** (`v0 = force × 6.2`), exactly as GB gives every mobile the same power bar;
+2. **one power law for every mobile** (`v0 = force × 5.9`), exactly as GB gives every mobile the same power bar;
 3. **one gravity for the roster** (`100 u/s²`, bent only by the map's `gravityModifier`): at the same angle and power
    every mobile draws the *same* parabola, so a range learned on one mobile transfers to the next. The first version of
    this ADR gave each mobile its own gravity and mass (`84–128`, `118–169`) to make one fly flat and another lob short;
    that is the one thing the genre does *not* do, and it made the angle and power tables untransferable
    (`reference-gunbound.md` § 10, revised 2026-11-08);
-4. wind acceleration `0.8 × wind` on the **horizontal axis only** — no vertical term and **no mass divisor**: GB's wind
+4. wind acceleration `1.0 × wind` on the **horizontal axis only** — no vertical term and **no mass divisor**: GB's wind
    is east or west and it pushes every mobile alike, and **no drag at all**;
 5. **per-mobile aim bands** (five trajectory profiles set the outer envelope, each mobile narrows it) plus seven shot
    classes (`arc`, `flat`, `lob`, `bounce`, `cluster`, `piercing`, `beam`) fixing the behaviour on impact;
 6. terrain interaction by carving: a blast removes a circular crater and a projectile detonates on impact (or bounces,
    for `bounce` shots).
 
-Calibration target: force 98 at 45° on `mbl-01` lands **3,680 units after 8.6 s** — nearly two map widths, so full
+Calibration target: force 98 at 45° on `mbl-01` lands **2,182 units after 5.35 s** — 1.33 map widths, so full
 power clears the map and the aimed band sits at two thirds of the bar (force ~65 reaches a 1,640-unit spawn gap); the
-same shot at wind +10 drifts 291 units and at full wind (26) 760, and every mobile drifts identically because the push
+same shot at wind +10 drifts 147 units and at full wind (26) 378, and every mobile drifts identically because the push
 has no mass term. HP, shield and damage use a 1,000-point scale (900–1,200 HP, 180–580 per Inner
 hit) to match the size of GunBound's health bars; the exact source values were server-side and do not survive
 (`reference-gunbound.md` § *what the source cannot give us*).

@@ -60,3 +60,28 @@ test("TC-MATCH-900: the live region says a shot happened", async ({ page }) => {
   // Fired and missed, or fired and hit: either way the region reports the shot rather than staying on the turn.
   await expect(region).toContainText(/bắn|trúng|fired|hit/i, { timeout: 5_000 });
 });
+
+/**
+ * `TC-MATCH-908` — the trajectory aid is off until the player asks for it.
+ *
+ * The genre gives the player an angle number and a power bar; reading the arc is the skill. The aid was on for everyone,
+ * which handed the answer to whoever pulled. Now it is a training wheel: off on a fresh device, remembered once chosen.
+ */
+test("TC-MATCH-908: the aim aid starts off and remembers being turned on", async ({ page }) => {
+  await openBotMatch(page);
+  const aid = page.getByTestId("aim-aid");
+  await expect(aid).toBeVisible();
+  await expect(aid).toHaveAttribute("aria-pressed", "false");
+
+  await aid.click();
+  await expect(aid).toHaveAttribute("aria-pressed", "true");
+
+  // The choice survives a reload: re-learning an arc every session is not the point.
+  await page.reload();
+  await expect(page.getByTestId("match-screen")).toBeVisible();
+  await expect(page.getByTestId("aim-aid")).toHaveAttribute("aria-pressed", "true");
+
+  // And it can be put back, which is what a fresh device looks like.
+  await page.getByTestId("aim-aid").click();
+  await expect(page.getByTestId("aim-aid")).toHaveAttribute("aria-pressed", "false");
+});

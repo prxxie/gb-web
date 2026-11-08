@@ -1,5 +1,32 @@
 # Changelog
 
+## 2026-11-08 — the bar gets its top half back
+
+The GB-parity work made the *rules* the genre's; this makes the **feel** match, measured rather than guessed. A probe over
+the whole roster said the game was slow and the power bar was dead: to reach the enemy (1,640 units) took only
+**2.16–2.64 bars**, a turn hung **5.75–9.95 s**, and full power threw the shell **1.88×** past the target.
+
+- **`gravity 100 → 152`, `speedK 6.2 → 5.9`**, solved from two feel targets — a full-power 45° shot should carry ~2,300
+  units and hang ~5.5 s. The pair puts the shot a player actually takes at **3.44 bars** with a **4.7 s** hang, and full
+  power at **1.12–1.33× the separation** instead of 1.88×.
+- **`windCoefficient 0.8 → 1.0`** so full wind still bends the calibration shot **378 units** (a fifth of the map) on the
+  shorter hang, instead of 760 on the old one.
+- **`maxFlightMs 10,000 → 12,000`**: four mobiles' full-power lobs were being cut off at the simulation cap mid-air
+  (`mbl-09`/`10`/`19`/`20`), so their "landing" was really the point where the window ended.
+- `RULESET_VERSION` → `2026-11-08.2` (`NFR-23`); the balance table in `mobiles.md` § 4 is regenerated from the real
+  integrator, and every pinned number in `ballistics`/`weather`/`mobiles` follows it.
+
+Two tests changed meaning rather than numbers, and both are worth naming: `TC-CORE-029` now fires past the map on
+purpose (no mobile's own `maxPower` leaves the sim window any more), and `TC-CORE-924` asserts the property that still
+holds — every mobile clears the spawn separation by 5 % and none doubles it.
+
+- **The trajectory aid is opt-in.** It was drawn for everyone on every pull, which handed the player the answer: the
+  genre gives an angle number and a power bar, and reading the arc is the skill. `mountBattle` keeps it off until
+  `setAimAid(true)`, the match HUD has a 44 px toggle (`aim-aid`) and the choice is remembered per device
+  (`TC-MATCH-908`). The power ring stays — that is the genre's own feedback.
+- Damage numbers and the impact shake were already there (`spawnNumbers`), so the "GB feel" gap there was my earlier
+  claim being wrong, not the game missing a feature.
+
 ## 2026-11-08 — the roster becomes a matchup chart
 
 The last piece of the GB-parity audit. The genre gives every weapon type a bonus against one armour class and a penalty
