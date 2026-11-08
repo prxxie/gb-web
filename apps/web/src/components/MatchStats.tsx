@@ -42,7 +42,8 @@ export function MatchStats({ seed, round, rounds, teams, gold, labels }: MatchSt
       <div className="match__forecast" role="group" aria-label={labels.weather} data-testid="weather-forecast">
         {Array.from({ length: rounds }, (_, index) => {
           const weather = rollWeather(seed, round + index + 1);
-          const arrow = weather.wind.sector === 0 ? "→" : "←";
+          // A thin chevron, not the pad's solid arrow: the two must not read as the same kind of control.
+          const arrow = weather.wind.sector === 0 ? "›" : "‹";
           return (
             <span
               key={index}

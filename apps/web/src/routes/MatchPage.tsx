@@ -922,22 +922,26 @@ export function MatchPage(): JSX.Element {
             sector: state.weather.wind.sector,
           })}
         />
+        {/* Three cells, one row: the roster on the left, the wind dead centre, the match controls on the right. The wind
+            used to be absolutely centred over the roster, which put the dial and the EN toggle on top of the health
+            chips (owner's report, 2026-11-08). */}
         <div className="match__top">
-          {/* The wind sits dead centre at the top: it is read before every shot and it belongs to the whole table, not to
-              one player's corner (owner's layout, 2026-11-08). */}
+          <div className="match__top-left">
+            <Roster
+              players={state.players}
+              activeSlot={state.turn.activeSlot}
+              eliminatedLabel={t("match.eliminated")}
+              chat={chat ? { slot: chat.slot, kind: chat.kind, text: chatText(t, chat.kind, chat.id) ?? "" } : null}
+            />
+          </div>
           <div className="match__wind">
             <WindDial weather={state.weather} label={t("match.wind")} />
           </div>
-          <Roster
-            players={state.players}
-            activeSlot={state.turn.activeSlot}
-            eliminatedLabel={t("match.eliminated")}
-            chat={chat ? { slot: chat.slot, kind: chat.kind, text: chatText(t, chat.kind, chat.id) ?? "" } : null}
-          />
-          <div className="row">
-            <div className="match__angle" data-testid="angle-value">
-            {Math.round(aimAngle)}°
-          </div>
+          <div className="match__top-right">
+            {/* The angle is read in the centre of the power ring (`ring-angle`); a second copy up here was noise. */}
+            <div className="match__angle" data-testid="angle-value" hidden>
+              {Math.round(aimAngle)}°
+            </div>
             <div className="match__round" data-testid="turn-round">
               {t("match.round", { round: state.turn.round })}
             </div>
@@ -946,23 +950,24 @@ export function MatchPage(): JSX.Element {
             </div>
             {/* The app bar is gone in a match (`TC-MATCH-910`), so the language toggle lives here instead. */}
             <LocaleToggle />
+            <button
+              type="button"
+              className={aimAid ? "match__aid match__aid--on" : "match__aid"}
+              data-testid="aim-aid"
+              aria-pressed={aimAid}
+              aria-label={t("match.aid.hint")}
+              title={t("match.aid.hint")}
+              onClick={() => setAimAid((current) => !current)}
+            >
+              <span aria-hidden="true">◎</span>
+            </button>
           </div>
         </div>
 
-        <button
-          type="button"
-          className={aimAid ? "match__aid match__aid--on" : "match__aid"}
-          data-testid="aim-aid"
-          aria-pressed={aimAid}
-          title={t("match.aid.hint")}
-          onClick={() => setAimAid((current) => !current)}
-        >
-          {aimAid ? t("match.aid.hide") : t("match.aid.show")}
-        </button>
 
         <div
           className={focus ? "match__power match__power--on-ring" : "match__power"}
-          style={focus ? { left: focus.x, top: focus.y - RING_RADIUS - 18 } : undefined}
+          style={focus ? { left: focus.x, top: focus.y - RING_RADIUS - 8 } : undefined}
         >
           {/* The ring's centre carries the angle: the gesture sets both, and the angle is the number a player reads
               while pulling (owner's layout, 2026-11-08). The power keeps its own chip and the ring's own arc. */}
@@ -974,30 +979,30 @@ export function MatchPage(): JSX.Element {
           </div>
         </div>
 
-        <DirectionPad
-          enabled={isMyTurn}
-          focus={focus}
-          canMove={Boolean(localPlayer && localPlayer.energy > 0)}
-          energy={localPlayer?.energy ?? 0}
-          movesLeft={Math.max(0, mobile.maxMovesPerTurn - (state?.effects.movesThisTurn ?? 0))}
-          angle={aimAngle}
-          angleWindow={{ min: mobile.angleMin, max: mobile.angleMax }}
-          labels={{
-            up: t("match.angle.up"),
-            down: t("match.angle.down"),
-            left: t("match.move.left"),
-            right: t("match.move.right"),
-          }}
-          onAction={onPad}
-          onRepeat={onRepeat}
-        />
 
+        {/* The bar is a three-cell grid: walking · shooting · the table's state. */}
         <div className="match__bottom">
-          {hint && (
-            <div className="match__hint" data-testid="pull-hint">
-              {hint}
-            </div>
-          )}
+          <div className="match__zone match__zone--move">
+
+            <DirectionPad
+              enabled={isMyTurn}
+              focus={focus}
+              canMove={Boolean(localPlayer && localPlayer.energy > 0)}
+              energy={localPlayer?.energy ?? 0}
+              movesLeft={Math.max(0, mobile.maxMovesPerTurn - (state?.effects.movesThisTurn ?? 0))}
+              angle={aimAngle}
+              angleWindow={{ min: mobile.angleMin, max: mobile.angleMax }}
+              labels={{
+                up: t("match.angle.up"),
+                down: t("match.angle.down"),
+                left: t("match.move.left"),
+                right: t("match.move.right"),
+              }}
+              onAction={onPad}
+              onRepeat={onRepeat}
+            />
+          </div>
+          <div className="match__zone match__zone--shoot">
           <div className="match__loadout">
           <WeaponStrip
             weapons={mobile.weapons}
@@ -1043,10 +1048,11 @@ export function MatchPage(): JSX.Element {
             onSkip={onSkip}
             onChat={onChat}
           />
+          </div>
           <MatchStats
             seed={state.seed}
             round={state.turn.round}
-            rounds={4}
+            rounds={3}
             teams={(["A", "B"] as const).map((team) => {
               const members = state.players.filter((player) => player.team === team);
               return {
@@ -1069,6 +1075,11 @@ export function MatchPage(): JSX.Element {
         {status === "reconnecting" ? <div className="overlay">{t("match.reconnecting")}</div> : null}
 
         {banner ? <div className="banner">{banner}</div> : null}
+        {hint ? (
+          <div className="match__hint" data-testid="pull-hint">
+            {hint}
+          </div>
+        ) : null}
         {feed.length > 0 ? (
           <div className="banner" style={{ top: "auto", bottom: "96px" }} data-testid="event-feed">
             {feed.map((event, index) => (

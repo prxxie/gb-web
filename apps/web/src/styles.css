@@ -258,7 +258,15 @@ td {
 .match__hud .match__power,
 .match__hud .match__actions,
 .match__hud .match__loadout,
-.match__hud 
+.match__hud .match__items,
+.match__hud .match__pad {
+  /* Only a control takes the press; the HUD's containers pass it through to the canvas. */
+  pointer-events: auto;
+}
+
+/* The weather banner is the one HUD element that floats over the battlefield on its own. It used to share a rule with the
+   pointer-events list above, so *every* button in the HUD inherited `position: absolute; left: 50%; top: 25%` and the whole
+   match bar collapsed into a pile in the middle of the screen (owner's report, 2026-11-08). */
 .match__weather-banner {
   position: absolute;
   left: 50%;
@@ -287,14 +295,34 @@ td {
 }
 
 .match__top {
+  /* Roster left · wind centre · controls right. The dial used to be absolutely centred *over* the roster, so the health
+     chips, the dial and the EN toggle all landed on the same 120 px (owner's report, 2026-11-08). */
   position: absolute;
-  top: calc(8px + var(--safe-top));
-  left: calc(8px + var(--safe-left));
-  right: calc(8px + var(--safe-right));
-  display: flex;
-  gap: 8px;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 44px;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
   align-items: center;
-  justify-content: space-between;
+  gap: 10px;
+  padding: 0 calc(10px + var(--safe-right)) 0 calc(10px + var(--safe-left));
+  background: linear-gradient(180deg, rgba(11, 18, 32, 0.9), rgba(11, 18, 32, 0));
+  pointer-events: none;
+}
+
+.match__top-left {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  min-width: 0;
+}
+
+.match__top-right {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
 }
 
 .match__roster {
@@ -389,19 +417,6 @@ td {
   border: 1px solid #24324c;
 }
 
-.match__pad {
-  /* Two 44 px cells in the bar's left end (owner's layout): the barrel is a gesture now, so only walking is a button. */
-  position: absolute;
-  left: calc(6px + var(--safe-left));
-  bottom: calc(6px + var(--safe-bottom));
-  display: flex;
-  gap: 4px;
-  align-items: center;
-  opacity: 0.92;
-  pointer-events: auto;
-  z-index: 3;
-}
-
 /*
  * Hanging on the mobile (`US-MATCH-003` AC11): the page reports the point the renderer drew the active mobile at,
  * `padLayout` clamps it into the viewport, and the box is placed from that corner instead of the screen's.
@@ -411,58 +426,12 @@ td {
   bottom: auto;
 }
 
-.match__pad-budget {
-  grid-area: 1 / 1;
-  align-self: center;
-  justify-self: center;
-  font-variant-numeric: tabular-nums;
-  font-size: 0.85rem;
-  color: var(--ink-dim);
-}
-
-.match__pad-budget--energy {
-  grid-area: 1 / 3;
-}
-
-.match__pad button {
-  width: 44px;
-  min-width: 44px;
-  height: 44px;
-  min-height: 44px;
-  padding: 0;
-  font-size: 0.95rem;
-  border-radius: 8px;
-  background: rgba(22, 33, 58, 0.92);
-  border: 1px solid #2b3b58;
-}
-
-.match__pad button[data-slot="up"] {
-  grid-area: 1 / 2;
-}
-
-.match__pad button[data-slot="left"] {
-  grid-area: 2 / 1;
-}
-
-.match__pad button[data-slot="right"] {
-  grid-area: 2 / 3;
-}
-
-.match__pad button[data-slot="down"] {
-  grid-area: 3 / 2;
-}
-
 .match__power.match__power--on-ring {
-  /* The number sits at the top of the power ring, exactly where `screens/match.md` puts it (`US-MATCH-002` AC2).
-     `bottom: auto` is load-bearing: with the base rule's `bottom` still set, the inline `top` stretched the chip into a
-     163 px column. */
+  /* Centred over the ring's top edge: `translate(-50%, -100%)` keeps the numbers off the arc whatever the touch point. */
+  transform: translate(-50%, -100%);
   bottom: auto;
-  left: 0;
-  top: 0;
-  transform: translate(-50%, -50%);
-  align-items: center;
-  text-align: center;
-  pointer-events: none;
+  min-width: 60px;
+  padding: 3px 8px;
 }
 
 .match__angle {
@@ -475,9 +444,22 @@ td {
 }
 
 .match__hint {
-  margin-top: 4px;
-  font-size: 13px;
-  color: var(--accent);
+  /* Guidance, not chrome: it floats above the bar and disappears, so it cannot push the bar's cells around. */
+  position: absolute;
+  left: 50%;
+  bottom: calc(76px + var(--safe-bottom));
+  transform: translateX(-50%);
+  max-width: 70%;
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: rgba(11, 18, 32, 0.9);
+  border: 1px solid var(--line);
+  color: var(--ink-dim);
+  font-size: 0.7rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
 }
 
 .match__power {
@@ -511,26 +493,24 @@ td {
  * here so the middle of the screen is battlefield and nothing else.
  */
 .match__bottom {
-  /* One bar, one height, nothing floating under it: the ruler that printed the camera window is gone (owner's call), so
-     the strip owns the bottom edge and every group inside it is 40 px tall and centred on the same line. */
+  /* Three cells, one row: walking on the left, the shooting controls in the middle, the table's state on the right.
+     An explicit grid instead of `space-between` — the hint sentence used to sit in this row and pushed the loadout into
+     the stats, so three groups landed on top of each other (owner's report, 2026-11-08). */
   position: absolute;
   left: 0;
   right: 0;
   bottom: 0;
-  height: 56px;
-  display: flex;
+  height: 64px;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
   align-items: center;
-  gap: 5px;
-  padding: 0 calc(6px + var(--safe-right)) calc(6px + var(--safe-bottom)) calc(102px + var(--safe-left));
-  background: linear-gradient(180deg, rgba(11, 18, 32, 0.55), rgba(11, 18, 32, 0.94));
+  gap: 14px;
+  padding: 0 calc(8px + var(--safe-right)) calc(8px + var(--safe-bottom)) calc(8px + var(--safe-left));
+  background: linear-gradient(180deg, rgba(11, 18, 32, 0.6), rgba(11, 18, 32, 0.96));
   border-top: 1px solid rgba(120, 160, 220, 0.16);
 }
 
 /* A hairline between groups instead of air: the bar carries six of them and padding alone reads as one long smear. */
-.match__bottom > * + * {
-  border-left: 1px solid rgba(120, 160, 220, 0.14);
-  padding-left: 6px;
-}
 
 .match__stats {
   min-width: 0;
@@ -545,39 +525,6 @@ td {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.match__loadout {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
-
-.weapon-strip {
-  display: flex;
-  gap: 8px;
-}
-
-.weapon-strip__slot {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-  min-width: 72px;
-  min-height: 60px;
-  padding: 6px 8px;
-  font-size: 0.75rem;
-  border-radius: 12px;
-  background: rgba(22, 33, 58, 0.92);
-}
-
-.weapon-strip__slot--active {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 1px var(--accent) inset;
-}
-
-.weapon-strip__icon {
-  font-size: 1.1rem;
 }
 
 .item-tray {
@@ -622,42 +569,33 @@ td {
 /* Skip + preset chat (`US-MATCH-004`) -------------------------------------- */
 
 .match__actions {
-  /* It used to float in the dead centre of the battlefield — two 60 px buttons at (346,190), which is exactly where a
-     thumb starts a pull. The finger never reached the canvas and the shot silently never happened. It is a row inside
-     the bottom strip now. */
   display: flex;
-  gap: 6px;
   align-items: center;
-}
-
-.match__skip {
-  min-width: 60px;
-  min-height: 60px;
-  border-radius: 12px;
-  background: rgba(22, 33, 58, 0.92);
+  gap: 6px;
 }
 
 /* The grid is an overlay that only exists while it is open (`screens/match.md` § Controls): twenty-four
    60 px targets laid over the battlefield would sit exactly where the pull gesture starts. */
 .match__chat {
+  /* A centred sheet above the bar: 24 targets laid out in a grid, opened by the 💬 icon. */
   position: absolute;
-  /* Above the strip, never over the middle: the grid is 24 targets and the pull gesture lives underneath it. */
-  bottom: calc(96px + var(--safe-bottom));
   left: 50%;
+  bottom: calc(76px + var(--safe-bottom));
   transform: translateX(-50%);
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  padding: 6px;
+  gap: 6px;
+  padding: 10px;
   border-radius: 14px;
-  background: rgba(9, 14, 26, 0.96);
-  max-height: calc(100% - 120px);
-  overflow-y: auto;
+  background: rgba(11, 18, 32, 0.96);
+  border: 1px solid var(--line);
+  pointer-events: auto;
+  z-index: 4;
 }
 
 .match__phrases {
   display: grid;
-  grid-template-columns: repeat(6, minmax(60px, 1fr));
+  grid-template-columns: repeat(6, minmax(52px, 1fr));
   gap: 4px;
 }
 
@@ -700,24 +638,27 @@ td {
 
 /* The aim aid is a training wheel and looks like one: small, quiet, and it sits above the ruler rather than in the
    thumb's way. 44 px of tap target is the floor (`NFR-17`, `TC-FND-133`). */
+.match__aid > span {
+  /* The glyph must not eat the press: the tap test asks what is under the button's centre. */
+  pointer-events: none;
+}
+
 .match__aid {
-  /* All four offsets, not just right/bottom: a shared rule was pinning `left`/`top` too, so the pill stretched across the
-     battlefield and swallowed every pull that started near the middle of the screen. */
-  position: absolute;
-  inset: auto 8px calc(66px + var(--safe-bottom)) auto;
-  width: max-content;
+  /* An icon in the top-right row. It used to be a text pill floating in the middle of the battlefield, where it covered
+     the canvas and swallowed pulls (owner's report, 2026-11-08). */
+  width: 44px;
   height: 44px;
   min-height: 44px;
-  padding: 6px 12px;
-  border-radius: 999px;
-  border: 1px solid var(--line);
-  background: rgba(11, 18, 32, 0.72);
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  border: 1px solid #2b3b58;
+  background: rgba(22, 33, 58, 0.92);
   color: var(--ink-dim);
-  font-size: 0.7rem;
-  /* The HUD layer is `pointer-events: none` so a pull reaches the canvas; a control has to opt back in or the canvas
-     swallows the tap (`TC-MATCH-908` found this the moment it was played in landscape). */
+  font-size: 0.9rem;
   pointer-events: auto;
-  z-index: 2;
 }
 
 .match__aid--on {
@@ -1141,172 +1082,15 @@ td {
 /* --- The match bar, per the owner's layout (2026-11-08): S1 S2 SS · skip · six item slots · the wind to come · the
    teams' health and the gold earned, in that order, left to right. ------------------------------------------------ */
 .match__wind {
-  position: absolute;
-  left: 50%;
-  top: 0;
-  transform: translateX(-50%);
-}
-
-.weapon-strip__key {
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  font-variant-numeric: tabular-nums;
-}
-
-.match__stats {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-left: auto;
-}
-
-.match__forecast {
-  display: flex;
-  gap: 3px;
-}
-
-.match__forecast-cell {
-  display: flex;
-  align-items: center;
-  gap: 1px;
-  min-width: 22px;
-  padding: 2px 2px;
-  border-radius: 6px;
-  background: rgba(16, 26, 46, 0.85);
-  border: 1px solid #24324c;
-  font-size: 0.62rem;
-  font-variant-numeric: tabular-nums;
-  color: var(--ink-dim);
-}
-
-.match__teams {
-  display: flex;
-  gap: 4px;
-}
-
-.match__team {
-  padding: 2px 4px;
-  border-radius: 6px;
-  font-size: 0.62rem;
-  font-variant-numeric: tabular-nums;
-  background: rgba(16, 26, 46, 0.85);
-  border: 1px solid #24324c;
-}
-
-.match__team--a {
-  border-color: #2f6fd0;
-}
-
-.match__team--b {
-  border-color: #b04a2f;
-}
-
-.match__gold {
-  display: flex;
-  align-items: center;
-  gap: 3px;
-  padding: 2px 4px;
-  border-radius: 6px;
-  font-size: 0.62rem;
-  font-variant-numeric: tabular-nums;
-  color: #f0c65a;
-  background: rgba(16, 26, 46, 0.85);
-  border: 1px solid #3a3423;
-}
-
-.match__items {
-  display: grid;
-  grid-template-columns: repeat(6, 32px);
-  gap: 4px;
-}
-
-.match__item {
-  position: relative;
-  width: 32px;
-  height: 44px;
-  padding: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 8px;
-  border: 1px solid #2b3b58;
-  background: rgba(22, 33, 58, 0.92);
-  color: var(--ink);
-}
-
-.match__item--empty {
-  border-style: dashed;
-  border-color: rgba(120, 160, 220, 0.22);
-  background: rgba(16, 26, 46, 0.5);
-}
-
-.match__item--spent {
-  opacity: 0.4;
-}
-
-.match__item-glyph {
-  font-size: 0.6rem;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-}
-
-.match__item-qty {
-  position: absolute;
-  right: -2px;
-  bottom: -3px;
-  min-width: 13px;
-  padding: 0 3px;
-  border-radius: 999px;
-  background: var(--accent);
-  color: #08101f;
-  font-size: 0.55rem;
-  font-weight: 700;
-  line-height: 1.3;
-  font-variant-numeric: tabular-nums;
 }
 
 /* The three slot keys, the skip icon and the stat chips all sit on the bar's own baseline. */
 .weapon-strip {
   display: flex;
   gap: 4px;
-  align-items: center;
-}
-
-.weapon-strip__slot {
-  min-width: 44px;
-  min-height: 44px;
-  height: 44px;
-  padding: 0 6px;
-  border-radius: 8px;
-  border: 1px solid #2b3b58;
-  background: rgba(22, 33, 58, 0.92);
-  color: var(--ink-dim);
-}
-
-.weapon-strip__slot--active {
-  border-color: var(--accent);
-  color: var(--ink);
-  box-shadow: 0 0 0 1px var(--accent) inset;
-}
-
-.match__skip {
-  width: 44px;
-  height: 44px;
-  min-height: 44px;
-  padding: 0;
-  border-radius: 8px;
-  border: 1px solid #2b3b58;
-  background: rgba(22, 33, 58, 0.92);
-  font-size: 0.9rem;
-  color: var(--ink-dim);
-}
-
-.match__forecast-cell,
-.match__team,
-.match__gold {
-  height: 26px;
-  display: inline-flex;
   align-items: center;
 }
 
@@ -1327,4 +1111,306 @@ td {
   font-size: 0.62rem;
   color: var(--ink-dim);
   font-variant-numeric: tabular-nums;
+}
+
+/* ===================================================================================================================
+   The match bar (owner's layout, 2026-11-08)
+   -------------------------------------------------------------------------------------------------------------------
+   One row, three cells: walking · shooting · the table's state. Every control is 44 px or more on its short side
+   (`NFR-17`), every group is a flex row with a real gap, and nothing in here is absolutely positioned — the earlier
+   passes stacked absolute overlays on top of a flex row and three groups ended up on the same pixels.
+   =================================================================================================================== */
+
+.match__bottom {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 64px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 0 calc(8px + var(--safe-right)) calc(8px + var(--safe-bottom)) calc(12px + var(--safe-left));
+  background: linear-gradient(180deg, rgba(11, 18, 32, 0.6), rgba(11, 18, 32, 0.96));
+  border-top: 1px solid rgba(120, 160, 220, 0.16);
+}
+
+.match__zone {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.match__zone--move {
+  padding-right: 14px;
+  border-right: 1px solid rgba(120, 160, 220, 0.16);
+}
+
+.match__zone--shoot {
+  justify-content: flex-start;
+}
+
+/* --- walking ---------------------------------------------------------------------------------------------------- */
+
+.match__pad {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  pointer-events: auto;
+}
+
+.match__pad button {
+  width: 44px;
+  min-width: 44px;
+  height: 44px;
+  min-height: 44px;
+  padding: 0;
+  font-size: 1rem;
+  border-radius: 10px;
+  border: 1px solid #2b3b58;
+  background: rgba(22, 33, 58, 0.92);
+  color: var(--ink);
+}
+
+.match__pad-budget {
+  /* A chip, not loose digits: the move count and the energy sat as naked text beside the arrows. */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 24px;
+  padding: 0 5px;
+  border-radius: 6px;
+  background: rgba(16, 26, 46, 0.9);
+  border: 1px solid #24324c;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.64rem;
+  color: var(--ink-dim);
+}
+
+/* --- the three weapon slots ------------------------------------------------------------------------------------- */
+
+.match__loadout {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.weapon-strip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.weapon-strip__slot {
+  width: 44px;
+  min-width: 44px;
+  height: 44px;
+  min-height: 44px;
+  padding: 0;
+  border-radius: 10px;
+  border: 1px solid #2b3b58;
+  background: rgba(22, 33, 58, 0.92);
+  color: var(--ink-dim);
+}
+
+.weapon-strip__slot--active {
+  /* Selection is a filled accent, the only filled thing in the bar: outlines were also on the skip button and the team
+     chips, so "blue border" stopped meaning "selected" (design review, 2026-11-08). */
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #08101f;
+  font-weight: 700;
+}
+
+.weapon-strip__key {
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- the six item slots ----------------------------------------------------------------------------------------- */
+
+.match__items {
+  display: grid;
+  grid-template-columns: repeat(6, 36px);
+  gap: 4px;
+}
+
+.match__item {
+  position: relative;
+  width: 36px;
+  height: 44px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  border: 1px solid #2b3b58;
+  background: rgba(22, 33, 58, 0.92);
+  color: var(--ink);
+}
+
+.match__item--empty {
+  border-style: dashed;
+  border-color: rgba(120, 160, 220, 0.2);
+  background: rgba(16, 26, 46, 0.45);
+}
+
+.match__item--spent {
+  opacity: 0.4;
+}
+
+.match__item-glyph {
+  font-size: 0.65rem;
+  font-weight: 700;
+}
+
+.match__item-qty {
+  position: absolute;
+  right: -3px;
+  bottom: -4px;
+  min-width: 15px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #08101f;
+  font-size: 0.6rem;
+  font-weight: 700;
+  line-height: 1.35;
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- skip and chat ---------------------------------------------------------------------------------------------- */
+
+.match__actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.match__skip {
+  /* Solid border like every other control: the dashed one made a working button look disabled. */
+  width: 44px;
+  min-width: 44px;
+  height: 44px;
+  min-height: 44px;
+  padding: 0;
+  border-radius: 10px;
+  border: 1px solid #2b3b58;
+  background: rgba(22, 33, 58, 0.92);
+  color: var(--ink);
+  font-size: 1rem;
+}
+
+/* --- the table's state: the wind to come, the teams' health, the gold ------------------------------------------- */
+
+.match__stats {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.match__forecast {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.match__forecast-cell {
+  display: inline-flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 1px;
+  min-width: 36px;
+  height: 32px;
+  padding: 0 5px;
+  overflow: visible;
+  border-radius: 8px;
+  border: 1px solid #24324c;
+  background: rgba(16, 26, 46, 0.85);
+  color: var(--ink-dim);
+  font-size: 0.7rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.match__teams {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.match__team {
+  display: inline-flex;
+  align-items: center;
+  height: 32px;
+  padding: 0 6px;
+  border-radius: 8px;
+  border: 1px solid #24324c;
+  background: rgba(16, 26, 46, 0.85);
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.match__team--a {
+  color: #7fb0ff;
+}
+
+.match__team--b {
+  color: #ffab8f;
+}
+
+.match__gold {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 32px;
+  padding: 0 8px;
+  border-radius: 8px;
+  border: 1px solid #3a3423;
+  background: rgba(16, 26, 46, 0.85);
+  color: #f0c65a;
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+}
+
+/* One control height for the whole top strip: the pills, the round, the clock, the language toggle, the aid button and
+   the dial all sit on a 36 px line, so the row reads as one band instead of five heights. */
+.match__top .match__player,
+.match__top .match__round,
+.match__top .match__clock,
+.match__top .match__aid,
+.match__top button,
+.match__top a {
+  height: 44px;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+}
+
+/* The `NFR-17` floor is 44 px and the language toggle is a tap target like any other, so the top strip is a 44 px line
+   rather than the 36 px it wanted to be. */
+.match__top {
+  height: 48px;
+}
+
+.match__wind {
+  height: 44px;
+}
+
+.match__wind > * {
+  transform: scale(0.62);
+  transform-origin: center;
+}
+
+.match__top-right .match__clock {
+  font-size: 0.9rem;
+  font-weight: 700;
+  min-width: 42px;
+  text-align: right;
 }
