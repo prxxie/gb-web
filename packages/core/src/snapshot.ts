@@ -55,6 +55,7 @@ export function toSnapshot(
         // The slot is the last one this seat fired with, not a property of the player: the host passes the
         // map it tracks from accepted inputs (`options.weaponSlots`), and 0 is the honest default.
         weaponSlot: options.weaponSlots?.[player.slot] ?? 0,
+        ssCharge: player.ssCharge,
       }),
     ),
     projectiles: state.projectiles.map(
@@ -128,6 +129,7 @@ export function encodeSnapshot(snapshot: Snapshot | WireSnapshot): string {
       player.delay,
       player.eliminated ? 1 : 0,
       player.weaponSlot,
+      player.ssCharge,
     ]),
     ...(state.terrain === undefined ? {} : { m: state.terrain }),
     j: state.scores.jewels.flatMap((jewel) => [jewel.x, jewel.y, jewel.carriedBy ?? -1]),
@@ -222,6 +224,7 @@ export function expandWire(wire: WireSnapshot): Snapshot {
       delay: row[7] ?? 0,
       eliminated: (row[8] ?? 0) === 1,
       weaponSlot: ((row[9] ?? 0) as 0 | 1 | 2),
+      ssCharge: row[10] ?? 0,
     })),
     projectiles: [],
     scores: {
@@ -289,6 +292,7 @@ export function applySnapshot(state: MatchState, snapshot: Snapshot): ApplyResul
       facing: remote.facing,
       delay: remote.delay,
       eliminated: remote.eliminated,
+      ssCharge: remote.ssCharge,
     };
   });
   const terrain =

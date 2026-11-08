@@ -8,7 +8,8 @@ import {
   type MatchEvent,
   type Seat,
 } from "../src/match.js";
-import { groundY } from "../src/terrain.js";
+import { createTerrain, groundY } from "../src/terrain.js";
+import { getMobile } from "../src/data/mobiles.js";
 import { advanceTurn } from "../src/turn.js";
 import { TUNABLES } from "../src/tuning.js";
 import type { ItemId, MatchState } from "../src/types.js";
@@ -86,12 +87,6 @@ function calm(state: MatchState): MatchState {
   };
 }
 
-/** Height the shell gained between launch and the top of its arc. */
-function apexOf(state: MatchState, path: readonly { readonly y: number }[]): number {
-  const launch = state.players[0]!;
-  return launch.y - Math.min(...path.map((point) => point.y));
-}
-
 describe("items", () => {
   it("TC-CORE-901: every item charges its delay cost and spends one copy before the next player is chosen", () => {
     const loadout: Record<string, number> = {};
@@ -115,7 +110,7 @@ describe("items", () => {
     }
 
     // Delay is charged per item, and the queue still moves on when the player finally acts.
-    expect(charged).toBe(240);
+    expect(charged).toBe(ITEMS.reduce((total, item) => total + item.delayCost, 0));
     const lastItem = ITEMS.at(-1);
     expect(lastItem).toBeDefined();
     // The last item's own cost is the only delay on that fresh match; the sum above is the whole table's cost.
@@ -161,52 +156,44 @@ describe("items", () => {
     expect(second.state.players[0]!.delay).toBe(delay);
   });
 
-  it("TC-CORE-906: Blood adds 25 % power to one shot and then clears", () => {
-    const plain = shotOf(fire(match(), 0, 0, 45, 60).events);
+  it("TC-CORE-906: Blood trades 8 % of your health for +33 % damage on one shot", () => {
+    const seats = [seat(0, "A", "mbl-01", { "itm-blood": 1 }), seat(1, "B")];
+    const plain = shotOf(fire(match(seats), 0, 0, 45, 60).events);
 
-    const state = match([seat(0, "A", "mbl-01", { "itm-blood": 1 }), seat(1, "B")]);
+    const state = match(seats);
+    const before = state.players[0]!;
     const armed = use(state, 0, "itm-blood").state;
     expect(armed.effects.bloodNext).toBe(true);
+    // GB's Blood is a trade, not a free buff: 8 % of the bar is gone before the shot leaves.
+    expect(armed.players[0]!.hp).toBe(before.hp - Math.round(getMobile("mbl-01").maxHp * 0.08));
 
     const boostedResult = fire(armed, 0, 0, 45, 60);
-    expect(shotOf(boostedResult.events).power).toBe(Math.round(plain.power * 1.25));
+    expect(shotOf(boostedResult.events).power).toBe(Math.round(plain.power * 1.33));
     expect(boostedResult.state.effects.bloodNext).toBe(false);
 
     const again = calm(backTo(boostedResult.state, 0));
     expect(shotOf(fire(again, 0, 0, 45, 60).events).power).toBe(plain.power);
   });
 
-  it("TC-CORE-906: Power up raises the force cap by 20 for exactly one shot", () => {
-    const plainState = calm(match([seat(0, "A", "mbl-07"), seat(1, "B", "mbl-07")]));
-    const plain = shotOf(fire(plainState, 0, 0, 80, 200).events);
-    const plainApex = apexOf(plainState, plain.path);
-
-    const state = match([seat(0, "A", "mbl-07", { "itm-power-up": 1 }), seat(1, "B", "mbl-07")]);
-    const armed = calm(use(state, 0, "itm-power-up").state);
-    expect(armed.effects.powerUpNext).toBe(true);
-
-    const boostedResult = fire(armed, 0, 0, 80, 200);
-    const boostedApex = apexOf(armed, shotOf(boostedResult.events).path);
-    expect(boostedApex).toBeGreaterThan(plainApex);
-    expect(boostedResult.state.effects.powerUpNext).toBe(false);
-
-    const again = calm(backTo(boostedResult.state, 0));
-    const afterApex = apexOf(again, shotOf(fire(again, 0, 0, 80, 200).events).path);
-    expect(afterApex).toBeCloseTo(plainApex, 5);
-  });
-
-  it("TC-CORE-907: Energy up 1 adds 30 and Energy up 2 adds 60, charging 5 and 10 delay", () => {
+  it("TC-CORE-907: Energy up restores health — 10 % for the small one, 25 % for the large one", () => {
+    // GB's Energy up is a heal, not movement points: the item buys life back, and its delay is the tempo cost.
+    const maxHp = getMobile("mbl-01").maxHp;
     const low = match([seat(0, "A", "mbl-01", { "itm-energy-1": 1 }), seat(1, "B")]);
-    const lowBefore = low.players[0]!;
-    const lowAfter = use(low, 0, "itm-energy-1").state.players[0]!;
-    expect(lowAfter.energy).toBe(lowBefore.energy + 30);
-    expect(lowAfter.delay).toBe(lowBefore.delay + 5);
+    const hurt = { ...low, players: low.players.map((p) => (p.slot === 0 ? { ...p, hp: 400 } : p)) };
+    const lowAfter = use(hurt, 0, "itm-energy-1").state.players[0]!;
+    expect(lowAfter.hp).toBe(400 + Math.round(maxHp * 0.1));
+    expect(lowAfter.energy).toBe(hurt.players[0]!.energy);
+    expect(lowAfter.delay).toBe(hurt.players[0]!.delay + 100);
 
     const high = match([seat(0, "A", "mbl-01", { "itm-energy-2": 1 }), seat(1, "B")]);
-    const highBefore = high.players[0]!;
-    const highAfter = use(high, 0, "itm-energy-2").state.players[0]!;
-    expect(highAfter.energy).toBe(highBefore.energy + 60);
-    expect(highAfter.delay).toBe(highBefore.delay + 10);
+    const hurtHigh = { ...high, players: high.players.map((p) => (p.slot === 0 ? { ...p, hp: 400 } : p)) };
+    const highAfter = use(hurtHigh, 0, "itm-energy-2").state.players[0]!;
+    expect(highAfter.hp).toBe(400 + Math.round(maxHp * 0.25));
+    expect(highAfter.delay).toBe(hurtHigh.players[0]!.delay + 300);
+
+    // Never past the bar.
+    const full = match([seat(0, "A", "mbl-01", { "itm-energy-2": 1 }), seat(1, "B")]);
+    expect(use(full, 0, "itm-energy-2").state.players[0]!.hp).toBe(maxHp);
   });
 
   it("TC-CORE-908: Change Wind re-rolls the wind, announces it and records the round", () => {
@@ -249,48 +236,65 @@ describe("items", () => {
     expect(pushed.x).toBeGreaterThanOrEqual(0);
   });
 
-  it("TC-CORE-909: Team Teleport brings every living team mate within 40 px of the caster", () => {
-    const state = match([
+  it("TC-CORE-909: Team Teleport swaps the caster with the team mate on the lowest health", () => {
+    // GB's Team Teleport is a rescue: it puts you where your weakest team mate stands and puts them where you stood.
+    const base = match([
       seat(0, "A", "mbl-01", { "itm-team-teleport": 1 }),
       seat(1, "A"),
       seat(2, "B"),
       seat(3, "A"),
     ]);
+    const state: MatchState = {
+      ...base,
+      players: base.players.map((player) =>
+        player.slot === 1 ? { ...player, hp: 300 } : player.slot === 3 ? { ...player, hp: 800 } : player,
+      ),
+    };
     const before = state.players;
-    const result = use(state, 0, "itm-team-teleport");
-    const after = result.state.players;
-    const caster = after.find((player) => player.slot === 0)!;
+    const after = use(state, 0, "itm-team-teleport").state.players;
 
-    expect(caster.x).toBe(before.find((player) => player.slot === 0)!.x);
-    for (const slot of [1, 3]) {
-      const mate = after.find((player) => player.slot === slot)!;
-      expect(Math.abs(mate.x - caster.x)).toBeLessThanOrEqual(40);
-      expect(mate.y).toBeLessThan(groundY(terrainOf(result.state), mate.x));
+    const casterBefore = before.find((player) => player.slot === 0)!;
+    const weakestBefore = before.find((player) => player.slot === 1)!;
+    const otherBefore = before.find((player) => player.slot === 3)!;
+    const caster = after.find((player) => player.slot === 0)!;
+    const weakest = after.find((player) => player.slot === 1)!;
+
+    expect(caster.x).toBe(weakestBefore.x);
+    expect(weakest.x).toBe(casterBefore.x);
+    // The team mate who was not the weakest stays put, and the enemy never moves.
+    expect(after.find((player) => player.slot === 3)!.x).toBe(otherBefore.x);
+    expect(after.find((player) => player.slot === 2)!.x).toBe(before.find((player) => player.slot === 2)!.x);
+    // Both ends land on the ground, not in it.
+    for (const moved of [caster, weakest]) {
+      expect(moved.y).toBeLessThan(groundY(terrainOf(state), moved.x));
     }
-    expect(after.find((player) => player.slot === 2)!.x).toBe(
-      before.find((player) => player.slot === 2)!.x,
-    );
   });
 
-  it("TC-CORE-910: Bunge returns the shell to the caster", () => {
-    // TODO(next stage): Bunge becomes GunBound's Bunge Shot (+25 % terrain carved) instead of bringing the
-    // shell home — this test then needs rewriting for that behaviour. Today it still pins the come-home rule.
-    const field = match([seat(0, "A", "mbl-01", { "itm-bunge": 1 }), seat(1, "B")]);
-    // The property is the shell's return, not the weather: with no mass dividing it the rolled wind
-    // out-pushes gravity and blows the shell off the map, so the field is pinned to calm.
-    const state: MatchState = { ...field, weather: { ...field.weather, wind: { magnitude: 0, directionDeg: 0, sector: 0 } } };
-    const caster = state.players[0]!;
-    const armed = use(state, 0, "itm-bunge").state;
+  it("TC-CORE-910: Bunge Shot carves 25 % more ground instead of bringing the shell home", () => {
+    // GB's Bunge shot is the same shell with a wider bite taken out of the terrain; the boomerang arc belongs to a
+    // mobile, not to an item. Two identical shots, one armed with the item, compared sample by sample.
+    const baseline = createTerrain("map-01");
+    const armedState = match([seat(0, "A", "mbl-01", { "itm-bunge": 1 }), seat(1, "B")]);
+    const plainState = match([seat(0, "A", "mbl-01"), seat(1, "B")]);
+    const armed = use(armedState, 0, "itm-bunge").state;
     expect(armed.effects.bungeNext).toBe(true);
 
-    // 45° / force 40 is a shot that flies ~615 units un-bunge'd; with the item the shell turns at 350 ms and
-    // detonates on its own muzzle. At the old force 98 it out-runs the bunge pull and leaves the map instead.
-    const shot = shotOf(fire(armed, 0, 0, 45, 40).events);
-    expect(shot.impact).not.toBeNull();
-    const landing = shot.impact ?? shot.path.at(-1);
-    expect(landing).toBeDefined();
-    expect(Math.abs((landing?.x ?? 0) - caster.x)).toBeLessThanOrEqual(200);
-    expect((landing?.y ?? 0) - caster.y).toBeCloseTo(0, -2);
+    const plainAfter = fire(plainState, 0, 0, 45, 60).state;
+    const armedAfter = fire(armed, 0, 0, 45, 60).state;
+
+    const carved = (state: MatchState): number => {
+      const heights = terrainOf(state).heights;
+      let count = 0;
+      for (let i = 0; i < heights.length; i += 1) if (heights[i] !== baseline.heights[i]) count += 1;
+      return count;
+    };
+    const plainCarved = carved(plainAfter);
+    const armedCarved = carved(armedAfter);
+    expect(plainCarved).toBeGreaterThan(0);
+    // 25 % more radius is 56 % more area: the crater has to be visibly wider, not just different.
+    expect(armedCarved).toBeGreaterThan(plainCarved * 1.2);
+    // And the shell still lands where the plain one does: the item changes the ground, not the flight.
+    expect(shotOf(fire(armed, 0, 0, 45, 60).events).impact).toEqual(shotOf(fire(plainState, 0, 0, 45, 60).events).impact);
   });
 
   it("TC-CORE-911: Thunder strikes the band at the caster's aim and spares the rest of the field", () => {
@@ -316,7 +320,7 @@ describe("items", () => {
     expect(spared.hp).toBe(sparedBefore.hp);
     expect(spared.shield).toBe(sparedBefore.shield);
     expect(result.players.find((player) => player.slot === 0)!.delay).toBe(
-      before.find((player) => player.slot === 0)!.delay + 35,
+      before.find((player) => player.slot === 0)!.delay + (ITEMS.find((item) => item.itemId === "itm-thunder")?.delayCost ?? 0),
     );
   });
 

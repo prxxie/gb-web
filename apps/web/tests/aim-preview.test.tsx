@@ -43,7 +43,12 @@ function resolvedImpact(state: ReturnType<typeof match>, input: FireInput): { x:
 
 describe("TC-MATCH-941: the aim aid shows that weapon's shot (US-MATCH-005 AC2)", () => {
   it("reports the selected slot and its own blast radius", () => {
-    const state = match("mbl-02");
+    // The super shot is gated by its gauge (`US-CORE-007`): charge it, or the preview for slot 2 is null.
+    const base = match("mbl-02");
+    const state = {
+      ...base,
+      players: base.players.map((player) => (player.slot === 0 ? { ...player, ssCharge: 100 } : player)),
+    };
     const weapons = getMobile("mbl-02").weapons;
     for (const slot of [0, 1, 2] as const) {
       const preview = aimPreview({ state, localSlot: 0, weaponSlot: slot, angle: 45, power: 2 })!;
@@ -90,19 +95,19 @@ describe("TC-MATCH-941: the aim aid shows that weapon's shot (US-MATCH-005 AC2)"
     }
   });
 
-  it("follows the item that bends the shot, because the engine does", () => {
+  it("does not bend the shot for Bunge Shot, because the engine does not either", () => {
+    // GB's Bunge Shot carves more ground; it is not a returning shell, so the aid has to stay the straight flight.
     const plain = match("mbl-02");
     const bunge = { ...plain, effects: { ...plain.effects, bungeNext: true } };
     const mobile = getMobile("mbl-02");
     const input = fireFromPull({ angle: 45, power: 2 }, { slot: 0, weaponSlot: 0, seq: 1, mobile })!;
 
     const straight = aimPreview({ state: plain, localSlot: 0, weaponSlot: 0, angle: 45, power: 2 })!;
-    const home = aimPreview({ state: bunge, localSlot: 0, weaponSlot: 0, angle: 45, power: 2 })!;
+    const armed = aimPreview({ state: bunge, localSlot: 0, weaponSlot: 0, angle: 45, power: 2 })!;
 
     expect(straight.impact).toEqual(resolvedImpact(plain, input));
-    expect(home.impact).toEqual(resolvedImpact(bunge, input));
-    // `itm-bunge` brings the shell home, so the aid cannot be the straight flight.
-    expect(home.impact).not.toEqual(straight.impact);
+    expect(armed.impact).toEqual(resolvedImpact(bunge, input));
+    expect(armed.impact).toEqual(straight.impact);
   });
 
   it("fires the slot `itm-dual` forces while its pair lasts (US-CORE-009 AC2)", () => {

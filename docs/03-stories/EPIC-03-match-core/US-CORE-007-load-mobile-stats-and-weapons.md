@@ -35,7 +35,7 @@ and **three weapon slots** (shot 1, shot 2, super shot) ``. Our data table is
 |---|---|---|---|
 | AC1 | the twenty mobile records | they are loaded | every record validates against the schema and the clamps in `data/mobiles.md` (`TC-CORE-905`) |
 | AC2 | a mobile with three weapons | a `weaponSlot` is selected | the matching weapon's class, power and radius are used, and the shot flies with **the mobile's** `gravity` and `mass` (`TC-CORE-912`, `TC-CORE-925`) |
-| AC3 | the super shot | it is used once | it cannot be selected again and the slot reports empty (`TC-CORE-922`) |
+| AC3 | the super shot | the gauge is full (100) | it fires, the gauge drops to 0, and damage dealt or taken refills it — so a second SS is possible in the same match (`TC-CORE-922`) |
 | AC4 | a data file with an out-of-range value | it is loaded | the loader throws at build time, not at runtime (`TC-FND-002`) |
 | AC5 | a `rulesetVersion` bump | the client boots | the version is read from the data bundle and sent in the snapshot (`TC-CORE-040`) |
 | AC6 | two players pick the same mobile | the match starts | it is allowed; nothing in the rules keys on `mobileId` (`TC-ROOM-148`) |

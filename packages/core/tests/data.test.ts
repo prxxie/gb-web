@@ -127,9 +127,13 @@ describe("TC-CORE-904: items", () => {
     expect(ITEMS).toHaveLength(11);
     expect(LOADOUT_CAP).toBe(11);
     for (const item of ITEMS) {
-      expect(item.delayCost).toBeGreaterThan(0);
+      // GB's Blood is the one item with no delay ("Delay: None"): everything else is a tempo cost.
+      expect(item.delayCost).toBeGreaterThanOrEqual(0);
+      expect(item.itemId === "itm-blood" ? item.delayCost : item.delayCost).toBeGreaterThanOrEqual(0);
       expect(ITEMS_BY_ID.get(item.itemId)).toBe(item);
     }
+    expect(ITEMS.filter((item) => item.delayCost > 0)).toHaveLength(10);
+    expect(ITEMS_BY_ID.get("itm-blood")?.delayCost).toBe(0);
     expect(loadoutTotal({ "itm-dual": 2, "itm-power-up": 1 })).toBe(3);
   });
 });

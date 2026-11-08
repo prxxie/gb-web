@@ -17,12 +17,12 @@ import { getMobile } from "./data/mobiles.js";
 import { getMap } from "./data/maps.js";
 import { ITEMS_BY_ID, isItemId } from "./data/items.js";
 import { avatarBonus, bonusMultipliers } from "./data/avatars.js";
-import { carve, createTerrain, groundY, heightAt, type Terrain } from "./terrain.js";
+import { carve, createTerrain, groundY, type Terrain } from "./terrain.js";
 import { launch, segmentImpact, stepProjectile } from "./ballistics.js";
 import { applyBlast, damageByTeam, mergeHits, teamStatus, type HitResult } from "./combat.js";
-import { addDelay, advanceTurn, createTurn, nextSlot } from "./turn.js";
+import { addDelay, advanceTurn, createTurn, nextSlot, thinkingDelay } from "./turn.js";
 import { FORCE_FIELD, returnsOffMapShots } from "./gimmicks.js";
-import { newerWeather, rollWeather, rollWind } from "./weather.js";
+import { newerWeather, rollWeather } from "./weather.js";
 import { applyGimmicks } from "./gimmicks.js";
 import { tryMove, teleportTo } from "./movement.js";
 import { createRng } from "./rng.js";
@@ -144,7 +144,7 @@ function seatsToPlayers(seats: readonly Seat[], map: MapDef): readonly PlayerSta
       damageDealt: 0,
       shotsFired: 0,
       hits: 0,
-      superShotUsed: false,
+      ssCharge: 0,
       items,
     };
   });
@@ -239,15 +239,6 @@ export function flightPath(state: MatchState, projectile: ReturnType<typeof laun
       }
       return { path, impact: null, flightMs: current.ageMs };
     }
-    // `itm-bunge` comes home: the same rule as `simulateFlight`, so a previewed arc matches the resolver.
-    if (
-      current.bunge &&
-      current.ageMs >= TUNABLES.bungeTurnMs &&
-      Math.abs(current.x - current.homeX) <= 60 &&
-      current.y >= heightAt(terrain, current.x) - 40
-    ) {
-      return { path, impact: { x: roundTo(current.x), y: roundTo(current.y) }, flightMs: current.ageMs };
-    }
     const hit = segmentImpact(terrain, previous, { x: current.x, y: current.y });
     if (hit) {
       if (current.piercing) continue;
@@ -298,8 +289,13 @@ function launchFor(
   const effects = state.effects;
 
   const clampedAngle = Math.min(mobile.angleMax, Math.max(mobile.angleMin, angle));
-  const clampedForce = Math.min(mobile.maxPower + (effects.powerUpNext ? 20 : 0), Math.max(0, force));
-  const powerMultiplier = player.attack * (effects.bloodNext ? 1.25 : 1) * (effects.dualPlusNext ? 1.15 : 1);
+  const clampedForce = Math.min(mobile.maxPower, Math.max(0, force));
+  // GB's buffs are damage multipliers, not extra power: Blood +33 %, Power up +33 %, Dual+ +15 % on the second shot.
+  const powerMultiplier =
+    player.attack *
+    (effects.bloodNext ? 1.33 : 1) *
+    (effects.powerUpNext ? 1.33 : 1) *
+    (effects.dualPlusNext ? 1.15 : 1);
 
   const projectile = launch({
     id: state.seq + 1,
@@ -311,7 +307,6 @@ function launchFor(
     angle: clampedAngle,
     force: clampedForce,
     powerMultiplier,
-    bunge: effects.bungeNext,
   });
   const flight = flightPath(state, projectile, getMap(state.mapId));
 
@@ -333,7 +328,7 @@ export function previewShot(
   const player = state.players.find((candidate) => candidate.slot === slot);
   if (!player || player.eliminated) return null;
   const effective = state.effects.dualWeapon ?? weaponSlot;
-  if (effective === 2 && player.superShotUsed) return null;
+  if (effective === 2 && player.ssCharge < TUNABLES.ssCost) return null;
 
   const launched = launchFor(state, player, effective, angle, force);
 
@@ -484,8 +479,8 @@ function resolveShot(
 ): InputResult {
   const player = state.players.find((candidate) => candidate.slot === slot);
   if (!player) return { state, events: [{ kind: "reject", slot, reason: "unknown-slot" }] };
-  if (weaponSlot === 2 && player.superShotUsed) {
-    return { state, events: [{ kind: "reject", slot, reason: "super-shot-spent" }] };
+  if (weaponSlot === 2 && player.ssCharge < TUNABLES.ssCost) {
+    return { state, events: [{ kind: "reject", slot, reason: "super-shot-not-charged" }] };
   }
   const effects = state.effects;
   const { weapon, projectile, flight } = launchFor(state, player, weaponSlot, angle, force);
@@ -494,27 +489,46 @@ function resolveShot(
   const terrain = terrainOf(state);
   let players: readonly PlayerState[] = state.players.map((candidate) =>
     candidate.slot === slot
-      ? { ...candidate, shotsFired: candidate.shotsFired + 1, superShotUsed: candidate.superShotUsed || weaponSlot === 2 }
+      ? {
+          ...candidate,
+          shotsFired: candidate.shotsFired + 1,
+          ssCharge: weaponSlot === 2 ? Math.max(0, candidate.ssCharge - TUNABLES.ssCost) : candidate.ssCharge,
+        }
       : candidate,
   );
 
   let hits: readonly HitResult[] = [];
   let carved = false;
   if (flight.impact) {
-    carve(terrain, flight.impact.x, flight.impact.y, weapon.radius * TUNABLES.terrainCarveRatio);
+    // GB's Bunge Shot is not a returning shell: it is the same shot with 25 % more ground taken out of it.
+    const carveRadius =
+      weapon.radius * TUNABLES.terrainCarveRatio * (effects.bungeNext ? 1 + TUNABLES.bungeCarveBonus : 1);
+    carve(terrain, flight.impact.x, flight.impact.y, carveRadius);
     carved = true;
     hits = applyBlast(
       players,
       { x: flight.impact.x, y: flight.impact.y, radius: weapon.radius, power: weapon.power, ownerSlot: slot },
-      { defenseOf: (victim) => mobileOf(victim).defense, attack: player.attack, bloodBonus: effects.bloodNext ? 1.25 : 1 },
+      { defenseOf: (victim) => mobileOf(victim).defense, attack: player.attack, bloodBonus: effects.bloodNext ? 1.33 : 1 },
     );
     const damagedSomeoneElse = hits.some((hit) => hit.player.slot !== slot);
-    players = mergeHits(players, hits).map((candidate) =>
-      candidate.slot === slot && damagedSomeoneElse ? { ...candidate, hits: candidate.hits + 1 } : candidate,
-    );
+    // GB charges the super-shot gauge from the fighting: dealing fills it twice as fast as being hit, so a player who
+    // trades shots earns another one instead of banking a single finisher per match.
+    const charge = new Map<number, number>();
+    for (const hit of hits) {
+      if (hit.damage <= 0) continue;
+      charge.set(hit.player.slot, (charge.get(hit.player.slot) ?? 0) + hit.damage * TUNABLES.ssChargeTaken);
+      if (hit.player.slot !== slot) charge.set(slot, (charge.get(slot) ?? 0) + hit.damage * TUNABLES.ssChargeDealt);
+    }
+    players = mergeHits(players, hits).map((candidate) => {
+      const gained = charge.get(candidate.slot) ?? 0;
+      const charged = gained > 0 ? Math.min(TUNABLES.ssCost, candidate.ssCharge + Math.round(gained)) : candidate.ssCharge;
+      const credited =
+        candidate.slot === slot && damagedSomeoneElse ? { ...candidate, hits: candidate.hits + 1 } : candidate;
+      return { ...credited, ssCharge: charged };
+    });
   }
 
-  players = addDelay(players, slot, weapon.delay);
+  players = addDelay(players, slot, weapon.delay + thinkingDelay(state.turn, now));
 
   let scores = state.scores;
   if (state.mode === "jewel") {
@@ -602,7 +616,12 @@ function applyItem(state: MatchState, slot: number, itemId: ItemId, now: number)
   const terrain = terrainOf(state);
   let players: readonly PlayerState[] = state.players.map((candidate) =>
     candidate.slot === slot
-      ? { ...candidate, items: { ...candidate.items, [itemId]: quantity - 1 }, delay: candidate.delay + item.delayCost }
+      ? {
+          ...candidate,
+          items: { ...candidate.items, [itemId]: quantity - 1 },
+          // An item costs its own delay plus the thinking time, exactly like a shot (`tunables.md` § 2).
+          delay: candidate.delay + item.delayCost + thinkingDelay(state.turn, now),
+        }
       : candidate,
   );
   let effects = state.effects;
@@ -617,7 +636,13 @@ function applyItem(state: MatchState, slot: number, itemId: ItemId, now: number)
       effects = { ...effects, shotsLeft: 2, dualPlusNext: true };
       break;
     case "itm-blood":
+      // GB: "takes away 8 % of your health, adds 33 % damage to your shot" — a real trade, not a free buff.
       effects = { ...effects, bloodNext: true };
+      players = players.map((candidate) =>
+        candidate.slot === slot
+          ? { ...candidate, hp: Math.max(1, candidate.hp - Math.round(mobileOf(candidate).maxHp * 0.08)) }
+          : candidate,
+      );
       break;
     case "itm-power-up":
       effects = { ...effects, powerUpNext: true };
@@ -626,14 +651,28 @@ function applyItem(state: MatchState, slot: number, itemId: ItemId, now: number)
       effects = { ...effects, bungeNext: true };
       break;
     case "itm-energy-1":
-      players = players.map((candidate) => (candidate.slot === slot ? { ...candidate, energy: candidate.energy + 30 } : candidate));
+      // GB's Energy up restores life, it does not buy movement: a small amount back.
+      players = players.map((candidate) =>
+        candidate.slot === slot
+          ? { ...candidate, hp: Math.min(mobileOf(candidate).maxHp, candidate.hp + Math.round(mobileOf(candidate).maxHp * 0.1)) }
+          : candidate,
+      );
       break;
     case "itm-energy-2":
-      players = players.map((candidate) => (candidate.slot === slot ? { ...candidate, energy: candidate.energy + 60 } : candidate));
+      players = players.map((candidate) =>
+        candidate.slot === slot
+          ? { ...candidate, hp: Math.min(mobileOf(candidate).maxHp, candidate.hp + Math.round(mobileOf(candidate).maxHp * 0.25)) }
+          : candidate,
+      );
       break;
     case "itm-change-wind": {
-      const rng = createRng((state.seed ^ Math.imul(state.seq + 7, 0x85ebca6b)) >>> 0);
-      weather = { wind: rollWind(rng), rolledAtRound: state.turn.round };
+      // GB's Change Wind reverses the wind, it does not re-roll it: the same strength now blows the other way.
+      const reversed = {
+        magnitude: weather.wind.magnitude,
+        sector: weather.wind.sector === 0 ? 1 : 0,
+        directionDeg: weather.wind.sector === 0 ? 180 : 0,
+      };
+      weather = { wind: reversed, rolledAtRound: weather.rolledAtRound };
       events.push({ kind: "weather", weather });
       break;
     }
@@ -643,15 +682,17 @@ function applyItem(state: MatchState, slot: number, itemId: ItemId, now: number)
       );
       break;
     case "itm-team-teleport": {
+      // GB's Team Teleport swaps you with the team mate on the lowest health — a rescue, not a rally.
       const caster = players.find((candidate) => candidate.slot === slot);
-      if (caster) {
-        let index = 0;
+      const mate = players
+        .filter((candidate) => candidate.team === caster?.team && !candidate.eliminated && candidate.slot !== slot)
+        .sort((a, b) => a.hp - b.hp || a.slot - b.slot)[0];
+      if (caster && mate) {
+        const casterSpot = { x: caster.x, y: caster.y };
         players = players.map((candidate) => {
-          if (candidate.team !== caster.team || candidate.eliminated || candidate.slot === slot) return candidate;
-          // Alternate the sides of the caster so every mate lands inside 40 px, however many there are.
-          const side = index % 2 === 0 ? 1 : -1;
-          index += 1;
-          return teleportTo(candidate, terrain, caster.x + side * 40 * caster.facing);
+          if (candidate.slot === slot) return teleportTo(candidate, terrain, mate.x);
+          if (candidate.slot === mate.slot) return teleportTo(candidate, terrain, casterSpot.x);
+          return candidate;
         });
       }
       break;

@@ -116,7 +116,7 @@ export function botShot(
   // AC3: the weapon is the one that actually lands closest, simulated per slot rather than assumed.
   // The super shot is only considered when the target is nearly finished, and never twice.
   const finisher = target.hp + target.shield <= mobile.weapons[2].power * 1.6;
-  const wantsSuper = finisher && !bot.superShotUsed && rng.float(0, 1) < config.superShotChance;
+  const wantsSuper = finisher && bot.ssCharge >= TUNABLES.ssCost && rng.float(0, 1) < config.superShotChance;
   const slots: readonly (0 | 1 | 2)[] = wantsSuper ? [0, 1, 2] : [0, 1];
   let weaponSlot: 0 | 1 | 2 = 0;
   let pick = bestFor(0);
@@ -198,9 +198,16 @@ export function botItemUse(
     { returnOffMap: returnsOffMapShots(map) },
   );
   const reachable = Math.abs(flight.landingX - target.x) <= 120;
-  if (reachable) return null;
+  // GB's Power up is a damage multiplier, not extra range (`data/items.md`), so the bot spends it on a shot that
+  // already lands and whose extra third is what finishes the target. The other items are not range-dependent either,
+  // so they stay available whenever the shot is on target.
+  const weapon = mobile.weapons[best.weaponSlot];
+  const finishing = reachable && target.hp + target.shield <= weapon.power * 1.33;
+  if (!reachable) return null;
   if (rng.float(0, 1) >= config.itemUseChance) return null;
-  const heldId = ITEM_PREFERENCE.find((itemId) => (bot.items[itemId] ?? 0) > 0);
+  const heldId = ITEM_PREFERENCE.find(
+    (itemId) => (bot.items[itemId] ?? 0) > 0 && (itemId !== "itm-power-up" || finishing),
+  );
   if (!heldId) return null;
   return { kind: "item", slot, itemId: heldId, seq: state.seq };
 }

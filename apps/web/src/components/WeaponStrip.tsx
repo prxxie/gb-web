@@ -6,7 +6,7 @@
  * itself is still resolved by `@gbw/core` when it is sent.
  *
  * `charges` is the remaining count per slot (`0` = unusable, so the button is disabled). Shots 1 and
- * 2 are unlimited and pass `1`; the super shot passes `1` until `superShotUsed`, then `0`.
+ * 2 are unlimited and pass `1`; the super shot passes `1` while its gauge is full, `0` while it charges.
  */
 import type { Weapon } from "@gbw/core";
 import type { JSX } from "react";

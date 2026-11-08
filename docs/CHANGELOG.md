@@ -1,5 +1,33 @@
 # Changelog
 
+## 2026-11-08 — the tempo goes back to GunBound's
+
+The second half of the GB-parity audit: the physics was fixed in the change below, and this one fixes what the game
+*charges* for acting. Every number is the genre's own ratio restated at our shot delay (~100).
+
+- **Thinking costs delay.** GB adds 10 to your delay for every second the turn takes, so deliberating loses you queue
+  position — the turn clock was decoration here. `TUNABLES.thinkingDelayPerSecond = 10`, measured from `turnStartedAt`
+  (derived from the deadline, so nothing new rides the wire) and charged on shots *and* on items.
+- **Items cost what they cost in GB.** Every item was priced at +5…+40 delay — a fifth of a shot — which made the item
+  economy free. Now Dual is +600 (six shots), Energy up 2 +300, Dual+ +250, Thunder +200, Teleport / Change Wind / Power
+  up +150, Energy up 1 +100, Team Teleport and Bunge +50, and Blood is free because its price is health.
+- **Four items were modelled wrong**, all now the genre's version: **Energy up heals** (it was buying movement points),
+  **Blood** costs 8 % of your health for +33 % damage (it was a free +25 %), **Power up** adds 33 % damage without
+  touching the arc (it was a force cap), **Change Wind reverses** the wind instead of re-rolling it, **Team Teleport
+  swaps** you with the team mate on the lowest health instead of rallying the team, and **Bunge Shot carves 25 % more
+  ground** instead of flying home — the boomerang arc is a mobile trait, not an item.
+- **The super shot recharges.** It was one per match, which made it a single finisher; GB charges an SS gauge from the
+  fighting. `PlayerState.ssCharge` (0…100) fills by 0.25 per point of damage dealt and 0.12 per point taken, a shot
+  spends all of it, and the gauge rides the snapshot so the HUD can draw it (`TC-CORE-922`).
+- The bot's Power up heuristic followed the item: it now spends it on a shot that lands and finishes, not on a shot that
+  cannot reach.
+- Docs: `data/items.md` (the whole table plus where the numbers come from), `tunables.md` § 3, `US-CORE-007` AC3,
+  and the six test-case rows that described the old behaviour.
+
+Still open from the audit: the **armour × weapon-type bonus matrix** (GB gives a weapon type extra damage against an
+armour class; we have neither field), and `itm-teleport` still blinks 150 px instead of teleporting to where the shot
+lands, which needs the shot-then-teleport flow.
+
 ## 2026-11-08 — the physics goes back to GunBound's
 
 An audit of the integrator against the genre found the model had invented two things GB does not have and scaled a third

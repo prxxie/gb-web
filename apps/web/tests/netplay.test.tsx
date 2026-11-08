@@ -88,10 +88,10 @@ describe("TC-NET-905: a snapshot carries no terrain and stays inside the budget 
   it("packs eight players into the budget", () => {
     const payload = wireSnapshot(toSnapshot(eightPlayers(), 1));
 
-    // Measured 2026-11-08 after the packing: 379 B for eight players, against the 1319 B the named-field form
+    // Measured 2026-11-08 after the packing: 395 B for eight players (the SS gauge rides the player row), against the 1319 B the named-field form
     // weighed. AC7 is met with half the budget to spare.
     expect(withinSnapshotBudget(payload)).toBe(true);
-    expect(encodeBytes(payload)).toBe(379);
+    expect(encodeBytes(payload)).toBe(395);
   });
 
   it("survives the round trip: what the peer reads is what the host packed", () => {

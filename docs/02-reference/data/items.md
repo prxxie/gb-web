@@ -9,17 +9,17 @@ shot, whether it skips a turn and whether it takes two loadout slots — see
 
 | itemId | item | effect in our build | `delayCost` | combat use | Oracle |
 |---|---|---|---|---|---|
-| `itm-dual` | Dual | fire twice this turn (second shot uses the same weapon) | +20 | yes | `TC-CORE-906` |
-| `itm-blood` | Blood | next shot deals +25 % damage | +15 | yes | `TC-CORE-906` |
-| `itm-energy-2` | Energy up 2 | +60 movement energy this turn | +10 | yes | `TC-CORE-907` |
-| `itm-energy-1` | Energy up 1 | +30 movement energy this turn | +5 | yes | `TC-CORE-907` |
-| `itm-dual-plus` | Dual+ | fire twice, second shot +15 % power | +30 | yes | `TC-CORE-906` |
-| `itm-change-wind` | Change Wind | set the wind vector to a new random value, announce it | +25 | yes | `TC-CORE-908` |
-| `itm-team-teleport` | Team Teleport | move every living team mate to the caster's position ±40 px | +40 | yes | `TC-CORE-909` |
-| `itm-bunge` | Bunge shot | tether the shot to the caster: it returns and explodes near the caster | +20 | yes | `TC-CORE-910` |
-| `itm-power-up` | Power up | `force` cap +20 for this shot | +15 | yes | `TC-CORE-906` |
-| `itm-thunder` | Thunder | lightning strikes a horizontal band at the aim point | +35 | yes | `TC-CORE-911` |
-| `itm-teleport` | Teleport | move the caster up to 150 px, ignoring incline | +25 | yes | `TC-CORE-909` |
+| `itm-dual` | Dual | fire twice this turn (second shot uses the same weapon) | +600 | yes | `TC-CORE-906` |
+| `itm-blood` | Blood | spend 8 % of your health for +33 % damage on this shot | +0 | yes | `TC-CORE-906` |
+| `itm-energy-2` | Energy up 2 | restore 25 % of your health | +300 | yes | `TC-CORE-907` |
+| `itm-energy-1` | Energy up 1 | restore 10 % of your health | +100 | yes | `TC-CORE-907` |
+| `itm-dual-plus` | Dual+ | fire twice, second shot +15 % power | +250 | yes | `TC-CORE-906` |
+| `itm-change-wind` | Change Wind | reverse the wind: same strength, the other way | +150 | yes | `TC-CORE-908` |
+| `itm-team-teleport` | Team Teleport | swap places with the team mate on the lowest health | +50 | yes | `TC-CORE-909` |
+| `itm-bunge` | Bunge shot | 25 % more ground carved by this shot | +50 | yes | `TC-CORE-910` |
+| `itm-power-up` | Power up | +33 % damage on this shot | +150 | yes | `TC-CORE-906` |
+| `itm-thunder` | Thunder | lightning strikes a horizontal band at the aim point | +200 | yes | `TC-CORE-911` |
+| `itm-teleport` | Teleport | move the caster up to 150 px, ignoring incline | +150 | yes | `TC-CORE-909` |
 
 ## Loadout rules
 
@@ -28,10 +28,18 @@ shot, whether it skips a turn and whether it takes two loadout slots — see
 | Loadout cap | 11 items per match (total quantity, not per type) | `TC-MATCH-006` |
 | Picker | ready-room grid, 9 per page, host can lock the loadout | `TC-ROOM-151` |
 | Who resolves an effect | the **host** applies it and puts it in the snapshot (we have no server-side referee — `OQ-30`) | `TC-NET-044` |
-| Delay interaction | the item's `delayCost` is added to the caster's accumulated delay before the queue is re-sorted | `TC-CORE-901` |
+| Delay interaction | the item's `delayCost` **plus the thinking time** (`+10 per second of the turn`, `tunables.md` § 2) is added to the caster's accumulated delay before the queue is re-sorted | `TC-CORE-901` |
 | Untrusted input | the host validates `itemId` and the caster's remaining quantity before applying | `TC-NET-067` |
 
-## Unverified
+## Where the numbers come from
 
-In the genre the client only displays an ownership status; the referee resolves the effect. Per-item numeric effects in the
-table above are our design, not extracted values (`[assumption: OQ-19]`).
+The delay column is the genre's own tempo scale, restated at our shot delay (~100): **Dual costs six shots**, Teleport,
+Change Wind and Power up a shot and a half, Thunder two, Team Teleport and Bunge half, Energy up 1/2 a third and three
+shots, and **Blood is free** — the price is 8 % of your health. The first version of this table had every item at +5…+40,
+i.e. a fifth of a shot, which made the whole item economy free and removed the genre's central trade.
+
+The effects follow the genre too, and two of them were modelled wrong until 2026-11-08: **Energy up heals** (it was
+buying movement points), **Bunge Shot carves more ground** (it was a returning shell — the boomerang arc is a mobile
+trait, not an item), **Change Wind reverses** rather than re-rolls, and **Team Teleport swaps** you with your weakest
+team mate rather than rallying the team. `itm-teleport` still blinks 150 px instead of teleporting to where the shot
+lands; that one needs the shot-then-teleport flow and is the remaining gap.

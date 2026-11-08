@@ -110,11 +110,18 @@ describe("turn queue (US-CORE-002)", () => {
     const superDelay = getMobile("mbl-01").weapons[2].delay;
     expect(superDelay).toBe(200);
 
-    const onSlot3: MatchState = { ...state, turn: { ...state.turn, activeSlot: 3 } };
+    // The SS is gated by its gauge (`US-CORE-007`), so the fixture has to charge it first.
+    const charged: MatchState = {
+      ...state,
+      turn: { ...state.turn, activeSlot: 3 },
+      players: state.players.map((player) => (player.slot === 3 ? { ...player, ssCharge: TUNABLES.ssCost } : player)),
+    };
+    const onSlot3: MatchState = charged;
     const fired = applyInput(onSlot3, { kind: "fire", slot: 3, weaponSlot: 2, angle: 45, force: 50, seq: 0 }, NOW + 1_000);
 
     expect(fired.events.some((event) => event.kind === "shot")).toBe(true);
-    expect(fired.state.players[3]!.delay).toBe(100 + superDelay);
+    // The shot costs its own delay plus the second spent deciding (`+10/s`, `tunables.md` § 2).
+    expect(fired.state.players[3]!.delay).toBe(100 + superDelay + TUNABLES.thinkingDelayPerSecond);
     expect(fired.state.players.filter((player) => player.slot !== 3).every((player) => player.delay === 100)).toBe(true);
     expect(slots(queueOrder(fired.state.players))).toEqual([0, 1, 2, 3]);
     expect(fired.state.turn.activeSlot).toBe(0);
@@ -124,10 +131,11 @@ describe("turn queue (US-CORE-002)", () => {
   it("TC-CORE-901: an item's delay cost is added before sorting, so it can cost the next turn", () => {
     const state = withDelays(four({ "itm-team-teleport": 1 }), [100, 120, 120, 120]);
     const item = ITEMS_BY_ID.get("itm-team-teleport");
-    expect(item?.delayCost).toBe(40);
+    expect(item?.delayCost).toBe(50);
 
     const used = applyInput(state, { kind: "item", slot: 0, itemId: "itm-team-teleport", seq: 0 }, NOW + 500);
-    expect(used.state.players[0]!.delay).toBe(140);
+    // The item's own 50 plus nothing for thinking: half a second floors to zero seconds (`tunables.md` § 2).
+    expect(used.state.players[0]!.delay).toBe(150);
     expect(used.state.turn.activeSlot).toBe(0);
     // Already last in the queue before the shot resolves.
     expect(slots(queueOrder(used.state.players))).toEqual([1, 2, 3, 0]);
@@ -137,7 +145,7 @@ describe("turn queue (US-CORE-002)", () => {
       { kind: "fire", slot: 0, weaponSlot: 0, angle: 45, force: 60, seq: used.state.seq },
       NOW + 1_000,
     );
-    expect(fired.state.players[0]!.delay).toBe(240);
+    expect(fired.state.players[0]!.delay).toBe(260);
     expect(fired.state.turn.activeSlot).toBe(1);
   });
 
