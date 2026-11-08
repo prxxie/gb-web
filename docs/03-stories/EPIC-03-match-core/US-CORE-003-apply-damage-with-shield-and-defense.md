@@ -7,7 +7,7 @@ priority: P0
 size: M
 depends_on: [US-CORE-001]
 open_questions: []
-accepted_assumptions: [OQ-19, OQ-37]
+accepted_assumptions: [OQ-19, OQ-37, OQ-02]
 refs: [02-reference/gameplay/tunables.md, 02-reference/gameplay/reference-gunbound.md, 02-reference/data/mobiles.md]
 ---
 

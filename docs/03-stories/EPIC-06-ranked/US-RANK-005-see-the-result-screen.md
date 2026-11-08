@@ -7,7 +7,7 @@ priority: P1
 size: M
 depends_on: [US-RANK-001, US-CORE-003]
 open_questions: []
-accepted_assumptions: [OQ-28]
+accepted_assumptions: [OQ-28, OQ-43]
 refs: [02-reference/screens/results.md, 02-reference/api/matches.md, 02-reference/api/signaling.md]
 ---
 
