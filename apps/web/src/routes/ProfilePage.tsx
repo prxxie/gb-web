@@ -2,7 +2,7 @@
  * Profile (`US-AUTH-003`, `US-AUTH-004`, `US-RANK-003`).
  */
 import { useCallback, useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, Navigate, useNavigate } from "react-router-dom";
 import { useLocale, useSession } from "../app/providers";
 import { ApiError, api, type HistoryItem, type ProfileResponse } from "../lib/api";
 import { clearSession, updateSubject } from "../lib/session";
@@ -74,13 +74,9 @@ export function ProfilePage(): JSX.Element {
   }, [load]);
 
   if (!session || session.subject.kind !== "account") {
-    return (
-      <div className="screen screen--center">
-        <p>
-          {t("signIn.title")} — <Link to="/sign-in">{t("main.signIn")}</Link>
-        </p>
-      </div>
-    );
+    // `TC-AUTH-143`, `docs/02-reference/screens/profile.md`: a guest landing here is sent to `/sign-in` — the route has
+    // no meaning without an account, so it redirects instead of explaining itself on a screen the player cannot use.
+    return <Navigate to="/sign-in" replace />;
   }
 
   /**

@@ -68,7 +68,7 @@ over the WebSocket ([signaling.md](../api/signaling.md)).
 | Two browsers join, both see the same roster and teams | `tests/e2e/lobby.spec.ts` (TC-ROOM-147) |
 | `Bắt đầu` gating (equal, non-empty, all assigned) | `tests/e2e/lobby.spec.ts` (TC-ROOM-148) |
 | Host leaving promotes the earliest joiner and the banner shows | `tests/e2e/lobby.spec.ts` (TC-ROOM-149) |
-| Reconnect within 20 s restores slot/team | `tests/e2e/reconnect.spec.ts` — planned, see `05-quality/test-plan-status.md` (TC-ROOM-046) |
+| Reconnect within 20 s restores slot/team | `tests/e2e/reconnect.spec.ts` (TC-ROOM-046) — the lobby half; the mid-match `lastSnapshot` half is not automated |
 | Copy button writes the exact code | `tests/e2e/lobby.spec.ts` (TC-ROOM-150) |
 | The mobile grid shows every mobile in both tints and a pick is a `loadout` frame | `apps/web/tests/lobby-mobile.test.tsx` (TC-ROOM-709) |
 | A `loadout` frame stores `mobileId` on the member and echoes it in `room_state` | `apps/worker/tests/room-settings.test.ts` (TC-ROOM-708) |

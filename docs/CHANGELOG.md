@@ -1,5 +1,26 @@
 # Changelog
 
+## 2026-11-08 — the five missing browser oracles, and two defects they found
+
+- **Added** the five Playwright specs the oracle tables named but the repository never had:
+  `tests/e2e/errors.spec.ts` (`TC-FND-079`: every API call aborted → a translated sentence, never a raw error string),
+  `focus.spec.ts` (`TC-PWA-131`: focus lands on the new route's `h1`, lazy routes and back included),
+  `profile.spec.ts` (`TC-AUTH-143`: a guest opening `/profile` is sent to `/sign-in`),
+  `privacy.spec.ts` (`TC-ROOM-052`: the stubbed TURN username and credential never reach storage, a cookie or the DOM),
+  `reconnect.spec.ts` (`TC-ROOM-046`: a guest that reloads inside the grace window keeps its seat and team).
+- **Fixed** route focus on the two lazy routes. `useRouteFocus()` looked for `#main h1` once, 50 ms after the
+  navigation; `/sign-in` and `/match/:code` commit their chunk later, so focus stayed on the control the navigation had
+  already removed (`US-PWA-004` AC7). The attempt now repeats inside a 2 s budget.
+- **Fixed** `/profile` for a guest: it rendered a prompt with a sign-in link, while `screens/profile.md` and
+  `TC-AUTH-143` promise a redirect. It now redirects.
+- **Changed** `TC-PWA-131`/`TC-PWA-190` and the `02-reference` oracle rows to the criterion the stories actually state
+  (focus moves to the route's `h1`; the "returns to the invoking control on back" clause was in no acceptance criterion
+  and in no code).
+- **Note** `tests/e2e/prod-smoke.spec.ts` left the oracle set for `deployment.md` § post-deploy: a check against a
+  deployed environment is a release-stage check (`cpt-release` RR7), not a design oracle.
+- **Note** one gap stays on the record in `05-quality/test-plan-status.md` § 3: a route whose session could not be
+  minted renders no `h1`, so the heading rule does not hold on that failure path.
+
 ## 2026-11-08 — the records match the tree, and the payload has a ratchet
 
 - **Fixed** the red Playwright job: `tests/e2e/pwa-offline.spec.ts` asserted the menu's offline sentence against the

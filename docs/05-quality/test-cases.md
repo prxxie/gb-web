@@ -26,6 +26,7 @@ The `covers` column names the requirement ([nonfunctional-requirements.md](../01
 | TC-FND-018 | US-FND-001 | AC3 — `packages/core` imports no DOM, Phaser or network module | Static import scan is empty | unit | NFR-22 |
 | TC-FND-071 | US-FND-002 | AC2 — a route throws `validation_failed` | `application/problem+json` with `type`, `title`, `status`, `detail`, `instance`, `request_id`, fields under `errors[]` | worker | `api/README.md` |
 | TC-FND-072 | US-FND-002 | AC3 — a route throws an unexpected `Error` | `500` `…/internal`, no stack trace, no SQL, same `request_id` as the log line | worker | NFR-24 |
+| TC-FND-079 | US-FND-003 | AC5 note — every API call on a route fails | The route still renders its `h1` and a translated sentence; no `TypeError`, `Failed to fetch` or empty screen reaches the DOM | e2e | NFR-16 |
 | TC-FND-073 | US-FND-002 | AC5 — an unknown route | `404` `not-found` with `instance`, no crash, `ROOMS` still bound | worker | `api/README.md` |
 | TC-FND-070 | US-FND-002 | AC6 — response shapes for all endpoints match `openapi.yaml` | Match `openapi.yaml` (schemathesis or explicit fixtures) | worker | `api/README.md` |
 | TC-FND-100 | US-FND-002 | AC4 — migrations apply to an empty D1 | Schema equals `data/README.md` | worker | ADR-0003 |
@@ -330,8 +331,8 @@ The `covers` column names the requirement ([nonfunctional-requirements.md](../01
 | TC-PWA-130 | US-PWA-002 | Every route in both locales at both landscape sizes | No overflow, no missing key, no untranslated string | e2e | NFR-18 |
 | TC-PWA-162 | US-PWA-002 | 30 % text expansion fixture in `vi` and `en` | No overflow in the lobby and results layouts | e2e | NFR-18 |
 | TC-PWA-063 | US-PWA-003 | AC3, AC4, AC5, AC6 — the portrait notice, the tablet-height floor, a rotation mid-match and a tall desktop window | Rotate notice with only the locale toggle; the battlefield keeps over 500 px at 1024 × 768; rotation keeps the canvas and the turn clock; 820 × 1180 also gets the notice | e2e | `US-PWA-003` AC3, AC4, AC5, AC6; NFR-19 |
-| TC-PWA-190 | US-PWA-004 | AC7 — focus moves into the mounted route | The route's `h1` takes focus on mount, and a back navigation returns it to the invoking control | web | NFR-16 |
-| TC-PWA-131 | US-PWA-004 | Route change with keyboard focus | Focus moves to the route `h1`, returns to the invoking control on back | e2e | NFR-16 |
+| TC-PWA-190 | US-PWA-004 | AC7 — focus moves into the mounted route | The route's `h1` takes focus on mount, and again on the next navigation | web | NFR-16 |
+| TC-PWA-131 | US-PWA-004 | Route change with keyboard focus | Focus moves to the route `h1` on every navigation, including back — never stays on the control that is gone | e2e | NFR-16 |
 | TC-PWA-158 | US-PWA-004 | axe-core on every route, both locales | Zero WCAG 2.2 AA violations | e2e | NFR-16 |
 | TC-PWA-159 | US-PWA-004 | 200 % font size on lobby and results | No clipped text, no overlap | e2e | NFR-16 |
 | TC-PWA-160 | US-PWA-004 | Computed touch-target sizes on match and lobby | Every target ≥ 44 px, fire/skip ≥ 60 px, gaps ≥ 8 px | e2e | NFR-17 |
