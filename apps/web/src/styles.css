@@ -309,12 +309,29 @@ td {
 .match__player {
   /* The phrase banner is positioned against the chip, so it hangs over the speaker and not over the canvas. */
   position: relative;
-  padding: 6px 10px;
-  border-radius: 10px;
+  /* One line, not two. The cell carries the same four facts as before — who, hp/maxHp, shield, turn-order debt — but
+     stacked in two rows it was 58 px tall on a 390 px screen, a seventh of the field to say "Guest 1050/1050 +150 100".
+     Nothing is dropped: the name truncates, the numbers never do. */
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 3px 8px;
+  border-radius: 8px;
   background: rgba(16, 26, 46, 0.85);
   border: 1px solid #24324c;
-  font-size: 0.8rem;
-  min-width: 84px;
+  font-size: 0.66rem;
+  line-height: 1.25;
+  min-width: 0;
+  max-width: 44vw;
+  white-space: nowrap;
+}
+
+.match__player > div:first-child {
+  /* A long display name loses its tail, never the HP: the numbers are the reason the cell exists. */
+  max-width: 8ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: 600;
 }
 
 .match__delay {

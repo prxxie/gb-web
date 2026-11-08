@@ -12,6 +12,10 @@ was 844×313 with the bar and 844×390 without it.
   resolves to it, not to the canvas — the HUD layer is `pointer-events: none`), and still switching the language mid-match
   without dropping it (`TC-PWA-130`).
 - Every other route keeps the bar. `US-FND-003` AC1 gains the exception, and `screens/match.md` records the rule.
+- **The roster cells are one line instead of two.** Each seat printed its name on one row and `hp/maxHp +shield delay` on
+  the next: 58 px per cell, and two cells covered 14.9 % of a 390 px screen to say `Guest 1050/1050 +150 100`. The same
+  four facts now sit in a 24 px chip (2.7 % of the screen); the name truncates at 8 characters and the numbers never do.
+  Nothing the AC asks for was dropped — who is alive, HP, shield and the turn-order debt are all still printed.
 
 ## 2026-11-08 — the bar gets its top half back
 
