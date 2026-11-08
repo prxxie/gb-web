@@ -81,7 +81,7 @@ The `payload` is JSON ≤ 8 KB and is relayed with `to` rewritten to the sender'
 ## 8. Test notes
 
 `TC-ROOM-050`, `TC-ROOM-125`, `TC-ROOM-051`, `TC-ROOM-052`. The TURN route is tested against a stubbed fetch;
-`tests/e2e/privacy.spec.ts` — planned, see `05-quality/test-plan-status.md` — is what will assert AC4 after a full match.
+`tests/e2e/privacy.spec.ts` asserts AC4 after a full match: the TURN username and credential it stubs never reach `localStorage`, `sessionStorage`, a cookie or the DOM.
 
 - **Red:** none — no production code changed in this pass; the sweep added TC-ROOM-192 to the worker relay suite and
   TC-ROOM-196/197/198 to apps/web/tests/mesh.test.tsx and lobby-gating.test.tsx, and left every existing case in place.

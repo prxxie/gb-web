@@ -107,6 +107,6 @@ stayed included (`matches.md` § `abandoned`); the room's `match_recorded` broad
 | Legal transitions only; illegal ones rejected without side effects | `apps/worker/tests/state-machine.test.ts` (TC-ROOM-162), property test over random event sequences |
 | `start_match` guards (equal, non-empty, assigned) | `tests/e2e/lobby.spec.ts` (TC-ROOM-148) |
 | Turn timeout, disconnect-skip, elimination skip | `packages/core/tests/turn.test.ts` (TC-CORE-152), `apps/worker/tests/room.test.ts` (TC-NET-067) |
-| Grace 20 s boundaries and reconnect restore | `tests/e2e/reconnect.spec.ts` — planned, see `05-quality/test-plan-status.md` (TC-ROOM-046, TC-ROOM-047) |
+| Grace 20 s boundaries and reconnect restore | `tests/e2e/reconnect.spec.ts` (TC-ROOM-046) for the seat; the countdown to `disconnected` (TC-ROOM-047) is not automated |
 | Forfeit only when a whole team is gone | `apps/worker/tests/room.test.ts` (TC-ROOM-070) |
 | `match_recorded` exactly once per match | `apps/worker/tests/matches.test.ts` (TC-RANK-111) |

@@ -51,12 +51,16 @@ service-worker precache 12 entries / 1 933.77 KiB.
 
 ### Recorded, not fixed here
 
-9. **Structural debt.** `apps/web/src/routes/MatchPage.tsx` is 1 004 lines with 13 `useEffect`s; `apps/worker/src/room-do.ts`
-   is 1 190 lines. Neither is a defect — both are cohesive and commented — but they are where the next feature will hurt.
-10. **Anti-cheat is plausibility-only** (`OQ-30`, accepted): a tampered host can still claim a false result and the Elo
+9. **A route whose session could not be minted renders no `h1`.** With every API call aborted, `/lobby/:code` and
+   `/results/:code` fall back to the sign-in prompt, which carries no heading — so the "every route moves focus to its
+   `h1`" rule does not hold on that failure path, and `tests/e2e/focus.spec.ts` cannot include it. Recorded in
+   `05-quality/test-plan-status.md` § 3; the fix is a heading in those two fallbacks.
+10. **Structural debt.** `apps/web/src/routes/MatchPage.tsx` is 1 004 lines with 13 `useEffect`s; `apps/worker/src/room-do.ts`
+    is 1 190 lines. Neither is a defect — both are cohesive and commented — but they are where the next feature will hurt.
+11. **Anti-cheat is plausibility-only** (`OQ-30`, accepted): a tampered host can still claim a false result and the Elo
     ladder accepts it. Re-confirm before `M3`, because the ladder is user-visible.
-11. **`US-ROOM-006` AC4** is asserted by `tests/e2e/privacy.spec.ts`, which is still planned. The story stays `done` and
-    the gap is now on the record in `05-quality/test-plan-status.md` § 3.
+12. **`TC-ROOM-047`** (the 20 s countdown to `disconnected`) and the mid-match half of `TC-ROOM-046` (HP restored from
+    `lastSnapshot`) still have no automated case; `tests/e2e/reconnect.spec.ts` proves the lobby seat and team.
 
 ## 3. What this pass changed
 
@@ -69,10 +73,14 @@ service-worker precache 12 entries / 1 933.77 KiB.
 | 12 story lines and 4 spec headers repointed from the retired layout (`tests/core/…`, `tests/web/…`, `tests/worker/…`) to the package paths, and three story filenames corrected | The same class of drift as finding 5, inside the stories |
 | `tests/meta/traceability-baseline.txt` 72 → 292 | Finding 7 — the floor now sits where coverage actually is |
 | `scripts/bundle-budget.mjs` + `scripts/bundle-budget.json` + `pnpm budget` + a CI step | Finding 8 — the weight of every chunk is a ratchet: a bucket may only grow when its number is raised in the same change, and a chunk that matches no bucket fails |
+| The five Playwright specs the oracle tables named but the repository never had — `errors`, `focus`, `profile`, `privacy`, `reconnect` (11 cases) | Findings 5 and 11 — and they found two real defects, below |
+| `useRouteFocus()` now repeats its attempt inside a 2 s budget | The single 50 ms attempt found no `h1` on the two lazy routes (`/sign-in`, `/match/:code`), so focus stayed on the control the navigation had removed — `US-PWA-004` AC7 was only true for eager routes |
+| `/profile` redirects a guest instead of prompting | `screens/profile.md` and `TC-AUTH-143` promise a redirect; the screen offered a link |
+| `TC-PWA-131`, `TC-PWA-190` and four oracle rows narrowed to the criterion the stories state | The "focus returns to the invoking control on back" clause existed in no acceptance criterion and in no code — the case table was asserting a feature nobody wrote |
 | `AGENTS.md` § PROJECT and this report | The numbers a stranger reads first |
 
-`pnpm e2e` after the changes: **62 passed**. `pnpm test`: 123 files / 1036 cases. `pnpm budget`: every bucket inside
-its recorded weight.
+`pnpm e2e` after the changes: **73 passed** (21 specs). `pnpm test`: 123 files / 1036 cases, traceability 295 of 355
+documented cases automated. `pnpm budget`: every bucket inside its recorded weight.
 
 ## 4. What is left, and who can do it
 

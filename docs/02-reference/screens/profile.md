@@ -71,6 +71,6 @@ No account ids and no other player's rating are rendered.
 |----------|-----------|
 | Name validation, `409` handling, optimistic revert | `apps/web/tests/profile.test.tsx` (TC-AUTH-140) |
 | History pagination appends without duplicates | `apps/worker/tests/history.test.ts` (TC-RANK-141) for the cursor; the UI append half is `tests/e2e/profile.spec.ts` — planned, see `05-quality/test-plan-status.md` |
-| Delete flow: typed confirmation, `204`, redirect, no further API access | `tests/e2e/profile.spec.ts` — planned, see `05-quality/test-plan-status.md` (TC-AUTH-142) |
-| Guest is redirected to `/sign-in` | `tests/e2e/profile.spec.ts` — planned, see `05-quality/test-plan-status.md` (TC-AUTH-143) |
+| Delete flow: typed confirmation, `204`, redirect, no further API access | `tests/e2e/profile.spec.ts` — planned, see `05-quality/test-plan-status.md` (TC-AUTH-142) — the guest path in the same file is written |
+| Guest is redirected to `/sign-in` | `tests/e2e/profile.spec.ts` (TC-AUTH-143) |
 | No account id rendered in the DOM | `apps/worker/tests/privacy.test.ts` (TC-AUTH-075) for the payload; the DOM half is `tests/e2e/profile.spec.ts` — planned, see `05-quality/test-plan-status.md` |
