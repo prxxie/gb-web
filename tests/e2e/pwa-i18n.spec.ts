@@ -1,5 +1,5 @@
 /**
- * `US-PWA-002` (`docs/03-stories/EPIC-07-pwa-i18n/US-PWA-002-bilingual-ui.md`) AC4 and AC5.
+ * `US-PWA-002` (`docs/03-stories/EPIC-07-pwa-i18n/US-PWA-002-switch-between-vietnamese-and-english.md`) AC4 and AC5.
  *
  * Switching language while a match runs must repaint the text — the HUD — and leave the battlefield alone.
  * And the longer English labels must fit: a control that overflows its box is a clipped label.

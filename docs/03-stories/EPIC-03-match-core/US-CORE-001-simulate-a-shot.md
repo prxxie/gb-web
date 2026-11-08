@@ -97,8 +97,8 @@ Terrain collision and crater carving ([`US-CORE-006`](US-CORE-006-carve-terrain-
 ## 8. Test notes
 
 `TC-CORE-020`, `TC-CORE-021`, `TC-CORE-022`, `TC-CORE-023`, `TC-CORE-028`, `TC-CORE-029`, `TC-CORE-912`,
-`TC-CORE-913`, `TC-CORE-924`, `TC-CORE-935` — `tests/core/ballistics.test.ts`, `tests/core/mobiles.test.ts`.
-- **Red:** `TC-CORE-024`… no: the first red was `TC-CORE-023` in `tests/core/weather.test.ts`, which failed because
+`TC-CORE-913`, `TC-CORE-924`, `TC-CORE-935` — `packages/core/tests/ballistics.test.ts`, `packages/core/tests/mobiles.test.ts`.
+- **Red:** `TC-CORE-024`… no: the first red was `TC-CORE-023` in `packages/core/tests/weather.test.ts`, which failed because
   `stepProjectile` rounded velocity to the 0.1 position quantum, so drift stopped being linear in `magnitude`
   (half the wind gave double the drift).
 

@@ -1,5 +1,23 @@
 # Changelog
 
+## 2026-11-08 — the records match the tree, and the payload has a ratchet
+
+- **Fixed** the red Playwright job: `tests/e2e/pwa-offline.spec.ts` asserted the menu's offline sentence against the
+  leaderboard banner, which `e2e8d08` had moved to `leaderboard.offline` (`02-reference/screens/leaderboard.md` § Offline).
+- **Added** `pnpm budget` (`scripts/bundle-budget.mjs` + `scripts/bundle-budget.json`, and a CI step) — the gzip weight
+  of every web chunk is a ratchet behind `NFR-03`: a bucket may only grow when its number is raised in the same change,
+  and a chunk that matches no bucket fails the check.
+- **Changed** `tests/meta/traceability-baseline.txt` from 72 to 292: the floor now sits where automated coverage
+  actually is (292 of 354 documented cases), so a regression is caught instead of tolerated.
+- **Fixed** 15 oracle rows in `02-reference/` and `01-overview/` that named Playwright specs which do not exist — each
+  now names the file that covers the case, or says `— planned, see 05-quality/test-plan-status.md`.
+- **Fixed** the retired test layout in 12 story lines and 4 spec headers (`tests/core/…`, `tests/web/…`,
+  `tests/worker/…` → the package paths) and three story filenames cited from spec headers.
+- **Changed** `05-quality/test-plan-status.md` and `environment-setup.md` § 6 to the measured numbers (123 files /
+  1036 cases, 16 specs / 62 cases), and `test-plan-status.md` § 3 now names the `done` stories whose oracle is still
+  planned instead of leaving the gap implicit.
+- **Note** the independent review of this pass is [`06-reports/2026-11-08-independent-review.md`](06-reports/2026-11-08-independent-review.md).
+
 ## 2026-11-05 — joinable rooms, verified realtime path, ground-anchored camera
 
 - **Added** `POST /api/v1/rooms/{code}/join` — without it a second player had no way into an existing room

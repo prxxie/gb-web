@@ -17,3 +17,4 @@ Reported so far:
 |------|-----------------|
 | [`2026-11-05-implementation-status.md`](2026-11-05-implementation-status.md) | What the one-pass implementation built, and which checks needed an environment this machine did not have |
 | [`status-2026-11-05-verification-pass.md`](status-2026-11-05-verification-pass.md) | Independent re-run of those claims, the evidence it produced under `05-quality/evidence/`, and the findings that keep stories at `ready` |
+| [`2026-11-08-independent-review.md`](2026-11-08-independent-review.md) | A second read-and-run pass at `da17f7e`: the red Playwright job it found and fixed, the doc drift it repaired, the new `pnpm budget` ratchet, and what is left before `M3` |

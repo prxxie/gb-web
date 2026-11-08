@@ -1,5 +1,5 @@
 /**
- * `US-PWA-001` AC6/AC7 and `US-PWA-003` (`docs/03-stories/EPIC-07-pwa-i18n/US-PWA-003-landscape-gate.md`).
+ * `US-PWA-001` AC6/AC7 and `US-PWA-003` (`docs/03-stories/EPIC-07-pwa-i18n/US-PWA-003-landscape-only-layout.md`).
  *
  * What the browser sees before the game draws: an installable landscape manifest, and the rotate notice —
  * not a squeezed version of the game — whenever the window is taller than it is wide.

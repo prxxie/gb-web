@@ -1,0 +1,12 @@
+{
+  "measured": "2026-11-08",
+  "unit": "KiB gzip",
+  "note": "A ratchet: `pnpm budget` fails when a bucket grows past its number. Raise the number in the same change that adds the weight, so the diff shows what the payload cost. `shell` is what every route pays (the entry plus its vendor chunk); `match` is the Phaser route, which the service worker precaches but a cold load never fetches.",
+  "buckets": {
+    "shell": { "chunks": "^index-.*\\.js$", "maxKiB": 153 },
+    "match": { "chunks": "^MatchPage-.*\\.js$", "maxKiB": 386 },
+    "signin": { "chunks": "^SignInPage-.*\\.js$", "maxKiB": 1 },
+    "css": { "chunks": ".*\\.css$", "maxKiB": 3 }
+  },
+  "totalMaxKiB": 543
+}
