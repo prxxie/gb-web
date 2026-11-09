@@ -146,6 +146,8 @@ export function MatchPage(): JSX.Element {
   /** The "drag to aim" hint, shown once per match (`US-MATCH-002` AC4). */
   const [hint, setHint] = useState<string | null>(null);
   const [aimAid, setAimAid] = useState(readAimAid);
+  /** The phrase grid: its 💬 toggle is in the top strip, the grid itself opens above the bar. */
+  const [chatOpen, setChatOpen] = useState(false);
   const hintShown = useRef(false);
   const [aimDelta, setAimDelta] = useState(0);
   /** The angle the finger is currently pulling at (`US-MATCH-002` AC2). The pad only nudges it. */
@@ -952,6 +954,17 @@ export function MatchPage(): JSX.Element {
             <LocaleToggle />
             <button
               type="button"
+              className="match__aid"
+              data-testid="chat-toggle"
+              aria-expanded={chatOpen}
+              aria-label={t("match.phrases.title")}
+              title={t("match.phrases.title")}
+              onClick={() => setChatOpen((was) => !was)}
+            >
+              <span aria-hidden="true">💬</span>
+            </button>
+            <button
+              type="button"
               className={aimAid ? "match__aid match__aid--on" : "match__aid"}
               data-testid="aim-aid"
               aria-pressed={aimAid}
@@ -982,7 +995,6 @@ export function MatchPage(): JSX.Element {
 
         {/* The bar is a three-cell grid: walking · shooting · the table's state. */}
         <div className="match__bottom">
-          <div className="match__row match__row--controls">
           <div className="match__zone match__zone--move">
 
             <DirectionPad
@@ -1048,16 +1060,15 @@ export function MatchPage(): JSX.Element {
             }}
             phraseText={(id) => t(`match.phrase.${id}`)}
             emoteText={(id) => t(`match.emote.${id}`)}
+            open={chatOpen}
             onSkip={onSkip}
             onChat={onChat}
           />
           </div>
-          </div>
-          <div className="match__row match__row--state">
           <MatchStats
             seed={state.seed}
             round={state.turn.round}
-            rounds={4}
+            rounds={3}
             teams={(["A", "B"] as const).map((team) => {
               const members = state.players.filter((player) => player.team === team);
               return {
@@ -1075,7 +1086,6 @@ export function MatchPage(): JSX.Element {
               health: t("match.teamHealth"),
             }}
           />
-          </div>
         </div>
 
         {status === "reconnecting" ? <div className="overlay">{t("match.reconnecting")}</div> : null}

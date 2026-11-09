@@ -493,21 +493,25 @@ td {
  * here so the middle of the screen is battlefield and nothing else.
  */
 .match__bottom {
-  /* One bar, two aligned rows. Twenty 44 px controls (`NFR-17`) do not fit across 844 px on one line: squeezed into one
-     row they overflowed and the six item slots were drawn underneath the stats (owner's report, 2026-11-08).
-     Row 1 walks and shoots; row 2 states the table's condition. */
+  /* One row, everything on it (owner's call, 2026-11-09). Twenty controls at 44 px need 968 px of an 844 px screen, so the
+     pieces were compacted rather than stacked: the weapon keys and the six item slots are 40 px wide (44 tall, so the tap
+     floor on the short edge holds), the chat toggle moved to the top strip, and the forecast shows the next three rounds.
+     The step counter is gone from the screen entirely, which returned 50 px. */
   position: absolute;
   left: 0;
   right: 0;
   bottom: 0;
-  height: 92px;
+  height: 56px;
   display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: 6px;
+  align-items: center;
+  gap: 8px;
   padding: 0 calc(8px + var(--safe-right)) calc(8px + var(--safe-bottom)) calc(8px + var(--safe-left));
   background: linear-gradient(180deg, rgba(11, 18, 32, 0.6), rgba(11, 18, 32, 0.96));
   border-top: 1px solid rgba(120, 160, 220, 0.16);
+}
+
+.match__row {
+  display: contents;
 }
 
 .match__row {
@@ -1194,8 +1198,8 @@ td {
 }
 
 .weapon-strip__slot {
-  width: 44px;
-  min-width: 44px;
+  width: 40px;
+  min-width: 40px;
   height: 44px;
   min-height: 44px;
   padding: 0;
@@ -1225,13 +1229,13 @@ td {
 
 .match__items {
   display: grid;
-  grid-template-columns: repeat(6, 44px);
-  gap: 6px;
+  grid-template-columns: repeat(6, 40px);
+  gap: 4px;
 }
 
 .match__item {
   position: relative;
-  width: 44px;
+  width: 40px;
   height: 44px;
   padding: 0;
   display: flex;
@@ -1300,7 +1304,8 @@ td {
 .match__stats {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
+  margin-left: auto;
   min-width: 0;
 }
 
@@ -1315,9 +1320,9 @@ td {
   align-items: baseline;
   justify-content: center;
   gap: 2px;
-  min-width: 40px;
+  min-width: 34px;
   height: 28px;
-  padding: 0 6px;
+  padding: 0 5px;
   border-radius: 8px;
   border: 1px solid #24324c;
   background: rgba(16, 26, 46, 0.85);

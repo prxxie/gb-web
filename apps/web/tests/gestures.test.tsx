@@ -126,6 +126,7 @@ describe("TC-MATCH-916 / NFR-17: what a thumb taps clears the 44 px floor", () =
       <>
         <DirectionPad enabled canMove labels={LABELS} onAction={() => undefined} onRepeat={() => undefined} />
         <PhrasePicker
+          open
           skipEnabled
           phraseIds={["phrase-01"]}
           emoteIds={["emote-01"]}
@@ -147,11 +148,8 @@ describe("TC-MATCH-916 / NFR-17: what a thumb taps clears the 44 px floor", () =
       </>,
     );
 
-    // The chat grid is closed by default, so its buttons are measured after opening it: `NFR-17` applies to
-    // every target a thumb can reach, closed or open.
-    const toggle = document.querySelector('[data-testid="chat-toggle"]');
-    expect(toggle, "the chat toggle is rendered").not.toBeNull();
-    fireEvent.click(toggle as Element);
+    // The grid is rendered open here (`open` prop): its 💬 toggle moved to the top strip, which this case does not mount,
+    // so `NFR-17` is asserted on the phrase targets themselves — every target a thumb can reach, closed or open.
     // The pad only nudges the angle now that a finger pans the window, so it sits at the `NFR-17` 44 px floor
     // instead of 60; the skip and phrase buttons keep their larger targets, which is what the thumb hits
     // most often under time pressure.

@@ -5,7 +5,7 @@
  * component. Skip is disabled outside the player's own turn (AC2). Six taps inside a second lose the
  * third onward locally (AC4); the host still enforces its own limit.
  */
-import { useRef, useState } from "react";
+import { useRef } from "react";
 import type { JSX } from "react";
 import type { ChatId, ChatKind, EmoteId, PhraseId } from "@gbw/core";
 
@@ -18,6 +18,8 @@ export interface PhrasePickerLabels {
 }
 
 export interface PhrasePickerProps {
+  /** Owned by the page: its 💬 toggle lives in the top strip, the grid opens here. */
+  readonly open: boolean;
   readonly skipEnabled: boolean;
   readonly phraseIds: readonly PhraseId[];
   readonly emoteIds: readonly EmoteId[];
@@ -33,6 +35,7 @@ const CHAT_WINDOW_MS = 1000;
 const CHAT_PER_WINDOW = 2;
 
 export function PhrasePicker({
+  open,
   skipEnabled,
   phraseIds,
   emoteIds,
@@ -43,7 +46,6 @@ export function PhrasePicker({
   onChat,
 }: PhrasePickerProps): JSX.Element {
   const sent = useRef<number[]>([]);
-  const [open, setOpen] = useState(false);
 
   const chat = (kind: ChatKind, id: ChatId): void => {
     const now = Date.now();
@@ -66,18 +68,6 @@ export function PhrasePicker({
       >
         {/* An icon, not a sentence: the bar is six groups wide and "Bỏ lượt" cost 97 px of it. */}
         <span aria-hidden="true">⏭</span>
-      </button>
-      <button
-        type="button"
-        className="match__skip"
-        data-testid="chat-toggle"
-        aria-expanded={open}
-        aria-label={labels.phrases}
-        title={labels.phrases}
-        onClick={() => setOpen((was) => !was)}
-      >
-        {/* The bar is one row of icons: "Câu nói nhanh" as a sentence cost 129 px of it. */}
-        <span aria-hidden="true">💬</span>
       </button>
       {/*
         The grid opens on demand: twenty-four 60 px targets cannot sit over a battlefield that a one-finger

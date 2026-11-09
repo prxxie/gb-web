@@ -22,6 +22,7 @@ function picker(overrides: Partial<Parameters<typeof PhrasePicker>[0]> = {}) {
   const onChat = vi.fn();
   render(
     <PhrasePicker
+      open
       skipEnabled
       phraseIds={PHRASES}
       emoteIds={EMOTES}
@@ -39,7 +40,6 @@ function picker(overrides: Partial<Parameters<typeof PhrasePicker>[0]> = {}) {
 /** The grid is one button until it is opened (`screens/match.md` § Controls — a 24-cell grid over the canvas
  *  would swallow the pull gesture), so every case below opens it first, exactly as a player does. */
 async function openGrid(): Promise<void> {
-  await userEvent.click(screen.getByTestId("chat-toggle"));
 }
 
 describe("TC-MATCH-905: skip", () => {
@@ -100,6 +100,7 @@ describe("TC-MATCH-905: the picker's surface", () => {
   it("offers no free-text field anywhere in the picker", () => {
     const { container } = render(
       <PhrasePicker
+        open
         skipEnabled
         phraseIds={PHRASES}
         emoteIds={EMOTES}

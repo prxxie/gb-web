@@ -74,6 +74,7 @@ function renderPicker(overrides: Partial<PhrasePickerProps> = {}): {
   const onChat = vi.fn();
   render(
     <PhrasePicker
+      open
       skipEnabled
       phraseIds={["phrase-01", "phrase-02", "phrase-03"]}
       emoteIds={["emote-01", "emote-02"]}
@@ -186,7 +187,6 @@ describe("TC-MATCH-905: skip and preset chat", () => {
     const { onChat } = renderPicker();
     // The grid opens from the chat button: the closed picker is one 60 × 60 target so the canvas stays free
     // for the pull gesture (`screens/match.md` § Controls).
-    fireEvent.click(screen.getByTestId("chat-toggle"));
     fireEvent.click(screen.getByTestId("phrase-phrase-01"));
     fireEvent.click(screen.getByTestId("phrase-phrase-02"));
     fireEvent.click(screen.getByTestId("phrase-phrase-03"));
@@ -199,7 +199,6 @@ describe("TC-MATCH-905: skip and preset chat", () => {
 
   it("TC-MATCH-905: an emote tap sends one emote id", () => {
     const { onChat } = renderPicker();
-    fireEvent.click(screen.getByTestId("chat-toggle"));
     fireEvent.click(screen.getByTestId("emote-emote-02"));
     expect(onChat).toHaveBeenCalledTimes(1);
     expect(onChat.mock.calls).toEqual([["emote", "emote-02"]]);
