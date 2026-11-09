@@ -313,7 +313,7 @@ td {
 
 .match__top-left {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: flex-start;
   min-width: 0;
 }
@@ -326,33 +326,37 @@ td {
 }
 
 .match__roster {
+  /* One grey panel with opacity around the whole list (owner's call, 2026-11-09). The rows inside carry no frames of
+     their own — a box per player turned the top-left corner into a stack of borders. */
   display: flex;
-  gap: 6px;
+  flex-direction: column;
+  gap: 1px;
+  padding: 5px 9px;
+  border-radius: 8px;
+  background: rgba(38, 44, 58, 0.42);
+  color: var(--ink);
+  font-size: 0.66rem;
+  line-height: 1.35;
+  min-width: 132px;
+  pointer-events: none;
 }
 
 .match__player {
-  /* The phrase banner is positioned against the chip, so it hangs over the speaker and not over the canvas. */
+  /* Text only: name, health, delay, one line per seat, in queue order. `position: relative` keeps the chat banner
+     anchored over the speaker's own row. */
   position: relative;
-  /* One line, not two. The cell carries the same four facts as before — who, hp/maxHp, shield, turn-order debt — but
-     stacked in two rows it was 58 px tall on a 390 px screen, a seventh of the field to say "Guest 1050/1050 +150 100".
-     Nothing is dropped: the name truncates, the numbers never do. */
   display: flex;
   align-items: baseline;
   gap: 6px;
-  padding: 3px 8px;
-  border-radius: 8px;
-  background: rgba(16, 26, 46, 0.85);
-  border: 1px solid #24324c;
-  font-size: 0.66rem;
-  line-height: 1.25;
-  min-width: 0;
-  max-width: 44vw;
+  padding: 0;
+  border: 0;
+  background: none;
   white-space: nowrap;
 }
 
-.match__player > div:first-child {
-  /* A long display name loses its tail, never the HP: the numbers are the reason the cell exists. */
-  max-width: 8ch;
+.match__player-name {
+  /* A long display name loses its tail, never the numbers: they are the reason the row exists. */
+  max-width: 7ch;
   overflow: hidden;
   text-overflow: ellipsis;
   font-weight: 600;
@@ -360,7 +364,8 @@ td {
 
 .match__delay {
   font-variant-numeric: tabular-nums;
-  opacity: 0.85;
+  opacity: 0.75;
+  margin-left: auto;
 }
 
 .match__round {
@@ -404,8 +409,14 @@ td {
 }
 
 .match__player--active {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 1px var(--accent) inset;
+  /* The shooting row is the only emphasis in the panel: brighter text, nothing drawn around it. */
+  color: #ffffff;
+  font-weight: 700;
+}
+
+.match__player-hp {
+  font-variant-numeric: tabular-nums;
+  opacity: 0.9;
 }
 
 .match__clock {
@@ -1373,7 +1384,6 @@ td {
 
 /* One control height for the whole top strip: the pills, the round, the clock, the language toggle, the aid button and
    the dial all sit on a 36 px line, so the row reads as one band instead of five heights. */
-.match__top .match__player,
 .match__top .match__round,
 .match__top .match__clock,
 .match__top .match__aid,
