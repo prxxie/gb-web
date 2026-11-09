@@ -120,7 +120,10 @@ export function DirectionPad({
       {/* Two bare digits sat here and read as buttons (owner's question, 2026-11-08): they are the steps left this turn
           and the movement energy, so the first one now says what it counts and the second one is spoken, not printed —
           energy is a threshold, not a number a player needs to read mid-turn. */}
-      <span className="match__pad-steps" data-testid="pad-moves-left" title={labels.steps}>
+      {/* The owner struck the step counter from the screen (2026-11-09): the pad is two arrows and nothing else. The count
+          stays in the accessible tree — `US-MATCH-006` AC2 still needs it — and the arrows disable on their own when the
+          budget or the energy is spent. */}
+      <span className="sr-only" data-testid="pad-moves-left" title={labels.steps}>
         <span className="match__pad-count">{movesLeft}</span>
         <span className="match__pad-unit">{labels.steps}</span>
       </span>
