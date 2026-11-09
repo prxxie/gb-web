@@ -171,8 +171,10 @@ test.describe("production build: install and offline play", () => {
     await page.mouse.move(startX - 120, startY + 90, { steps: 12 });
     await expect(page.getByTestId("power-value")).not.toHaveText("0.00");
     await page.mouse.up();
-    // The turn resolves locally: the feed names the shot, and nothing was sent anywhere.
-    await expect(page.getByTestId("event-feed")).toBeVisible();
+    // The turn resolves locally and the pull was spent: the readout drops back to zero and no event log is drawn over the
+    // field (the owner struck it, 2026-11-09 — it sat mid-screen, over the arc the shell flies).
+    await expect(page.getByTestId("event-feed")).toHaveCount(0);
+    await expect(page.getByTestId("power-value")).toHaveText(/0\.00/);
   });
 });
 

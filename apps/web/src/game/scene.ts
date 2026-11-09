@@ -84,6 +84,9 @@ function now(): number {
   return typeof performance === "undefined" ? Date.now() : performance.now();
 }
 
+/** The angle the barrel opens on: the classic artillery 45°, clamped into whatever the mobile can fire. */
+const OPEN_ANGLE = 45;
+
 /** How long an impact flash and its scorch mark stay on screen after the shell lands. */
 const IMPACT_MS = 420;
 const SCORCH_MS = 6_000;
@@ -144,12 +147,19 @@ class BattleScene extends Phaser.Scene {
   /** The first pull of a match starts mid-window so the barrel can go both ways; after that it keeps the last angle. */
   private barrelSeeded = false;
 
-  /** The middle of the aiming mobile's own barrel window (`angleMin`…`angleMax`). */
-  private midWindowAngle(): number {
+  /**
+   * Where the barrel starts. 45° is the angle every artillery game opens on, and on this map it is the one that reaches the
+   * opponent at a comfortable pull: measured, the old seed (the middle of the mobile's window — 18° for `mbl-01`) threw the
+   * shell 970 units of the 1,640 between the two spawns, so the first shot of every match was a guaranteed miss.
+   *
+   * A mobile whose window does not contain 45° gets the nearest angle it can actually fire, not a silent clamp to a number
+   * outside its own range.
+   */
+  private openAngle(): number {
     const player = this.state.players.find((candidate) => candidate.slot === this.localSlot);
     if (!player) return this.barrelAngle;
     const mobile = getMobile(player.mobileId);
-    return (mobile.angleMin + mobile.angleMax) / 2;
+    return Math.min(Math.max(OPEN_ANGLE, mobile.angleMin), mobile.angleMax);
   }
   private previousSpread: number | null = null;
   private pullPower = 0;
@@ -234,7 +244,9 @@ class BattleScene extends Phaser.Scene {
     this.flying.push({
       path: event.path,
       startedAt,
-      flightMs: Math.max(220, Math.min(2_600, event.flightMs || 700)),
+      // The engine's own flight time, not a 2.6 s squeeze of it: a 4.7 s arc compressed into 2.6 s was a shell the player
+      // could not follow, and following it is the whole point of animating from the resolved path.
+      flightMs: Math.max(220, Math.min(6_000, event.flightMs || 700)),
       impact: event.impact,
       radius: 70,
       hits,
@@ -483,7 +495,7 @@ class BattleScene extends Phaser.Scene {
       // Only a player who may shoot gets a ring; everyone else keeps panning (`AC7`).
       this.origin = this.aimAllowed && armed.origin ? { id: 0, x: armed.origin.x, y: armed.origin.y } : null;
       if (this.origin && !this.barrelSeeded) {
-        this.barrelAngle = this.midWindowAngle();
+        this.barrelAngle = this.openAngle();
         this.barrelSeeded = true;
       }
     } else if (armed !== this.hold) {
@@ -628,17 +640,18 @@ class BattleScene extends Phaser.Scene {
         const at = Math.max(0, Math.min(last, Math.floor(progress * last)));
         const point = shot.path[at];
         if (point) {
-          // A short trail behind the shell, so a fast shot still reads as motion.
-          for (let back = 1; back <= 4; back += 1) {
-            const previous = shot.path[Math.max(0, at - back * 2)];
+          // A trail behind the shell, so a fast shot still reads as motion — and a shell big enough to find on a
+          // 2,000-unit map: 5 px at the far end of the field was a speck (`owner`, 2026-11-09).
+          for (let back = 1; back <= 6; back += 1) {
+            const previous = shot.path[Math.max(0, at - back * 3)];
             if (!previous) continue;
-            graphics.fillStyle(0xffc46b, 0.35 / back);
-            graphics.fillCircle(previous.x, previous.y, 5 - back * 0.7);
+            graphics.fillStyle(0xffc46b, 0.4 / back);
+            graphics.fillCircle(previous.x, previous.y, 7 - back * 0.8);
           }
           graphics.fillStyle(0xffe0a3, 1);
-          graphics.fillCircle(point.x, point.y, 5);
-          graphics.fillStyle(0xffffff, 0.85);
-          graphics.fillCircle(point.x, point.y, 2.4);
+          graphics.fillCircle(point.x, point.y, 7);
+          graphics.fillStyle(0xffffff, 0.9);
+          graphics.fillCircle(point.x, point.y, 3.2);
         }
         continue;
       }

@@ -42,7 +42,7 @@ import { WindDial } from "../components/WindDial";
 import { type CameraWindow } from "@gbw/core";
 import { useLocale } from "../app/providers";
 import { useLiveAnnouncement } from "../app/useLiveAnnouncement";
-import { translate, type Locale } from "../i18n";
+import { translate } from "../i18n";
 import {
   inputFrameOf,
   isStaleInput,
@@ -1099,40 +1099,10 @@ export function MatchPage(): JSX.Element {
             {hint}
           </div>
         ) : null}
-        {feed.length > 0 ? (
-          <div className="banner" style={{ top: "auto", bottom: "96px" }} data-testid="event-feed">
-            {feed.map((event, index) => (
-              <div key={index}>{describeEvent(event, locale)}</div>
-            ))}
-          </div>
-        ) : null}
       </div>
     </div>
   );
 }
 
-function describeEvent(event: MatchEvent, locale: Locale): string {
-  switch (event.kind) {
-    case "shot":
-      // `power` is the weapon's damage power; the player's own input is the pull strength, shown on the HUD.
-      return translate(locale, "match.event.shot", { power: event.power });
-    case "weather":
-      return translate(locale, "match.event.weather", { magnitude: event.weather.wind.magnitude });
-    case "turn":
-      return translate(locale, "match.event.turn", { number: event.turn.number });
-    case "item":
-      return translate(locale, "match.event.item", { itemId: event.itemId });
-    case "move":
-      return translate(locale, "match.event.move");
-    case "chat":
-      return translate(locale, "match.event.chat");
-    case "end":
-      return translate(locale, "match.event.end");
-    case "reject":
-      return translate(locale, "match.event.reject", { reason: event.reason });
-    default:
-      return "";
-  }
-}
 
 export { createTerrain, TUNABLES };

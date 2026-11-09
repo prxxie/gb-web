@@ -145,7 +145,10 @@ describe("turn queue (US-CORE-002)", () => {
       { kind: "fire", slot: 0, weaponSlot: 0, angle: 45, force: 60, seq: used.state.seq },
       NOW + 1_000,
     );
-    expect(fired.state.players[0]!.delay).toBe(260);
+    // 150 already banked + the shot's own cost + one second of thinking, read from the table so the case follows the
+    // tunable instead of hardcoding it.
+    const shotDelay = getMobile("mbl-01").weapons[0]!.delay;
+    expect(fired.state.players[0]!.delay).toBe(150 + shotDelay + TUNABLES.thinkingDelayPerSecond);
     expect(fired.state.turn.activeSlot).toBe(1);
   });
 

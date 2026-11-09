@@ -2,7 +2,7 @@
  * The ruleset constants (`tunables.md` § 1.2). One object, imported everywhere, versioned by
  * `rulesetVersion`: a match recorded under one version is never rated under another.
  */
-export const RULESET_VERSION = "2026-11-08";
+export const RULESET_VERSION = "2026-11-09";
 
 export const TUNABLES = {
   rulesetVersion: RULESET_VERSION,
@@ -26,7 +26,12 @@ export const TUNABLES = {
    * GB adds 10 to your delay for every second the turn takes, so a player who deliberates falls down the queue: the
    * clock is not decoration, it is part of the tempo. Ours adds the same, measured from the turn's own start.
    */
-  thinkingDelayPerSecond: 10,
+  /**
+   * Deliberating costs queue position, but not this much: at 10 a full 18 s turn added 180 delay, which is three quarters of a
+   * shot — measured in a real match, six turns of careful play put the player 800 delay behind a bot that answers instantly
+   * and handed it three extra turns. 4 keeps the pressure and leaves the queue winnable.
+   */
+  thinkingDelayPerSecond: 4,
   /** The super-shot gauge: full is `100`, and a shot spends all of it (`US-CORE-007`). */
   ssCost: 100,
   /** Gauge points per point of damage dealt / taken — dealing fills it twice as fast as being hit. */

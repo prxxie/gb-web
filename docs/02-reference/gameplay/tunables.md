@@ -178,7 +178,7 @@ Health in this genre reads in the hundreds-to-thousands, so we use a
 | `baseDelay` | per mobile 90–120 | starting weight | `TC-CORE-901` |
 | `weaponDelay` | shot 1 `100`, shot 2 `120`, super shot `200` | added when the shot is fired | `TC-CORE-901` |
 | `itemDelay` | per item `+0…+600` (`data/items.md`) | added when the item is used | `TC-CORE-901` |
-| `thinkingDelayPerSecond` | `10` | **GB adds 10 to your delay for every second the turn takes**, so deliberating costs queue position; measured from the turn's own start (`turnStartedAt`) and capped at the turn length | `TC-CORE-901` |
+| `thinkingDelayPerSecond` | `4` | **GB adds delay for every second the turn takes**, so deliberating costs queue position; measured from the turn's own start (`turnStartedAt`) and capped at the turn length. It was `10`, which made an 18 s turn cost 180 delay — three quarters of a shot, and enough that a careful player fell a full turn behind an instant bot every six turns (measured 2026-11-09) | `TC-CORE-901` |
 | `ssCost` / `ssChargeDealt` / `ssChargeTaken` | `100` / `0.25` / `0.12` | the super-shot gauge: full is 100, a shot spends all of it, and damage fills it — twice as fast when you deal it | `TC-CORE-922` |
 | `moveDelay` | per mobile `+8…+14` per move action | movement is never free; it also costs queue position | `TC-CORE-904` |
 | `maxMovesPerTurn` | per mobile `1` or `2` | how many move actions a turn allows | `TC-CORE-904` |
