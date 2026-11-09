@@ -9,7 +9,16 @@
  * lower half is the ground the mobile stands on.
  */
 import type { JSX } from "react";
-import { ITEM_SLOTS, type EquippedItem } from "./ItemSlots";
+/** The six slots a player brings into a match (`US-MATCH-006` AC3). */
+export const ITEM_SLOTS = 6;
+
+export interface EquippedItem {
+  readonly id: string;
+  readonly qty: number;
+  /** The turn-order delay the item costs, shown in the tooltip. */
+  readonly delay: number;
+  readonly name: string;
+}
 
 /** How far the slots sit from the mobile: 92 px clears the nameplate and stays inside a 390 px tall field. */
 export const WHEEL_RADIUS = 92;

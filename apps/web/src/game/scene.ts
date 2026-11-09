@@ -33,7 +33,7 @@ import {
   type UnitFrame,
   type UnitPose,
 } from "./interpolate";
-import { RING_RADIUS, RING_START, ringColor, ringSweep } from "./aim";
+import { ANGLE_RING_RADIUS, RING_RADIUS, RING_START, angleArc, anglePoint, ringColor, ringSweep } from "./aim";
 import { armFullscreen } from "../lib/fullscreen";
 import { aimPreview } from "./preview";
 
@@ -821,12 +821,34 @@ class BattleScene extends Phaser.Scene {
     // The ring and the preview only exist while this client may actually shoot (`US-MATCH-002` AC7).
     if (!this.aimAllowed) return;
 
+    // The mobile's own firing window, drawn before the pull ring so it reads as the ground the ring sits on: a dim fan from
+    // `angleMin` to `angleMax` with the current angle lit (owner's request, 2026-11-09). It is on screen whenever this client
+    // may shoot, not only mid-pull, so the player can see the sweep and where the barrel sits inside it.
+    const mobile = getMobile(player.mobileId);
+    const px = (value: number): number => screenConstant(value, this.screenScale);
+    const pivotY = frame.y - px(10);
+    const window = angleArc(mobile.angleMin, mobile.angleMax, player.facing);
+    graphics.lineStyle(px(4), 0x2b3a58, 0.85);
+    graphics.beginPath();
+    graphics.arc(frame.x, pivotY, px(ANGLE_RING_RADIUS), window.start, window.end, window.anticlockwise);
+    graphics.strokePath();
+    // The current angle: a brighter needle over the window, and a dot where it leaves the arc.
+    const needle = anglePoint(Math.min(Math.max(this.barrelAngle, mobile.angleMin), mobile.angleMax), player.facing);
+    const tipX = frame.x + Math.cos(needle) * px(ANGLE_RING_RADIUS);
+    const tipY = pivotY + Math.sin(needle) * px(ANGLE_RING_RADIUS);
+    graphics.lineStyle(px(3), 0x4f9dff, 0.95);
+    graphics.beginPath();
+    graphics.moveTo(frame.x + Math.cos(needle) * px(ANGLE_RING_RADIUS - 12), pivotY + Math.sin(needle) * px(ANGLE_RING_RADIUS - 12));
+    graphics.lineTo(tipX, tipY);
+    graphics.strokePath();
+    graphics.fillStyle(0x4f9dff, 1);
+    graphics.fillCircle(tipX, tipY, px(3));
+
     if (this.pullPower > 0) {
       // A gradient arc around the mobile, clockwise from −90°, that fills with the pull (`US-MATCH-002` AC2).
       // Everything the player aims with keeps its screen size at any zoom (`US-MATCH-007` AC6): the scene draws in
       // world units, so each CSS-pixel length is divided by the canvas scale.
-      const px = (value: number): number => screenConstant(value, this.screenScale);
-      const centerY = frame.y - px(10);
+      const centerY = pivotY;
       graphics.lineStyle(px(6), 0x2b3a58, 0.8);
       graphics.strokeCircle(frame.x, centerY, px(RING_RADIUS));
       graphics.lineStyle(px(6), ringColor(this.pullPower), 0.95);

@@ -8,8 +8,15 @@
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
-import { ItemWheel, WHEEL_RADIUS, wheelAngle, wheelCentre, wheelPoint } from "../src/components/ItemWheel";
-import { ITEM_SLOTS, type EquippedItem } from "../src/components/ItemSlots";
+import {
+  ITEM_SLOTS,
+  ItemWheel,
+  WHEEL_RADIUS,
+  wheelAngle,
+  wheelCentre,
+  wheelPoint,
+  type EquippedItem,
+} from "../src/components/ItemWheel";
 
 afterEach(cleanup);
 

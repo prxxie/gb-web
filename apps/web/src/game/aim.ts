@@ -18,6 +18,33 @@ export const FORCE_MAX = 100;
 /** The ring keeps a fixed screen radius so the number never shrinks when the camera zooms out (`screens/match.md`). */
 export const RING_RADIUS = 64;
 
+/** The angle-range ring around the mobile: smaller than the power ring, so the two never read as one circle. */
+export const ANGLE_RING_RADIUS = 40;
+
+/**
+ * The fan a mobile can actually fire through, in radians on the canvas — Phaser's `arc` measures angles the way a maths
+ * plot does, with y growing downwards, so a firing angle of θ points along −θ when the hull faces right and along π+θ when
+ * it faces left.
+ *
+ * `anticlockwise` is part of the answer, not an implementation detail: raising the barrel runs the fan the other way when the
+ * hull is mirrored, and getting it wrong draws the window upside down.
+ */
+export function angleArc(
+  angleMin: number,
+  angleMax: number,
+  facing: 1 | -1,
+): { readonly start: number; readonly end: number; readonly anticlockwise: boolean } {
+  const rad = (degrees: number): number => (degrees * Math.PI) / 180;
+  if (facing === 1) return { start: -rad(angleMin), end: -rad(angleMax), anticlockwise: true };
+  return { start: Math.PI + rad(angleMin), end: Math.PI + rad(angleMax), anticlockwise: false };
+}
+
+/** Where a firing angle sits on the canvas, for the needle that marks the current one. */
+export function anglePoint(angle: number, facing: 1 | -1): number {
+  const radians = (angle * Math.PI) / 180;
+  return facing === 1 ? -radians : Math.PI + radians;
+}
+
 /** Full power is a full circle; the arc starts at −90° and runs clockwise (`screens/match.md` § 4). */
 export const RING_START = -Math.PI / 2;
 
