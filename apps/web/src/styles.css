@@ -338,7 +338,11 @@ td {
   font-size: 0.66rem;
   line-height: 1.35;
   min-width: 132px;
-  pointer-events: none;
+  min-height: 44px;
+  justify-content: center;
+  /* The panel is the chat area (`US-MATCH-004` AC3) since the 💬 button left the HUD, so it takes taps. */
+  pointer-events: auto;
+  cursor: pointer;
 }
 
 .match__player {
@@ -368,15 +372,6 @@ td {
   margin-left: auto;
 }
 
-.match__round {
-  font-variant-numeric: tabular-nums;
-  font-size: 0.8rem;
-  padding: 4px 10px;
-  border-radius: 999px;
-  background: rgba(16, 26, 46, 0.9);
-  border: 1px solid #24324c;
-  white-space: nowrap;
-}
 
 /*
  * A phrase stays three seconds and an emote one and a half (`US-MATCH-004` AC3, AC6); it hangs under the speaker's

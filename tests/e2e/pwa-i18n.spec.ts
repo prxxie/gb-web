@@ -16,7 +16,13 @@ test.describe("live language switch", () => {
       if (canvas) (canvas as HTMLElement & { __gbwMarker?: number }).__gbwMarker = 1;
     });
 
-    await page.getByTestId("locale-toggle").click();
+    // The match HUD no longer carries a language toggle (owner, 2026-11-09): the switch is made in another tab of the
+    // same origin and the running match follows it — `US-PWA-002` AC4 is about the repaint, not about where the tap lands.
+    const other = await page.context().newPage();
+    await other.goto("/");
+    await other.getByTestId("locale-toggle").click();
+    await expect(other.locator("html")).toHaveAttribute("lang", "en");
+    await other.close();
 
     await expect(page.locator("html")).toHaveAttribute("lang", "en");
     await expect(page.getByTestId("match-screen")).toBeVisible();

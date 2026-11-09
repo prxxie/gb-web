@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
-import { loadLocale, saveLocale, translator, type Locale, type Translator } from "../i18n";
+import { STORAGE_KEY, loadLocale, saveLocale, translator, type Locale, type Translator } from "../i18n";
 import { ensureSession, currentSession, type Session } from "../lib/session";
 
 interface LocaleState {
@@ -25,6 +25,18 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     document.documentElement.lang = locale;
   }, [locale]);
+
+  // The language toggle left the match HUD (owner, 2026-11-09), so `US-PWA-002` AC4 — a switch while a match runs
+  // repaints the HUD without touching the canvas — now travels the way a player would do it: they change the language in
+  // another tab and the running match follows. `storage` fires only in the *other* documents, which is exactly right.
+  useEffect(() => {
+    const onStorage = (event: StorageEvent): void => {
+      if (event.key !== STORAGE_KEY) return;
+      setLocaleState(loadLocale());
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, []);
 
   const setLocale = useCallback((next: Locale) => {
     setLocaleState(next);

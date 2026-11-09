@@ -25,7 +25,6 @@ import {
   type MatchState,
   type Seat,
 } from "@gbw/core";
-import { LocaleToggle } from "../app/Shell";
 import { mountBattle, type BattleHandle } from "../game/scene";
 import { canAim, fireFromPull, RING_RADIUS } from "../game/aim";
 import { DirectionPad, type PadAction } from "../components/DirectionPad";
@@ -933,6 +932,11 @@ export function MatchPage(): JSX.Element {
               players={state.players}
               activeSlot={state.turn.activeSlot}
               eliminatedLabel={t("match.eliminated")}
+              /* The turn list is also the chat area (`US-MATCH-004` AC3): tapping the corner opens the phrase grid,
+                 which is what replaced the 💬 button the owner struck from the HUD (2026-11-09). */
+              chatOpen={chatOpen}
+              chatLabel={t("match.phrases.title")}
+              onOpenChat={() => setChatOpen((was) => !was)}
               chat={chat ? { slot: chat.slot, kind: chat.kind, text: chatText(t, chat.kind, chat.id) ?? "" } : null}
             />
           </div>
@@ -944,25 +948,9 @@ export function MatchPage(): JSX.Element {
             <div className="match__angle" data-testid="angle-value" hidden>
               {Math.round(aimAngle)}°
             </div>
-            <div className="match__round" data-testid="turn-round">
-              {t("match.round", { round: state.turn.round })}
-            </div>
             <div className="match__clock" data-testid="turn-clock">
               {clock}s
             </div>
-            {/* The app bar is gone in a match (`TC-MATCH-910`), so the language toggle lives here instead. */}
-            <LocaleToggle />
-            <button
-              type="button"
-              className="match__aid"
-              data-testid="chat-toggle"
-              aria-expanded={chatOpen}
-              aria-label={t("match.phrases.title")}
-              title={t("match.phrases.title")}
-              onClick={() => setChatOpen((was) => !was)}
-            >
-              <span aria-hidden="true">💬</span>
-            </button>
             <button
               type="button"
               className={aimAid ? "match__aid match__aid--on" : "match__aid"}

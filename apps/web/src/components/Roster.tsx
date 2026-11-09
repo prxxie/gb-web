@@ -11,7 +11,7 @@
  */
 import type { ChatKind, PlayerState } from "@gbw/core";
 import { getMobile } from "@gbw/core";
-import type { JSX } from "react";
+import type { JSX, KeyboardEvent } from "react";
 
 export interface RosterChat {
   /** The seat that spoke. */
@@ -27,6 +27,10 @@ export interface RosterProps {
   readonly eliminatedLabel: string;
   /** The phrase or emote currently on screen, shown over the speaker's own cell (`US-MATCH-004` AC3, AC6). */
   readonly chat?: RosterChat | null;
+  /** Set when the panel doubles as the chat area: the owner removed the 💬 button from the HUD (2026-11-09). */
+  readonly onOpenChat?: (() => void) | undefined;
+  readonly chatOpen?: boolean;
+  readonly chatLabel?: string;
 }
 
 /**
@@ -53,10 +57,32 @@ export function turnOrder(players: readonly PlayerState[], activeSlot: number): 
   });
 }
 
-export function Roster({ players, activeSlot, eliminatedLabel, chat = null }: RosterProps): JSX.Element {
+export function Roster({
+  players,
+  activeSlot,
+  eliminatedLabel,
+  chat = null,
+  onOpenChat,
+  chatOpen = false,
+  chatLabel,
+}: RosterProps): JSX.Element {
   const activeDelay = players.find((player) => player.slot === activeSlot)?.delay ?? 0;
+  const opens = onOpenChat
+    ? {
+        "data-testid": "chat-toggle",
+        role: "button" as const,
+        tabIndex: 0,
+        "aria-expanded": chatOpen,
+        "aria-label": chatLabel,
+        title: chatLabel,
+        onClick: onOpenChat,
+        onKeyDown: (event: KeyboardEvent<HTMLDivElement>) => {
+          if (event.key === "Enter" || event.key === " ") onOpenChat();
+        },
+      }
+    : {};
   return (
-    <div className="match__roster">
+    <div className="match__roster" {...opens}>
       {turnOrder(players, activeSlot).map((player) => (
         <div
           key={player.slot}

@@ -129,38 +129,29 @@ test("TC-MATCH-909: the HUD stays reachable after the match goes fullscreen", as
  * `TC-MATCH-910` — the battlefield gets the whole viewport.
  *
  * The shared app bar (product name + language toggle) sat above every route and cost the match 77 of 390 px of a
- * landscape screen: a fifth of the field, spent on a name the player is already inside. The match renders without it and
- * hosts the language toggle in its own HUD, so the control stays one tap away instead of disappearing with the strip.
+ * landscape screen: a fifth of the field, spent on a name the player is already inside. The match renders without it.
+ *
+ * The language toggle used to be hosted inside the match HUD to compensate; the owner struck it from the match too
+ * (2026-11-09) — a match is played, not configured, and the toggle is one tap away on every other route.
  */
-test("TC-MATCH-910: the match fills the viewport and still offers the language toggle", async ({ page }) => {
+test("TC-MATCH-910: the match fills the viewport and carries no chrome of its own", async ({ page }) => {
   await openBotMatch(page);
 
   const layout = await page.evaluate(() => {
     const canvas = document.querySelector("canvas")?.getBoundingClientRect();
-    const toggles = document.querySelectorAll('[data-testid="locale-toggle"]');
-    const toggle = toggles[0]?.getBoundingClientRect();
-    const at = toggle ? document.elementFromPoint(toggle.x + toggle.width / 2, toggle.y + toggle.height / 2) : null;
     return {
       viewportHeight: window.innerHeight,
       canvasTop: canvas ? Math.round(canvas.y) : null,
       canvasHeight: canvas ? Math.round(canvas.height) : null,
       barPresent: document.querySelector(".shell__bar") !== null,
-      toggleCount: toggles.length,
-      toggleHit: at?.getAttribute("data-testid") ?? at?.tagName ?? null,
-      toggleHeight: toggle ? Math.round(toggle.height) : null,
+      toggleCount: document.querySelectorAll('[data-testid="locale-toggle"]').length,
     };
   });
 
   expect(layout.barPresent).toBe(false);
   expect(layout.canvasTop).toBe(0);
   expect(layout.canvasHeight).toBe(layout.viewportHeight);
-  // One toggle, and a finger can reach it: the HUD layer is `pointer-events: none`, so this is the real test.
-  expect(layout.toggleCount).toBe(1);
-  expect(layout.toggleHit).toBe("locale-toggle");
-  expect(layout.toggleHeight).toBeGreaterThanOrEqual(44);
-
-  // And it still works from inside the match (`TC-PWA-130`).
-  await page.getByTestId("locale-toggle").click();
-  await expect(page.locator("html")).toHaveAttribute("lang", "en");
+  // No language toggle in a match: it is not part of the field, and `TC-PWA-130` covers it on the routes that do carry it.
+  expect(layout.toggleCount).toBe(0);
   await expect(page.getByTestId("match-screen")).toBeVisible();
 });

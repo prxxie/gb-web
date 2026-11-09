@@ -8,7 +8,7 @@
  * reads the real stylesheet because jsdom has no layout — the numbers are the ones the browser gets.
  */
 import { afterEach, describe, expect, it } from "vitest";
-import { cleanup, fireEvent, render } from "@testing-library/react";
+import { cleanup, render } from "@testing-library/react";
 import { readFileSync } from "node:fs";
 import { TUNABLES, defaultWindow, panBy, pinchTo } from "@gbw/core";
 import { addPointer, classify, clearPointers, movePointer } from "../src/game/viewport";
