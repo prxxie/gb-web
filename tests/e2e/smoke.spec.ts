@@ -13,14 +13,16 @@ test.describe("solo demo path", () => {
     await expect(page.getByTestId("match-screen")).toBeVisible();
     await expect(page.getByTestId("turn-clock")).toBeVisible();
     await expect(page.getByTestId("wind-dial")).toBeVisible();
-    // The bottom ruler is gone (owner's call): the bar carries S1/S2/SS, the skip icon, the six item slots, the wind to
-    // come, the teams' health and the gold, all on one line — that row is what a player reads instead of a scale.
+    // The bottom ruler is gone (owner's call): the bar carries the pad, S1/S2/SS, the skip icon, the wind to come, the
+    // teams' health and the gold, all on one line — that row is what a player reads instead of a scale. The loadout is not
+    // in it any more: it fans out around the mobile on a held press.
     const bar = page.locator(".match__bottom");
     await expect(bar).toBeVisible();
     await expect(page.getByTestId("weapon-0")).toBeVisible();
     await expect(page.getByTestId("weapon-2")).toBeVisible();
     await expect(page.getByTestId("match-skip")).toBeVisible();
-    await expect(page.getByTestId("item-slots")).toBeVisible();
+    await expect(page.getByTestId("item-slots")).toHaveCount(0);
+    await expect(page.getByTestId("item-wheel")).toHaveCount(0);
     await expect(page.getByTestId("weather-forecast")).toBeVisible();
     await expect(page.getByTestId("gold")).toBeVisible();
     await expect(page.getByTestId("ruler")).toHaveCount(0);

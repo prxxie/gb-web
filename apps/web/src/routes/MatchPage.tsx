@@ -29,7 +29,8 @@ import { mountBattle, type BattleHandle } from "../game/scene";
 import { canAim, fireFromPull, RING_RADIUS } from "../game/aim";
 import { DirectionPad, type PadAction } from "../components/DirectionPad";
 import type { ChatKind } from "@gbw/core";
-import { ItemSlots } from "../components/ItemSlots";
+import { ItemWheel } from "../components/ItemWheel";
+import type { EquippedItem } from "../components/ItemSlots";
 import { PhrasePicker } from "../components/PhrasePicker";
 import { MatchStats } from "../components/MatchStats";
 import { Roster } from "../components/Roster";
@@ -147,6 +148,8 @@ export function MatchPage(): JSX.Element {
   const [aimAid, setAimAid] = useState(readAimAid);
   /** The phrase grid: its 💬 toggle is in the top strip, the grid itself opens above the bar. */
   const [chatOpen, setChatOpen] = useState(false);
+  /** The item wheel: the scene opens it when a press is held on this client's own mobile (owner, 2026-11-09). */
+  const [itemWheelAt, setItemWheelAt] = useState<{ readonly x: number; readonly y: number } | null>(null);
   const hintShown = useRef(false);
   const [aimDelta, setAimDelta] = useState(0);
   /** The angle the finger is currently pulling at (`US-MATCH-002` AC2). The pad only nudges it. */
@@ -224,6 +227,13 @@ export function MatchPage(): JSX.Element {
   stateRef.current = state;
 
   const localPlayer = state?.players.find((player) => player.slot === plan?.localSlot) ?? null;
+  /** What the wheel fans out: the same six slots the bar used to print, in a stable order so an arc never reshuffles. */
+  const equippedItems: readonly EquippedItem[] = Object.entries(localPlayer?.items ?? {}).map(([id, qty]) => ({
+    id,
+    qty,
+    delay: ITEMS_BY_ID.get(id)?.delayCost ?? 0,
+    name: ITEMS_BY_ID.get(id)?.name ?? id,
+  }));
   const isMyTurn = Boolean(state && localPlayer && state.turn.activeSlot === localPlayer.slot && state.status === "playing");
   const mobile = getMobile(localPlayer?.mobileId ?? "mbl-01");
 
@@ -364,6 +374,8 @@ export function MatchPage(): JSX.Element {
       callbacks: {
         // The pad rings the mobile the player is shooting (`US-MATCH-003` AC11).
         onFocus: (point) => setFocus(point),
+        // A press held on this client's own hull fans the loadout out around it (`owner`, 2026-11-09).
+        onItemHold: (point) => setItemWheelAt(point),
         onPull: (value, angle) => {
           setPower(value);
           setPullAngle(angle);
@@ -966,9 +978,25 @@ export function MatchPage(): JSX.Element {
         </div>
 
 
+        {itemWheelAt ? (
+          <ItemWheel
+            items={equippedItems}
+            enabled={isMyTurn}
+            at={itemWheelAt}
+            label={t("match.item.tray")}
+            quantityLabel={t("match.item.quantity")}
+            delayLabel={t("match.item.delay")}
+            onUse={onUseItem}
+            onClose={() => setItemWheelAt(null)}
+          />
+        ) : null}
+
+        {/* The pull readout is hidden while the wheel is open: it hangs at `focus.y − RING_RADIUS − 8`, which is exactly
+            where the arc's two top wedges land. */}
         <div
           className={focus ? "match__power match__power--on-ring" : "match__power"}
-          style={focus ? { left: focus.x, top: focus.y - RING_RADIUS - 8 } : undefined}
+          style={focus && !itemWheelAt ? { left: focus.x, top: focus.y - RING_RADIUS - 8 } : undefined}
+          hidden={itemWheelAt !== null}
         >
           {/* The ring's centre carries the angle: the gesture sets both, and the angle is the number a player reads
               while pulling (owner's layout, 2026-11-08). The power keeps its own chip and the ring's own arc. */}
@@ -1022,19 +1050,6 @@ export function MatchPage(): JSX.Element {
             label={t("match.weapon.group")}
             disabled={!isMyTurn || lockedTurn === state.turn.number}
             onSelect={selectWeapon}
-          />
-          <ItemSlots
-            items={Object.entries(localPlayer?.items ?? {}).map(([id, qty]) => ({
-              id,
-              qty,
-              delay: ITEMS_BY_ID.get(id)?.delayCost ?? 0,
-              name: ITEMS_BY_ID.get(id)?.name ?? id,
-            }))}
-            enabled={isMyTurn}
-            label={t("match.item.tray")}
-            quantityLabel={t("match.item.quantity")}
-            delayLabel={t("match.item.delay")}
-            onUse={onUseItem}
           />
           </div>
           <PhrasePicker

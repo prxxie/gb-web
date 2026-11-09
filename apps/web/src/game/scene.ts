@@ -49,6 +49,11 @@ export interface BattleCallbacks {
    * rings the mobile instead of covering it; `null` means the mobile is not on screen and the pad falls back.
    */
   readonly onFocus?: (point: { readonly x: number; readonly y: number } | null) => void;
+  /**
+   * The item wheel (owner's layout, 2026-11-09): a press **held on this client's own mobile** opens it at that point, and
+   * a press anywhere else closes it (`null`). A hold on the field still arms a shot — only a hold on the hull is a loadout.
+   */
+  readonly onItemHold?: (point: { readonly x: number; readonly y: number } | null) => void;
 }
 
 export interface BattleHandle {
@@ -125,6 +130,10 @@ class BattleScene extends Phaser.Scene {
   private lastDrawn: readonly UnitPose[] | null = null;
   private pointers: PointerState = clearPointers();
   private origin: Point | null = null;
+  /** The press that started on this client's own hull: its hold opens the item wheel instead of arming a shot. */
+  private holdOnSelf = false;
+  /** The wheel is on screen, so the next press elsewhere has to dismiss it. */
+  private itemOpen = false;
   /** One finger either pans the camera or arms a shot; `hold.ts` owns which (`US-MATCH-002`). */
   private hold: HoldState = IDLE;
   /**
@@ -315,9 +324,18 @@ class BattleScene extends Phaser.Scene {
       canvas.setPointerCapture?.(event.pointerId);
       this.pointers = addPointer(this.pointers, toPoint(event));
       if (this.pointers.pointers.length === 1) {
-        // A press is ambiguous: it may become a pan or a shot. `hold.ts` decides, and `origin` stays null until the hold
-        // fires — so a drag that never arms cannot fire on release (`US-MATCH-002` AC7/AC8).
-        this.hold = press(toPoint(event), now());
+        // A press is ambiguous: it may become a pan, a shot, or — on the player's own hull — the item wheel. `hold.ts`
+        // decides, and `origin` stays null until the hold fires, so a drag that never arms cannot fire on release
+        // (`US-MATCH-002` AC7/AC8).
+        const pressPoint = toPoint(event);
+        const onSelf = this.aimAllowed && this.onOwnHull(pressPoint);
+        this.holdOnSelf = onSelf;
+        // A press anywhere but the hull dismisses the wheel; the hull itself re-opens it after the hold.
+        if (this.itemOpen && !onSelf) {
+          this.itemOpen = false;
+          this.callbacks.onItemHold?.(null);
+        }
+        this.hold = press(pressPoint, now());
         this.origin = null;
         this.pullPower = 0;
         this.pullAngle = 0;
@@ -366,6 +384,7 @@ class BattleScene extends Phaser.Scene {
       this.pullAngle = 0;
       this.origin = null;
       this.hold = lift();
+      this.holdOnSelf = false;
       this.previousSpread = null;
       if (this.pointers.pointers.length === 0) this.pointers = clearPointers();
     };
@@ -389,6 +408,16 @@ class BattleScene extends Phaser.Scene {
    */
   private fullPowerDistance(): number {
     return this.scale.width;
+  }
+
+  /**
+   * Is this press on this client's own mobile? The hull is 26 px wide on screen at the framing the match uses; the hit
+   * radius is generous (34 px) because the hold is a deliberate act and a miss costs the player their aim.
+   */
+  private onOwnHull(point: Point): boolean {
+    const at = this.reportedFocus;
+    if (!at) return false;
+    return Math.hypot(point.x - at.x, point.y - at.y) <= 34;
   }
 
   private spread(): number {
@@ -439,6 +468,17 @@ class BattleScene extends Phaser.Scene {
     // The hold timer lives here because only the frame loop knows time passed without a move.
     const armed = advance(this.hold, now());
     if (armed.phase === "pulling" && this.hold.phase === "pending") {
+      if (this.holdOnSelf) {
+        // A held press on the player's own hull is a loadout, not a shot: open the wheel where the mobile stands and spend
+        // the hold, so the release that follows cannot fire (`owner`, 2026-11-09).
+        this.holdOnSelf = false;
+        this.itemOpen = true;
+        this.hold = lift();
+        this.origin = null;
+        const at = this.reportedFocus;
+        this.callbacks.onItemHold?.(at ? { x: at.x, y: at.y } : null);
+        return;
+      }
       this.hold = armed;
       // Only a player who may shoot gets a ring; everyone else keeps panning (`AC7`).
       this.origin = this.aimAllowed && armed.origin ? { id: 0, x: armed.origin.x, y: armed.origin.y } : null;

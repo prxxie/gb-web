@@ -82,7 +82,8 @@ describe("TC-MATCH-926: a finished match stops the render loop and hands over to
     callbacks!.onRelease(16, 45);
 
     await waitFor(() => expect(screen.getByTestId("results-stub")).toBeTruthy());
-    expect(destroy).toHaveBeenCalled();
+    // The handle is destroyed by the page's unmount cleanup, which lands a tick after the route swaps.
+    await waitFor(() => expect(destroy).toHaveBeenCalled());
 
     const raw = sessionStorage.getItem("gbw.result");
     expect(raw).not.toBeNull();

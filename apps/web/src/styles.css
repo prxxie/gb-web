@@ -258,7 +258,6 @@ td {
 .match__hud .match__power,
 .match__hud .match__actions,
 .match__hud .match__loadout,
-.match__hud .match__items,
 .match__hud .match__pad {
   /* Only a control takes the press; the HUD's containers pass it through to the canvas. */
   pointer-events: auto;
@@ -1215,8 +1214,8 @@ td {
 }
 
 .weapon-strip__slot {
-  width: 40px;
-  min-width: 40px;
+  width: 44px;
+  min-width: 44px;
   height: 44px;
   min-height: 44px;
   padding: 0;
@@ -1244,55 +1243,11 @@ td {
 
 /* --- the six item slots ----------------------------------------------------------------------------------------- */
 
-.match__items {
-  display: grid;
-  grid-template-columns: repeat(6, 40px);
-  gap: 4px;
-}
 
-.match__item {
-  position: relative;
-  width: 40px;
-  height: 44px;
-  padding: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 10px;
-  border: 1px solid #2b3b58;
-  background: rgba(22, 33, 58, 0.92);
-  color: var(--ink);
-}
 
-.match__item--empty {
-  border-style: dashed;
-  border-color: rgba(120, 160, 220, 0.2);
-  background: rgba(16, 26, 46, 0.45);
-}
 
-.match__item--spent {
-  opacity: 0.4;
-}
 
-.match__item-glyph {
-  font-size: 0.65rem;
-  font-weight: 700;
-}
 
-.match__item-qty {
-  position: absolute;
-  right: -3px;
-  bottom: -4px;
-  min-width: 15px;
-  padding: 0 4px;
-  border-radius: 999px;
-  background: var(--accent);
-  color: #08101f;
-  font-size: 0.6rem;
-  font-weight: 700;
-  line-height: 1.35;
-  font-variant-numeric: tabular-nums;
-}
 
 /* --- skip and chat ---------------------------------------------------------------------------------------------- */
 
@@ -1421,4 +1376,82 @@ td {
   font-weight: 700;
   min-width: 42px;
   text-align: right;
+}
+
+/* ---------------------------------------------------------------- the item wheel (`ItemWheel.tsx`)
+
+   The loadout fans out around the player's own mobile instead of sitting in the bar (owner, 2026-11-09). The scrim is the
+   whole screen so the first tap elsewhere dismisses it; the arc itself never takes a press, only its slots do. */
+.item-wheel {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+}
+
+.item-wheel__scrim {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: rgba(6, 10, 18, 0.28);
+  cursor: default;
+}
+
+.item-wheel__arc {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.item-wheel__slot {
+  position: absolute;
+  width: 44px;
+  height: 44px;
+  margin: 0;
+  padding: 0;
+  transform: translate(-50%, -50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: 1px solid #2b3b58;
+  background: rgba(18, 28, 48, 0.94);
+  color: var(--ink);
+  font-size: 0.7rem;
+  font-weight: 700;
+  pointer-events: auto;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.45);
+}
+
+.item-wheel__slot--empty {
+  border-style: dashed;
+  border-color: #24324c;
+  background: rgba(14, 22, 38, 0.55);
+}
+
+.item-wheel__slot--spent {
+  opacity: 0.42;
+}
+
+.item-wheel__glyph {
+  letter-spacing: 0.02em;
+}
+
+.item-wheel__qty {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 3px;
+  border-radius: 8px;
+  background: var(--accent);
+  color: #08111f;
+  font-size: 0.6rem;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
