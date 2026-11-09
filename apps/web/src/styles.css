@@ -707,18 +707,29 @@ td {
 }
 
 .wind {
+  /* No plate behind the dial (owner, 2026-11-09): only the ring is drawn, over the battlefield. The magnitude lives in the
+     centre of the ring now, so the wrapper is a plain box with nothing painted on it. */
   display: flex;
-  gap: 8px;
   align-items: center;
-  padding: 6px 12px;
-  border-radius: 12px;
-  background: rgba(16, 26, 46, 0.9);
-  border: 1px solid #24324c;
+  justify-content: center;
+  padding: 0;
+  background: none;
+  border: 0;
 }
 
 .wind__dial {
-  width: 44px;
-  height: 44px;
+  /* Bigger, and free of the 0.62 shrink the strip used to apply: 64 px is the size the number needs to be read at a
+     glance while a finger is pulling. */
+  width: 64px;
+  height: 64px;
+  overflow: visible;
+}
+
+.wind__value {
+  fill: #ffffff;
+  font-size: 15px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
 }
 
 .overlay {
@@ -1397,13 +1408,13 @@ td {
 }
 
 .match__wind {
-  height: 44px;
+  /* The dial is taller than the strip; it is allowed to hang over the field rather than be shrunk back down. */
+  height: 64px;
+  align-self: center;
+  overflow: visible;
 }
 
-.match__wind > * {
-  transform: scale(0.62);
-  transform-origin: center;
-}
+
 
 .match__top-right .match__clock {
   font-size: 0.9rem;
