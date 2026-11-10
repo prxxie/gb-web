@@ -90,3 +90,28 @@ response.
 ## Delivery status — 2026-11-05
 
 **in-progress.** `scripts/slo-snapshot.mjs` is written; it needs a deployed Worker and D1 to query.
+
+## Delivery status — 2026-11-10
+
+**The credentials exist and the job now runs — and running it found two defects the missing token had been hiding.**
+
+`CF_ANALYTICS_TOKEN` (a `gbw-wrangler` user token, verified active against `/user/tokens/verify`) is set as a repository
+secret, with `CLOUDFLARE_ACCOUNT_ID` and `GBW_WORKER_NAME` as repository variables. The first live run then failed, twice,
+for reasons that had nothing to do with the secret:
+
+1. **No time window.** Every query omitted `datetime_geq`/`datetime_leq`, and Cloudflare's default range is unbounded, so
+   the API answered "cannot request a time range wider than 4w4d". The queries now measure the 24 h ending at the snapshot
+   date's midnight UTC.
+2. **A percentile that does not exist.** `workersInvocationsAdaptive.quantiles` rejects `p50`, `p75`, `p90`, `p95` and
+   `p99` as unknown fields, and `workersOverviewRequestsAdaptiveGroups` has no `quantiles` at all — so SLO-2's p95 cannot be
+   read from this API. The snapshot now measures the **mean** (`sum.duration / sum.requests`) against the same 400 ms
+   ceiling, which is the stricter direction: a mean over the bound proves the target is missed, so the row can never read
+   green while latency is bad. `docs/08-ops/slo.md` § 1 carries the substitution and the reason.
+
+`TC-OPS-908` pins both fixes so the queries cannot drift back, and the first real snapshot is committed at
+`docs/06-reports/slo-snapshots/2026-11-09.md`.
+
+**It is red, and honestly so:** all four rows read `no data`, because `gbw-api` has never been deployed to this account
+(`workersInvocationsAdaptive` returns an empty series for the script name). No traffic means no SLI, and AC3 makes that a
+breach rather than a skip. Green requires a deploy — `US-FND-004` and `US-OPS-004`, which need production Clerk keys and
+the `PRODUCTION_READY` switch, not another token.

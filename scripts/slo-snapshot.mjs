@@ -32,7 +32,7 @@ const [SLO_1, SLO_2, SLO_3, SLO_4] = ["slo-1", "slo-2", "slo-3", "slo-4"];
 export const QUERIES = {
   [SLO_1]: {
     direction: "at-least",
-    query: ({ accountTag, worker }) => `query { viewer { accounts(filter: {accountTag: "${accountTag}"}) { workersInvocationsAdaptive(filter: {scriptName: "${worker}"}, limit: 1) { sum { requests, errors } } } } }`,
+    query: ({ accountTag, worker, window }) => `query { viewer { accounts(filter: {accountTag: "${accountTag}"}) { workersInvocationsAdaptive(filter: {scriptName: "${worker}", ${window}}, limit: 1) { sum { requests, errors } } } } }`,
     pick: (data) => {
       const sums = data?.viewer?.accounts?.[0]?.workersInvocationsAdaptive?.[0]?.sum;
       if (!sums || sums.requests === 0) return null;
@@ -41,19 +41,28 @@ export const QUERIES = {
   },
   [SLO_2]: {
     direction: "at-most",
-    query: ({ accountTag, worker }) => `query { viewer { accounts(filter: {accountTag: "${accountTag}"}) { workersInvocationsAdaptive(filter: {scriptName: "${worker}"}, limit: 1) { quantiles { p95 } } } } }`,
-    pick: (data) => data?.viewer?.accounts?.[0]?.workersInvocationsAdaptive?.[0]?.quantiles?.p95 ?? null,
+    // `workersInvocationsAdaptive.quantiles` carries no percentile in the live schema — `p50`, `p75`, `p90`, `p95` and
+    // `p99` are all rejected as unknown fields, and `workersOverviewRequestsAdaptiveGroups` has no `quantiles` at all — so
+    // the histogram the SLO is written against cannot be read from this API. The mean is what can be measured, and it is
+    // held to the same 400 ms ceiling: mean ≤ 400 ms is a strictly stronger claim than p95 ≤ 400 ms, so the row cannot be
+    // green while the p95 target is breached. `docs/08-ops/slo.md` § 1 records the substitution.
+    query: ({ accountTag, worker, window }) => `query { viewer { accounts(filter: {accountTag: "${accountTag}"}) { workersInvocationsAdaptive(filter: {scriptName: "${worker}", ${window}}, limit: 1) { sum { requests, duration } } } } }`,
+    pick: (data) => {
+      const sums = data?.viewer?.accounts?.[0]?.workersInvocationsAdaptive?.[0]?.sum;
+      if (!sums || !sums.requests) return null;
+      return sums.duration / sums.requests;
+    },
   },
   [SLO_3]: {
     direction: "at-least",
-    query: ({ accountTag, worker }) => `query { viewer { accounts(filter: {accountTag: "${accountTag}"}) { rooms: workersInvocationsAdaptive(filter: {scriptName: "${worker}"}, limit: 1) { sum { requests } } } } }`,
+    query: ({ accountTag, worker, window }) => `query { viewer { accounts(filter: {accountTag: "${accountTag}"}) { rooms: workersInvocationsAdaptive(filter: {scriptName: "${worker}", ${window}}, limit: 1) { sum { requests } } } } }`,
     // SLO-3 is a product ratio computed from D1 (`match_record` vs rooms that reached `playing`), not from Workers
     // analytics; `scripts/slo-snapshot.mjs` reads it from the D1 query in `docs/08-ops/slo.md` § 2.
     pick: (data) => data?.viewer?.accounts?.[0]?.rooms?.[0]?.sum?.requests ?? null,
   },
   [SLO_4]: {
     direction: "at-most",
-    query: ({ accountTag }) => `query { viewer { accounts(filter: {accountTag: "${accountTag}"}) { d1AnalyticsAdaptiveGroups(limit: 1) { sum { rowsWritten } } } } }`,
+    query: ({ accountTag, window }) => `query { viewer { accounts(filter: {accountTag: "${accountTag}"}) { d1AnalyticsAdaptiveGroups(filter: {${window}}, limit: 1) { sum { rowsWritten } } } } }`,
     pick: (data) => {
       const rows = data?.viewer?.accounts?.[0]?.d1AnalyticsAdaptiveGroups?.[0]?.sum?.rowsWritten;
       return rows === undefined ? null : (rows / 100_000) * 100;
@@ -139,13 +148,18 @@ async function collectLive(date, env) {
     throw new Error("CF_ANALYTICS_TOKEN and CLOUDFLARE_ACCOUNT_ID are required (or pass --values)");
   }
   const worker = env.GBW_WORKER_NAME ?? "gbw-api";
+  // The API answers an unbounded range with "cannot request a time range wider than 4w4d" — the default is not "today".
+  // A snapshot for `date` measures the 24 h that end at that date's midnight UTC.
+  const until = new Date(`${date}T00:00:00Z`);
+  const since = new Date(until.getTime() - 86_400_000);
+  const window = `datetime_geq: "${since.toISOString()}", datetime_leq: "${until.toISOString()}"`;
   const values = {};
   for (const id of [SLO_1, SLO_2, SLO_3, SLO_4]) {
     const spec = QUERIES[id];
     const response = await fetch(GRAPHQL, {
       method: "POST",
       headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
-      body: JSON.stringify({ query: spec.query({ accountTag, worker }), variables: { date } }),
+      body: JSON.stringify({ query: spec.query({ accountTag, worker, window }), variables: { date } }),
     });
     if (!response.ok) {
       // `AC6`: the job fails loudly and writes nothing rather than a partial file.

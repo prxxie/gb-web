@@ -10,9 +10,17 @@ Window: rolling **30 days** unless stated. Error budget = `1 − target` of the 
 | # | SLI (exact query) | Target | Window | NFR | Error budget | If exhausted |
 |---|-------------------|--------|--------|-----|--------------|--------------|
 | SLO-1 | `sum(rate(workers_requests_total{status!~"5.."}[5m])) / sum(rate(workers_requests_total[5m]))` on the `gbw-api` script | 99.5 % | 30 d | NFR-26 | 0.5 % ≈ 3 h 39 m of full outage | Feature freeze except fixes; every 5xx gets a root cause before new work; announce in the client status note |
-| SLO-2 | `histogram_quantile(0.95, sum(rate(workers_request_duration_ms_bucket{route=~"/api/v1/.*"}[5m])) by (le))` | ≤ 400 ms p95, ≤ 1 s p99 | 30 d | NFR-27 | 5 % of minutes breaching | Profile the slowest route; D1 query review first; if it is the leaderboard, raise its cache from 30 s to 60 s |
+| SLO-2 | `sum(workersInvocationsAdaptive.sum.duration) / sum(workersInvocationsAdaptive.sum.requests)` over the day, from the Cloudflare GraphQL API — the **mean**, because the histogram the target is written against is not exposed (see the note under the table) | ≤ 400 ms p95, ≤ 1 s p99 | 30 d | NFR-27 | 5 % of minutes breaching | Profile the slowest route; D1 query review first; if it is the leaderboard, raise its cache from 30 s to 60 s |
 | SLO-3 | `count(room ended with winner) / count(room created)` from `match_record` vs `Room` creation logs, per week | ≥ 70 % | 7 d | NFR-07 | 30 % of rooms | Read the abandon reasons (`abandoned`, `disconnected`, `error`); fix the dominant one before any new feature |
 | SLO-4 | `sum(rate(d1_rows_written_total[1d]))` against the 100 k/day allowance | ≤ 80 % of daily writes | 1 d | NFR-05 | 20 % headroom | Ranked play to "results pending"; batch writes; check for a `POST /matches` retry loop |
+
+**SLO-2 is measured as a mean, not a p95, and that is a deliberate substitution.** The Cloudflare GraphQL schema rejects
+`quantiles { p50 }`, `{ p75 }`, `{ p90 }`, `{ p95 }` and `{ p99 }` on `workersInvocationsAdaptive` as unknown fields, and
+`workersOverviewRequestsAdaptiveGroups` has no `quantiles` field at all — so the percentile the target names cannot be read
+from the API this project can reach. The snapshot holds the **mean** to the same 400 ms ceiling: a mean under 400 ms does
+not prove a p95 under 400 ms, but a mean over it does prove the target is missed, so the row can only be wrong in the
+forgiving direction and never reports green while the latency is bad. If a real percentile source appears (Logpush, Workers
+Analytics Engine, or a paid plan's query), the row goes back to `histogram_quantile` and this note goes away.
 
 Host migration has a target of its own (`NFR-06`, ≤ 5 s) and is checked per release rather than as an SLI, because its
 frequency is too low to compute a ratio in a 30-day window: TC-ROOM-049 measures it, the release record carries the number.

@@ -6,7 +6,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { parseSloTable, renderSnapshot, verdictFor } from "../../scripts/slo-snapshot.mjs";
+import { QUERIES, parseSloTable, renderSnapshot, verdictFor } from "../../scripts/slo-snapshot.mjs";
 
 const ROOT = join(import.meta.dirname, "..", "..");
 const rows = parseSloTable(readFileSync(join(ROOT, "docs", "08-ops", "slo.md"), "utf8"));
@@ -88,5 +88,54 @@ describe("TC-OPS-907: the workflow separates 'not configured' from 'breached'", 
     // If the skip had been pushed into the script, `renderSnapshot` would treat an empty value set as "nothing to do".
     const rendered = renderSnapshot("2026-12-01", rows, {});
     expect(rendered.breached).toBe(true);
+  });
+});
+
+/**
+ * `TC-OPS-908`: the live queries are ones the API will actually answer.
+ *
+ * The job was skipped for want of a token for so long that nobody noticed its queries could not run even with one. Two
+ * defects, both found by running the script against the real API on 2026-11-10:
+ *
+ * 1. **No time window.** Cloudflare answers an unbounded range with "cannot request a time range wider than 4w4d" — the
+ *    default range is not "today", so every query failed on the first call.
+ * 2. **A percentile that does not exist.** `workersInvocationsAdaptive.quantiles` rejects `p50`/`p75`/`p90`/`p95`/`p99` as
+ *    unknown fields, so the p95 the target names cannot be read at all.
+ *
+ * A skipped job hides both, which is why this case reads the query text instead of trusting that "the script runs".
+ */
+describe("TC-OPS-908: the analytics queries match the schema the API serves", () => {
+  const window = 'datetime_geq: "2026-11-09T00:00:00.000Z", datetime_leq: "2026-11-10T00:00:00.000Z"';
+
+  it("puts a bounded time window in every query", () => {
+    for (const [id, spec] of Object.entries(QUERIES)) {
+      const text = (spec as { query: (args: Record<string, string>) => string }).query({
+        accountTag: "acc",
+        worker: "gbw-api",
+        window,
+      });
+      expect(text, `${id} carries the window`).toContain("datetime_geq");
+      expect(text, `${id} carries the window`).toContain("datetime_leq");
+    }
+  });
+
+  it("never asks for a percentile the schema does not have", () => {
+    for (const [id, spec] of Object.entries(QUERIES)) {
+      const text = (spec as { query: (args: Record<string, string>) => string }).query({
+        accountTag: "acc",
+        worker: "gbw-api",
+        window,
+      });
+      expect(text, `${id} does not use quantiles`).not.toContain("quantiles");
+    }
+  });
+
+  it("measures slo-2 as the mean the API can give, not a histogram it cannot", () => {
+    const spec = QUERIES["slo-2"] as { pick: (data: unknown) => number | null };
+    const data = { viewer: { accounts: [{ workersInvocationsAdaptive: [{ sum: { requests: 200, duration: 20_000 } }] }] } };
+    expect(spec.pick(data)).toBe(100);
+    // No traffic is "no data", which the renderer counts as a breach rather than a pass.
+    expect(spec.pick({ viewer: { accounts: [{ workersInvocationsAdaptive: [] }] } })).toBeNull();
+    expect(spec.pick({ viewer: { accounts: [{ workersInvocationsAdaptive: [{ sum: { requests: 0, duration: 0 } }] }] } })).toBeNull();
   });
 });
