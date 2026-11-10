@@ -73,3 +73,51 @@ describe("TC-OPS-906: the load test's summary", () => {
     expect(report).toContain("p95 ≤ 3000 ms");
   });
 });
+
+/**
+ * `TC-OPS-909`: the run measures the rooms, not its own rate limiter.
+ *
+ * Two mistakes this case exists for, both found by running the script against the deployed worker:
+ *
+ * 1. It sent `cf-connecting-ip` for every virtual player to dodge `NFR-25`. `wrangler dev` trusts that header; Cloudflare's
+ *    edge answers it with its own `403` and never reaches the worker — the first production run reported 0/50 rooms ready
+ *    with a Cloudflare HTML body, which reads like a broken deploy and is not one.
+ * 2. Pacing. Fifty rooms need a hundred sessions and the limit is thirty a minute per address, so a run that mints them all
+ *    at once measures the limiter. Mints are now paced, and the report states the pace.
+ */
+describe("TC-OPS-909: addresses and pacing", () => {
+  it("never sends a spoofed address unless the run is local", async () => {
+    const sent: (Record<string, string> | undefined)[] = [];
+    const original = globalThis.fetch;
+    globalThis.fetch = (async (_url: unknown, init: { headers?: Record<string, string> }) => {
+      sent.push(init.headers);
+      return new Response(JSON.stringify({ sessionToken: "t" }), { status: 200 });
+    }) as typeof fetch;
+    try {
+      const module = await import("../../scripts/load-test-rooms.mjs");
+      await module.mintForTest("https://example.test/api/v1", null, async () => {});
+      await module.mintForTest("https://example.test/api/v1", "198.18.0.7", async () => {});
+    } finally {
+      globalThis.fetch = original;
+    }
+    expect(sent[0]).not.toHaveProperty("cf-connecting-ip");
+    expect(sent[1]).toMatchObject({ "cf-connecting-ip": "198.18.0.7" });
+  });
+
+  it("spaces the mints at the documented per-address limit", async () => {
+    const module = await import("../../scripts/load-test-rooms.mjs");
+    const pace = module.makePacerForTest(600); // ten a second, so the case is quick
+    const started = Date.now();
+    await Promise.all([pace(), pace(), pace(), pace()]);
+    // Four mints at ten a second cannot finish in under 300 ms: the fourth has to wait its turn.
+    expect(Date.now() - started).toBeGreaterThanOrEqual(280);
+  });
+
+  it("a pace of zero does not wait at all", async () => {
+    const module = await import("../../scripts/load-test-rooms.mjs");
+    const pace = module.makePacerForTest(0);
+    const started = Date.now();
+    await Promise.all([pace(), pace(), pace()]);
+    expect(Date.now() - started).toBeLessThan(50);
+  });
+});
