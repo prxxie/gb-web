@@ -66,6 +66,7 @@ the title, `depends_on` the original — `03-definition-of-ready-and-done.md` §
 |-------|--------------------|-----------|
 | `US-ROOM-004` | `TC-ROOM-046` proves the seat and the team come back through a lobby reload; the `lastSnapshot` half (HP restored mid-match) has no automated case, and `TC-ROOM-047` (the 20 s countdown to `disconnected`) has none either | AC2/AC3 |
 | `US-AUTH-003` | `TC-AUTH-142` (delete flow: typed confirmation, `204`, redirect, no further API access) needs a signed-in account, so `tests/e2e/profile.spec.ts` covers only the guest redirect | AC7 |
+| `US-PWA-005` | The platform lock is proven against a stubbed `screen.orientation`, never on a real installed app: `TC-PWA-192` shows the call is made once, installed-only, and that a rejection is swallowed, but that an Android PWA actually lands in landscape needs a phone with the app installed. The failure mode if it does not is the old notice | AC2 |
 | `US-PWA-004` | AC7 is now covered on the failure path as well — the lobby's no-session branch renders an `h1`
 (`TC-PWA-191`, component level, because a browser always mints a guest session and cannot reach that branch). What is
 still unproven are the other two ACs that name cases no file defines: **AC2** (200 % browser text size, `TC-PWA-159`)

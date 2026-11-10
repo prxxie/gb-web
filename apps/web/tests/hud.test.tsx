@@ -40,8 +40,10 @@ describe("TC-PWA-162: orientation gate", () => {
     Object.defineProperty(window, "innerHeight", { configurable: true, value: 844 });
     Object.defineProperty(window, "matchMedia", {
       writable: true,
+      // A phone in portrait: the orientation query disagrees and the pointer is coarse (`US-PWA-005` AC4),
+      // which is what makes the gate apply at all now.
       value: (query: string) => ({
-        matches: false,
+        matches: query.includes("pointer: coarse") || query.includes("hover: none"),
         media: query,
         addEventListener: (_: string, listener: (event: MediaQueryListEvent) => void) => listeners.push(listener),
         removeEventListener: () => undefined,

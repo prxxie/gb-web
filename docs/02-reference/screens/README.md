@@ -51,7 +51,7 @@ flowchart LR
 
 | Rule | Value |
 |------|-------|
-| Orientation | Landscape only; portrait shows a full-screen rotate notice (`NFR-19`) |
+| Orientation | Landscape only; a **touch** device in portrait shows a full-screen rotate notice, and an installed app asks the platform to lock to landscape (`NFR-19`, `US-PWA-005`) |
 | Viewport | `viewport-fit=cover`, safe-area insets respected on both sides (notch) |
 | Shell | Fixed 56 px top bar (back, title, language switch) + content area; no scrolling on the match route |
 | Canvas host | The match route mounts one `<canvas>` sized with `Phaser.Scale.FIT`; every other route is pure DOM |
@@ -76,6 +76,7 @@ flowchart LR
 | Contract | Checked by |
 |----------|-----------|
 | Every route renders, in both locales, at 844 × 390 and 390 × 844 | `tests/e2e/routes.spec.ts` (TC-PWA-152) |
-| Portrait shows the rotate notice | `tests/e2e/pwa-shell.spec.ts` (TC-PWA-063) |
+| Portrait shows the rotate notice | `tests/e2e/pwa-shell.spec.ts` (TC-PWA-063, touch context) |
+| A narrow desktop window gets the game, not the notice | `tests/e2e/pwa-shell.spec.ts` (TC-PWA-194) |
 | Focus moves to the `h1` on every route, including a lazy one and a back navigation | `tests/e2e/focus.spec.ts` (TC-PWA-131) |
 | No route renders a raw error string when every API call fails | `tests/e2e/errors.spec.ts` (TC-FND-079) |

@@ -46,6 +46,10 @@ test.describe("the tab iOS opens", () => {
 });
 
 test.describe("landscape gate", () => {
+  // A phone, not a narrow desktop window: `US-PWA-005` AC1 made the gate a touch-device rule. The suite's
+  // `Pixel 7 landscape` profile already sets `hasTouch: true`, and this line says so out loud.
+  test.use({ hasTouch: true });
+
   test("TC-PWA-063: a portrait window shows the notice instead of a mangled game", async ({ page }) => {
     await page.setViewportSize({ width: 412, height: 915 });
     await page.goto("/");
@@ -90,13 +94,6 @@ test.describe("landscape gate", () => {
     await expect(page.locator("#main h1")).toBeFocused();
   });
 
-  test("US-PWA-003 AC6: a desktop window taller than it is wide is portrait too", async ({ page }) => {
-    await page.setViewportSize({ width: 820, height: 1180 });
-    await page.goto("/");
-
-    await expect(page.getByTestId("orientation-hint")).toBeVisible();
-  });
-
   test("US-PWA-003 AC4: a tablet's extra height goes to the battlefield, not to a stretched canvas", async ({
     page,
   }) => {
@@ -135,5 +132,28 @@ test.describe("landscape gate", () => {
     expect(kept.width).toBeGreaterThan(0);
     const seconds = (text: string | null): number => Number((text ?? "").replace(/\D/g, ""));
     expect(seconds(await page.getByTestId("turn-clock").textContent())).toBeLessThanOrEqual(seconds(clockBefore));
+  });
+});
+
+test.describe("a desktop window cannot rotate, so it is not told to", () => {
+  // `US-PWA-005` AC1, superseding `US-PWA-003` AC6. The suite's shared profile is `Pixel 7 landscape`, which
+  // carries `hasTouch: true` — a coarse pointer for every spec — so this describe has to opt out to be a mouse,
+  // which is exactly what a narrow browser window on a laptop reports.
+  test.use({ hasTouch: false, isMobile: false });
+  test("TC-PWA-194: a window taller than it is wide gets the game, not the notice", async ({ page }) => {
+    await page.setViewportSize({ width: 820, height: 1180 });
+    await page.goto("/");
+
+    await expect(page.getByTestId("orientation-hint")).toHaveCount(0);
+    await expect(page.locator("#main h1")).toBeVisible();
+  });
+
+  test("TC-PWA-194: and the same window with touch emulation is gated again", async ({ browser }) => {
+    const phone = await browser.newContext({ hasTouch: true });
+    const page = await phone.newPage();
+    await page.setViewportSize({ width: 820, height: 1180 });
+    await page.goto("/");
+    await expect(page.getByTestId("orientation-hint")).toBeVisible();
+    await phone.close();
   });
 });

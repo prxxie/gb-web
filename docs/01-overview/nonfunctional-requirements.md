@@ -53,7 +53,7 @@ Targets inherited from the source spec carry `[spec: gbw-spec.md#…]`; targets 
 | NFR-16 | The DOM shell meets **WCAG 2.2 AA**: contrast ≥ 4.5:1 for text, visible focus, keyboard operability of every non-gameplay screen, labels on all controls. The canvas scene exposes its critical state (turn, HP, wind, timer) as text outside the canvas. | axe-core in Playwright on every shell route (TC-PWA-156) + a manual screen-reader pass in the `M2` checklist. | `[brief §9]` |
 | NFR-17 | Touch targets are **≥ 44 × 44 CSS px**, primary actions (fire, skip) **≥ 60 × 60**, with ≥ 8 px spacing. | Computed-style assertion in a Playwright test over the match and lobby screens (TC-PWA-158). | `[spec: gbw-spec.md#NFR-05]` |
 | NFR-18 | The UI ships in **Vietnamese (default) and English**, switchable in-app without a reload; no user-visible string is hardcoded; layout tolerates 30 % text expansion (German-length test strings). | i18n lint (no literal strings in components), a Playwright pass in both locales, and the expansion fixture (TC-PWA-152). | `[brief §9 / OQ-09]` |
-| NFR-19 | The app is **landscape-only** on phones: portrait shows a rotate notice instead of a squeezed layout. A tablet in landscape uses the same layout. | Playwright viewport test at 390 × 844 portrait and 844 × 390 landscape (TC-PWA-063). | `[brief §9 / OQ-22]` |
+| NFR-19 | The app is **landscape-only** on phones: portrait shows a rotate notice instead of a squeezed layout. A tablet in landscape uses the same layout. | Playwright viewport test at 390 × 844 portrait and 844 × 390 landscape, in a **touch** context (TC-PWA-063); a desktop window in the same shape is not gated (TC-PWA-194). | `[brief §9 / OQ-22]` |
 
 ## Compatibility and installability
 
