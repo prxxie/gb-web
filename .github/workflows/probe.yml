@@ -1,0 +1,23 @@
+name: probe
+on:
+  workflow_dispatch:
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Probe the deployed worker
+        env:
+          API: ${{ vars.PRODUCTION_API_URL }}
+        run: |
+          set -uo pipefail
+          echo "=== health ==="
+          curl -sS -o /tmp/h -w "%{http_code}\n" "$API/api/v1/health"; head -c 200 /tmp/h; echo
+          echo "=== sessions (no origin, with cf-connecting-ip) ==="
+          curl -sS -D /tmp/hd -o /tmp/b -w "%{http_code}\n" -X POST "$API/api/v1/sessions" \
+            -H 'content-type: application/json' -H 'cf-connecting-ip: 198.18.0.11' -d '{"displayName":"Probe"}'
+          echo "--- headers ---"; head -20 /tmp/hd
+          echo "--- body ---"; head -c 400 /tmp/b; echo
+          echo "=== sessions (with pages origin, no cf header) ==="
+          curl -sS -o /tmp/b2 -w "%{http_code}\n" -X POST "$API/api/v1/sessions" \
+            -H 'content-type: application/json' -H 'origin: https://gbw-pages.pages.dev' -d '{"displayName":"Probe2"}'
+          head -c 400 /tmp/b2; echo
