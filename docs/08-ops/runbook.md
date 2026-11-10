@@ -7,12 +7,15 @@ Alert strings in the `Symptom` column are the literal text of the alert.
 
 | Service | Where | Health check | Logs / metrics |
 |---------|-------|--------------|----------------|
-| Web (Pages) | `https://gbw.<domain>` | `curl -fsSI https://gbw.<domain>/` → `200`, `text/html` | Pages dashboard → Deployments; CF analytics |
-| API (Worker) | `https://api.gbw.<domain>/api/v1` | `curl -fsS https://api.gbw.<domain>/api/v1/health` | `wrangler tail --env production`; Workers metrics (requests, errors, p95) |
+| Web (Pages) | `https://gbw-pages.pages.dev` | `curl -fsSI https://gbw-pages.pages.dev/` → `200`, `text/html` | Pages dashboard → Deployments; CF analytics |
+| API (Worker) | `https://gbw-api.gbw-demo.workers.dev/api/v1` | `curl -fsS https://gbw-api.gbw-demo.workers.dev/api/v1/health` | `wrangler tail --env production`; Workers metrics (requests, errors, p95) |
 | Rooms (Durable Object) | same Worker, class `Room` | `wrangler tail` filtered on `room.` events; `Room` metric in the dashboard | DO dashboard (requests, duration, storage) |
-| D1 | `gbw-db` | `wrangler d1 execute gbw-db --remote --command "select 1"` | D1 dashboard (reads/writes/day, size) |
+| D1 | `gbw` (production), `gbw-preview` | `wrangler d1 execute gbw --remote --command "select 1"` | D1 dashboard (reads/writes/day, size) |
 | Clerk | dashboard | Sign-in card renders on `/sign-in` | Clerk dashboard → Sessions, Errors |
 | TURN | Cloudflare dashboard | `GET /turn-credentials` with a valid token → `200` | TURN analytics (GB egress) |
+
+These are the live hostnames today: the account has no zone, so the app and the API sit on their provider subdomains
+rather than a shared domain (`deployment.md` § 1). A domain would replace the first two rows and nothing else.
 
 ## 2. Routine operations
 
@@ -82,3 +85,5 @@ pnpm exec wrangler d1 info gbw-db
 pnpm exec wrangler d1 execute gbw-db --remote --command \
   "select count(*) from profile where rated_matches >= 10"
 ```
+
+<!-- rehearsal: second preview deploy so a rollback has somewhere to go -->
