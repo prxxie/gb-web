@@ -23,6 +23,10 @@ on:
         description: Rooms in flight at once
         required: false
         default: "25"
+      soak:
+        description: Seconds every room is held open, so the rooms overlap instead of closing one after another
+        required: false
+        default: "0"
 
 permissions:
   contents: read
@@ -47,6 +51,7 @@ jobs:
             --rooms "${{ inputs.rooms }}" \
             --seats "${{ inputs.seats }}" \
             --concurrency "${{ inputs.concurrency }}" \
+            --soak-seconds "${{ inputs.soak }}" \
             --out "$RUNNER_TEMP/load.md"
 
       # The report is the evidence, so it is uploaded even when the run breached its budget — a red job whose report is

@@ -240,27 +240,33 @@ function openSeat(wsUrl, token, displayName, seats, timeoutMs, soakMs) {
 
 async function runRoom(base, index, seats, timeoutMs, soakMs, options) {
   const firstPlayer = index * seats;
-  const hostAddress = options.local ? addressFor(firstPlayer) : null;
-  const hostToken = await mintSession(base, hostAddress, options.paceSession);
-  // Room creation is the tighter per-address limit (`NFR-25`: 10/min against 30 for sessions), so it has its own pacer —
-  // without it a fifty-room run from one address spends its time collecting `429`s and calls that a capacity failure.
-  await options.paceRoom();
-  // The clock starts here: the wait above is the rate limiter's cost, not the room's latency.
-  const startedAt = Date.now();
-  const created = await post(base, "/rooms", hostToken, { maxPlayers: seats }, hostAddress);
+  const addressForSeat = (seat) => (options.local ? addressFor(firstPlayer + seat) : null);
 
-  const guests = [];
+  // Every session is minted **before** the room exists. Minting is paced (30/min per address) and the guest's token is only
+  // needed after the room is created, so doing it in between put the pacer's queueing time inside the room's own latency —
+  // the run reported p50 10 s and p95 52 s for rooms that were up in well under a second.
+  const hostToken = await mintSession(base, addressForSeat(0), options.paceSession);
+  const guestTokens = [];
   for (let seat = 1; seat < seats; seat += 1) {
-    const address = options.local ? addressFor(firstPlayer + seat) : null;
-    const token = await mintSession(base, address, options.paceSession);
+    guestTokens.push(await mintSession(base, addressForSeat(seat), options.paceSession));
+  }
+
+  // Room creation is the tighter per-address limit (`NFR-25`: 10/min against 30 for sessions), so it has its own pacer.
+  // The clock starts after that wait: the wait is the rate limiter's cost, not the room's latency.
+  await options.paceRoom();
+  const startedAt = Date.now();
+  const created = await post(base, "/rooms", hostToken, { maxPlayers: seats }, addressForSeat(0));
+
+  // Joins carry no per-address limit (`RULES` in `apps/worker/src/lib/ratelimit.ts`), so they are measured as they are.
+  const guests = [];
+  for (const [offset, token] of guestTokens.entries()) {
     const joined = await post(
       base,
       `/rooms/${created.roomCode}/join`,
       token,
-      { displayName: `Tải ${seat}`, mobileId: "mbl-01", avatarId: "av-01" },
-      address,
+      { displayName: `Tải ${offset + 1}`, mobileId: "mbl-01", avatarId: "av-01" },
+      addressForSeat(offset + 1),
     );
-    // Each seat opens its own socket: the join response carries the URL for that seat.
     guests.push({ token, wsUrl: joined.wsUrl, playerId: joined.playerId });
   }
 
@@ -268,7 +274,7 @@ async function runRoom(base, index, seats, timeoutMs, soakMs, options) {
   // they stay open for the soak window, which is what `AC2` asks about.
   const sockets = [
     openSeat(created.wsUrl, hostToken, "Tải chủ", seats, timeoutMs, soakMs),
-    ...guests.map((guest, index) => openSeat(guest.wsUrl, guest.token, `Tải ${index + 1}`, seats, timeoutMs, soakMs)),
+    ...guests.map((guest, offset) => openSeat(guest.wsUrl, guest.token, `Tải ${offset + 1}`, seats, timeoutMs, soakMs)),
   ];
   const settled = await Promise.all(sockets);
   const readyMs = Date.now() - startedAt - soakMs;
