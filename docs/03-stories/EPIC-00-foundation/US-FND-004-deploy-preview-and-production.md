@@ -96,3 +96,22 @@ client's.
 ## Delivery status — 2026-11-05
 
 **in-progress.** the workflows are written but cannot be exercised here: they need a GitHub remote and the Cloudflare secrets (`CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `CLERK_SECRET_KEY`, `TURN_KEY_*`). Remaining step: push the repository, add the secrets, watch the first preview deployment.
+
+## Delivery status — 2026-11-10
+
+**The pipeline is live and has deployed production for real.** Run `42828656432` went green end to end —
+`migrations → worker → build → Pages → verify the deployed sha` — and `vars.PRODUCTION_READY` is `true`, so a green CI run on
+`main` now deploys by itself.
+
+| AC | Evidence |
+|---|---|
+| AC1 | **Verified on PR #3**: CI passed and `deploy-preview` commented both URLs — web `https://pr-3.gbw-pages.pages.dev`, API `https://gbw-api-preview.gbw-demo.workers.dev/api/v1/health` — against commit `081e87d`. The preview has its own database (`gbw-preview`, `c969e339…`) and its own worker. |
+| AC2 | Run `42828656432`: migrations applied to `gbw` before the worker, the Pages deploy last, `set -e` with separate steps. The first two attempts failed at the Pages step (`Command "wrangler" not found` — wrangler belongs to `apps/worker`, not the root) and then at the health check (`version: 9adfcc2` against an expected `82e93f3`, because a `VERSION` secret outranked `--var`). Both are fixed; the check is what caught them. |
+| AC3 | **Rehearsed on preview.** `wrangler rollback <version-id> --env preview` put `f1b54352` back at 100 % of traffic in seconds, and `.github/workflows/smoke.yml` — a dispatch job that asks a deployed worker which sha it serves — confirmed the answer from a clean network. Two findings: the bare `wrangler rollback` flips between the last two deployments, so a second call undoes the first; and the sha assertion only became meaningful once `VERSION` was stamped, which for **preview** needed the fix merged to `main` first, because a `workflow_run` workflow reads the default branch's copy of itself. |
+| AC4 | Secrets exist only as names in the workflow files and in the worker's binding list; the values were set with `gh secret set` and `wrangler secret put` and never echoed. |
+| AC5 | `deployment.md` § 1 and `runbook.md` § 1 now describe what exists: no Cloudflare zone, so production answers on the workers.dev hostname and the Pages subdomain, with Clerk still on the test instance. |
+| AC6 | The workflow's first step is CI's `typecheck`; nothing deploys unless CI is green, and `deploy-production` only arms itself on `workflow_run.conclusion == 'success'`. |
+
+Still open, and not closable here: a **Clerk production instance** needs a domain (its dialog demands one) and the account has
+no zone, so the deployed app runs the test instance and its sessions are unranked. That is the one thing standing between
+this pipeline and a real production release, and it costs a domain.

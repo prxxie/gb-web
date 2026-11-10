@@ -22,6 +22,7 @@ rather than a shared domain (`deployment.md` § 1). A domain would replace the f
 | Task | Command / step |
 |------|----------------|
 | Deploy | push to `main` → approve `deploy-production.yml` (see `deployment.md`) |
+| Tail the live worker | `pnpm exec wrangler tail gbw-api --format json` — **not** `--env production`, which asks the API for `gbw-api-production`, a worker that does not exist (the production environment keeps the plain name) |
 | Roll back the Worker | `pnpm exec wrangler rollback --env production --message "rollback <REL>"` |
 | Roll back Pages | Pages → Deployments → previous → *Rollback* |
 | Apply migrations | `pnpm exec wrangler d1 migrations apply gbw-db --remote` |
@@ -87,3 +88,12 @@ pnpm exec wrangler d1 execute gbw-db --remote --command \
 ```
 
 <!-- rehearsal: second preview deploy so a rollback has somewhere to go -->
+
+## 7. Traps that cost an afternoon
+
+| Trap | What it looks like | What it is |
+|------|--------------------|------------|
+| Durable Objects free-tier quota | `POST /api/v1/rooms` answers `500 internal` with `Exceeded allowed volume of requests in Durable Objects free tier` in the tail, and **every** room fails, not a fraction | A plan limit, not a regression. The free tier's DO request budget is spent by load runs; it resets daily. A fifty-room run with a long soak spends it in minutes, so `US-OPS-003` AC2 (400 sockets for ten minutes) needs Workers Paid. |
+| A client-supplied `cf-connecting-ip` | `403` with a Cloudflare HTML body, and the worker's log shows nothing at all | Cloudflare's edge rejects that header before the request reaches the worker. Only `wrangler dev` trusts it, which is why the load test has a `--local` flag. |
+| A `workflow_run` workflow reads the **default branch's** copy of itself | A workflow fix pushed on a pull-request branch has no effect on that pull request's own run | By design. The stamping fix for `VERSION` only took effect on preview after it merged to `main`. |
+| `wrangler rollback` without a version id | It flips between the last two deployments, so a second call undoes the first | Pass the version id: `wrangler rollback <version-id> --env preview`. |

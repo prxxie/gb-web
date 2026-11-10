@@ -98,3 +98,29 @@ the repeatability clause cannot be measured here at all. The report in `docs/06-
 per-AC state; in short, AC1 is **partial** (two seats, not eight), and AC2–AC6 are **not proven** — a ten-minute 400-socket
 soak, the D1/DO/CPU numbers (they need `CF_ANALYTICS_TOKEN`), a preview-worker target and a release record all sit outside
 what this repository can currently produce.
+
+## Delivery status — 2026-11-10 (second entry, against the deployed worker)
+
+The script now runs from a GitHub runner against `https://gbw-api.gbw-demo.workers.dev` (`.github/workflows/load-test.yml`),
+which is the first time it has measured anything real. What it found, in order:
+
+1. **A client-supplied `cf-connecting-ip` is rejected by Cloudflare's edge** with its own `403` and an HTML body, so the first
+   run reported 0/50 rooms "ready" against a worker that was healthy. The header is now `--local`-only.
+2. **Rate limits, not capacity, dominated the first two runs.** `NFR-25` allows 10 room creates and 30 sessions per minute per
+   address; mints and creates are now paced inside those limits, and the latency clock starts after the pacing so the wait is
+   not reported as room latency. Two intermediate runs reported p50 10 s and p50 −207 s for the same reason, in opposite
+   directions — both were measurement bugs, both are fixed.
+3. **The best run: 50/50 rooms ready, 0 % error** — and then the Durable Objects **free tier** ran out:
+   `Exceeded allowed volume of requests in Durable Objects free tier`. After that every `/rooms` call answered `500`, at three
+   rooms as surely as at fifty. That is a plan limit, and it means:
+
+| AC | State after this work |
+|---|---|
+| AC1 — 50 rooms, 8 authenticated sockets each | **Partial**: 50 rooms with two seats, verified by socket. Eight seats need 400 session mints at 30/min ≈ 13 minutes of pacing and a paid plan's DO budget. |
+| AC2 — 400 sockets for ten minutes, p95 < 400 ms | **Blocked by plan**: the free tier's DO request allowance is spent by the run itself. |
+| AC3/AC4 — D1 writes, DO durations, peak CPU per request | **Not proven**: those numbers come from the analytics API and need a paid plan's retention. |
+| AC5 — three runs within 15 % | **Not proven**: the runs that completed disagree by far more than 15 %, and two of them were measuring their own pacing. |
+| AC6 — the report lands in the release record | **Not proven**: no release record yet (`US-OPS-004`). |
+
+The script and its report are real and repeatable; the *load* is what the free tier cannot carry. Upgrading to Workers Paid
+($5/month) is the unblock, and it is a decision for the owner rather than a code change.
