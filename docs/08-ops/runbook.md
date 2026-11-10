@@ -85,3 +85,5 @@ pnpm exec wrangler d1 info gbw-db
 pnpm exec wrangler d1 execute gbw-db --remote --command \
   "select count(*) from profile where rated_matches >= 10"
 ```
+
+<!-- rehearsal: second preview deploy so a rollback has somewhere to go -->
