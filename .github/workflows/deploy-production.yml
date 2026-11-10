@@ -69,9 +69,12 @@ jobs:
         run: pnpm build
 
       - name: Deploy the Pages production branch
+        # `wrangler` is a devDependency of the worker package, not of the root, so `pnpm exec wrangler` at the root fails
+        # with `Command "wrangler" not found` — which is exactly how this step failed on its first real run.
+        working-directory: apps/worker
         run: |
           set -euo pipefail
-          pnpm exec wrangler pages deploy apps/web/dist \
+          pnpm exec wrangler pages deploy ../web/dist \
             --project-name "${{ vars.CLOUDFLARE_PAGES_PROJECT }}" \
             --branch main
 

@@ -63,9 +63,11 @@ jobs:
 
       - name: Deploy the Pages preview
         id: pages
+        # Same reason as the production workflow: `wrangler` belongs to the worker package, not the root.
+        working-directory: apps/worker
         run: |
           set -euo pipefail
-          pnpm exec wrangler pages deploy apps/web/dist \
+          pnpm exec wrangler pages deploy ../web/dist \
             --project-name "${{ vars.CLOUDFLARE_PAGES_PROJECT }}" \
             --branch "pr-${{ github.event.workflow_run.pull_requests[0].number }}" \
             | tee "$RUNNER_TEMP/pages.log"
