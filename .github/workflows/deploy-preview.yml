@@ -49,9 +49,13 @@ jobs:
       - name: Deploy the preview worker
         id: worker
         working-directory: apps/worker
+        env:
+          # Same stamp as production: `US-FND-004` AC3 verifies a rollback by asking `/health` for the *previous* sha, which
+          # needs every deploy to say which commit it is.
+          SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
         run: |
           set -euo pipefail
-          pnpm exec wrangler deploy --env preview | tee "$RUNNER_TEMP/deploy.log"
+          pnpm exec wrangler deploy --env preview --var VERSION:${SHA:0:7} | tee "$RUNNER_TEMP/deploy.log"
           url=$(grep -Eo 'https://[a-z0-9.-]+\.workers\.dev' "$RUNNER_TEMP/deploy.log" | tail -1)
           test -n "$url" || { echo "::error::wrangler printed no worker URL"; exit 1; }
           echo "url=$url" >> "$GITHUB_OUTPUT"
