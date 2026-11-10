@@ -59,9 +59,14 @@ jobs:
       - name: Deploy the production worker
         id: worker
         working-directory: apps/worker
+        env:
+          # The health check below greps for this sha, so the deploy has to stamp it. It is a `--var`, not a secret: a
+          # secret of the same name wins over `--var` and the check would then compare against a stale manual value —
+          # which is exactly how the first real run failed (`health never reported 82e93f3: version 9adfcc2`).
+          SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
         run: |
           set -euo pipefail
-          pnpm exec wrangler deploy --env production | tee "$RUNNER_TEMP/deploy.log"
+          pnpm exec wrangler deploy --env production --var VERSION:${SHA:0:7} | tee "$RUNNER_TEMP/deploy.log"
 
       - name: Build the web app
         env:
