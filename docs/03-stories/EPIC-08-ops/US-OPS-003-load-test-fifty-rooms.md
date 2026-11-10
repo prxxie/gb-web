@@ -83,3 +83,18 @@ written, distinct `request_id` count, sockets opened/closed, close-code histogra
 ## Delivery status — 2026-11-05
 
 **in-progress.** `scripts/loadtest.mjs` is written; the fifty-room run needs a deployed environment and a TURN key.
+
+## Delivery status — 2026-11-10
+
+**in-progress, and the earlier note was wrong.** This story recorded `scripts/loadtest.mjs` as written; that file has never
+existed in the tree. What exists now is `scripts/load-test-rooms.mjs`, and it has been run:
+
+- **Run A** — 50 rooms, two seats, 25 in flight, local `wrangler dev`: **50/50 rooms ready, 0 % error, p50 1 615 ms,
+  p95 1 766 ms**.
+- **Run B** — the same shape after the harness began holding both seats' sockets: **50/50 ready, 0 % error, p95 9 508 ms**.
+
+Two runs of one shape disagreeing by 5× is the finding: the local dev worker's own variance is far outside AC5's 15 %, so
+the repeatability clause cannot be measured here at all. The report in `docs/06-reports/load/2026-11-10-rooms.md` carries the
+per-AC state; in short, AC1 is **partial** (two seats, not eight), and AC2–AC6 are **not proven** — a ten-minute 400-socket
+soak, the D1/DO/CPU numbers (they need `CF_ANALYTICS_TOKEN`), a preview-worker target and a release record all sit outside
+what this repository can currently produce.

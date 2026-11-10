@@ -66,7 +66,10 @@ the title, `depends_on` the original — `03-definition-of-ready-and-done.md` §
 |-------|--------------------|-----------|
 | `US-ROOM-004` | `TC-ROOM-046` proves the seat and the team come back through a lobby reload; the `lastSnapshot` half (HP restored mid-match) has no automated case, and `TC-ROOM-047` (the 20 s countdown to `disconnected`) has none either | AC2/AC3 |
 | `US-AUTH-003` | `TC-AUTH-142` (delete flow: typed confirmation, `204`, redirect, no further API access) needs a signed-in account, so `tests/e2e/profile.spec.ts` covers only the guest redirect | AC7 |
-| `US-PWA-004` | A route whose session could not be minted renders the sign-in prompt, which carries no `h1` — so the heading rule does not hold on that failure path, and `tests/e2e/focus.spec.ts` cannot include it | AC7 |
+| `US-PWA-004` | AC7 is now covered on the failure path as well — the lobby's no-session branch renders an `h1`
+(`TC-PWA-191`, component level, because a browser always mints a guest session and cannot reach that branch). What is
+still unproven are the other two ACs that name cases no file defines: **AC2** (200 % browser text size, `TC-PWA-159`)
+and **AC4** (keyboard-only order, `TC-PWA-161`) | AC2, AC4 |
 
 Two citations of files that never existed were also found and corrected: `US-FND-003` and `US-PWA-002` named
 `apps/web/tests/i18n.test.ts`; the file is `i18n.test.tsx` and it is written.

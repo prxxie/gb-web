@@ -55,6 +55,23 @@ export interface BotMatchInput {
   readonly mapId?: string;
 }
 
+/**
+ * What a practice match gives every seat (`US-MATCH-009`).
+ *
+ * The wheel was built and then never had anything in it: a practice seat carried no loadout, so the six-slot tray opened on
+ * an empty state in every match a developer or a new player ever started, and the item rules were unreachable without a
+ * room. The kit is deliberately the items whose effect changes a shot — a heal, a wind flip, a damage buff, a terrain
+ * carve and a mobility item — so one practice match exercises each item rule. It stays inside `LOADOUT_CAP` and every id
+ * is a real one; a case pins both.
+ */
+export const PRACTICE_LOADOUT: Readonly<Record<string, number>> = {
+  "itm-energy-1": 2,
+  "itm-change-wind": 1,
+  "itm-power-up": 1,
+  "itm-bunge": 1,
+  "itm-teleport": 1,
+};
+
 /** A practice match: one device, one opponent, no session and no network (`NFR-21`). */
 export function botMatchPlan(input: BotMatchInput): PlannedMatch {
   const mapId = input.mapId ?? MAPS[0]?.mapId ?? "map-01";
@@ -70,9 +87,18 @@ export function botMatchPlan(input: BotMatchInput): PlannedMatch {
         accountId: input.accountId,
         displayName: input.displayName,
         mobileId: input.mobileId,
+        loadout: PRACTICE_LOADOUT,
       },
       // A practice match always has an opponent, or the team check would end it on the first turn.
-      { slot: 1, team: "B", accountId: null, displayName: input.botLabel, mobileId: "mbl-04" },
+      {
+        slot: 1,
+        team: "B",
+        accountId: null,
+        displayName: input.botLabel,
+        mobileId: "mbl-04",
+        // The bot carries the same kit, so the practice is symmetric and the bot's own item rule has something to spend.
+        loadout: PRACTICE_LOADOUT,
+      },
     ],
     seed: Math.floor(Math.random() * 0xffffff),
     mapId,

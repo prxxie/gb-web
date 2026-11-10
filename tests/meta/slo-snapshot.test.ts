@@ -56,3 +56,37 @@ describe("slo snapshot", () => {
     expect(verdictFor({ target: 99.5, direction: "at-least", unit: "%" }, null).verdict).toBe("BREACH");
   });
 });
+
+/**
+ * TC-OPS-907: an unconfigured repository skips the job instead of failing it (`US-OPS-002` AC2/AC3).
+ *
+ * The alarm only works if red means a number is bad. The job went red every morning because no analytics token was set,
+ * which is a configuration fact, not a breached SLO — and a daily false red is how a team learns to ignore the board. The
+ * rule lives in the workflow, so this case reads the workflow: the snapshot step is gated on the configuration check and
+ * a missing metric still counts as a breach once it runs (that half is `TC-OPS-903`).
+ */
+describe("TC-OPS-907: the workflow separates 'not configured' from 'breached'", () => {
+  const workflow = readFileSync(join(ROOT, ".github", "workflows", "slo-snapshot.yml"), "utf8");
+
+  it("checks the credentials before it reads any analytics", () => {
+    const configIndex = workflow.indexOf("id: config");
+    const snapshotIndex = workflow.indexOf("node scripts/slo-snapshot.mjs");
+    expect(configIndex).toBeGreaterThan(-1);
+    expect(snapshotIndex).toBeGreaterThan(configIndex);
+    expect(workflow).toContain("configured=true");
+    expect(workflow).toContain("configured=false");
+  });
+
+  it("runs the snapshot and the commit only when it is configured", () => {
+    const gated = workflow.split("if: steps.config.outputs.configured == 'true'").length - 1;
+    expect(gated).toBe(2);
+    // A skip must be visible as a notice, not as a silent no-op.
+    expect(workflow).toContain("::notice title=SLO snapshot skipped::");
+  });
+
+  it("leaves the script's own rule alone: a missing metric is still a breach", () => {
+    // If the skip had been pushed into the script, `renderSnapshot` would treat an empty value set as "nothing to do".
+    const rendered = renderSnapshot("2026-12-01", rows, {});
+    expect(rendered.breached).toBe(true);
+  });
+});

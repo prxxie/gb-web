@@ -246,6 +246,7 @@ The `covers` column names the requirement ([nonfunctional-requirements.md](../01
 | TC-MATCH-949 | US-MATCH-004 | AC3, AC5, AC6, AC7 — a phrase from a peer, and a phrase from the host | Only the id crosses `control`; the receiver shows its own locale's string above the sender's chip; the host fans a peer's phrase out to the other peers and never back to the sender; a frame carrying free text is dropped | web | FR-07 |
 | TC-MATCH-951 | US-MATCH-006 | AC3 — the loadout on the mobile | A press held on the player's own mobile fans the six item slots out as a half circle above it; a pick or a press anywhere else closes the wheel; a slot with no stock or on a turn the player cannot use refuses the tap | web | FR-06 |
 | TC-MATCH-953 | US-MATCH-003 | AC6 — the weather the player reads | The tray shows the next four rounds, one cell each: the cell's magnitude is the roll's own, its kind is the band that magnitude falls in, its chevron is east or west, and the nearest round is the lit one | web | FR-06 |
+| TC-MATCH-954 | US-MATCH-009 | AC2/AC3 — the loadout reaches the engine | A practice plan's seats carry a legal kit, and `createMatch` turns it into `PlayerState.items` for every player, so the tray and the wheel are never empty; every id in the kit is one the item table knows | web | FR-06 |
 | TC-MATCH-952 | US-MATCH-002 | AC2 — the barrel's own range | The mobile carries a ring of the angles it can fire through, with the current angle lit; the fan mirrors with the hull's facing, never dips below the horizon and never points backwards; it is smaller than the power ring so the two do not read as one circle | web | FR-05 |
 | TC-CORE-963 | US-MATCH-004 | AC5, AC7 — the catalogue is the wire contract | Twelve phrases and eight emotes, each id once, no id in both kinds, and an id is accepted only for its own kind | unit | FR-07 |
 | TC-CORE-964 | US-CORE-015 | AC2 — the weather is a strength and a direction | The weather kinds tile `0…windMax` with no gap and no overlap, every magnitude the roll can produce gets exactly one name, the name depends on strength and not direction, and a magnitude past the table clamps instead of going unnamed | unit | FR-06 |
@@ -337,6 +338,7 @@ The `covers` column names the requirement ([nonfunctional-requirements.md](../01
 | TC-PWA-162 | US-PWA-002 | 30 % text expansion fixture in `vi` and `en` | No overflow in the lobby and results layouts | e2e | NFR-18 |
 | TC-PWA-063 | US-PWA-003 | AC3, AC4, AC5, AC6 — the portrait notice, the tablet-height floor, a rotation mid-match and a tall desktop window | Rotate notice with only the locale toggle; the battlefield keeps over 500 px at 1024 × 768; rotation keeps the canvas and the turn clock; 820 × 1180 also gets the notice | e2e | `US-PWA-003` AC3, AC4, AC5, AC6; NFR-19 |
 | TC-PWA-190 | US-PWA-004 | AC7 — focus moves into the mounted route | The route's `h1` takes focus on mount, and again on the next navigation | web | NFR-16 |
+| TC-PWA-191 | US-PWA-004 | AC7 — a route whose session could not be minted | The lobby's no-session branch renders exactly one `h1` (the sign-in title) and the way back to `/sign-in`, so the screen a user lands on has a heading to focus | web | NFR-16 |
 | TC-PWA-131 | US-PWA-004 | Route change with keyboard focus | Focus moves to the route `h1` on every navigation, including back — never stays on the control that is gone | e2e | NFR-16 |
 | TC-PWA-158 | US-PWA-004 | axe-core on every route, both locales | Zero WCAG 2.2 AA violations | e2e | NFR-16 |
 | TC-PWA-159 | US-PWA-004 | 200 % font size on lobby and results | No clipped text, no overlap | e2e | NFR-16 |
@@ -352,8 +354,10 @@ The `covers` column names the requirement ([nonfunctional-requirements.md](../01
 | TC-OPS-901 | US-OPS-002 | Every SLO in `slo.md` becomes a snapshot row | Four rows, each naming its `NFR-nn` | unit | `scripts/slo-snapshot.mjs` |
 | TC-OPS-903 | US-OPS-002 | A metric the source cannot answer | The row reads `no data` and the file is a breach | unit | `08-ops/slo.md` § 2 |
 | TC-OPS-904 | US-OPS-002 | A clean day and a breaching day | Clean exits 0; a breach marks only its own row and exits non-zero | unit | `08-ops/slo.md` |
+| TC-OPS-907 | US-OPS-002 | AC2/AC3 — a red run means a bad number | The workflow checks `CF_ANALYTICS_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` before reading any analytics, gates both the snapshot and the commit on that check, and announces a skip as a notice; a missing metric still counts as a breach once it runs | unit | NFR-26 |
 | TC-OPS-905 | US-OPS-002 | A target that cannot be read | Counted as a breach, never as an assumed pass | unit | `08-ops/slo.md` |
 | TC-OPS-185 | US-OPS-003 | 50 concurrent rooms load run | No 5xx, p95 API < 400 ms, report written | manual | OQ-33 |
+| TC-OPS-906 | US-OPS-003 | The load test's own arithmetic | The nearest-rank percentile is a real room (p95 of 50 is the 48th), failures are counted by reason, a run past the error-rate or p95 budget is a breach, an empty run is a breach, and the report states the verdict, the budgets and every failure | unit | NFR-05 |
 | TC-OPS-902 | US-OPS-004 | Release record completeness | Scope, evidence links, rollback plan and deployed versions present | manual | `07-release/README.md` |
 
 ## Manual (two-phone matrix, per release)
@@ -447,5 +451,6 @@ unrelated meanings), so every row below names the one thing it proves.
 | TC-ROOM-711 | US-ROOM-007 | AC2 — a host starts a match | `match_started` carries the mode, the map and the mobile each member picked | worker | `api/signaling.md` |
 | TC-ROOM-712 | US-ROOM-007 | AC7 — lobby write budget | Eleven item taps plus a mobile tap in one second pass; a twenty-first write in one second is refused `rate-limited` and the last accepted write survives | worker | `api/signaling.md` |
 | TC-ROOM-713 | US-ROOM-007 | AC7 — one join per page load | A `StrictMode` double mount posts `join` once and opens the room socket on the seat it got | web | `api/accounts.md` |
+| TC-ROOM-714 | US-MATCH-009 | AC1 — the room's loadouts reach the match | A `match_started` frame whose assignments carry different loadouts writes a plan whose seats carry them as quantity maps, still joined to the members for their display names, and the match that starts from that plan has the items | web | FR-06 |
 | TC-ROOM-700 | US-ROOM-008 | AC1 — the room object fits the size rule | `apps/worker/src/room-do.ts` ≤ 400 lines, with budgets, election and recording in their own modules under `apps/worker/src/room/` | worker | NFR-16 |
 | TC-ROOM-701 | US-ROOM-008 | AC2 — the split changes no behaviour | Every `apps/worker/tests/room-*.ts` file passes unchanged | worker | NFR-16 |

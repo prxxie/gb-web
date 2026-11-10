@@ -1,7 +1,7 @@
 {
   "measured": "2026-11-09",
   "unit": "KiB gzip",
-  "note": "A ratchet: `pnpm budget` fails when a bucket grows past its number. Raise the number in the same change that adds the weight, so the diff shows what the payload cost. `shell` is what every route pays (the entry plus its vendor chunk); `match` is the Phaser route, which the service worker precaches but a cold load never fetches. 2026-11-08: match 386 -> 388 KiB gzip, css 3 -> 4, total 543 -> 546 (shot animation, terrain/sky). 2026-11-09 (angle ring): match 388 -> 390, total 546 -> 548 — dead `ItemSlots` and the event-feed strings came out first. 2026-11-09 (weather tray): shell 153 -> 154 and css 4 -> 5 — four weather-kind strings and the tray's layout, after moving the per-kind ink into the component so the stylesheet did not carry four decorative rules.",
+  "note": "A ratchet: `pnpm budget` fails when a bucket grows past its number. Raise the number in the same change that adds the weight, so the diff shows what the payload cost. `shell` is what every route pays (the entry plus its vendor chunk); `match` is the Phaser route, which the service worker precaches but a cold load never fetches. 2026-11-08: match 386 -> 388 KiB gzip, css 3 -> 4, total 543 -> 546 (shot animation, terrain/sky). 2026-11-09 (angle ring): match 388 -> 390, total 546 -> 548 — dead `ItemSlots` and the event-feed strings came out first. 2026-11-09 (weather tray): shell 153 -> 154 and css 4 -> 5 — four weather-kind strings and the tray's layout, after moving the per-kind ink into the component so the stylesheet did not carry four decorative rules. 2026-11-10 (US-MATCH-009): total 548 -> 550 — the loadout mapping in the lobby and the practice\nstarter kit, so the item tray a player picked is no longer empty in every match.",
   "buckets": {
     "shell": {
       "chunks": "^index-.*\\.js$",
@@ -20,5 +20,5 @@
       "maxKiB": 5
     }
   },
-  "totalMaxKiB": 548
+  "totalMaxKiB": 550
 }

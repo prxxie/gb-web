@@ -185,13 +185,22 @@ export function LobbyPage(): JSX.Element {
               roomCode: code,
               localSlot: mine?.slot ?? 0,
               playerId: selfId,
-              seats: message.room.members.map((member) => ({
-                slot: member.slot,
-                team: member.team ?? "A",
-                accountId: member.accountId,
-                displayName: member.displayName,
-                mobileId: member.mobileId ?? DEFAULT_MOBILE_ID,
-              })),
+              // The seats come from the room's own `assignments`, not from `room.members`: the assignment is the frame
+              // that carries each player's loadout (`US-ROOM-007` AC2), and reading the public member list instead dropped
+              // it on the floor — every match started with an empty item tray, so the wheel had nothing in it
+              // (`US-MATCH-009`). `displayName` lives only on the member, so the two are joined by player id.
+              seats: message.room.members.map((member) => {
+                const assignment = message.assignments.find((entry) => entry.playerId === member.playerId);
+                return {
+                  slot: assignment?.slot ?? member.slot,
+                  team: assignment?.team ?? member.team ?? "A",
+                  accountId: assignment?.accountId ?? member.accountId,
+                  displayName: member.displayName,
+                  mobileId: assignment?.mobileId ?? member.mobileId ?? DEFAULT_MOBILE_ID,
+                  // `LoadoutEntry[]` on the wire, a quantity map in the engine: the same shape `Seat.loadout` documents.
+                  loadout: Object.fromEntries((assignment?.loadout ?? []).map((entry) => [entry.id, entry.qty])),
+                };
+              }),
               seed: message.seed,
               // The room's clock, not this device's: it is half of the record's id (`US-RANK-005` AC6).
               startedAt: message.startedAt,
@@ -294,10 +303,14 @@ export function LobbyPage(): JSX.Element {
   };
 
   if (!session) {
+    // A heading, not just a paragraph: this branch is a whole route whose session could not be minted, and every other
+    // route puts focus on its own `h1` when it renders (`US-PWA-004` AC7). Without one, a keyboard or screen-reader user
+    // arrived at a screen that announced nothing and had nowhere to land.
     return (
       <div className="screen screen--center">
+        <h1>{t("signIn.title")}</h1>
         <p>
-          {t("signIn.title")} — <Link to="/sign-in">{t("main.signIn")}</Link>
+          <Link to="/sign-in">{t("main.signIn")}</Link>
         </p>
       </div>
     );

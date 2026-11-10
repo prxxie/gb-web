@@ -43,3 +43,21 @@ buying movement points), **Bunge Shot carves more ground** (it was a returning s
 trait, not an item), **Change Wind reverses** rather than re-rolls, and **Team Teleport swaps** you with your weakest
 team mate rather than rallying the team. `itm-teleport` still blinks 150 px instead of teleporting to where the shot
 lands; that one needs the shot-then-teleport flow and is the remaining gap.
+
+## The practice starter kit
+
+A practice match has no room, so nobody has picked a loadout — and the tray used to open on an empty state in every
+practice match a developer or a new player ever started (`US-MATCH-009`). `PRACTICE_LOADOUT`
+(`apps/web/src/lib/plan.ts`) gives **both seats** the same five picks, six items in total, inside `LOADOUT_CAP`:
+
+| Item | Quantity | Why it is in the kit |
+|---|---|---|
+| `itm-energy-1` | 2 | The heal, so a practice match can show a health swing without ending |
+| `itm-change-wind` | 1 | The one item that changes a rule rather than a number |
+| `itm-power-up` | 1 | The damage buff, the simplest effect to see on the numbers |
+| `itm-bunge` | 1 | Terrain carving — the only item that edits the map |
+| `itm-teleport` | 1 | Mobility, which exercises the movement rules |
+
+The bot carries the same kit on purpose: a practice match is symmetric, and the bot's item heuristic
+(`packages/core/src/bot.ts`) then has something to spend. A real room's loadout always wins — this kit is only for a match
+that has no room behind it.

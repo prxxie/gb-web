@@ -153,3 +153,33 @@ describe("TC-ROOM-198: the lobby does not signal", () => {
     expect(frames.filter((frame) => frame.t === "snapshot_push")).toEqual([]);
   });
 });
+
+/**
+ * TC-PWA-191: the lobby's no-session branch is a screen, not a stray paragraph (`US-PWA-004` AC7).
+ *
+ * A route whose session could not be minted renders the sign-in prompt instead of its own content. Every other route puts
+ * focus on its `h1` when it renders, so this branch needs one too — without it a keyboard user arrives at a screen with no
+ * heading to land on, and the browser case for the same rule cannot even be written (a real browser always mints a guest
+ * session, which is why this half is a component case).
+ */
+describe("TC-PWA-191: the no-session lobby announces itself", () => {
+  it("renders exactly one heading and the way back to sign-in", () => {
+    sessionStorage.clear();
+    render(
+      <LocaleProvider>
+        <SessionProvider>
+          <MemoryRouter initialEntries={["/lobby/ABCD"]}>
+            <Routes>
+              <Route path="/lobby/:code" element={<LobbyPage />} />
+            </Routes>
+          </MemoryRouter>
+        </SessionProvider>
+      </LocaleProvider>,
+    );
+
+    const headings = screen.getAllByRole("heading", { level: 1 });
+    expect(headings).toHaveLength(1);
+    expect(headings[0]).toHaveTextContent("Đăng nhập");
+    expect(screen.getByRole("link", { name: "Đăng nhập" })).toHaveAttribute("href", "/sign-in");
+  });
+});
