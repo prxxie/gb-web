@@ -101,3 +101,47 @@ jobs:
           done
           echo "::error::health never reported ${SHA:0:7}: $body"
           exit 1
+
+      # A worker that answers with the right sha is half the release: the site the player opens is the other half. Two
+      # checks, because they fail differently — the bundle on the runner proves the *build* was wired to this API
+      # (`VITE_API_BASE` is baked in at build time, so a stale variable ships an app that calls the wrong backend), and the
+      # network check proves *this* deployment is what Pages serves.
+      - name: Verify the bundle was built against this API
+        env:
+          API: ${{ vars.PRODUCTION_API_URL }}
+        run: |
+          set -euo pipefail
+          host=$(printf '%s' "$API" | sed -E 's#https?://##; s#/.*##')
+          if ! grep -rl "$host" apps/web/dist/assets > /dev/null; then
+            echo "::error::no built asset mentions $host - the app was built against another API"
+            exit 1
+          fi
+          echo "the built bundle calls $host"
+
+      - name: Verify the Pages deployment
+        env:
+          WEB: ${{ vars.PRODUCTION_WEB_URL }}
+        run: |
+          set -euo pipefail
+          code=""
+          for _ in $(seq 1 30); do
+            code=$(curl -fsS -o "$RUNNER_TEMP/index.html" -w '%{http_code}' "$WEB/" || true)
+            [ "$code" = "200" ] && break
+            sleep 10
+          done
+          [ "$code" = "200" ] || { echo "::error::$WEB/ answered ${code:-nothing}"; exit 1; }
+          asset=$(grep -oE '/assets/[A-Za-z0-9._-]+\.js' "$RUNNER_TEMP/index.html" | head -1)
+          [ -n "$asset" ] || { echo "::error::the page names no /assets/*.js"; exit 1; }
+          curl -fsS -o /dev/null "$WEB$asset" || { echo "::error::$WEB$asset is not served"; exit 1; }
+          echo "the page serves $asset"
+
+      # A failed gate must not leave the bad version serving. No version id: the deploy this job just made is the latest
+      # one, so the previous deployment is the right target.
+      - name: Roll the worker back after a failed gate
+        if: failure() && steps.worker.outcome == 'success'
+        working-directory: apps/worker
+        run: |
+          set -euo pipefail
+          pnpm exec wrangler rollback --env production --message "deploy-production: gate failed for ${{ github.event.workflow_run.head_sha || github.sha }}"
+          echo "::warning::rolled the worker back; the Pages deployment still serves the new bundle"
+

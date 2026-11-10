@@ -8,7 +8,7 @@ decide, a contract that already exists in `02-reference/`, and tests that prove 
 <!-- cpt:stats -->
 | Stories | Done | In progress | Ready | Blocked | Draft | Closed |
 |---|---|---|---|---|---|---|
-| 57 | 50 | 0 | 7 | 0 | 0 | 0 |
+| 58 | 52 | 0 | 6 | 0 | 0 | 0 |
 
 Open questions: **Open: 13 · Blocking: 0 · Answered: 29 · Withdrawn: 1**
 <!-- /cpt:stats -->
@@ -18,7 +18,7 @@ Open questions: **Open: 13 · Blocking: 0 · Answered: 29 · Withdrawn: 1**
 <!-- cpt:epics -->
 | Epic | Code | Title | Stories | Done | Blocked |
 |---|---|---|---|---|---|
-| [EPIC-00-foundation](EPIC-00-foundation/README.md) | FND | Repository, tooling and delivery pipeline | 4 | 3 | 0 |
+| [EPIC-00-foundation](EPIC-00-foundation/README.md) | FND | Repository, tooling and delivery pipeline | 5 | 5 | 0 |
 | [EPIC-01-accounts](EPIC-01-accounts/README.md) | AUTH | Identity, guest sessions and profiles | 4 | 4 | 0 |
 | [EPIC-02-rooms](EPIC-02-rooms/README.md) | ROOM | Rooms, lobby, presence and host migration | 8 | 8 | 0 |
 | [EPIC-03-match-core](EPIC-03-match-core/README.md) | CORE | Deterministic match simulation | 14 | 14 | 0 |

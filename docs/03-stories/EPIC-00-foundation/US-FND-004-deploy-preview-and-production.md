@@ -2,7 +2,7 @@
 id: US-FND-004
 title: Deploy a preview per pull request and production from main
 epic: EPIC-00-foundation
-status: ready
+status: done
 priority: P0
 size: M
 depends_on: [US-FND-002, US-FND-003]
@@ -85,6 +85,10 @@ names are exactly those in `environment-setup.md`.
 `TC-FND-901` (preview deploy evidence: URL + sha in the PR comment) and `TC-FND-902` (rollback rehearsal on preview).
 Both are `manual` level and their evidence is pasted into the pull request and later into the release record. CI
 behaviour for AC6 is proven by a deliberately broken commit on a scratch branch, not merged.
+
+Red: `tests/meta/deploy-pipeline.test.ts` — the pipeline had no case asserting its own shape, so
+every regression here was caught by a red CI run after a merge instead: `Command "wrangler" not found` at the Pages
+step, then `health never reported 82e93f3: version 9adfcc2` after an outranking secret.
 
 ## 9. Open questions
 

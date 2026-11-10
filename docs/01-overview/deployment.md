@@ -11,6 +11,19 @@ that role `[user: interview R4 environments]`.
 | `preview` | `https://<hash>.gbw-pages.pages.dev` per PR | `gbw-api-preview` worker | `gbw-preview` (`c969e339…`) | Clerk test instance | test key | QA on real phones, UAT (`M2`) |
 | `production` | `https://gbw-pages.pages.dev` | `gbw-api` on `https://gbw-api.gbw-demo.workers.dev` | `gbw` (`1a3895e6…`) | Clerk **test** instance (no production instance exists yet) | production | Players |
 
+### What a deploy proves before it reports success
+
+`deploy-production.yml` claims success only after asking three questions, in order (`US-FND-005`):
+
+1. `GET $PRODUCTION_API_URL/api/v1/health` reports the commit the job deployed — a worker answering with the previous sha
+   means the deploy silently rolled back.
+2. `apps/web/dist/assets` mentions the host in `PRODUCTION_API_URL` — `VITE_API_BASE` is baked in at build time, so a stale
+   variable ships an app that calls another backend.
+3. `$PRODUCTION_WEB_URL/` answers `200` **and** the `/assets/*.js` asset the page names is really served.
+
+If any of them fails after the worker deployed, the job rolls the worker back (`wrangler rollback --env production`) rather
+than leaving the failed version serving. It cannot undo the Pages deployment; that is a runbook step.
+
 **There is no domain, so there is no custom hostname.** The account has no Cloudflare zone, so `production` answers on the
 workers.dev hostname Cloudflare gives the account (`gbw-demo`) and the web app on the Pages project's own subdomain. That
 also means the API and the app are on **different origins**: `VITE_API_BASE` must be absolute (the deploy workflow takes it
@@ -42,7 +55,7 @@ request; a Pages deploy that references an endpoint the Worker does not serve ye
 | Setting | preview | production |
 |---------|---------|------------|
 | `ENVIRONMENT` | `preview` | `production` |
-| `VITE_API_BASE` | preview Worker URL | `https://api.gbw.<domain>/api/v1` |
+| `VITE_API_BASE` | preview Worker URL | `https://gbw-api.gbw-demo.workers.dev/api/v1` |
 | `VITE_CLERK_PUBLISHABLE_KEY` | test instance key | production instance key |
 | Clerk instance | test | production |
 | `SESSION_TOKEN_SECRET` | preview secret | production secret (rotated quarterly) |
@@ -79,8 +92,8 @@ for the deploy step. A PR from a fork does not get secrets and therefore does no
 
 | Check | Command | Pass |
 |-------|---------|------|
-| API alive | `curl -fsS https://api.gbw.<domain>/api/v1/health` | `200`, `{"status":"ok","version":"<git sha, or the deploy tag>"}` |
-| Static app | `curl -fsSI https://gbw.<domain>/` | `200`, `content-type: text/html`, service worker reachable |
+| API alive | `curl -fsS https://gbw-api.gbw-demo.workers.dev/api/v1/health` | `200`, `{"status":"ok","version":"<git sha, or the deploy tag>"}` |
+| Static app | `curl -fsSI https://gbw-pages.pages.dev/` | `200`, `content-type: text/html`, service worker reachable |
 | Sign-in route loads Clerk | Playwright `tests/e2e/prod-smoke.spec.ts` against production (release-stage check, `cpt-release` RR7 — not a design oracle) | Sign-in card renders for both locales |
 | Room round trip | Same spec: two contexts create/join a room | Roster shows 2 members within 5 s |
 | Migration state | `wrangler d1 migrations list gbw-db --remote` | No pending migration |
