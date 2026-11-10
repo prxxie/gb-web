@@ -1,0 +1,60 @@
+name: Load test
+
+# `US-OPS-003`: fifty rooms at once against the deployed worker, from a network that can actually reach it.
+#
+# The script has to run somewhere with clean access to `*.workers.dev` — a developer machine behind an ISP that resets the
+# TLS handshake cannot tell a broken deploy from a blocked one. A GitHub runner is also the same kind of place the release
+# record will be produced from, so the number is comparable across runs.
+#
+# This is a dispatch-only job: it creates real rooms and real Durable Objects, so it never runs on a merge.
+
+on:
+  workflow_dispatch:
+    inputs:
+      rooms:
+        description: Rooms to create at the same time
+        required: false
+        default: "50"
+      seats:
+        description: Seats per room
+        required: false
+        default: "2"
+      concurrency:
+        description: Rooms in flight at once
+        required: false
+        default: "25"
+
+permissions:
+  contents: read
+
+jobs:
+  load:
+    name: ${{ inputs.rooms }} rooms
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Run the load test
+        env:
+          API: ${{ vars.PRODUCTION_API_URL }}
+        run: |
+          set -euo pipefail
+          node scripts/load-test-rooms.mjs \
+            --base "$API/api/v1" \
+            --rooms "${{ inputs.rooms }}" \
+            --seats "${{ inputs.seats }}" \
+            --concurrency "${{ inputs.concurrency }}" \
+            --out "$RUNNER_TEMP/load.md"
+
+      # The report is the evidence, so it is uploaded even when the run breached its budget — a red job whose report is
+      # thrown away teaches nothing.
+      - name: Upload the report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: load-report
+          path: ${{ runner.temp }}/load.md
+          if-no-files-found: error
