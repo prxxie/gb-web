@@ -50,9 +50,10 @@ jobs:
           node scripts/slo-snapshot.mjs ${{ inputs.date && format('--date {0}', inputs.date) || '' }}
 
       - name: Commit it
-        # A breach still commits the file: the evidence is the point, the red run is the alarm. A skipped run commits
-        # nothing, because there is no snapshot to commit.
-        if: steps.config.outputs.configured == 'true'
+        # A breach still commits the file: the evidence is the point, the red run is the alarm. `always()` is what makes
+        # that true — without it a failed snapshot step skips this one and the evidence of the breach is thrown away.
+        # A skipped run still commits nothing, because there is no snapshot to commit.
+        if: always() && steps.config.outputs.configured == 'true'
         run: |
           git config user.name "gbw-bot"
           git config user.email "bot@gbw.local"

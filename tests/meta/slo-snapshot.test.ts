@@ -78,8 +78,10 @@ describe("TC-OPS-907: the workflow separates 'not configured' from 'breached'", 
   });
 
   it("runs the snapshot and the commit only when it is configured", () => {
-    const gated = workflow.split("if: steps.config.outputs.configured == 'true'").length - 1;
+    const gated = workflow.split("steps.config.outputs.configured == 'true'").length - 1;
     expect(gated).toBe(2);
+    // The commit step must survive a failed snapshot: a breach is the evidence, and `if:` without `always()` drops it.
+    expect(workflow).toContain("if: always() && steps.config.outputs.configured == 'true'");
     // A skip must be visible as a notice, not as a silent no-op.
     expect(workflow).toContain("::notice title=SLO snapshot skipped::");
   });
