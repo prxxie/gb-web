@@ -46,11 +46,14 @@
     },
     "production": {
       "name": "gbw-api",
-      "routes": [{ "pattern": "api.gbw.example", "custom_domain": true }],
+      // No custom-domain route: this account has no zone, so the worker answers on its own
+      // `gbw-api.gbw-demo.workers.dev` hostname. A domain would replace this block and the one in
+      // `deploy-production.yml`'s health check (`vars.PRODUCTION_API_URL`).
+      "workers_dev": true,
       "vars": {
         "ENVIRONMENT": "production",
         "CLERK_ISSUER": "https://heroic-bison-1878.clerk.accounts.dev",
-        "ALLOWED_ORIGINS": "https://gbw.example"
+        "ALLOWED_ORIGINS": "https://gbw-pages.pages.dev,http://localhost:5173,http://127.0.0.1:5173"
       },
       "d1_databases": [
         {

@@ -25,7 +25,10 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  VITE_API_BASE: /api/v1
+  # Absolute, not `/api/v1`: the Pages project has no function proxying the API, so a relative base would ask
+  # `gbw-pages.pages.dev/api/v1/...` for a backend that is not there. It comes from the same variable the health check
+  # reads, so a deploy can never build against one API and verify another.
+  VITE_API_BASE: ${{ vars.PRODUCTION_API_URL }}/api/v1
   # `wrangler` reads these names; the older `CF_API_TOKEN` / `CF_ACCOUNT_ID` pair is deprecated and warns on every run.
   CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
   CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
