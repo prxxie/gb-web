@@ -173,18 +173,22 @@ believe it.
 
 | Message | Status | Code site today | Change required | Oracle |
 |---------|--------|-----------------|-----------------|--------|
-| `auth` (5 s, then `4401`) | live | `apps/worker/src/room-do.ts:318-343` | — | `apps/worker/tests/room-auth.test.ts` |
-| `signal` relay | live | `apps/worker/src/room-do.ts` `relaySignal` | — an offline `to` is `peer-not-connected` and a self-signal is `bad-request` | `apps/worker/tests/room-relay.test.ts` |
-| `team_assign` (batched) | live | `apps/worker/src/room-do.ts` `assignTeams` | — the lobby sends the whole roster (`apps/web/src/routes/LobbyPage.tsx`) and `parseClientFrame` refuses the old per-member shape | `apps/worker/tests/room-host.test.ts` |
-| `start_match` | live | `apps/worker/src/room-do.ts` `startMatch` + `START_REJECTIONS` | — core refusals map to `invalid-state` / `room-not-full` / `not-enough-players` / `teams-not-balanced` | `apps/worker/tests/room-host.test.ts` |
+| `auth` (5 s, then `4401`) | live | `apps/worker/src/room/handshake.ts` | — | `apps/worker/tests/room-auth.test.ts` |
+| `signal` relay | live | `apps/worker/src/room/relay.ts` `relaySignal` | — an offline `to` is `peer-not-connected` and a self-signal is `bad-request` | `apps/worker/tests/room-relay.test.ts` |
+| `team_assign` (batched) | live | `apps/worker/src/room/seats.ts` `assignTeams` | — the lobby sends the whole roster (`apps/web/src/routes/LobbyPage.tsx`) and `parseClientFrame` refuses the old per-member shape | `apps/worker/tests/room-host.test.ts` |
+| `start_match` | live | `apps/worker/src/room/match-lifecycle.ts` `startRoom` + `START_REJECTIONS` | — core refusals map to `invalid-state` / `room-not-full` / `not-enough-players` / `teams-not-balanced` | `apps/worker/tests/room-host.test.ts` |
 | `start_match` (duplicate HTTP path) | deleted | was `apps/worker/src/room-do.ts` (`action=start`); `action=settings` went with it | both bypassed the socket guards, and the start path stamped `rulesetVersion: room.settings.mode`. `StartOutcome.turnOrder` (`packages/core/src/room.ts:203`) is now unused | `apps/worker/tests/room-host.test.ts` |
-| `snapshot_push` → `snapshot_state` | live | `apps/worker/src/room-do.ts` `pushSnapshot` | — relay and rejoin replay share one name; a stale `seq` is dropped silently | `apps/worker/tests/room-relay.test.ts` |
-| `host_changed` + election | live | `apps/worker/src/room-do.ts` `electIfHostGone` / `announceHostChange` | — one election path, `hostGeneration` bumped once per change | `apps/worker/tests/room-election.test.ts` |
-| `match_end` → `match_recorded` | live | `apps/worker/src/room-do.ts` `endMatch` / `recordMatch` | — the DO posts to the Worker with the host's own token, a guest room broadcasts `ranked: false`, and `409` counts as success | `apps/worker/tests/matches.test.ts` |
-| `peer_left.reason` | live | `apps/worker/src/room-do.ts` (`left` on `leave`, `grace` on close and heartbeat timeout) | — the roster change arrives in the following `room_state` | `apps/worker/tests/room-election.test.ts` |
-| `ping` / `pong` | live | `apps/worker/src/room-do.ts` (`ping` case + `sweepSilentSockets`) | — `pong` echoes `at` and adds `now`; 45 s of silence moves the member to `grace` | `apps/worker/tests/room.test.ts` |
-| `move`, `item`, `room_settings`, `loadout` (§ 9) | live | `apps/worker/src/room-do.ts` (`applySettings`, `setLoadout`, `relayInput`) | — `move`/`item` are relayed to the host, which validates them; the DO only refuses a non-playing room and a missing host socket | `apps/worker/tests/room-settings.test.ts` |
+| `snapshot_push` → `snapshot_state` | live | `apps/worker/src/room/snapshot-relay.ts` `pushSnapshot` | — relay and rejoin replay share one name; a stale `seq` is dropped silently | `apps/worker/tests/room-relay.test.ts` |
+| `host_changed` + election | live | `apps/worker/src/room/election.ts` `hostIsGone` / `planPromotion`, announced by `room-do.ts` `announceHostChange` | — one election path, `hostGeneration` bumped once per change | `apps/worker/tests/room-election.test.ts` |
+| `match_end` → `match_recorded` | live | `apps/worker/src/room/match-lifecycle.ts` `planEnd` and `apps/worker/src/room/records.ts` `recordMatch` | — the DO posts to the Worker with the host's own token, a guest room broadcasts `ranked: false`, and `409` counts as success | `apps/worker/tests/matches.test.ts` |
+| `peer_left.reason` | live | `apps/worker/src/room/presence.ts` (`left` on `leave`, `grace` on close and heartbeat timeout) | — the roster change arrives in the following `room_state` | `apps/worker/tests/room-election.test.ts` |
+| `ping` / `pong` | live | `apps/worker/src/room/presence.ts` (`ping` case + `sweepSilentSockets`) | — `pong` echoes `at` and adds `now`; 45 s of silence moves the member to `grace` | `apps/worker/tests/room.test.ts` |
+| `move`, `item`, `room_settings`, `loadout` (§ 9) | live | `apps/worker/src/room/seats.ts` (`applyRoomSettings`, `applyLoadout`) and `apps/worker/src/room/relay.ts` (`relayInput`) | — `move`/`item` are relayed to the host, which validates them; the DO only refuses a non-playing room and a missing host socket | `apps/worker/tests/room-settings.test.ts` |
 | Snapshot payload additions (§ 9) | live, except `queue`/`delays`/`items`/`bonus`/`modeState` | `packages/core/src/snapshot.ts` carries `seq`, `hostGeneration`, per-player `shield`/`energy`/`weaponSlot` and the optional `terrain` mask | add `turn.queue`, `turn.delays`, per-player `items`/`bonus` and optional `modeState`, under the 800 B state budget; the mask rides only a carve frame, under the 8 KB cap | `packages/core/tests/snapshot.test.ts` (TC-CORE-041) |
+
+The code sites moved in `US-ROOM-008` (`room-do.ts` 1 198 → 394 lines): every row above names the collaborator under
+`apps/worker/src/room/` that now owns the behaviour, because a line number in the Durable Object was the first thing the
+split invalidated.
 
 Client-side counterpart: `apps/web/src/net/signaling.ts` no longer declares its own frame types — it re-exports
 `ClientFrame`/`ServerFrame` from `protocol.ts`, so a rename on one side cannot leave the other behind. The DO parses

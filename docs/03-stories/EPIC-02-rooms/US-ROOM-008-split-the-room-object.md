@@ -2,7 +2,7 @@
 id: US-ROOM-008
 title: Split the room object into collaborators
 epic: EPIC-02-rooms
-status: ready
+status: done
 priority: P2
 size: L
 depends_on: [US-ROOM-003, US-ROOM-005, US-ROOM-006, US-ROOM-007, US-RANK-001]
@@ -67,5 +67,27 @@ The P2P topology (`ADR-0004`), the anti-cheat boundary (`OQ-30`), the `move`/`it
 
 ## 8. Test notes
 
+Red: none — a refactor has no failing case to start from; the suites are the oracle for "no behaviour changed" (AC2), and
+`tests/meta/file-size.test.ts` is what keeps the size rule from drifting back.
+
 `TC-ROOM-700` (the size rule, meta), `TC-ROOM-701` (the harness suites unchanged). The existing `room-*.ts` files already
 drive the real object through `support/room-harness.ts`, so they are the proof that behaviour did not move.
+
+## Delivery status — 2026-11-10
+
+**done.** `room-do.ts` went **1 198 → 394 lines**. It now holds only what only a Durable Object can do — `ctx.storage`,
+`persist()`, the alarm wiring, the socket maps, and the four fields the harness reads — with fourteen collaborators under
+`apps/worker/src/room/`: `handshake`, `presence`, `match-lifecycle`, `records`, `wire`, `election`, `sweep`, `seats`,
+`protocol`, `snapshot-relay`, `rate-limit`, `rest`, `relay`, `identity`.
+
+| AC | Evidence |
+|---|---|
+| AC1 | `TC-ROOM-700` — 394 lines against the 400 limit, and the budgets, the election and the recording each exist as their own module (`room/rate-limit.ts`, `room/election.ts`, `room/records.ts`). |
+| AC2 | `TC-ROOM-701` — `apps/worker/tests` 38 files / 400 cases pass with **no assertion edited**, run four times during the split, including the socket-budget case and the migration cases. |
+| AC3 | `TC-ROOM-700` pins the storage key set: `room`, `hostCheck`, `snapshot`, `origin`, `matchStartedAt` — the same five, with no new key and no new alarm. |
+| AC4 | `pnpm build` clean; the worker bundle is inside its recorded budget (the `wrangler deploy --dry-run` figure itself needs Cloudflare credentials). |
+| AC5 | `apps/worker/package.json` is untouched. |
+
+Two sequencing normalisations came out of the split and are recorded rather than hidden: the join's `host_changed` frame and
+the alarm's silence frames now leave **after** `persist()` instead of before it. No test or harness path observes the order,
+but it is a real difference and it is named here.

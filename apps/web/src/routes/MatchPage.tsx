@@ -1,915 +1,111 @@
 /**
  * The match screen (`US-MATCH-001` … `US-MATCH-007`).
  *
- * The page owns the loop: it mounts the renderer, feeds it state, turns gestures into inputs and —
- * when this client is the host — broadcasts snapshots. All rules live in `@gbw/core`; this file only
- * decides *when* to call them.
+ * The page composes the match; it does not own it (`US-MATCH-008`). `useMatchPlan` reads the plan, `useMatchEngine`
+ * creates the state and is its only writer, `useBattleMount`/`useBattleSync` bridge that state to the renderer,
+ * `useBotOpponent`/`useTurnClock` drive the turns, `useNetplay` joins the room, and the HUD hooks plus the panels below
+ * render all of it. All rules live in `@gbw/core`; no hook here decides one.
+ *
+ * The order of the hook calls below is part of the contract: the renderer is mounted before anything is pushed into it,
+ * and the turn tick runs after the bot so a bot match advances one step at a time.
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
-import {
-  TUNABLES,
-  applyInput,
-  EMOTE_IDS,
-  PHRASE_IDS,
-  botTurn,
-  createMatch,
-  createRng,
-  createTerrain,
-  getMobile,
-  isItemId,
-  ITEMS_BY_ID,
-  toSnapshot,
-  type ChatId,
-  type MatchEvent,
-  type MatchState,
-  type Seat,
-} from "@gbw/core";
-import { mountBattle, type BattleHandle } from "../game/scene";
-import { canAim, fireFromPull, RING_RADIUS } from "../game/aim";
-import { DirectionPad, type PadAction } from "../components/DirectionPad";
-import type { ChatKind } from "@gbw/core";
-import { ItemWheel, type EquippedItem } from "../components/ItemWheel";
-import { PhrasePicker } from "../components/PhrasePicker";
-import { MatchStats } from "../components/MatchStats";
-import { Roster } from "../components/Roster";
-import { WeatherBanner } from "../components/WeatherBanner";
-import { winConditionOf } from "../lib/outcome";
-import { clockSeconds } from "../lib/clock";
-import { WeaponStrip, type WeaponSlot } from "../components/WeaponStrip";
-import { WindDial } from "../components/WindDial";
-import { type CameraWindow } from "@gbw/core";
+import { useRef, useState } from "react";
+import { useParams } from "react-router-dom";
+import { TUNABLES, createTerrain, getMobile } from "@gbw/core";
 import { useLocale } from "../app/providers";
-import { useLiveAnnouncement } from "../app/useLiveAnnouncement";
-import { translate } from "../i18n";
-import {
-  inputFrameOf,
-  isStaleInput,
-  SNAPSHOT_WATCHDOG_MS,
-  toPackedSnapshot,
-  unpackSnapshot,
-  type InputFrame,
-} from "../net/input";
-import { createMesh, type Mesh } from "../net/mesh";
-import { decideTurn } from "../net/host-clock";
-import { resyncFromSnapshot } from "../net/resync";
-import { countRejectedSnapshot } from "../net/diagnostics";
-import { chatFrame, chatText, isChatFrame, toastMs } from "../net/chat";
-import { adoptHostChanged } from "../net/migration";
-import { itemFrame } from "../net/frames";
-import { connectWithReconnect, type ReconnectingSocket } from "../net/reconnect";
-import type { ServerMessage } from "../net/signaling";
-import { api } from "../lib/api";
-import { readPlan, type PlannedMatch } from "../lib/plan";
-import { writeResult, type RecordedMatch, type ResultPayload } from "../lib/result";
-import { currentSession } from "../lib/session";
+import { MatchAimOverlays } from "../match/MatchAimOverlays";
+import { MatchBottomBar } from "../match/MatchBottomBar";
+import { MatchNotices } from "../match/MatchNotices";
+import { MatchTopBar } from "../match/MatchTopBar";
+import { useAimHud } from "../match/useAimHud";
+import { useBattleMount } from "../match/useBattleMount";
+import { useBattleSync } from "../match/useBattleSync";
+import { useBotOpponent } from "../match/useBotOpponent";
+import { useHosting } from "../match/useHosting";
+import { useMatchAnnouncement } from "../match/useMatchAnnouncement";
+import { useMatchChat } from "../match/useMatchChat";
+import { useMatchEngine } from "../match/useMatchEngine";
+import { useMatchInputs } from "../match/useMatchInputs";
+import { useMatchItems } from "../match/useMatchItems";
+import { useMatchPlan } from "../match/useMatchPlan";
+import { useMatchRecorder } from "../match/useMatchRecorder";
+import { useMatchWiring, type MatchStatus } from "../match/wiring";
+import { useNetplay } from "../match/useNetplay";
+import { useSnapshotWatchdog } from "../match/useSnapshotWatchdog";
+import { useTurnClock } from "../match/useTurnClock";
+import { useWeaponSelect } from "../match/useWeaponSelect";
 import type { JSX } from "react";
 
-export type { PlannedMatch };
-
-/**
- * How long a finished match waits for the room's `match_recorded` before the screen offers a retry
- * (`US-RANK-005` AC6). The round trip is one D1 batch; a room that has not answered in five seconds is
- * better shown as "not recorded yet" than a screen that never appears.
- */
-/** The aim aid is a training wheel: off unless the player turned it on, and remembered per device. */
-const AIM_AID_KEY = "gb.aimAid";
-
-function readAimAid(): boolean {
-  try {
-    return window.localStorage.getItem(AIM_AID_KEY) === "1";
-  } catch {
-    // Private mode throws on `localStorage`: the aid is a preference, not a feature.
-    return false;
-  }
-}
-
-const RECORD_TIMEOUT_MS = 5_000;
-
-/**
- * The seats with the result the record gave them: the room decides who won, lost or walked out, and the
- * screen must not keep a second opinion (`US-RANK-005` AC3, `signaling.md` § match_recorded).
- */
-function withRecordedResults(
-  players: ResultPayload["players"],
-  recorded: Pick<RecordedMatch, "results">,
-): ResultPayload["players"] {
-  if (!recorded.results || recorded.results.length === 0) return players;
-  const bySlot = new Map(recorded.results.map((entry) => [entry.slot, entry.result]));
-  return players.map((player) => {
-    const result = bySlot.get(player.slot);
-    return result ? { ...player, result } : player;
-  });
-}
-
-/** The fixed phrase and emote ids of `US-MATCH-004`; only their copy lives in the locale tables. */
-
-function botSeats(local: Seat): readonly Seat[] {
-  return [local, { slot: 1, team: "B", accountId: null, displayName: "Bot", mobileId: "mbl-04" }];
-}
+export type { PlannedMatch } from "../lib/plan";
 
 export function MatchPage(): JSX.Element {
   const { code = "" } = useParams<{ code: string }>();
-  const navigate = useNavigate();
-  const { t, locale } = useLocale();
-  const plan = useMemo<PlannedMatch | null>(() => {
-    const stored = readPlan();
-    if (stored && stored.roomCode === code) return stored;
-    const session = currentSession();
-    if (!session) return null;
-    return {
-      kind: "bot",
-      roomCode: code,
-      localSlot: 0,
-      playerId: `local-${session.subject.guestId ?? session.subject.accountId ?? "guest"}`,
-      seats: botSeats({
-        slot: 0,
-        team: "A",
-        accountId: session.subject.accountId ?? null,
-        displayName: session.subject.displayName,
-        mobileId: "mbl-01",
-      }),
-      seed: Math.floor(Math.random() * 0xffffff),
-      mapId: "map-01",
-      mode: "solo",
-      maxPlayers: 2,
-      hostPlayerId: "local",
-    };
-  }, [code]);
+  const { t } = useLocale();
 
-  const [state, setState] = useState<MatchState | null>(null);
-  const [feed, setFeed] = useState<readonly MatchEvent[]>([]);
-  /** The events of the step that produced the current state, handed to the renderer once (`shot` carries the path). */
-  const pendingEvents = useRef<readonly MatchEvent[]>([]);
-  const [power, setPower] = useState(0);
-  /** The "drag to aim" hint, shown once per match (`US-MATCH-002` AC4). */
-  const [hint, setHint] = useState<string | null>(null);
-  const [aimAid, setAimAid] = useState(readAimAid);
-  /** The phrase grid: its 💬 toggle is in the top strip, the grid itself opens above the bar. */
-  const [chatOpen, setChatOpen] = useState(false);
-  /** The item wheel: the scene opens it when a press is held on this client's own mobile (owner, 2026-11-09). */
-  const [itemWheelAt, setItemWheelAt] = useState<{ readonly x: number; readonly y: number } | null>(null);
-  const hintShown = useRef(false);
-  const [aimDelta, setAimDelta] = useState(0);
-  /** The angle the finger is currently pulling at (`US-MATCH-002` AC2). The pad only nudges it. */
-  const [pullAngle, setPullAngle] = useState(45);
-  const aimDeltaRef = useRef(0);
-  /** The barrel's resting angle: the gesture angle is added to this at release (`US-MATCH-006` AC4/AC5). */
-  /** The mobile this client is driving, from the state when it exists and from the plan before that. */
-  const aimMobile = useMemo(() => {
-    const slot = plan?.localSlot ?? 0;
-    const player = state?.players.find((candidate) => candidate.slot === slot);
-    const seat = plan?.seats.find((candidate) => candidate.slot === slot);
-    return getMobile(player?.mobileId ?? seat?.mobileId ?? "mbl-01");
-  }, [plan, state]);
-  // The number the player aims with: the pull's own angle (or the rest angle) plus the pad's nudge, clamped to the
-  // mobile's barrel window — the same expression `shotAngle` applies to the shot itself.
-  const aimAngle = Math.max(
-    aimMobile.angleMin,
-    Math.min(aimMobile.angleMax, Math.round((power > 0 ? pullAngle : 45) + aimDelta)),
-  );
-  // The camera window still drives the scene; the ruler that printed it is gone (`screens/match.md` § 8).
-  const [, setCamera] = useState<CameraWindow | null>(null);
-  /** Where the renderer last drew this client's mobile, in CSS pixels (`US-MATCH-003` AC11). */
-  const [focus, setFocus] = useState<{ readonly x: number; readonly y: number } | null>(null);
-  const [status, setStatus] = useState<"connecting" | "live" | "reconnecting" | "ended">("connecting");
+  const plan = useMatchPlan(code);
+  const wiring = useMatchWiring(plan);
+  const [status, setStatus] = useState<MatchStatus>("connecting");
   const [banner, setBanner] = useState<string | null>(null);
-  // The aim selection is local state but the renderer callback is created once, so the ref is what
-  // the shot reads; the state only drives the strip's `aria-pressed` (`US-MATCH-005` AC2).
-  const [weaponSlot, setWeaponSlot] = useState<WeaponSlot>(0);
-  const weaponSlotRef = useRef<WeaponSlot>(0);
-  // Turn number the weapon was fired in: the selection is locked until the turn changes (AC3).
-  const [lockedTurn, setLockedTurn] = useState<number | null>(null);
-  /** Mirrored for the mount-time closures: `onRelease` is created once and would read a stale state value. */
-  const lockedTurnRef = useRef<number | null>(null);
-  /** The phrase on screen, with the seat that said it: the banner belongs above that seat's chip (`AC3`). */
-  const [chat, setChat] = useState<{ readonly slot: number; readonly kind: ChatKind; readonly id: string } | null>(null);
+  const recorder = useMatchRecorder({ plan, setStatus, wiring });
+  const engine = useMatchEngine({ plan, finish: recorder.finish, setStatus, wiring });
+  const state = engine.state;
+  const hosting = useHosting(plan);
   const container = useRef<HTMLDivElement | null>(null);
-  const battle = useRef<BattleHandle | null>(null);
-  const mesh = useRef<Mesh | null>(null);
-  const socket = useRef<ReconnectingSocket | null>(null);
-  const seq = useRef(1);
-  /** Last `seq` applied per `slot:turn`, so a resent input is dropped instead of applied twice (`US-NET-002` AC4). */
-  const appliedInputs = useRef(new Map<string, number>());
-  /** `playerId → slot` from the last `room_state`, so a control frame can be attributed to a seat (`US-NET-002` AC1). */
-  const slotsByPlayer = useRef(new Map<string, number>());
-  /** When the last snapshot arrived, for the 2 s watchdog (`US-NET-002` AC6). */
-  const lastSnapshotAt = useRef(0);
-  const stateRef = useRef<MatchState | null>(null);
-  const ended = useRef(false);
-  /** Resolves the wait for `match_recorded` started by `finish`; `null` when no result is pending (`AC6`). */
-  const recording = useRef<((recorded: RecordedMatch) => void) | null>(null);
-  /** The same wait's other end, and its timer, so a finished screen can disarm both on unmount. */
-  const resolveRecording = useRef<((recorded: RecordedMatch) => void) | null>(null);
-  const recordTimer = useRef<number | null>(null);
 
-  // Leaving the screen forgets a record still in flight: its answer would navigate from a dead page.
-  useEffect(
-    () => () => {
-      if (recordTimer.current !== null) window.clearTimeout(recordTimer.current);
-      recordTimer.current = null;
-      resolveRecording.current = null;
-      recording.current = null;
-    },
-    [],
-  );
-  // Slots the room reports as `grace` or `disconnected`, and the newest host election seen: the first
-  // decides who gets skipped, the second which snapshots are still valid (`US-ROOM-004` AC3/AC5/AC7).
-  const absent = useRef<readonly number[]>([]);
-  const hostGeneration = useRef(0);
-  /**
-   * Who runs the simulation right now. Seeded from the lobby plan and moved by `host_changed`/`room_state`
-   * (`US-NET-003` AC2): the plan is a photograph of the room as it was when the match started.
-   */
-  const hostPlayerId = useRef<string | null>(plan?.hostPlayerId ?? null);
-
-  stateRef.current = state;
-
+  /** The seat this client drives; `null` until the engine exists. */
   const localPlayer = state?.players.find((player) => player.slot === plan?.localSlot) ?? null;
-  /** What the wheel fans out: the same six slots the bar used to print, in a stable order so an arc never reshuffles. */
-  const equippedItems: readonly EquippedItem[] = Object.entries(localPlayer?.items ?? {}).map(([id, qty]) => ({
-    id,
-    qty,
-    delay: ITEMS_BY_ID.get(id)?.delayCost ?? 0,
-    name: ITEMS_BY_ID.get(id)?.name ?? id,
-  }));
-  const isMyTurn = Boolean(state && localPlayer && state.turn.activeSlot === localPlayer.slot && state.status === "playing");
   const mobile = getMobile(localPlayer?.mobileId ?? "mbl-01");
+  const isMyTurn = Boolean(state && localPlayer && state.turn.activeSlot === localPlayer.slot && state.status === "playing");
 
-  const finish = useCallback(
-    (final: MatchState) => {
-      if (ended.current) return;
-      ended.current = true;
-      setStatus("ended");
-      const local = final.players.find((player) => player.slot === plan?.localSlot) ?? null;
-      const payload: ResultPayload = {
-        roomCode: final.roomCode,
-        mode: final.mode,
-        winnerTeam: final.winnerTeam,
-        startedAt: final.startedAt,
-        endedAt: Date.now(),
-        rulesetVersion: final.rulesetVersion,
-        // Which rule ended it, for the result screen (`US-CORE-010` AC6): the engine keeps only the
-        // winner, so the condition is read back with the same rules `conclusionOf` used.
-        winCondition: winConditionOf(final),
-        players: final.players.map((player) => ({
-          slot: player.slot,
-          accountId: player.accountId,
-          displayName: player.displayName,
-          team: player.team,
-          damageDealt: player.damageDealt,
-          shotsFired: player.shotsFired,
-          hits: player.hits,
-          result: final.winnerTeam === null ? "abandon" : final.winnerTeam === player.team ? "win" : "loss",
-        })),
-        localSlot: plan?.localSlot ?? 0,
-        mapId: final.mapId,
-        maxPlayers: plan?.maxPlayers ?? final.players.length,
-        mobileId: local?.mobileId ?? "mbl-01",
-        kind: plan?.kind === "online" ? "online" : "bot",
-        // The host is who runs the simulation now, not who created the room: a migration moves the role
-        // (`US-NET-003` AC2), and only the host may name the winner (`signaling.md` § match_end).
-        isHost: plan?.kind === "online" ? plan.playerId === hostPlayerId.current : true,
-        submission: null,
-      };
+  const aimHud = useAimHud(plan, state);
+  const weapons = useWeaponSelect({ ssCharge: localPlayer?.ssCharge ?? 0, battle: wiring.battle });
+  const chat = useMatchChat({ plan, wiring });
+  const items = useMatchItems({ plan, localPlayer, commit: engine.commit, wiring });
+  const inputs = useMatchInputs({
+    plan,
+    mobile,
+    commit: engine.commit,
+    hosting: hosting.hosting,
+    wiring,
+    setAimDelta: aimHud.setAimDelta,
+  });
 
-      // A practice match never leaves the device: there is nothing to record and the screen says so
-      // (`US-RANK-005` AC7).
-      if (payload.kind === "bot") {
-        writeResult({ ...payload, submission: { ranked: false, rankedReason: "bot", ratings: [] } });
-        navigate(`/results/${final.roomCode}`, { replace: true });
-        return;
-      }
-
-      // Written before the round trip, so a reload mid-record still lands on a result screen with the stats.
-      writeResult(payload);
-      if (payload.isHost) {
-        // The host names the winner and the statistics the room's record is built from; every client then
-        // waits for the broadcast that carries the deltas, because a finished room refuses new sockets
-        // (`signaling.md` § match_end → `match_recorded`).
-        socket.current?.send({
-          t: "match_end",
-          winnerTeam: final.winnerTeam,
-          stats: final.players.map((player) => ({
-            slot: player.slot,
-            damageDealt: player.damageDealt,
-            shotsFired: player.shotsFired,
-            hits: player.hits,
-          })),
-        });
-      }
-      // A peer cannot end a match, so a room that never answers leaves the host to resubmit from the
-      // result screen; the wait below is what turns that into a visible state instead of a hang (`AC6`).
-      const timer = window.setTimeout(() => {
-        resolveRecording.current?.({
-          ranked: false,
-          rankedReason: null,
-          ratings: [],
-          failed: true,
-        });
-        resolveRecording.current = null;
-        // Nothing waits after this: the screen has already handed over, and this page unmounts with the
-        // socket, so an answer that arrives later has no one to reach. Only a resubmit from the result screen
-        // can turn that into deltas (`409` -> the stored record).
-        recording.current = null;
-      }, RECORD_TIMEOUT_MS);
-      // Kept in refs so unmount can disarm it: a timer that fires after the player left would drag them
-      // back to a result screen they already walked away from.
-      recordTimer.current = timer;
-      resolveRecording.current = (recorded) => {
-        window.clearTimeout(timer);
-        recordTimer.current = null;
-        recording.current = null;
-        writeResult({ ...payload, submission: recorded, players: withRecordedResults(payload.players, recorded) });
-        navigate(`/results/${final.roomCode}`, { replace: true });
-      };
-      recording.current = (recorded) => {
-        const resolve = resolveRecording.current;
-        resolveRecording.current = null;
-        resolve?.(recorded);
-      };
-    },
-    [hostPlayerId, navigate, plan],
-  );
-
-  const commit = useCallback(
-    (next: MatchState, events: readonly MatchEvent[] = []) => {
-      stateRef.current = next;
-      pendingEvents.current = events;
-      setState(next);
-      if (events.length > 0) setFeed((previous) => [...previous, ...events].slice(-6));
-      if (next.status === "ended") finish(next);
-    },
-    [finish],
-  );
-
-  // Create the match once, then mount the renderer.
-  useEffect(() => {
-    if (!plan) return;
-    const match = createMatch({
-      matchId: `m-${plan.seed}`,
-      roomCode: plan.roomCode,
-      seed: plan.seed,
-      mode: plan.mode,
-      mapId: plan.mapId,
-      seats: plan.seats,
-      now: Date.now(),
-      // The room's start time, not this device's: the record's id is `${roomCode}-${startedAt}` from the
-      // room's clock (`room-do.ts` § recordMatch), and a result screen can only resubmit that id if the
-      // payload carries the same number (`US-RANK-005` AC6). Kept apart from `now`, because a reload into a
-      // live match must not hand the opening turn a deadline that already passed.
-      startedAt: plan.startedAt,
-    });
-    setState(match);
-    setStatus("live");
-  }, [plan]);
-
-  useEffect(() => {
-    if (!container.current || !state || !plan) return;
-    battle.current = mountBattle({
-      parent: container.current,
-      state,
-      localSlot: plan.localSlot,
-      callbacks: {
-        // The pad rings the mobile the player is shooting (`US-MATCH-003` AC11).
-        onFocus: (point) => setFocus(point),
-        // A press held on this client's own hull fans the loadout out around it (`owner`, 2026-11-09).
-        onItemHold: (point) => setItemWheelAt(point),
-        onPull: (value, angle) => {
-          setPower(value);
-          setPullAngle(angle);
-        },
-        onRelease: (value, nextAngle) => {
-          const current = stateRef.current;
-          if (!current || !plan) return;
-          // The scene already refuses to start a pull out of turn, but the release is the moment a shot would leave
-          // the client, so the same decision is taken again here (`US-MATCH-002` AC7/AC8).
-          const input = fireFromPull(
-            { power: value, angle: nextAngle },
-            {
-              slot: plan.localSlot,
-              weaponSlot: weaponSlotRef.current,
-              seq: seq.current,
-              mobile,
-              aimDelta: aimDeltaRef.current,
-              shot: { lockedTurn: lockedTurnRef.current, turnNumber: current.turn.number },
-            },
-          );
-          if (!input) return;
-          const turn = current.turn.number;
-          if (!hostingRef.current) {
-            // A peer never simulates (`US-NET-002` AC1): the input goes to the host, the shot appears when the host's
-            // snapshot comes back — one round trip later by design (`OQ-32`, no prediction).
-            seq.current = input.seq + 1;
-            mesh.current?.sendControlAll(
-              inputFrameOf(
-                {
-                  kind: "fire",
-                  angle: input.angle,
-                  force: input.force,
-                  facing: current.players.find((player) => player.slot === plan.localSlot)?.facing ?? 1,
-                  weaponSlot: input.weaponSlot,
-                },
-                turn,
-                input.seq,
-              ),
-            );
-            setLockedTurn(turn);
-            lockedTurnRef.current = turn;
-            setPower(0);
-            return;
-          }
-          seq.current += 1;
-          const result = applyInput(current, input, Date.now());
-          commit(result.state, result.events);
-          setLockedTurn(current.turn.number);
-          lockedTurnRef.current = current.turn.number;
-          // A shot that carved the mask is the only moment the peers need the terrain itself: they resolve
-          // hits against it (`US-CORE-006` AC4), and the mask is far too big to ride in every snapshot.
-          const carved = result.events.some((event) => event.kind === "shot" && event.carved);
-          const snapshot = toSnapshot(result.state, hostGeneration.current, { includeTerrain: carved });
-          mesh.current?.broadcast(snapshot);
-          socket.current?.send({ t: "snapshot_push", snapshot: toPackedSnapshot(snapshot) });
-          setPower(0);
-        },
-        onCancel: (reason) => {
-          setPower(0);
-          if (reason === "deadzone" && !hintShown.current) {
-            hintShown.current = true;
-            setHint(translate(locale, "match.hint.pull"));
-          }
-        },
-        onCamera: (window) => setCamera(window),
-      },
-    });
-    // A remounted scene starts on slot 0 and no nudge; hand it what the strip and the pad are showing.
-    battle.current.setWeaponSlot(weaponSlotRef.current);
-    battle.current.setAimDelta(aimDeltaRef.current);
-    return () => {
-      battle.current?.destroy();
-      battle.current = null;
-      // The mounted scene keeps its own copy of the state; the page pushes updates below.
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [Boolean(state), plan?.localSlot, commit]);
-
-  // The aim aid draws the angle the shot will carry, so the scene needs the pad's nudge (`US-MATCH-006`).
-  useEffect(() => {
-    aimDeltaRef.current = aimDelta;
-    battle.current?.setAimDelta(aimDelta);
-  }, [aimDelta]);
-
-  useEffect(() => {
-    if (battle.current && state) {
-      battle.current.setState(state, plan?.localSlot ?? 0, pendingEvents.current);
-      pendingEvents.current = [];
-    }
-  }, [state, plan?.localSlot]);
-
-  // The hint says its piece once and goes away on its own (`US-MATCH-002` AC4).
-  useEffect(() => {
-    if (!hint) return;
-    const timer = window.setTimeout(() => setHint(null), 2500);
-    return () => window.clearTimeout(timer);
-  }, [hint]);
-
-  // The scene draws the ring and the preview only while this client may shoot (`US-MATCH-002` AC7/AC8).
-  useEffect(() => {
-    if (!state) return;
-    const localSlot = plan?.localSlot ?? 0;
-    const own = state.players.find((player) => player.slot === localSlot);
-    battle.current?.setAimAllowed(
-      canAim({
-        status: state.status,
-        activeSlot: state.turn.activeSlot,
-        localSlot,
-        eliminated: own?.eliminated ?? false,
-        lockedTurn,
-        turnNumber: state.turn.number,
-      }),
-    );
-  }, [state, plan?.localSlot, lockedTurn]);
-
-  // The trajectory aid is opt-in (`US-MATCH-005` AC2): the scene keeps it off until the player asks, and the choice
-  // survives a reload because re-learning an arc every session is not the point.
-  useEffect(() => {
-    battle.current?.setAimAid(aimAid);
-    try {
-      window.localStorage.setItem(AIM_AID_KEY, aimAid ? "1" : "0");
-    } catch {
-      // Private mode: the toggle still works for this match.
-    }
-  }, [aimAid]);
-
-  // Bot opponent: think for a moment, then shoot.
-  useEffect(() => {
-    if (!plan || plan.kind !== "bot" || !state || state.status !== "playing") return;
-    // A guest seat also has `accountId: null`, so the opponent is identified by its slot, never by identity.
-    const bot = state.players.find((player) => player.slot !== plan.localSlot);
-    if (!bot || bot.eliminated || state.turn.activeSlot !== bot.slot) return;
-    const timer = window.setTimeout(() => {
-      const current = stateRef.current;
-      if (!current) return;
-      const rng = createRng(current.seed + current.turn.number * 7919);
-      const input = botTurn(current, rng);
-      if (!input) return;
-      const result = applyInput(current, { ...input, seq: seq.current++ }, Date.now());
-      commit(result.state, result.events);
-    }, 1400);
-    return () => window.clearTimeout(timer);
-  }, [state, plan, commit]);
-
-  // Turn clock: the host is the clock, and an absent player's turn is skipped rather than waited out
-  // (`US-ROOM-004` AC3, AC7). `decideTurn` owns the rules; this effect only applies the answer.
-  //
-  // Who the host is changes while a match runs: an election promotes a peer and demotes the client that was hosting
-  // (`US-NET-003` AC2). The plan from the lobby never changes, so it cannot answer that question.
-  const [hosting, setHosting] = useState(() => !plan || plan.kind === "bot" || plan.hostPlayerId === plan.playerId);
-  /**
-   * The role as the renderer holds it. `mountBattle` is not remounted when the role changes, so the callbacks it
-   * captured would keep answering from the lobby's plan (`US-NET-003` AC2).
-   */
-  const hostingRef = useRef(hosting);
-  useEffect(() => {
-    hostingRef.current = hosting;
-  }, [hosting]);
-  useEffect(() => {
-    if (!state || state.status !== "playing") return;
-    const tick = window.setInterval(() => {
-      const current = stateRef.current;
-      if (!current || current.status !== "playing" || !plan) return;
-      const decision = decideTurn({
-        isHost: hosting,
-        localSlot: plan.localSlot,
-        activeSlot: current.turn.activeSlot,
-        deadlineAt: current.turn.deadlineAt,
-        absentSlots: absent.current,
-        now: Date.now(),
-      });
-      if (decision.kind === "wait") return;
-      const result = applyInput(current, { kind: "skip", slot: current.turn.activeSlot, seq: seq.current++ }, Date.now());
-      commit(result.state, result.events);
-      // A skip this client decided is the host's word: the peers resync from the snapshot, which carries
-      // the new `deadlineAt`, so their clocks do not drift from the turn (`US-ROOM-004` § 5).
-      if (hosting && plan.kind === "online") {
-        const snapshot = toSnapshot(result.state, hostGeneration.current);
-        mesh.current?.broadcast(snapshot);
-        socket.current?.send({ t: "snapshot_push", snapshot: toPackedSnapshot(snapshot) });
-      }
-    }, 500);
-    return () => window.clearInterval(tick);
-  }, [state, plan, hosting, commit]);
-
-  // Online: join the room socket and the peer mesh.
-  useEffect(() => {
-    if (!plan || plan.kind !== "online") return;
-    const session = currentSession();
-    if (!session) return;
-    let cancelled = false;
-    const base = window.location.origin.replace(/^http/, "ws");
-
-    let iceServers: RTCIceServer[] = [];
-    const buildMesh = (hosting: boolean): Mesh =>
-      createMesh({
-        selfPlayerId: plan.playerId,
-        isHost: hosting,
-        iceServers,
-        // `host_hello` on every new control channel (`US-NET-001` § 5).
-        hostHello: () => ({ t: "host_hello", hostGeneration: hostGeneration.current, seq: seq.current }),
-        send: (channel) =>
-          socket.current?.send({
-            t: "signal",
-            to: channel.to,
-            payload:
-              channel.kind === "candidate"
-                ? { kind: "candidate", candidate: channel.payload }
-                : { kind: channel.kind, sdp: (channel.payload as RTCSessionDescriptionInit).sdp ?? "" },
-          }),
-        onSnapshot: (snapshot) => {
-          lastSnapshotAt.current = Date.now();
-          const current = stateRef.current;
-          if (!current) return;
-          const synced = resyncFromSnapshot(current, snapshot, hostGeneration.current);
-          hostGeneration.current = synced.hostGeneration;
-          if (synced.applied) commit(synced.state, []);
-          // A snapshot from a host that lost the election is dropped, and the drop is counted so a support
-          // check can tell a flickering connection from a client that never learned about the promotion.
-          else countRejectedSnapshot();
-        },
-        onControl: (from, message) => {
-          const current = stateRef.current;
-          if (!current) return;
-          // A phrase is not an input: it never changes the match, so it is handled before the turn guard and
-          // is never attributed by `seq` (`US-MATCH-004` AC3).
-          if (isChatFrame(message)) {
-            const slot = slotsByPlayer.current.get(from);
-            if (slot === undefined) return;
-            setChat({ slot, kind: message.kind, id: message.id });
-            // The host is the star's centre: a peer's phrase has to reach the other peers, and not come back
-            // to the sender, which already showed it.
-            if (hostPlayerId.current === plan.playerId) {
-              for (const playerId of slotsByPlayer.current.keys()) {
-                if (playerId !== from && playerId !== plan.playerId) mesh.current?.sendControl(playerId, message);
-              }
-            }
-            return;
-          }
-          const frame = message as Partial<InputFrame> & { t?: string };
-          if (frame?.t !== "input") return;
-          // Only the host runs the simulation; a peer that receives an input has already made a mistake.
-          if (hostPlayerId.current !== plan.playerId) return;
-          const slot = slotsByPlayer.current.get(from);
-          if (slot === undefined || frame.turn !== current.turn.number) return;
-          // AC4: an input older than the last one applied for this turn is dropped, not answered.
-          const key = `${slot}:${current.turn.number}`;
-          if (isStaleInput(frame as InputFrame, appliedInputs.current.get(key))) return;
-          appliedInputs.current.set(key, frame.seq ?? 0);
-          const input =
-            frame.kind === "skip"
-              ? { kind: "skip" as const, slot, seq: frame.seq ?? 0 }
-              : {
-                  kind: "fire" as const,
-                  slot,
-                  weaponSlot: frame.weaponSlot ?? 0,
-                  angle: frame.angle ?? 0,
-                  force: frame.force ?? 0,
-                  seq: frame.seq ?? 0,
-                };
-          const result = applyInput(current, input, Date.now());
-          commit(result.state, result.events);
-          // A resolved turn is published at once, so the shotter does not wait for the 100 ms tick (AC2, § 5).
-          const carved = result.events.some((event) => event.kind === "shot" && event.carved);
-          const snapshot = toSnapshot(result.state, hostGeneration.current, { includeTerrain: carved });
-          mesh.current?.broadcast(snapshot);
-          socket.current?.send({ t: "snapshot_push", snapshot: toPackedSnapshot(snapshot) });
-        },
-        onPeerState: (playerId, connectionState) => {
-          if (connectionState === "failed" || connectionState === "disconnected") {
-            setBanner(`${playerId}: ${connectionState}`);
-          }
-        },
-      });
-
-    void api.turnCredentials(session.token).then((credentials) => {
-      if (cancelled) return;
-      iceServers = credentials.iceServers.map((server) => ({
-        urls: Array.isArray(server.urls) ? server.urls : [server.urls],
-        ...(server.username ? { username: server.username } : {}),
-        ...(server.credential ? { credential: server.credential } : {}),
-      }));
-      mesh.current = buildMesh(hostPlayerId.current === plan.playerId);
-    });
-
-    socket.current = connectWithReconnect({
-      wsUrl: `${base}/api/v1/rooms/${plan.roomCode}/ws`,
-      token: session.token,
-      displayName: session.subject.displayName,
-      mobileId: localPlayer?.mobileId ?? "mbl-01",
-      onMessage: (message: ServerMessage) => {
-        if (message.t === "match_recorded") {
-          // The room's answer to `match_end`: the deltas the result screen renders (`US-RANK-005` AC1).
-          recording.current?.({
-            matchId: message.matchId,
-            ranked: message.ranked,
-            // The record's own reason (`US-RANK-005` AC2): `ruleset_mismatch` can never be derived here.
-            rankedReason: message.rankedReason ?? null,
-            ratings: message.ratings,
-            // The room's verdict on each seat, so the screen prints the record's result and not the one this
-            // client guessed from the winner' team.
-            results: message.players,
-          });
-          return;
-        }
-        if (message.t === "signal") {
-          const signal = message.payload;
-          void mesh.current?.applySignal(
-            message.from,
-            signal.kind,
-            signal.kind === "candidate" ? signal.candidate : { type: signal.kind, sdp: signal.sdp },
-          );
-          return;
-        }
-        if (message.t === "host_changed") {
-          setBanner(t("match.hostChanged"));
-          // Migration rebuilds the star (`US-NET-001` AC6): the elected host opens one link per remaining member and
-          // everyone drops the links that pointed at the old host. A link to a superseded host would stream state the
-          // peers are told to discard anyway, so the mesh is rebuilt from scratch.
-          hostGeneration.current = Math.max(hostGeneration.current, message.hostGeneration);
-          hostPlayerId.current = message.hostPlayerId;
-          const promoted = message.hostPlayerId === plan.playerId;
-          setHosting(promoted);
-          mesh.current?.close();
-          mesh.current = iceServers.length === 0 ? null : buildMesh(promoted);
-          for (const member of message.room.members) {
-            if (member.playerId !== plan.playerId) void mesh.current?.addPeer(member.playerId);
-          }
-          // The DO hands the promoted client the snapshot it kept: adopt it, then publish once so the peers and
-          // the replay any graced member receives carry the new host's numbers (`US-NET-003` AC1, AC4).
-          if (promoted) {
-            const adoption = adoptHostChanged(stateRef.current, message);
-            hostGeneration.current = adoption.hostGeneration;
-            if (adoption.state) {
-              commit(adoption.state, []);
-              const snapshot = toSnapshot(adoption.state, adoption.hostGeneration);
-              mesh.current?.broadcast(snapshot);
-              socket.current?.send({ t: "snapshot_push", snapshot: toPackedSnapshot(snapshot) });
-            }
-          }
-          return;
-        }
-        if (message.t === "peer_joined") {
-          void mesh.current?.addPeer(message.playerId);
-          return;
-        }
-        if (message.t === "snapshot_state") {
-          // The relay and the rejoin replay share one name: a returning client lands the host's hp, turn
-          // and wind without a reload (`US-ROOM-004` AC2, AC5).
-          lastSnapshotAt.current = Date.now();
-          const current = stateRef.current;
-          if (!current) return;
-          const synced = resyncFromSnapshot(current, unpackSnapshot(message.snapshot), hostGeneration.current);
-          hostGeneration.current = synced.hostGeneration;
-          if (synced.applied) commit(synced.state, []);
-          else countRejectedSnapshot();
-          return;
-        }
-        if (message.t === "room_state") {
-          // Who is present decides whose turn is skipped (`US-ROOM-004` AC3/AC7), and the generation
-          // decides which snapshots are still valid (AC5).
-          absent.current = message.room.members
-            .filter((member) => member.connectionState !== "connected")
-            .map((member) => member.slot);
-          hostGeneration.current = Math.max(hostGeneration.current, message.room.hostGeneration);
-          if (message.room.hostPlayerId !== hostPlayerId.current) {
-            hostPlayerId.current = message.room.hostPlayerId;
-            setHosting(message.room.hostPlayerId === plan.playerId);
-            mesh.current?.close();
-            mesh.current = iceServers.length === 0 ? null : buildMesh(message.room.hostPlayerId === plan.playerId);
-          }
-          for (const member of message.room.members) {
-            slotsByPlayer.current.set(member.playerId, member.slot);
-            if (member.playerId !== plan.playerId) void mesh.current?.addPeer(member.playerId);
-          }
-        }
-      },
-      // A transient drop reconnects inside the grace window (`US-ROOM-004` AC7); a code the server chose
-      // means retrying would only repeat the answer.
-      onReconnecting: () => setBanner(t("match.reconnecting")),
-      onReconnected: () => setBanner(null),
-      onFatal: (closeCode) => {
-        if (closeCode === 4401) setBanner(t("signIn.title"));
-        else setBanner(t("match.disconnected"));
-      },
-    });
-
-    return () => {
-      cancelled = true;
-      socket.current?.close();
-      socket.current = null;
-      mesh.current?.close();
-      mesh.current = null;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [plan?.roomCode, plan?.playerId]);
-
-  // `US-NET-002` AC6: a peer that has heard nothing for two seconds is looking at a frozen screen, so it says so.
-  // The replay itself is the socket's: a returning client receives `snapshot_state` from the DO (`US-ROOM-004` AC2).
-  useEffect(() => {
-    if (!plan || plan.kind !== "online" || hosting) return undefined;
-    const timer = setInterval(() => {
-      if (stateRef.current?.status !== "playing") return;
-      if (lastSnapshotAt.current === 0) return;
-      if (Date.now() - lastSnapshotAt.current > SNAPSHOT_WATCHDOG_MS) setBanner(t("match.reconnecting"));
-    }, 500);
-    return () => clearInterval(timer);
-  }, [plan, hosting, t]);
-
-  const onPad = useCallback(
-    (action: PadAction) => {
-      const current = stateRef.current;
-      if (!current || !plan) return;
-      if (action === "up") setAimDelta((value) => Math.min(mobile.angleMax - 45, value + 1));
-      if (action === "down") setAimDelta((value) => Math.max(mobile.angleMin - 45, value - 1));
-      if (action === "left" || action === "right") {
-        const result = applyInput(
-          current,
-          { kind: "move", slot: plan.localSlot, dir: action === "left" ? -1 : 1, run: false, seq: seq.current++ },
-          Date.now(),
-        );
-        commit(result.state, result.events);
-        // Only the host publishes: a peer's local move is not the simulation anyone else sees (`US-NET-002`).
-        if (hosting) mesh.current?.broadcast(toSnapshot(result.state, hostGeneration.current));
-      }
-    },
-    [plan, mobile, commit, hosting],
-  );
-
-  const onRepeat = useCallback(
-    (action: PadAction, times: number) => {
-      for (let index = 0; index < times; index += 1) onPad(action);
-    },
-    [onPad],
-  );
-
-  const selectWeapon = useCallback((slot: WeaponSlot) => {
-    weaponSlotRef.current = slot;
-    setWeaponSlot(slot);
-    // The dotted arc is drawn by the scene, so the selection has to reach it (`US-MATCH-005` AC2).
-    battle.current?.setWeaponSlot(slot);
-  }, []);
-
-  // The super shot is gated by its gauge, not by a once-per-match flag (`AC3`): when the gauge is not full the slot is
-  // disabled and the aim aid must not keep pointing at it.
-  const ssReady = (localPlayer?.ssCharge ?? 0) >= 100;
-  useEffect(() => {
-    if (weaponSlot === 2 && !ssReady) selectWeapon(0);
-  }, [weaponSlot, ssReady, selectWeapon]);
-
-
-  // Items go out once, and only on this player's turn (`US-MATCH-005` AC5); the engine still
-  // re-checks the quantity, so a double tap cannot spend two.
-  const onUseItem = useCallback(
-    (itemId: string) => {
-      const current = stateRef.current;
-      if (!current || !plan || current.turn.activeSlot !== plan.localSlot || !isItemId(itemId)) return;
-      const result = applyInput(current, { kind: "item", slot: plan.localSlot, itemId, seq: seq.current++ }, Date.now());
-      commit(result.state, result.events);
-      mesh.current?.broadcast(toSnapshot(result.state, hostGeneration.current));
-      socket.current?.send(itemFrame(itemId));
-    },
-    [plan, commit],
-  );
-
-  // Skip is the same input the clock expiry sends, so the turn resolves exactly once (`US-MATCH-004` AC1).
-  const onSkip = useCallback(() => {
-    const current = stateRef.current;
-    if (!current || !plan || current.turn.activeSlot !== plan.localSlot) return;
-    const turn = current.turn.number;
-    if (!hosting) {
-      mesh.current?.sendControlAll(inputFrameOf({ kind: "skip" }, turn, seq.current++));
-      return;
-    }
-    const result = applyInput(current, { kind: "skip", slot: plan.localSlot, seq: seq.current++ }, Date.now());
-    commit(result.state, result.events);
-    mesh.current?.broadcast(toSnapshot(result.state, hostGeneration.current));
-  }, [plan, commit, hosting]);
-
-  // A phrase carries an id, never a string the player typed (AC7), so every receiver renders it in
-  // its own locale (AC5). It is not a match input: it changes no state, so it never spends a `seq`.
-  // The quick-chat button is gone (owner's call): the phrase channel stays for the chat log, which is the next piece.
-  // Quick chat is gone with its button (owner's call); the chat log will reintroduce a sender.
-;
-
-  useEffect(() => {
-    if (!chat) return;
-    const timer = window.setTimeout(() => setChat(null), toastMs(chat.kind));
-    return () => window.clearTimeout(timer);
-  }, [chat]);
-
-  // The clock is derived from `deadlineAt`, so it only moves when something renders. A one-second heartbeat is
-  // what turns that derivation into a countdown the player can watch (`US-MATCH-003` AC2) — without it the readout
-  // froze at the turn duration until a move, a shot or a skipped turn re-rendered the screen.
-  const [, setSecond] = useState(0);
-  useEffect(() => {
-    if (state?.status !== "playing") return undefined;
-    const timer = setInterval(() => setSecond((second) => second + 1), 1_000);
-    return () => clearInterval(timer);
-  }, [state?.status]);
-
-  // The clock reads whole seconds from `deadlineAt` and never climbs above the turn duration (`AC2`).
-  const clock = state ? clockSeconds(state.turn.deadlineAt, Date.now(), TUNABLES.turnDurationMs) : 0;
-
-  // One polite live region per screen (`US-PWA-004` AC5): it reads the active player and their HP whenever
-  // either changes, throttled to one update per second. The canvas is `aria-hidden`, so this text is the
-  // only way a screen reader learns the state of the battlefield.
-  const activePlayer = state ? state.players.find((player) => player.slot === state.turn.activeSlot) ?? null : null;
-  // The polite region carries the last thing that happened, not just whose turn it is: a screen-reader player has to
-  // hear the shot land (`US-MATCH-003` AC10). A shot's hits are the engine's own numbers.
-  const lastShot = [...feed].reverse().find((event) => event.kind === "shot");
-  const announcement = useLiveAnnouncement(
-    lastShot && lastShot.kind === "shot"
-      ? lastShot.hits.length > 0
-        ? t("match.announce.hit", {
-            name: state?.players.find((player) => player.slot === lastShot.slot)?.displayName ?? "",
-            damage: Math.round(lastShot.hits.reduce((total, hit) => total + Number((hit as { damage?: number }).damage ?? 0), 0)),
-          })
-        : t("match.announce.miss", {
-            name: state?.players.find((player) => player.slot === lastShot.slot)?.displayName ?? "",
-          })
-      : activePlayer
-        ? t("match.announce.turn", { name: activePlayer.displayName, hp: activePlayer.hp })
-        : "",
-  );
-
-  // The chat sender the phrase grid calls (`US-MATCH-004`): only the id crosses the wire, never text.
-  const onChat = useCallback(
-    (kind: ChatKind, id: ChatId) => {
-      if (!plan) return;
-      setChat({ slot: plan.localSlot, kind, id });
-      mesh.current?.sendControlAll(chatFrame(kind, id));
-    },
-    [plan],
-  );
+  useBattleMount({
+    container,
+    plan,
+    state,
+    commit: engine.commit,
+    mobile,
+    wiring,
+    aim: aimHud,
+    weapons,
+    hostingRef: hosting.hostingRef,
+  });
+  useBattleSync({
+    wiring,
+    state,
+    localSlot: plan?.localSlot ?? 0,
+    pendingEvents: engine.pendingEvents,
+    aimDelta: aimHud.aimDelta,
+    aimDeltaRef: aimHud.aimDeltaRef,
+    aimAid: aimHud.aimAid,
+    lockedTurn: weapons.lockedTurn,
+  });
+  useBotOpponent({ plan, state, commit: engine.commit, wiring });
+  const clock = useTurnClock({ plan, state, hosting: hosting.hosting, commit: engine.commit, wiring });
+  useNetplay({
+    plan,
+    mobileId: localPlayer?.mobileId ?? "mbl-01",
+    setHosting: hosting.setHosting,
+    commit: engine.commit,
+    wiring,
+    setChat: chat.setChat,
+    setBanner,
+    onRecorded: recorder.onRecorded,
+    t,
+  });
+  useSnapshotWatchdog({ plan, hosting: hosting.hosting, wiring, setBanner, t });
+  const announcement = useMatchAnnouncement({ state, feed: engine.feed, t });
 
   if (!plan || !state) {
     return (
@@ -926,183 +122,51 @@ export function MatchPage(): JSX.Element {
       </div>
       <div className="match__canvas" ref={container} aria-hidden="true" />
       <div className="match__hud">
-        {/* One banner per wind roll, 1.5 s, dismissed by a tap (`US-MATCH-003` AC10). */}
-        <WeatherBanner
-          rolledAtRound={state.weather.rolledAtRound}
-          text={t("match.weather.changed", {
-            magnitude: state.weather.wind.magnitude,
-            sector: state.weather.wind.sector,
-          })}
+        <MatchTopBar
+          state={state}
+          chatOpen={chat.open}
+          chat={chat.chat}
+          clock={clock}
+          aimAngle={aimHud.aimAngle}
+          aimAid={aimHud.aimAid}
+          onToggleChat={chat.toggleOpen}
+          onToggleAimAid={aimHud.toggleAimAid}
         />
-        {/* Three cells, one row: the roster on the left, the wind dead centre, the match controls on the right. The wind
-            used to be absolutely centred over the roster, which put the dial and the EN toggle on top of the health
-            chips (owner's report, 2026-11-08). */}
-        <div className="match__top">
-          <div className="match__top-left">
-            <Roster
-              players={state.players}
-              activeSlot={state.turn.activeSlot}
-              eliminatedLabel={t("match.eliminated")}
-              /* The turn list is also the chat area (`US-MATCH-004` AC3): tapping the corner opens the phrase grid,
-                 which is what replaced the 💬 button the owner struck from the HUD (2026-11-09). */
-              chatOpen={chatOpen}
-              chatLabel={t("match.phrases.title")}
-              onOpenChat={() => setChatOpen((was) => !was)}
-              chat={chat ? { slot: chat.slot, kind: chat.kind, text: chatText(t, chat.kind, chat.id) ?? "" } : null}
-            />
-          </div>
-          <div className="match__wind">
-            <WindDial weather={state.weather} label={t("match.wind")} />
-          </div>
-          <div className="match__top-right">
-            {/* The angle is read in the centre of the power ring (`ring-angle`); a second copy up here was noise. */}
-            <div className="match__angle" data-testid="angle-value" hidden>
-              {Math.round(aimAngle)}°
-            </div>
-            <div className="match__clock" data-testid="turn-clock">
-              {clock}s
-            </div>
-            <button
-              type="button"
-              className={aimAid ? "match__aid match__aid--on" : "match__aid"}
-              data-testid="aim-aid"
-              aria-pressed={aimAid}
-              aria-label={t("match.aid.hint")}
-              title={t("match.aid.hint")}
-              onClick={() => setAimAid((current) => !current)}
-            >
-              <span aria-hidden="true">◎</span>
-            </button>
-          </div>
-        </div>
 
-
-        {itemWheelAt ? (
-          <ItemWheel
-            items={equippedItems}
-            enabled={isMyTurn}
-            at={itemWheelAt}
-            label={t("match.item.tray")}
-            quantityLabel={t("match.item.quantity")}
-            delayLabel={t("match.item.delay")}
-            onUse={onUseItem}
-            onClose={() => setItemWheelAt(null)}
-          />
-        ) : null}
-
-        {/* The pull readout is hidden while the wheel is open: it hangs at `focus.y − RING_RADIUS − 8`, which is exactly
-            where the arc's two top wedges land. */}
-        <div
-          className={focus ? "match__power match__power--on-ring" : "match__power"}
-          style={focus && !itemWheelAt ? { left: focus.x, top: focus.y - RING_RADIUS - 8 } : undefined}
-          hidden={itemWheelAt !== null}
-        >
-          {/* The ring's centre carries the angle: the gesture sets both, and the angle is the number a player reads
-              while pulling (owner's layout, 2026-11-08). The power keeps its own chip and the ring's own arc. */}
-          <div className="match__power-value" data-testid="power-value">
-            <span className="match__power-angle" data-testid="ring-angle">
-              {Math.round(aimAngle)}°
-            </span>
-            <span className="match__power-number">{power.toFixed(2)}</span>
-          </div>
-        </div>
-
+        <MatchAimOverlays
+          items={items.equipped}
+          itemsEnabled={isMyTurn}
+          wheelAt={aimHud.itemWheelAt}
+          onUseItem={items.useItem}
+          onCloseWheel={aimHud.closeItemWheel}
+          focus={aimHud.focus}
+          aimAngle={aimHud.aimAngle}
+          power={aimHud.power}
+        />
 
         {/* The bar is a three-cell grid: walking · shooting · the table's state. */}
-        <div className="match__bottom">
-          <div className="match__zone match__zone--move">
+        <MatchBottomBar
+          state={state}
+          localPlayer={localPlayer}
+          mobile={mobile}
+          isMyTurn={isMyTurn}
+          focus={aimHud.focus}
+          aimAngle={aimHud.aimAngle}
+          weaponSlot={weapons.weaponSlot}
+          ssReady={weapons.ssReady}
+          lockedTurn={weapons.lockedTurn}
+          chatOpen={chat.open}
+          onAction={inputs.onPad}
+          onRepeat={inputs.onRepeat}
+          onSelectWeapon={weapons.select}
+          onSkip={inputs.onSkip}
+          onChat={chat.send}
+        />
 
-            <DirectionPad
-              enabled={isMyTurn}
-              focus={focus}
-              canMove={Boolean(localPlayer && localPlayer.energy > 0)}
-              energy={localPlayer?.energy ?? 0}
-              movesLeft={Math.max(0, mobile.maxMovesPerTurn - (state?.effects.movesThisTurn ?? 0))}
-              angle={aimAngle}
-              angleWindow={{ min: mobile.angleMin, max: mobile.angleMax }}
-              labels={{
-                up: t("match.angle.up"),
-                down: t("match.angle.down"),
-                left: t("match.move.left"),
-                right: t("match.move.right"),
-                steps: t("match.move.steps"),
-                energy: t("match.move.energy"),
-              }}
-              onAction={onPad}
-              onRepeat={onRepeat}
-            />
-          </div>
-          <div className="match__zone match__zone--shoot">
-          <div className="match__loadout">
-          <WeaponStrip
-            weapons={mobile.weapons}
-            active={weaponSlot}
-            charges={[1, 1, ssReady ? 1 : 0]}
-            names={[t("match.weapon.1"), t("match.weapon.2"), t("match.weapon.3")]}
-            chargeLabels={[
-              t("match.weapon.ready"),
-              t("match.weapon.ready"),
-              ssReady
-                ? t("match.weapon.ready")
-                : t("match.weapon.charge", { count: Math.min(100, localPlayer?.ssCharge ?? 0), max: 100 }),
-            ]}
-            label={t("match.weapon.group")}
-            disabled={!isMyTurn || lockedTurn === state.turn.number}
-            onSelect={selectWeapon}
-          />
-          </div>
-          <PhrasePicker
-            skipEnabled={isMyTurn}
-            phraseIds={PHRASE_IDS}
-            emoteIds={EMOTE_IDS}
-            labels={{
-              skip: t("match.skip"),
-              phrases: t("match.phrases.title"),
-              emotes: t("match.emotes.title"),
-            }}
-            phraseText={(id) => t(`match.phrase.${id}`)}
-            emoteText={(id) => t(`match.emote.${id}`)}
-            open={chatOpen}
-            onSkip={onSkip}
-            onChat={onChat}
-          />
-          </div>
-          <MatchStats
-            seed={state.seed}
-            round={state.turn.round}
-            rounds={4}
-            teams={(["A", "B"] as const).map((team) => {
-              const members = state.players.filter((player) => player.team === team);
-              return {
-                team,
-                hp: members.reduce((total, player) => total + (player.eliminated ? 0 : player.hp), 0),
-                maxHp: members.reduce((total, player) => total + getMobile(player.mobileId).maxHp, 0),
-                alive: members.filter((player) => !player.eliminated).length,
-                members: members.length,
-              };
-            })}
-            gold={localPlayer?.damageDealt ?? 0}
-            labels={{
-              weather: t("match.forecast"),
-              gold: t("match.gold"),
-              health: t("match.teamHealth"),
-              kind: (kind) => t(`match.weather.kind.${kind}`),
-            }}
-          />
-        </div>
-
-        {status === "reconnecting" ? <div className="overlay">{t("match.reconnecting")}</div> : null}
-
-        {banner ? <div className="banner">{banner}</div> : null}
-        {hint ? (
-          <div className="match__hint" data-testid="pull-hint">
-            {hint}
-          </div>
-        ) : null}
+        <MatchNotices status={status} banner={banner} hint={aimHud.hint} />
       </div>
     </div>
   );
 }
-
 
 export { createTerrain, TUNABLES };

@@ -2,7 +2,7 @@
 id: US-MATCH-008
 title: Split the match page into hooks and panels
 epic: EPIC-05-match-ui
-status: ready
+status: done
 priority: P2
 size: L
 depends_on: [US-MATCH-001, US-MATCH-003, US-MATCH-005, US-MATCH-007]
@@ -68,5 +68,24 @@ in `US-MATCH-003`/`US-MATCH-007`.
 
 ## 8. Test notes
 
+Red: none — a refactor has no failing case to start from; the suites are the oracle for "no behaviour changed" (AC2), and
+`tests/meta/file-size.test.ts` is what keeps the size rule from drifting back.
+
 `TC-MATCH-190` (the size rule, meta), `TC-MATCH-191` (the suites unchanged). No new behaviour means no new case beyond
 those two: every other assertion in the repository is already the proof.
+
+## Delivery status — 2026-11-10
+
+**done.** `MatchPage.tsx` went **1 108 → 172 lines** with **zero `useEffect`s left in the component body**; the twenty-odd
+hooks and panels live under `apps/web/src/match/` (`useMatchEngine`, `useMatchPlan`, `useNetplay`, `battleMesh`,
+`useBattleMount`, `useBattleSync`, `useTurnClock`, `useBotOpponent`, `useMatchInputs`, `useMatchItems`, `useMatchChat`,
+`useWeaponSelect`, `useAimHud`, `useMatchRecorder`, `useHosting`, `useSnapshotWatchdog`, `useMatchAnnouncement`, `wiring`,
+`aimAid`, and the `MatchTopBar`/`MatchBottomBar`/`MatchAimOverlays`/`MatchNotices` panels).
+
+| AC | Evidence |
+|---|---|
+| AC1 | `TC-MATCH-190` — 172 lines against the 400 limit, and no route file over 500 (the case measures every file under `apps/web/src/routes/`). The cited file did not exist until now, which is why the page had grown back to 1 108 lines unnoticed. |
+| AC2 | `TC-MATCH-191` — `apps/web/tests` 61 files / 417 cases pass with **no assertion edited**; `tests/e2e` 77 cases pass; `npx tsc -b` and `eslint apps/web/src` clean. A throwaway A/B spec rendered the pre-refactor page from `git show HEAD:` against the new one and compared `container.innerHTML` in five states (initial HUD, mid-pull, wheel open, wheel closed, pull hint): byte-identical. |
+| AC3 | `TC-MATCH-190` also counts `useEffect(` in the page body and fails past four; the body has none. |
+| AC4 | `pnpm budget` — the bucket list is unchanged and `shell` did not grow; every new module is a static import of the same lazy route, so no chunk appeared. |
+| AC5 | `apps/web/package.json` is untouched. |
