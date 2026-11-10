@@ -1,0 +1,37 @@
+name: Smoke
+
+# `US-FND-004` AC3 rehearses a rollback by asking a deployed worker which sha it serves. That question has to be asked from
+# somewhere with clean access to `*.workers.dev` — a developer machine behind an ISP that resets the TLS handshake cannot
+# tell a rolled-back worker from an unreachable one.
+
+on:
+  workflow_dispatch:
+    inputs:
+      api:
+        description: Base API URL, e.g. https://gbw-api-preview.gbw-demo.workers.dev
+        required: true
+      expect:
+        description: Short sha the worker should report (leave empty to just print it)
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ask /health which sha is serving
+        env:
+          API: ${{ inputs.api }}
+          EXPECT: ${{ inputs.expect }}
+        run: |
+          set -euo pipefail
+          body=$(curl -fsS "$API/api/v1/health")
+          echo "$body"
+          if [ -n "$EXPECT" ]; then
+            printf '%s' "$body" | grep -q "\"version\":\"$EXPECT\"" \
+              || { echo "::error::health reports a different version than $EXPECT"; exit 1; }
+            echo "health reports $EXPECT"
+          fi

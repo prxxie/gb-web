@@ -192,6 +192,7 @@ async function mintSession(base, address, pace) {
  */
 function openSeat(wsUrl, token, displayName, seats, timeoutMs, soakMs) {
   return new Promise((resolve, reject) => {
+    const openedAt = Date.now();
     const socket = new WebSocket(wsUrl);
     let ready = false;
     let closeCode = null;
@@ -199,6 +200,7 @@ function openSeat(wsUrl, token, displayName, seats, timeoutMs, soakMs) {
       socket.close();
       reject(new Error(ready ? "soak-timeout" : "roster-timeout"));
     }, timeoutMs + soakMs);
+    let readyAt = openedAt;
     const finish = (error) => {
       clearTimeout(timer);
       try {
@@ -207,14 +209,14 @@ function openSeat(wsUrl, token, displayName, seats, timeoutMs, soakMs) {
         /* already closing */
       }
       if (error) reject(error);
-      else resolve({ dropped: closeCode });
+      else resolve({ readyMs: readyAt - openedAt, dropped: closeCode });
     };
     socket.addEventListener("open", () => socket.send(JSON.stringify({ t: "auth", token, displayName })));
     socket.addEventListener("error", () => finish(new Error("socket-error")));
     socket.addEventListener("close", (event) => {
       closeCode = event.code;
       // A close after the soak began is the finding; a close before the roster arrived is already a failure.
-      if (ready) finish(null);
+      if (ready) resolve({ readyMs: readyAt - openedAt, dropped: event.code });
       else finish(new Error(`closed:${event.code}`));
     });
     socket.addEventListener("message", (event) => {
@@ -231,6 +233,7 @@ function openSeat(wsUrl, token, displayName, seats, timeoutMs, soakMs) {
       const members = frame.room?.members?.length ?? frame.members?.length ?? 0;
       if (!ready && members >= seats) {
         ready = true;
+        readyAt = Date.now();
         if (soakMs <= 0) finish(null);
         else setTimeout(() => finish(null), soakMs);
       }
@@ -277,7 +280,9 @@ async function runRoom(base, index, seats, timeoutMs, soakMs, options) {
     ...guests.map((guest, offset) => openSeat(guest.wsUrl, guest.token, `Tải ${offset + 1}`, seats, timeoutMs, soakMs)),
   ];
   const settled = await Promise.all(sockets);
-  const readyMs = Date.now() - startedAt - soakMs;
+  // The slowest seat decides when the room is playable, and the clock is the roster arriving — not the soak, and not the
+  // moment the sockets closed, which is why a run that lost a socket used to report a negative latency.
+  const readyMs = startedAt + Math.max(...settled.map((seat) => seat.readyMs)) - startedAt;
   const dropped = settled.filter((seat) => seat.dropped !== null && seat.dropped !== 1000 && seat.dropped !== 1005).length;
   return { ok: true, readyMs, roomCode: created.roomCode, seats: settled.length, dropped };
 }
