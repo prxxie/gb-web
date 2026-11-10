@@ -31,13 +31,13 @@
       "vars": {
         "ENVIRONMENT": "development",
         "CLERK_ISSUER": "https://heroic-bison-1878.clerk.accounts.dev",
-        "ALLOWED_ORIGINS": "https://pr-0.gbw-pages.pages.dev"
+        "ALLOWED_ORIGINS": "https://*.gbw-pages.pages.dev"
       },
       "d1_databases": [
         {
           "binding": "GBW_DB",
           "database_name": "gbw-preview",
-          "database_id": "REPLACE_WITH_PREVIEW_D1_ID",
+          "database_id": "c969e339-ba75-4904-bafe-72292edba3ca",
           "migrations_dir": "migrations"
         }
       ],

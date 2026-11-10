@@ -17,7 +17,16 @@ export function decideCors(request: Request, allowedOrigins: readonly string[]):
   const normalised = origin.replace(/\/$/, "");
   const allowed = allowedOrigins.some((candidate) => {
     const pattern = candidate.replace(/\/$/, "");
-    if (pattern.endsWith(":*")) return normalised.startsWith(`${pattern.slice(0, -2)}:`);
+    // A `*` is allowed inside the pattern, which is how a Pages preview host gets through: every preview lives on
+    // `https://<hash>.gbw-pages.pages.dev`, so an exact list can never name it and a bare `*` would let any site drive a
+    // signed-in session (`NFR-11`). The wildcard is anchored and only stands in for a run of characters inside the host.
+    if (pattern.includes("*")) {
+      const source = pattern
+        .split("*")
+        .map((part) => part.replace(/[.+?^${}()|[\]\\]/g, "\\$&"))
+        .join("[^/]*");
+      return new RegExp(`^${source}$`).test(normalised);
+    }
     return pattern === normalised;
   });
   return { allowed, origin: allowed ? normalised : null };

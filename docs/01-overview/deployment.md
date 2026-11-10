@@ -8,11 +8,22 @@ that role `[user: interview R4 environments]`.
 | Environment | Web | API + DO | D1 | Clerk | TURN | Purpose |
 |-------------|-----|----------|----|-------|------|---------|
 | `local` | `vite` on :5173 | `wrangler dev` on :8787 (miniflare) | local SQLite | Clerk test instance | not used | Development and all automated tests |
-| `preview` | Pages preview URL per PR | Worker `preview` version (`wrangler versions upload`) | `gbw-db-preview` | Clerk test instance | test key | QA on real phones, UAT (`M2`) |
-| `production` | `https://gbw.<domain>` (Pages custom domain) | Worker `production` deployment | `gbw-db` | Clerk production | production | Players |
+| `preview` | `https://<hash>.gbw-pages.pages.dev` per PR | `gbw-api-preview` worker | `gbw-preview` (`c969e339…`) | Clerk test instance | test key | QA on real phones, UAT (`M2`) |
+| `production` | `https://gbw-pages.pages.dev` | `gbw-api` on `https://gbw-api.gbw-demo.workers.dev` | `gbw` (`1a3895e6…`) | Clerk **test** instance (no production instance exists yet) | production | Players |
+
+**There is no domain, so there is no custom hostname.** The account has no Cloudflare zone, so `production` answers on the
+workers.dev hostname Cloudflare gives the account (`gbw-demo`) and the web app on the Pages project's own subdomain. That
+also means the API and the app are on **different origins**: `VITE_API_BASE` must be absolute (the deploy workflow takes it
+from `vars.PRODUCTION_API_URL`) and the worker's `ALLOWED_ORIGINS` names the Pages host, with `https://*.gbw-pages.pages.dev`
+covering previews.
+
+A Clerk **production** instance needs a domain — its creation dialog demands one — so the deployed app runs the test instance
+and its sessions are unranked. Buying a domain is the only thing standing between this and a real production deployment;
+when one exists, add it as a zone, put a custom-domain route back on the worker, switch `ALLOWED_ORIGINS` to the real host and
+create the Clerk production instance.
 
 Production requires the domain to be HTTPS-only with HSTS; iOS refuses secure-context APIs otherwise (`NFR-09`,
-`environment-setup.md` § 7).
+`environment-setup.md` § 7). That rule is unverified today because no domain exists.
 
 ## 2. What gets deployed
 
