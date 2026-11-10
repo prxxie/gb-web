@@ -1184,6 +1184,36 @@ td {
   pointer-events: auto;
 }
 
+/* The left half of the bar keeps its 44 px hit box (`NFR-17`, measured by `TC-FND-133`) but draws its surface on the
+   right half's 28 px line, so the strip reads as one row instead of two heights (owner, 2026-11-09). The pill is a
+   pseudo-element: shrinking the buttons themselves would put the tap targets under the floor. */
+.match__pad button,
+.weapon-strip__slot,
+.match__skip {
+  position: relative;
+  /* `isolate` keeps the pill behind the label: an absolutely positioned `::before` paints above in-flow text, which hid
+     the selected slot's own `S1` under its opaque accent fill. The stacking context keeps `z-index: -1` inside the button
+     instead of dropping it behind the bar. */
+  isolation: isolate;
+  border: 0;
+  background: none;
+  color: var(--ink);
+}
+
+.match__pad button::before,
+.weapon-strip__slot::before,
+.match__skip::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: 50% 0 auto 0;
+  height: var(--bar-chip, 28px);
+  transform: translateY(-50%);
+  border-radius: 10px;
+  border: 1px solid var(--chip-border, #2b3b58);
+  background: var(--chip-bg, rgba(22, 33, 58, 0.92));
+}
+
 .match__pad button {
   width: 44px;
   min-width: 44px;
@@ -1192,9 +1222,6 @@ td {
   padding: 0;
   font-size: 1rem;
   border-radius: 10px;
-  border: 1px solid #2b3b58;
-  background: rgba(22, 33, 58, 0.92);
-  color: var(--ink);
 }
 
 
@@ -1220,16 +1247,14 @@ td {
   min-height: 44px;
   padding: 0;
   border-radius: 10px;
-  border: 1px solid #2b3b58;
-  background: rgba(22, 33, 58, 0.92);
   color: var(--ink-dim);
 }
 
 .weapon-strip__slot--active {
   /* Selection is a filled accent, the only filled thing in the bar: outlines were also on the skip button and the team
      chips, so "blue border" stopped meaning "selected" (design review, 2026-11-08). */
-  border-color: var(--accent);
-  background: var(--accent);
+  --chip-bg: var(--accent);
+  --chip-border: var(--accent);
   color: #08101f;
   font-weight: 700;
 }
@@ -1265,8 +1290,6 @@ td {
   min-height: 44px;
   padding: 0;
   border-radius: 10px;
-  border: 1px solid #2b3b58;
-  background: rgba(22, 33, 58, 0.92);
   color: var(--ink);
   font-size: 1rem;
 }
