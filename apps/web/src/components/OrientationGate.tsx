@@ -56,8 +56,17 @@ export function shouldGate(): boolean {
  * rejection is the normal case on half the devices in the world, so it is swallowed rather than reported
  * — the rotate notice stays the fallback.
  */
+/**
+ * `ScreenOrientation.lock` is not in the TypeScript DOM lib this project compiles against — the same reason Safari
+ * ignores it. Declaring the shape here keeps the call site honest instead of casting the whole object to `any`.
+ */
+interface LockableOrientation {
+  lock?: (orientation: "landscape" | "portrait" | "portrait-primary" | "landscape-primary") => Promise<void>;
+}
+
 export async function requestLandscapeLock(): Promise<boolean> {
-  const orientation = typeof screen === "undefined" ? undefined : screen.orientation;
+  const orientation =
+    typeof screen === "undefined" ? undefined : (screen.orientation as unknown as LockableOrientation | undefined);
   if (typeof orientation?.lock !== "function") return false;
   const installed =
     typeof window.matchMedia === "function" &&
