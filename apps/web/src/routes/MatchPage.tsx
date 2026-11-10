@@ -1070,7 +1070,7 @@ export function MatchPage(): JSX.Element {
           <MatchStats
             seed={state.seed}
             round={state.turn.round}
-            rounds={3}
+            rounds={4}
             teams={(["A", "B"] as const).map((team) => {
               const members = state.players.filter((player) => player.team === team);
               return {
@@ -1086,6 +1086,7 @@ export function MatchPage(): JSX.Element {
               weather: t("match.forecast"),
               gold: t("match.gold"),
               health: t("match.teamHealth"),
+              kind: (kind) => t(`match.weather.kind.${kind}`),
             }}
           />
         </div>

@@ -7,9 +7,11 @@ import { decodeSnapshot, encodeSnapshot, snapshotBytes, toSnapshot } from "../sr
 import { TUNABLES } from "../src/tuning.js";
 import type { Rng, Wind } from "../src/types.js";
 import {
+  WEATHER_BANDS,
   describeWind,
   isCalm,
   newerWeather,
+  weatherKind,
   rollWeather,
   rollWind,
   sectorLabel,
@@ -285,5 +287,58 @@ describe("TC-CORE-960: full wind (26) bends the full-force shot by a fifth of th
     expect(windAcceleration(EAST(26)).ax / TUNABLES.gravity).toBeCloseTo(0.171, 3);
     expect(drift / TUNABLES.mapWidth).toBeGreaterThan(0.15);
     expect(drift / TUNABLES.mapWidth).toBeLessThan(0.25);
+  });
+});
+
+/**
+ * TC-CORE-964: the weather the tray names is a band of the magnitude the roll already produced.
+ *
+ * The point of the case is that naming the sky is **not** a second mechanic: the bands have to tile `0…windMax` exactly, so
+ * every roll lands in a named band and no magnitude can be read as two kinds at once. A hole would leave a roll unnamed; a
+ * shared edge would make the label depend on which end of the range the search happened to check first.
+ */
+describe("TC-CORE-964: weather kinds are bands over the wind", () => {
+  it("tiles 0…windMax with no gap and no overlap", () => {
+    expect(WEATHER_BANDS[0]!.min).toBe(0);
+    expect(WEATHER_BANDS[WEATHER_BANDS.length - 1]!.max).toBe(TUNABLES.windMax);
+    for (let index = 1; index < WEATHER_BANDS.length; index += 1) {
+      const previous = WEATHER_BANDS[index - 1]!;
+      const current = WEATHER_BANDS[index]!;
+      expect(current.min).toBe(previous.max + 1);
+      expect(current.min).toBeLessThanOrEqual(current.max);
+    }
+  });
+
+  it("names every magnitude the roll can produce, monotonically", () => {
+    const order = WEATHER_BANDS.map((band) => band.kind);
+    let lastIndex = 0;
+    for (let magnitude = 0; magnitude <= TUNABLES.windMax; magnitude += 1) {
+      const kind = weatherKind({ magnitude, directionDeg: 0, sector: 0 });
+      const index = order.indexOf(kind);
+      expect(index).toBeGreaterThanOrEqual(lastIndex);
+      lastIndex = index;
+      // The band it reports is the one that actually contains the magnitude.
+      const band = WEATHER_BANDS[index]!;
+      expect(magnitude).toBeGreaterThanOrEqual(band.min);
+      expect(magnitude).toBeLessThanOrEqual(band.max);
+    }
+  });
+
+  it("does not depend on the direction, only on the strength", () => {
+    for (const magnitude of [0, 4, 5, 13, 14, 20, 21, TUNABLES.windMax]) {
+      const east = weatherKind({ magnitude, directionDeg: 0, sector: 0 });
+      const west = weatherKind({ magnitude, directionDeg: 180, sector: 1 });
+      expect(west).toBe(east);
+    }
+  });
+
+  it("names the four states the tray can show, and only those", () => {
+    const shown = new Set(Array.from({ length: TUNABLES.windMax + 1 }, (_, magnitude) => weatherKind({ magnitude, directionDeg: 0, sector: 0 })));
+    expect([...shown].sort()).toEqual(["breeze", "clear", "gale", "storm"]);
+  });
+
+  it("clamps rather than leaving a magnitude unnamed", () => {
+    // Nothing rolls above `windMax`, but an item or a fixture could hand the tray a bigger number; it must still get a name.
+    expect(weatherKind({ magnitude: TUNABLES.windMax + 10, directionDeg: 0, sector: 0 })).toBe("storm");
   });
 });

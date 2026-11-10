@@ -1281,26 +1281,59 @@ td {
   min-width: 0;
 }
 
-.match__forecast {
+
+
+/* The weather tray: four rounds, one cell each. The nearest round is lit — it is the one the player is planning
+   against — and the rest sit back so the strip does not read as four equal buttons. */
+.match__tray {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 3px;
 }
 
-.match__forecast-cell {
+.match__tray-cell {
   display: inline-flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: center;
-  gap: 2px;
-  min-width: 34px;
+  gap: 3px;
   height: 28px;
-  padding: 0 5px;
+  /* Fixed width, not content width: a strip of ragged pills reads as four different kinds of thing, and the four rounds
+     are the same kind of thing. */
+  min-width: 41px;
+  padding: 0 4px;
   border-radius: 8px;
   border: 1px solid #24324c;
   background: rgba(16, 26, 46, 0.85);
   color: var(--ink-dim);
-  font-size: 0.7rem;
+  font-size: 0.68rem;
   font-variant-numeric: tabular-nums;
+}
+
+.match__tray-cell:first-child {
+  border-color: #3d5478;
+  background: rgba(28, 44, 72, 0.95);
+  color: var(--ink);
+}
+
+.match__tray-kind svg {
+  display: block;
+  width: 13px;
+  height: 13px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.match__tray-heading {
+  opacity: 0.85;
+  font-size: 0.95rem;
+  line-height: 1;
+}
+
+.match__tray-value {
+  font-weight: 600;
 }
 
 .match__teams {

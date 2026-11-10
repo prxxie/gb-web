@@ -7,8 +7,9 @@
  * everywhere. Gold is **derived**, not stored: the genre pays out on damage dealt, and `PlayerState.damageDealt` is
  * already on the wire, so `GOLD_PER_DAMAGE` turns it into a number without widening the snapshot.
  */
-import { rollWeather, type Team } from "@gbw/core";
+import type { Team, WeatherKind } from "@gbw/core";
 import type { JSX } from "react";
+import { WeatherTray } from "./WeatherTray";
 
 /** One gold per point of damage dealt — the genre's rate, and a display rule rather than a mechanic. */
 export const GOLD_PER_DAMAGE = 1;
@@ -33,30 +34,20 @@ export interface MatchStatsProps {
     readonly weather: string;
     readonly gold: string;
     readonly health: string;
+    /** Kind name for the tray (`Nắng`, `Gió`, `Gió mạnh`, `Lốc`). */
+    readonly kind: (kind: WeatherKind) => string;
   };
 }
 
 export function MatchStats({ seed, round, rounds, teams, gold, labels }: MatchStatsProps): JSX.Element {
   return (
     <div className="match__stats">
-      <div className="match__forecast" role="group" aria-label={labels.weather} data-testid="weather-forecast">
-        {Array.from({ length: rounds }, (_, index) => {
-          const weather = rollWeather(seed, round + index + 1);
-          // A thin chevron, not the pad's solid arrow: the two must not read as the same kind of control.
-          const arrow = weather.wind.sector === 0 ? "›" : "‹";
-          return (
-            <span
-              key={index}
-              className="match__forecast-cell"
-              data-testid={`forecast-${index}`}
-              title={`R${round + index + 1}`}
-            >
-              <span aria-hidden="true">{arrow}</span>
-              {weather.wind.magnitude}
-            </span>
-          );
-        })}
-      </div>
+      <WeatherTray
+        seed={seed}
+        round={round}
+        rounds={rounds}
+        labels={{ weather: labels.weather, kind: labels.kind }}
+      />
       <div className="match__teams" role="group" aria-label={labels.health}>
         {teams.map((standing) => (
           <span

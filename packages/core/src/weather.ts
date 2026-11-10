@@ -42,6 +42,37 @@ export function newerWeather(current: Weather, incoming: Weather): Weather {
   return incoming.rolledAtRound > current.rolledAtRound ? incoming : current;
 }
 
+/**
+ * What the sky is doing, named: the four bands a wind roll can land in.
+ *
+ * These are **labels over the magnitude the roll already produced**, not a second mechanic — the physics reads `magnitude`
+ * and nothing else. That is deliberate: naming the weather costs no ruleset change, no wire field and no replay divergence,
+ * and it gives the tray four distinct icons instead of four numbers (`TC-CORE-964`, `TC-MATCH-953`).
+ *
+ * The bands tile `0…windMax` with no gap and no overlap, and a case pins that: a hole in the table would leave a roll
+ * unnamed and a shared edge would make the label depend on evaluation order.
+ */
+export type WeatherKind = "clear" | "breeze" | "gale" | "storm";
+
+export interface WeatherBand {
+  readonly kind: WeatherKind;
+  readonly min: number;
+  readonly max: number;
+}
+
+export const WEATHER_BANDS: readonly WeatherBand[] = [
+  { kind: "clear", min: 0, max: 4 },
+  { kind: "breeze", min: 5, max: 13 },
+  { kind: "gale", min: 14, max: 20 },
+  { kind: "storm", min: 21, max: TUNABLES.windMax },
+];
+
+/** The band a wind roll falls in. Anything outside the table is clamped to the nearest end, never left unnamed. */
+export function weatherKind(wind: Wind): WeatherKind {
+  const band = WEATHER_BANDS.find((candidate) => wind.magnitude <= candidate.max);
+  return (band ?? WEATHER_BANDS[WEATHER_BANDS.length - 1]!).kind;
+}
+
 export function isCalm(weather: Weather): boolean {
   return weather.wind.magnitude === 0;
 }

@@ -59,6 +59,7 @@ ruler is the player's protractor substitute for the arc they cannot compute — 
 | Shield | per player, 0–300 | snapshot `players[].shield` | Thin bar above HP |
 | Active slot | integer | `turn.activeSlot` | Highlighted in the roster strip |
 | **Wind dial** | 12-tick compass, arrow at the sector, numeric **0–26** | `weather.wind` | Arrow at `directionDeg` (a multiple of 30°), ticks every 30° with a longer tick at `0/90/180/270`, numbers at the four cardinals, `0` drawn as a hollow arrow with the dial greyed |
+| **Weather tray** | four cells, one per upcoming round: kind glyph, direction chevron, magnitude | `rollWeather(seed, round + n)` and `weatherKind(wind)` — both pure, nothing on the wire | The nearest round is lit and the rest sit back. The kind is a **band of the magnitude the roll already produced** (`clear` 0–4, `breeze` 5–13, `gale` 14–20, `storm` 21–26), not a second mechanic: the physics still reads the magnitude alone, so naming the sky costs no ruleset change and cannot disagree with it. Four cells is one full turn cycle in a four-seat match (`TC-MATCH-953`, `TC-CORE-964`) |
 | Weather banner | text + dial for 1.5 s | `weather` when `rolledAtRound` changes | `match.weather.changed` — "Gió đổi: 14 · hướng 120°"; any tap dismisses it; never blocks input |
 | Turn clock | countdown from **20 s** | `turn.deadlineAt` | Local countdown, re-synced on each snapshot; turns `warning` under 5 s |
 | Turn number | integer | `turn.number` | — |
@@ -132,6 +133,7 @@ a drag. All pad and button targets are ≥ 60 × 60 logical px (`NFR-17`).
 | Landscape launch, safe-area insets respected, no fullscreen launch flag | `tests/e2e/smoke.spec.ts` (TC-PWA-063) |
 | Turn clock starts at 20 s, skips on timeout, does not drift > 1 s | `packages/core/tests/turn.test.ts` (TC-CORE-152) |
 | Wind re-rolled once per round, dial shows east-or-west and 0–26 | `packages/core/tests/weather.test.ts` (TC-CORE-926), `apps/web/tests/wind-dial.test.tsx` (TC-MATCH-923) |
+| The next four rounds are named and drawn, and the kind never disagrees with the magnitude | `packages/core/tests/weather.test.ts` (TC-CORE-964), `apps/web/tests/weather-tray.test.tsx` (TC-MATCH-953) |
 | Blast damage, friendly fire, elimination, team-loss detection | `packages/core/tests/combat.test.ts`, `packages/core/tests/match.test.ts` (TC-CORE-020…TC-CORE-028) |
 | Snapshot apply is idempotent and duck-types by `seq` | `packages/core/tests/snapshot.test.ts` (TC-CORE-040) |
 | Reconnect overlay countdown matches the 20 s grace | `apps/web/tests/reconnect.test.tsx` (TC-ROOM-174…TC-ROOM-177) |
