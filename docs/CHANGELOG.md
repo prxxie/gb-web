@@ -1,5 +1,17 @@
 # Changelog
 
+## 2026-11-11 — one shell in the air at a time
+
+Reported from a bot match: "đạn vừa bay ra thì bot bên kia đã bắn rồi". The engine resolves a shot in one tick, so the
+turn had already passed while the renderer was still animating the shell, and the bot fired a fixed **1 400 ms** after the
+turn arrived — inside a ~4 s flight. Measured: the opponent's shot resolved **1 398 ms** after the player's before, and
+**4 181 ms** after it now.
+
+The shot now keeps the sky until its animation ends (`US-MATCH-012`): `useMatchEngine` exposes `lockedUntil`/`cinematic`
+from the step's own `shot` events (`flight + IMPACT_MS`), `canAim` refuses the pull while a shell is in the air, and the
+bot waits out the flight **and then** thinks. The match screen carries `data-cinematic` so the state is observable, and
+`TC-MATCH-960..963` pin the arithmetic, `canAim`, and both sides of the hand-over in a real bot match.
+
 ## 2026-11-11 — the battlefield draws at the screen's real resolution
 
 Reported as jagged graphics. The canvas was rasterised at **one device pixel per CSS pixel** — `scale: { mode: RESIZE }`

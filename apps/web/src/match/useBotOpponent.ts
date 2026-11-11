@@ -6,6 +6,7 @@
  */
 import { useEffect } from "react";
 import { applyInput, botTurn, createRng, type MatchState } from "@gbw/core";
+import { shotWaitMs } from "../game/flight";
 import type { PlannedMatch } from "../lib/plan";
 import type { CommitState, MatchWiring } from "./wiring";
 
@@ -14,16 +15,22 @@ export interface BotOpponentOptions {
   readonly state: MatchState | null;
   readonly commit: CommitState;
   readonly wiring: MatchWiring;
+  /** When the previous seat's shell finishes on screen (`US-MATCH-012`); the bot never fires into an occupied sky. */
+  readonly lockedUntil: number;
 }
 
+/** How long the bot thinks before it shoots. */
+export const BOT_THINKING_MS = 1_400;
+
 export function useBotOpponent(options: BotOpponentOptions): void {
-  const { plan, state, commit, wiring } = options;
+  const { plan, state, commit, wiring, lockedUntil } = options;
   const { stateRef, seq } = wiring;
 
   useEffect(() => {
     if (!plan || plan.kind !== "bot" || !state || state.status !== "playing") return;
     const bot = state.players.find((player) => player.slot !== plan.localSlot);
     if (!bot || bot.eliminated || state.turn.activeSlot !== bot.slot) return;
+    // `US-MATCH-012`: the delay is the thinking time, or the rest of the shell still in the air — whichever is longer.
     const timer = window.setTimeout(() => {
       const current = stateRef.current;
       if (!current) return;
@@ -32,7 +39,7 @@ export function useBotOpponent(options: BotOpponentOptions): void {
       if (!input) return;
       const result = applyInput(current, { ...input, seq: seq.current++ }, Date.now());
       commit(result.state, result.events);
-    }, 1400);
+    }, shotWaitMs(BOT_THINKING_MS, lockedUntil, Date.now()));
     return () => window.clearTimeout(timer);
-  }, [state, plan, commit, stateRef, seq]);
+  }, [state, plan, commit, stateRef, seq, lockedUntil]);
 }

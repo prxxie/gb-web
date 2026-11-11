@@ -20,10 +20,12 @@ export interface BattleSyncOptions {
   readonly aimDeltaRef: RefObject<number>;
   readonly aimAid: boolean;
   readonly lockedTurn: number | null;
+  /** A shell from the previous turn is still in the air (`US-MATCH-012`). */
+  readonly cinematic: boolean;
 }
 
 export function useBattleSync(options: BattleSyncOptions): void {
-  const { wiring, state, localSlot, pendingEvents, aimDelta, aimDeltaRef, aimAid, lockedTurn } = options;
+  const { wiring, state, localSlot, pendingEvents, aimDelta, aimDeltaRef, aimAid, lockedTurn, cinematic } = options;
   const { battle } = wiring;
 
   // The aim aid draws the angle the shot will carry, so the scene needs the pad's nudge (`US-MATCH-006`).
@@ -51,9 +53,10 @@ export function useBattleSync(options: BattleSyncOptions): void {
         eliminated: own?.eliminated ?? false,
         lockedTurn,
         turnNumber: state.turn.number,
+        cinematic,
       }),
     );
-  }, [state, localSlot, lockedTurn, battle]);
+  }, [state, localSlot, lockedTurn, cinematic, battle]);
 
   // The trajectory aid is opt-in (`US-MATCH-005` AC2): the scene keeps it off until the player asks, and the choice
   // survives a reload because re-learning an arc every session is not the point.

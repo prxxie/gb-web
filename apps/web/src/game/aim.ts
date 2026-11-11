@@ -125,6 +125,8 @@ export interface AimContext {
   /** The turn number this client already fired in (`AC8`: a second fire waits for the turn to resolve). */
   readonly lockedTurn: number | null;
   readonly turnNumber: number;
+  /** A shell the previous turn launched is still on screen (`US-MATCH-012`). */
+  readonly cinematic?: boolean;
 }
 
 /**
@@ -137,5 +139,8 @@ export function canAim(context: AimContext): boolean {
   if (context.status !== "playing") return false;
   if (context.eliminated) return false;
   if (context.activeSlot !== context.localSlot) return false;
+  // A shell from the previous turn is still in the air: the turn has passed but the sky has not been handed over yet
+  // (`US-MATCH-012`). Firing into it is what put two shells on screen at once.
+  if (context.cinematic) return false;
   return context.lockedTurn !== context.turnNumber;
 }

@@ -8,7 +8,7 @@ decide, a contract that already exists in `02-reference/`, and tests that prove 
 <!-- cpt:stats -->
 | Stories | Done | In progress | Ready | Blocked | Draft | Closed |
 |---|---|---|---|---|---|---|
-| 63 | 56 | 0 | 7 | 0 | 0 | 0 |
+| 64 | 57 | 0 | 7 | 0 | 0 | 0 |
 
 Open questions: **Open: 13 · Blocking: 0 · Answered: 29 · Withdrawn: 1**
 <!-- /cpt:stats -->
@@ -23,7 +23,7 @@ Open questions: **Open: 13 · Blocking: 0 · Answered: 29 · Withdrawn: 1**
 | [EPIC-02-rooms](EPIC-02-rooms/README.md) | ROOM | Rooms, lobby, presence and host migration | 10 | 9 | 0 |
 | [EPIC-03-match-core](EPIC-03-match-core/README.md) | CORE | Deterministic match simulation | 14 | 14 | 0 |
 | [EPIC-04-netplay](EPIC-04-netplay/README.md) | NET | Peer-to-peer transport and host authority | 4 | 4 | 0 |
-| [EPIC-05-match-ui](EPIC-05-match-ui/README.md) | MATCH | Match scene, touch aiming and HUD | 11 | 11 | 0 |
+| [EPIC-05-match-ui](EPIC-05-match-ui/README.md) | MATCH | Match scene, touch aiming and HUD | 12 | 12 | 0 |
 | [EPIC-06-ranked](EPIC-06-ranked/README.md) | RANK | Results, match records, Elo and leaderboard | 5 | 5 | 0 |
 | [EPIC-07-pwa-i18n](EPIC-07-pwa-i18n/README.md) | PWA | Installable PWA, offline play, bilingual UI and accessibility | 6 | 4 | 0 |
 | [EPIC-08-ops](EPIC-08-ops/README.md) | OPS | Observability, load evidence and release | 4 | 0 | 0 |

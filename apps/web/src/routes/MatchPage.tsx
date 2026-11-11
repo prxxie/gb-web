@@ -90,8 +90,9 @@ export function MatchPage(): JSX.Element {
     aimDeltaRef: aimHud.aimDeltaRef,
     aimAid: aimHud.aimAid,
     lockedTurn: weapons.lockedTurn,
+    cinematic: engine.cinematic,
   });
-  useBotOpponent({ plan, state, commit: engine.commit, wiring });
+  useBotOpponent({ plan, state, commit: engine.commit, wiring, lockedUntil: engine.lockedUntil });
   const clock = useTurnClock({ plan, state, hosting: hosting.hosting, commit: engine.commit, wiring });
   useNetplay({
     plan,
@@ -116,7 +117,7 @@ export function MatchPage(): JSX.Element {
   }
 
   return (
-    <div className="match" data-testid="match-screen">
+    <div className="match" data-testid="match-screen" data-cinematic={engine.cinematic ? "true" : "false"}>
       <div className="sr-only" role="status" aria-live="polite" data-testid="match-announce">
         {announcement}
       </div>

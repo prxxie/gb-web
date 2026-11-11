@@ -77,6 +77,9 @@ describe("TC-MATCH-937: aiming is refused out of turn, when wrecked and after on
     expect(canAim({ ...base, status: "ended" })).toBe(false);
     expect(canAim({ ...base, lockedTurn: 4 })).toBe(false);
     expect(canAim({ ...base, lockedTurn: 3 })).toBe(true);
+    // TC-MATCH-961 (`US-MATCH-012`): the previous turn's shell is still on screen, so the sky is not handed over yet.
+    expect(canAim({ ...base, cinematic: true })).toBe(false);
+    expect(canAim({ ...base, cinematic: false })).toBe(true);
   });
 });
 

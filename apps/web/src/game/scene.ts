@@ -49,6 +49,7 @@ import {
 } from "./interpolate";
 import { ANGLE_RING_RADIUS, RING_RADIUS, RING_START, angleArc, anglePoint, ringColor, ringSweep } from "./aim";
 import { armFullscreen } from "../lib/fullscreen";
+import { IMPACT_MS, clampFlightMs } from "./flight";
 import { aimPreview } from "./preview";
 
 
@@ -101,8 +102,7 @@ function now(): number {
 /** The angle the barrel opens on: the classic artillery 45°, clamped into whatever the mobile can fire. */
 const OPEN_ANGLE = 45;
 
-/** How long an impact flash and its scorch mark stay on screen after the shell lands. */
-const IMPACT_MS = 420;
+/** The impact flash lives as long as `flight.ts` says, so a waiting seat and the drawing agree (`US-MATCH-012`). */
 const SCORCH_MS = 6_000;
 
 interface FlyingShot {
@@ -274,7 +274,7 @@ class BattleScene extends Phaser.Scene {
       startedAt,
       // The engine's own flight time, not a 2.6 s squeeze of it: a 4.7 s arc compressed into 2.6 s was a shell the player
       // could not follow, and following it is the whole point of animating from the resolved path.
-      flightMs: Math.max(220, Math.min(6_000, event.flightMs || 700)),
+      flightMs: clampFlightMs(event.flightMs),
       impact: event.impact,
       radius: 70,
       hits,
