@@ -94,6 +94,31 @@ pnpm exec wrangler d1 execute gbw-db --remote --command \
 | Trap | What it looks like | What it is |
 |------|--------------------|------------|
 | Durable Objects free-tier quota | `POST /api/v1/rooms` answers `500 internal` with `Exceeded allowed volume of requests in Durable Objects free tier` in the tail, and **every** room fails, not a fraction | A plan limit, not a regression. The free tier's DO request budget is spent by load runs; it resets daily. A fifty-room run with a long soak spends it in minutes, so `US-OPS-003` AC2 (400 sockets for ten minutes) needs Workers Paid. |
+| A quiet room billed ~600 requests a minute | `durableObjectsInvocationsAdaptiveGroups` shows a per-minute plateau that starts when the sockets drop and stops at the room's expiry, `wrangler tail` shows nothing, and no client is connected | `sweepAt` handed back an instant that had already passed, so the alarm re-armed itself and fired again immediately (`US-ROOM-011`). Fixed by clamping to `MIN_SWEEP_DELAY_MS`; the harness now clears the alarm before invoking the handler, the way workerd does. |
 | A client-supplied `cf-connecting-ip` | `403` with a Cloudflare HTML body, and the worker's log shows nothing at all | Cloudflare's edge rejects that header before the request reaches the worker. Only `wrangler dev` trusts it, which is why the load test has a `--local` flag. |
 | A `workflow_run` workflow reads the **default branch's** copy of itself | A workflow fix pushed on a pull-request branch has no effect on that pull request's own run | By design. The stamping fix for `VERSION` only took effect on preview after it merged to `main`. |
 | `wrangler rollback` without a version id | It flips between the last two deployments, so a second call undoes the first | Pass the version id: `wrangler rollback <version-id> --env preview`. |
+
+## 8. What a room costs
+
+Measured on production 2026-11-11 with Cloudflare GraphQL, `durableObjectsInvocationsAdaptiveGroups` with
+`dimensions { objectId }`, because that is the only place a Durable Object's requests can be attributed:
+
+| Situation | Durable Object requests |
+|---|---|
+| One room, two seats, 60 s (before `US-ROOM-011`) | **6 451** |
+| One room, two seats, 250 s (before `US-ROOM-011`) | **5 226** |
+| 165 rooms × 5 minutes of load test, one hour (before) | **661 132** |
+| The same room held open by a real browser, frames counted locally | 16 room frames/minute (8 `ping` + 8 `pong`) |
+
+Almost none of that was game traffic. A room with no sockets and no frames sat at ~590–790 requests/minute — the alarm
+spinning after `US-ROOM-011` — while the frames a real client sends are two orders of magnitude fewer.
+
+What the free plan therefore buys, on the *fixed* numbers (`US-ROOM-011` in place; re-measure before quoting these
+externally):
+
+- **100 000 DO requests/day** and **13 000 GB-s/day** (128 MB per object ⇒ ~28 DO-hours of wall time).
+- The duration limit was never the binding one; the request limit is, by more than an order of magnitude.
+- Load tests belong on Workers Paid or on `wrangler dev`: five runs in one day is what spent the free tier, and
+  `US-OPS-003` AC2 (400 sockets for ten minutes) does not fit in the free budget at all.
+

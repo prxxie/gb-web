@@ -1,5 +1,17 @@
 # Changelog
 
+## 2026-11-11 — a quiet room no longer bills by the second
+
+A room with nobody in it was costing about **6 000 Durable Object requests** instead of a handful. `sweepAt` answers
+"wake me at `lastActivityAt + 60_000`" for a lobby, and once the sweep was overdue that instant was in the past; the
+platform clears an alarm before invoking the handler, so each alarm re-armed at the same past instant and fired again
+immediately. Production measured a steady ~590–790 requests/minute for the whole ten-minute idle window, per room, with no
+sockets connected — and `wrangler tail` showed nothing, because none of it entered a Worker handler.
+
+The next wake is now clamped to `MIN_SWEEP_DELAY_MS` ahead (`US-ROOM-011`, `TC-ROOM-716..718`), and the test harness clears
+the alarm before invoking the handler the way workerd does, so this class of spin cannot hide behind a friendly fake again.
+`docs/08-ops/runbook.md` § 8 records what a room costs.
+
 ## 2026-11-11 — the angle rotates from where you pressed
 
 Hand-playing a bot match found that the barrel's angle compounded with the browser's event rate: `scene.ts` fed

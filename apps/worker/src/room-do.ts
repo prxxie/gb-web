@@ -362,7 +362,7 @@ export class Room implements DurableObject {
   }
 
   private async scheduleSweep(): Promise<void> {
-    const at = sweepAt(this.room, this.sockets.size);
+    const at = sweepAt(this.room, this.sockets.size, Date.now());
     if (at !== null) await this.setAlarmIfSooner(at);
   }
 

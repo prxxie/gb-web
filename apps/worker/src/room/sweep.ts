@@ -9,6 +9,7 @@
 import { TUNABLES, isForfeited, isRoomExpired, type RoomState, type Team } from "@gbw/core";
 import { anyConnected, electNext, hostIsGone } from "./election.js";
 import { withStatus } from "./match-lifecycle.js";
+import { MIN_SWEEP_DELAY_MS } from "./protocol.js";
 import { expireGrace, withGrace } from "./presence.js";
 import { peerLeft, roomState, type Outgoing } from "./wire.js";
 
@@ -35,12 +36,18 @@ export interface SweepInput {
 /**
  * When the next sweep is due, or `null` while a socket is still open. `workflow-state-machine.md`: a lobby whose
  * last member left is deleted sixty seconds later; an ended room rides the normal idle window.
+ *
+ * A due instant that has already passed is pushed `MIN_SWEEP_DELAY_MS` ahead instead of being returned as-is
+ * (`US-ROOM-011`). The room is quiet by definition — nobody is connected — so the overdue sweep has nothing to do but
+ * wait for the expiry it already knows about; asking to be woken in the past is an alarm that re-arms itself for free.
  */
-export function sweepAt(room: RoomState, openSockets: number): number | null {
+export function sweepAt(room: RoomState, openSockets: number, now: number): number | null {
   if (openSockets > 0) return null;
-  return room.status === "lobby" || room.members.length === 0
-    ? room.lastActivityAt + 60_000
-    : room.lastActivityAt + TUNABLES.roomIdleMs;
+  const due =
+    room.status === "lobby" || room.members.length === 0
+      ? room.lastActivityAt + 60_000
+      : room.lastActivityAt + TUNABLES.roomIdleMs;
+  return Math.max(due, now + MIN_SWEEP_DELAY_MS);
 }
 
 export function planSweep(input: SweepInput): readonly SweepAction[] {

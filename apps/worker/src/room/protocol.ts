@@ -17,6 +17,17 @@ export const CLOSE_RATE_LIMITED = 4429;
 export const HOST_MIGRATION_RECHECK_MS = 5_000;
 
 /**
+ * The least time a sweep may wait before it is woken again (`US-ROOM-011`).
+ *
+ * A room whose sockets are gone keeps its roster and an idle window, so the sweep the object wants has already passed
+ * when it is scheduled — `lastActivityAt + 60_000` for a lobby. `setAlarm` accepts a past instant, and a Durable Object
+ * woken by an alarm that immediately re-arms at the same past instant spins: measured on production at ~600 requests a
+ * minute for the whole ten-minute idle window, per room, with nobody in it. The clamp is what turns that into one wake
+ * per interval; the sweep's own decisions (grace expiry, forfeit, close) are unchanged.
+ */
+export const MIN_SWEEP_DELAY_MS = 5_000;
+
+/**
  * The status the same refusal would carry on the REST side, so a log line and a problem body agree.
  * `problem.ts` cannot answer this: the frame codes include `payload-too-large` and the roster codes,
  * which no REST route returns.

@@ -248,7 +248,13 @@ export class RoomHarness {
     await this.do.webSocketClose(socket as unknown as Parameters<Room["webSocketClose"]>[0]);
   }
 
+  /**
+   * Fire the alarm the way workerd does: the platform **clears the alarm before the handler runs**, which is why an
+   * object that re-arms at an instant already in the past spins instead of politely waiting (`US-ROOM-011`). A harness
+   * that left the old time in place would hide exactly that.
+   */
   async alarm(): Promise<void> {
+    this.ctx.storage.alarmAt = null;
     await this.do.alarm();
   }
 
