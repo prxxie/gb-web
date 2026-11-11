@@ -114,11 +114,23 @@ Measured on production 2026-11-11 with Cloudflare GraphQL, `durableObjectsInvoca
 Almost none of that was game traffic. A room with no sockets and no frames sat at ~590–790 requests/minute — the alarm
 spinning after `US-ROOM-011` — while the frames a real client sends are two orders of magnitude fewer.
 
-What the free plan therefore buys, on the *fixed* numbers (`US-ROOM-011` in place; re-measure before quoting these
-externally):
+After `US-ROOM-011` was deployed, the same one-room two-seat 60 s run was repeated (`ad84975`, room
+`2c5467896693d0`):
+
+| | Before | After |
+|---|---|---|
+| Whole life of a 60 s two-seat room | 6 451 requests | **120 requests** |
+| Empty-room rate, sustained | ~590–790/minute | **12/minute** (one wake per `MIN_SWEEP_DELAY_MS`) |
+
+What the free plan therefore buys, on the *fixed* numbers:
 
 - **100 000 DO requests/day** and **13 000 GB-s/day** (128 MB per object ⇒ ~28 DO-hours of wall time).
-- The duration limit was never the binding one; the request limit is, by more than an order of magnitude.
-- Load tests belong on Workers Paid or on `wrangler dev`: five runs in one day is what spent the free tier, and
-  `US-OPS-003` AC2 (400 sockets for ten minutes) does not fit in the free budget at all.
+- A room costs ~120–150 requests for its whole life, almost all of it the ten-minute idle tail, so the free plan carries
+  roughly **600–800 rooms a day** — a demo, not a launch.
+- The duration limit is not the binding one; requests are, by more than an order of magnitude.
+- Load tests belong on Workers Paid or on `wrangler dev`: five runs in one day is what spent the free tier before the fix,
+  and `US-OPS-003` AC2 (400 sockets for ten minutes) does not fit in the free budget at all.
+- Next lever, not yet taken (`US-ROOM-012`): a room with nobody connected has exactly one future event — its idle expiry —
+  so the sweep could be scheduled straight at that instant instead of every five seconds. That would take a room from
+  ~120 requests to a handful, and the free plan to thousands of rooms a day.
 
