@@ -31,6 +31,7 @@ import {
   movePointer,
   pullBaseAngle,
   removePointer,
+  renderScaleFor,
   screenConstant,
   screenToWorld,
   viewportFor,
@@ -186,8 +187,13 @@ class BattleScene extends Phaser.Scene {
   private aimDelta = 0;
   /** Whether the trajectory preview is drawn; off unless the player asks for it (`setAimAid`). */
   private aimAid = false;
-  /** World units per CSS pixel, recomputed every frame: the HUD parts of the canvas stay screen-sized at any zoom. */
+  /** Canvas pixels per world unit, recomputed every frame: the HUD parts of the canvas stay screen-sized at any zoom. */
   private screenScale = 1;
+  /**
+   * Device pixels per CSS pixel (`US-MATCH-011`). The canvas is rasterised at this ratio and styled back down, so the
+   * drawing space is device pixels while gestures and screen constants are still measured in CSS pixels.
+   */
+  private renderScale = 1;
   private pointerHandlers: Array<{ type: string; handler: (event: PointerEvent) => void }> = [];
   /** The one-shot fullscreen request armed on the canvas (`US-MATCH-007` AC1). */
   private disarmFullscreen: () => void = () => undefined;
@@ -198,11 +204,12 @@ class BattleScene extends Phaser.Scene {
   private flashes: { readonly x: number; readonly y: number; readonly at: number }[] = [];
   private shakeUntil = 0;
 
-  constructor(state: MatchState, localSlot: number, callbacks: BattleCallbacks) {
+  constructor(state: MatchState, localSlot: number, callbacks: BattleCallbacks, renderScale = 1) {
     super("battle");
     this.state = state;
     this.localSlot = localSlot;
     this.callbacks = callbacks;
+    this.renderScale = Math.max(1, renderScale);
     // A placeholder only: `create()` frames the window on the real canvas, because Phaser has no `scale`
     // until the scene is booted (`this.scale` in the constructor throws).
     this.window = defaultWindow(TUNABLES.viewDefaultWidth / TUNABLES.viewDefaultHeight);
@@ -295,9 +302,12 @@ class BattleScene extends Phaser.Scene {
       active.x,
       active.y,
     );
+    // `worldToScreen` answers in canvas pixels; this point is consumed by the DOM (the item wheel's anchor) and by the
+    // hull hit test, which compares it with raw pointer coordinates. Both are CSS pixels (`US-MATCH-011`).
+    const css = { x: point.x / this.renderScale, y: point.y / this.renderScale };
     const last = this.reportedFocus;
-    if (last && Math.abs(last.x - point.x) < 2 && Math.abs(last.y - point.y) < 2) return;
-    const next = { x: point.x, y: point.y };
+    if (last && Math.abs(last.x - css.x) < 2 && Math.abs(last.y - css.y) < 2) return;
+    const next = { x: css.x, y: css.y };
     this.reportedFocus = next;
     report(next);
   }
@@ -389,7 +399,7 @@ class BattleScene extends Phaser.Scene {
       this.hold = stepped.state;
       if (stepped.pan) {
         // One finger drags the world: the camera follows the hand and stays where it is put until the player moves it.
-        this.window = panBy(this.window, stepped.pan.dx, stepped.pan.dy, this.scale.width);
+        this.window = panBy(this.window, stepped.pan.dx, stepped.pan.dy, this.cssWidth());
         this.callbacks.onCamera(this.window);
         return;
       }
@@ -440,7 +450,20 @@ class BattleScene extends Phaser.Scene {
    * the 175 px flick the shorter edge gave.
    */
   private fullPowerDistance(): number {
-    return this.scale.width;
+    return this.cssWidth();
+  }
+
+  /**
+   * The battlefield's width in CSS pixels. `this.scale.width` is the canvas backing store, which is `renderScale` times
+   * the CSS width, so every gesture constant and every pan has to come back through here (`US-MATCH-011`).
+   */
+  private cssWidth(): number {
+    return this.scale.width / this.renderScale;
+  }
+
+  /** Re-asked on resize: a window dragged to another display can change its ratio. */
+  setRenderScale(renderScale: number): void {
+    this.renderScale = Math.max(1, renderScale);
   }
 
   /**
@@ -480,7 +503,7 @@ class BattleScene extends Phaser.Scene {
     }
     if (gesture.kind === "pan") {
       // Two fingers pan the window; the camera then stays where the player put it until the next turn.
-      this.window = panBy(this.window, gesture.dx, gesture.dy, this.scale.width);
+      this.window = panBy(this.window, gesture.dx, gesture.dy, this.cssWidth());
       this.callbacks.onCamera(this.window);
       return;
     }
@@ -719,10 +742,11 @@ class BattleScene extends Phaser.Scene {
       const label = this.add
         .text(shot.impact!.x + (index - 0.5) * 34, shot.impact!.y - 46, `-${Math.round(hit.amount)}`, {
           fontFamily: "system-ui, sans-serif",
-          fontSize: "18px",
+          // The glyphs are rasterised once, so they have to be rasterised at device resolution (`US-MATCH-011`).
+          fontSize: `${Math.round(18 * this.renderScale)}px`,
           color: "#ffd9a0",
           stroke: "#1b0f06",
-          strokeThickness: 4,
+          strokeThickness: 4 * this.renderScale,
         })
         .setOrigin(0.5)
         .setScale(1 / Math.max(0.2, this.screenScale));
@@ -848,7 +872,7 @@ class BattleScene extends Phaser.Scene {
     // `angleMin` to `angleMax` with the current angle lit (owner's request, 2026-11-09). It is on screen whenever this client
     // may shoot, not only mid-pull, so the player can see the sweep and where the barrel sits inside it.
     const mobile = getMobile(player.mobileId);
-    const px = (value: number): number => screenConstant(value, this.screenScale);
+    const px = (value: number): number => screenConstant(value * this.renderScale, this.screenScale);
     const pivotY = frame.y - px(10);
     const window = angleArc(mobile.angleMin, mobile.angleMax, player.facing);
     graphics.lineStyle(px(4), 0x2b3a58, 0.85);
@@ -921,20 +945,30 @@ class BattleScene extends Phaser.Scene {
 
 /** Mount the battlefield inside a container. Returns a handle the page uses to push state and clean up. */
 export function mountBattle(options: Options): BattleHandle {
-  const scene = new BattleScene(options.state, options.localSlot, options.callbacks);
+  const render = renderScaleFor(typeof window === "undefined" ? 1 : window.devicePixelRatio);
+  const scene = new BattleScene(options.state, options.localSlot, options.callbacks, render);
   const game = new Phaser.Game({
     type: Phaser.AUTO,
     parent: options.parent,
-    width: options.parent.clientWidth,
-    height: options.parent.clientHeight,
+    // The game size is the **device-pixel** size and `zoom` styles the canvas back down to its parent (`US-MATCH-011`).
+    // `Scale.RESIZE` cannot be used for this: it forces the backing store to the parent's CSS size, which is why a
+    // 2.6-ratio phone was rasterising the battlefield at one device pixel per CSS pixel and the compositor stretched it.
+    width: Math.round(Math.max(1, options.parent.clientWidth) * render),
+    height: Math.round(Math.max(1, options.parent.clientHeight) * render),
     backgroundColor: "#070d1a",
     scene,
-    scale: { mode: Phaser.Scale.RESIZE, autoCenter: Phaser.Scale.CENTER_BOTH },
+    scale: { mode: Phaser.Scale.NONE, zoom: 1 / render, autoCenter: Phaser.Scale.CENTER_BOTH },
     input: { activePointers: 2 },
     render: { antialias: true },
   });
   const resize = (): void => {
-    game.scale.resize(options.parent.clientWidth, options.parent.clientHeight);
+    const ratio = renderScaleFor(typeof window === "undefined" ? 1 : window.devicePixelRatio);
+    scene.setRenderScale(ratio);
+    game.scale.setZoom(1 / ratio);
+    game.scale.resize(
+      Math.round(Math.max(1, options.parent.clientWidth) * ratio),
+      Math.round(Math.max(1, options.parent.clientHeight) * ratio),
+    );
   };
   window.addEventListener("resize", resize);
   return {

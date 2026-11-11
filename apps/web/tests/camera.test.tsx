@@ -17,7 +17,7 @@ import {
   windowOn,
   type CameraWindow,
 } from "@gbw/core";
-import { screenConstant } from "../src/game/viewport";
+import { MAX_RENDER_SCALE, renderScaleFor, screenConstant } from "../src/game/viewport";
 
 const MAP = { width: TUNABLES.mapWidth, height: TUNABLES.mapHeight };
 const SCREEN_WIDTH = 800;
@@ -161,5 +161,24 @@ describe("TC-MATCH-918: following a player stays inside the map", () => {
     expect(stray.width).toBe(MAP.width);
     expect(stray.x).toBe(0);
     expect(stray.y).toBe(MAP.height - stray.height);
+  });
+});
+
+describe("TC-MATCH-957: the battlefield renders at the screen's pixel density", () => {
+  it("takes the device ratio, up to the cap", () => {
+    expect(renderScaleFor(1)).toBe(1);
+    expect(renderScaleFor(2.625)).toBe(MAX_RENDER_SCALE);
+    expect(renderScaleFor(3)).toBe(MAX_RENDER_SCALE);
+  });
+
+  it("never rasterises below one device pixel per CSS pixel", () => {
+    expect(renderScaleFor(0.75)).toBe(1);
+    expect(renderScaleFor(0)).toBe(1);
+  });
+
+  it("survives a platform that reports no ratio at all", () => {
+    expect(renderScaleFor(undefined)).toBe(1);
+    expect(renderScaleFor(Number.NaN)).toBe(1);
+    expect(renderScaleFor(Number.POSITIVE_INFINITY)).toBe(1);
   });
 });

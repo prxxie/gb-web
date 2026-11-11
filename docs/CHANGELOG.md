@@ -1,5 +1,17 @@
 # Changelog
 
+## 2026-11-11 — the battlefield draws at the screen's real resolution
+
+Reported as jagged graphics. The canvas was rasterised at **one device pixel per CSS pixel** — `scale: { mode: RESIZE }`
+forces the backing store to the parent's CSS size in Phaser 4, which has no `resolution`/`autoDensity` to raise it — so on
+a 2.625-ratio phone the whole battlefield was drawn at 1× and stretched by the compositor. Measured on production: canvas
+`863 × 360` for an `863 × 360` CSS box.
+
+The game size is now `cssSize × min(max(devicePixelRatio, 1), 2)` with `scale.zoom = 1 / ratio` styling the canvas back down
+(`US-MATCH-011`, `TC-MATCH-956`/`TC-MATCH-957`): the same screen measures `1726 × 720` in an unchanged CSS box. Drawing is in
+device pixels, gestures and screen constants stay in CSS pixels — verified by hand, a 12 px downward drag still reads
+45° → 42° and a 240 px sideways drag still reads power 2.50.
+
 ## 2026-11-11 — the app asks for landscape outside an installed app too
 
 Reported as "production still does not rotate". It was true, and it was our guard: the landscape lock only ran when

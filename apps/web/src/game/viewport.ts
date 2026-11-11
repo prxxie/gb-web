@@ -114,6 +114,26 @@ export function classify(
   return { kind: "pan", dx: mid.x - previousMid.x, dy: mid.y - previousMid.y };
 }
 
+/**
+ * The most device pixels per CSS pixel the battlefield renders at (`US-MATCH-011`).
+ *
+ * A 2.6-ratio phone draws at 2 rather than 3 for the same reason a desktop browser caps it: the canvas costs area, and a
+ * 2.6x raster is ~7x the pixels of 1x for a difference the eye does not resolve on a 6-inch screen.
+ */
+export const MAX_RENDER_SCALE = 2;
+
+/**
+ * How many device pixels one CSS pixel of battlefield is worth.
+ *
+ * The game size is the device-pixel size and the canvas is styled back down to its parent (`scale.zoom`), which is what
+ * makes the difference between vector art drawn at the screen's real resolution and the same art rasterised at 1x and
+ * stretched by the compositor — the aliasing the owner reported as "răng cưa" on production.
+ */
+export function renderScaleFor(devicePixelRatio: number | undefined): number {
+  const ratio = typeof devicePixelRatio === "number" && Number.isFinite(devicePixelRatio) ? devicePixelRatio : 1;
+  return Math.min(Math.max(ratio, 1), MAX_RENDER_SCALE);
+}
+
 export interface Viewport {
   /** Screen pixels per world unit. */
   readonly scale: number;

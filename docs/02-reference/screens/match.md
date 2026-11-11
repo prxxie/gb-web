@@ -181,3 +181,9 @@ The battlefield is a **gesture surface**, not a canvas with buttons on it:
 - **The bottom strip** (56 px) holds the shot's own inputs — wind dial, weapon slots, item tray, skip, phrases — and the
   power chip. Nothing else floats over the middle of the field: the skip/phrase buttons used to sit at `(346, 190)`, dead
   centre, where every pull starts.
+
+## Canvas density
+
+The canvas is rasterised at the device's pixel density, capped at 2 (`US-MATCH-011`): the game size is
+`cssSize × ratio` and the canvas is styled back down to its parent, so drawing happens in device pixels while gestures and
+screen constants stay in CSS pixels.
