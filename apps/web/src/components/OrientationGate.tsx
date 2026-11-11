@@ -49,12 +49,18 @@ export function shouldGate(): boolean {
 }
 
 /**
- * Ask the platform to lock the screen to landscape (`US-PWA-005` AC2).
+ * Ask the platform to lock the screen to landscape (`US-PWA-005` AC2, fixed by `US-PWA-006` AC1).
  *
- * This is the only way the app can spare the player the rotation, and it is deliberately best-effort:
- * Safari has no `ScreenOrientation.lock` at all, and Chrome only honours it for an installed app. A
- * rejection is the normal case on half the devices in the world, so it is swallowed rather than reported
- * — the rotate notice stays the fallback.
+ * This is the only way the app can spare the player the rotation, and it is deliberately best-effort: Safari
+ * has no `ScreenOrientation.lock` at all. A rejection is the normal case on half the devices in the world, so
+ * it is swallowed rather than reported — the rotate notice stays the fallback.
+ *
+ * Chrome honours `lock()` in a **fullscreen document**, and a browser tab is not fullscreen even when the
+ * manifest asks for `display: fullscreen` — that only applies once the app is installed. The first version of
+ * this function returned `false` in a tab without ever calling `lock()`, so a phone that opened the site
+ * normally was told to rotate and the app never tried to spare it (measured on production 2026-11-11:
+ * `lock()` succeeded in a tab, but the app bailed out before asking). Asking for fullscreen first is what
+ * makes the lock reachable outside an installed app.
  */
 /**
  * `ScreenOrientation.lock` is not in the TypeScript DOM lib this project compiles against — the same reason Safari
@@ -64,16 +70,47 @@ interface LockableOrientation {
   lock?: (orientation: "landscape" | "portrait" | "portrait-primary" | "landscape-primary") => Promise<void>;
 }
 
+/**
+ * The document element with the prefixed spelling older WebKit builds still ship. It is a standalone shape rather than
+ * an interface extending `HTMLElement`: `lib.dom` already declares `requestFullscreen(options?)`, and narrowing it here
+ * would be a declaration conflict rather than a cast.
+ */
+interface FullscreenCapable {
+  requestFullscreen?: (options?: FullscreenOptions) => Promise<void>;
+  webkitRequestFullscreen?: () => Promise<void>;
+}
+
+/** `document.fullscreenElement` plus the WebKit prefix, which `lib.dom` does not declare. */
+interface FullscreenDocument extends Document {
+  readonly webkitFullscreenElement?: Element | null;
+}
+
+/** True when the document already owns the screen: real fullscreen, or an installed app's fullscreen mode. */
+export function isFullscreenNow(): boolean {
+  const doc = document as FullscreenDocument;
+  if (doc.fullscreenElement ?? doc.webkitFullscreenElement) return true;
+  return typeof window.matchMedia === "function" && window.matchMedia("(display-mode: fullscreen)").matches;
+}
+
+/** Ask for fullscreen, swallowing the refusal Safari throws for an element that cannot go fullscreen. */
+async function enterFullscreen(): Promise<boolean> {
+  const root = document.documentElement as unknown as FullscreenCapable | null;
+  const call = root?.requestFullscreen ?? root?.webkitRequestFullscreen;
+  if (typeof call !== "function" || !root) return false;
+  try {
+    await call.call(root);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export async function requestLandscapeLock(): Promise<boolean> {
   const orientation =
     typeof screen === "undefined" ? undefined : (screen.orientation as unknown as LockableOrientation | undefined);
   if (typeof orientation?.lock !== "function") return false;
-  const installed =
-    typeof window.matchMedia === "function" &&
-    ["(display-mode: standalone)", "(display-mode: fullscreen)", "(display-mode: minimal-ui)"].some(
-      (query) => window.matchMedia(query).matches,
-    );
-  if (!installed) return false;
+  // Chrome refuses `lock()` outside fullscreen, and a tab is not fullscreen however the manifest reads.
+  if (!isFullscreenNow()) await enterFullscreen();
   try {
     await orientation.lock("landscape");
     return true;
@@ -110,8 +147,12 @@ export function OrientationGate({ children, message, action }: OrientationGatePr
       asked = true;
       void requestLandscapeLock();
     };
-    window.addEventListener("pointerdown", ask, { once: true });
-    window.addEventListener("keydown", ask, { once: true });
+    // Only a touch device is spared the rotation; a desktop window that went fullscreen on its first click would be
+    // a surprise, and it has no orientation to lock anyway (`US-PWA-005` AC1).
+    if (isTouchDevice()) {
+      window.addEventListener("pointerdown", ask, { once: true });
+      window.addEventListener("keydown", ask, { once: true });
+    }
     return () => {
       window.removeEventListener("pointerdown", ask);
       window.removeEventListener("keydown", ask);

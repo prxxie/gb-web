@@ -8,7 +8,7 @@ decide, a contract that already exists in `02-reference/`, and tests that prove 
 <!-- cpt:stats -->
 | Stories | Done | In progress | Ready | Blocked | Draft | Closed |
 |---|---|---|---|---|---|---|
-| 61 | 54 | 0 | 7 | 0 | 0 | 0 |
+| 62 | 55 | 0 | 7 | 0 | 0 | 0 |
 
 Open questions: **Open: 13 · Blocking: 0 · Answered: 29 · Withdrawn: 1**
 <!-- /cpt:stats -->
@@ -25,7 +25,7 @@ Open questions: **Open: 13 · Blocking: 0 · Answered: 29 · Withdrawn: 1**
 | [EPIC-04-netplay](EPIC-04-netplay/README.md) | NET | Peer-to-peer transport and host authority | 4 | 4 | 0 |
 | [EPIC-05-match-ui](EPIC-05-match-ui/README.md) | MATCH | Match scene, touch aiming and HUD | 10 | 10 | 0 |
 | [EPIC-06-ranked](EPIC-06-ranked/README.md) | RANK | Results, match records, Elo and leaderboard | 5 | 5 | 0 |
-| [EPIC-07-pwa-i18n](EPIC-07-pwa-i18n/README.md) | PWA | Installable PWA, offline play, bilingual UI and accessibility | 5 | 3 | 0 |
+| [EPIC-07-pwa-i18n](EPIC-07-pwa-i18n/README.md) | PWA | Installable PWA, offline play, bilingual UI and accessibility | 6 | 4 | 0 |
 | [EPIC-08-ops](EPIC-08-ops/README.md) | OPS | Observability, load evidence and release | 4 | 0 | 0 |
 <!-- /cpt:epics -->
 

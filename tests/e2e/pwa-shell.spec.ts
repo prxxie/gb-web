@@ -116,6 +116,11 @@ test.describe("landscape gate", () => {
     });
     const clockBefore = (await page.getByTestId("turn-clock").textContent()) ?? "";
 
+    // The first gesture in a match asks the document for fullscreen (`US-MATCH-007` AC1), and a fullscreen window cannot
+    // be resized: leave fullscreen first, then model the rotation the way a phone doing it would.
+    await page.evaluate(async () => {
+      if (document.fullscreenElement) await document.exitFullscreen();
+    });
     await page.setViewportSize({ width: 412, height: 915 });
     await expect(page.getByTestId("orientation-hint")).toBeVisible();
     await page.setViewportSize({ width: 915, height: 412 });

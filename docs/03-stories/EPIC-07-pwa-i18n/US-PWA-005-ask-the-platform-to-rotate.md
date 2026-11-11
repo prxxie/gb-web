@@ -44,8 +44,8 @@ quay ngang, không tự quay ngang được à?"):
 | # | Given | When | Then |
 |---|-------|------|------|
 | AC1 | A desktop window taller than it is wide (fine pointer, no touch) | The app loads | The requested route renders and no rotate notice appears — supersedes `US-PWA-003` AC6 (`TC-PWA-194`) |
-| AC2 | An installed app on a platform that has `ScreenOrientation.lock` | The player's first pointer or key gesture happens | The app asks for `landscape` exactly once, and a rejection changes nothing on screen (`TC-PWA-192`) |
-| AC3 | A platform without the API (Safari) or a browser tab that is not installed | The player's first gesture happens | No lock is requested and no error is surfaced; the rotate notice stays the only fallback (`TC-PWA-192`) |
+| AC2 | ~~An installed app~~ any touch device on a platform that has `ScreenOrientation.lock` **— superseded by `US-PWA-006` AC1** | The player's first pointer or key gesture happens | The app asks the document for fullscreen when it does not own the screen and then asks for `landscape`, exactly once; a rejection changes nothing on screen (`TC-PWA-192`, `TC-PWA-195`) |
+| AC3 | A platform without the API (Safari) — ~~or a browser tab that is not installed~~ **superseded by `US-PWA-006` AC1**, a tab is now asked too | The player's first gesture happens | No lock is requested and no error is surfaced; the rotate notice stays the only fallback (`TC-PWA-192`) |
 | AC4 | A touch device held in portrait | The app loads | The rotate notice appears, unchanged from `US-PWA-003` AC1 (`TC-PWA-152`) |
 
 ## 4. Contract

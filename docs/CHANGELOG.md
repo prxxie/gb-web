@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-11-11 — the app asks for landscape outside an installed app too
+
+Reported as "production still does not rotate". It was true, and it was our guard: the landscape lock only ran when
+`display-mode` said the app was installed, so a phone opening a link got the "rotate your device" notice from an app that
+never asked the platform. A production probe found `screen.orientation.lock` present **and accepted** in an ordinary tab.
+
+The first gesture now asks the document for fullscreen — Chrome only honours `lock()` in a fullscreen document, and a tab
+is not fullscreen however the manifest reads — and then asks for `landscape` (`US-PWA-006`, `TC-PWA-195..198`). Safari
+still gets nothing (no API) and a mouse is never sent fullscreen. The rotate notice stays the fallback.
+
 ## 2026-11-11 — a quiet room no longer bills by the second
 
 A room with nobody in it was costing about **6 000 Durable Object requests** instead of a handful. `sweepAt` answers

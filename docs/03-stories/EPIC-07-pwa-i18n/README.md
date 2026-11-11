@@ -28,6 +28,7 @@ Generated from story frontmatter — run `node .agents/scripts/verify-docs.mjs -
 | [US-PWA-003](US-PWA-003-landscape-only-layout.md) | Enforce the landscape layout with a rotate notice | P1 | S | done | US-FND-003 |
 | [US-PWA-004](US-PWA-004-meet-the-accessibility-bar.md) | Meet the accessibility bar on every screen | P2 | M | ready | US-FND-003, US-MATCH-003 |
 | [US-PWA-005](US-PWA-005-ask-the-platform-to-rotate.md) | Ask the platform to rotate, and stop nagging desktop windows | P2 | S | done | US-PWA-003 |
+| [US-PWA-006](US-PWA-006-a-tab-can-ask-for-landscape.md) | A browser tab can ask for landscape too | P1 | S | done | US-PWA-005 |
 <!-- /cpt:epic-stories -->
 
 ## Out of scope

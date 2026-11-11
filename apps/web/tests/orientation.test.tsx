@@ -37,6 +37,21 @@ function setViewport(width: number, height: number): void {
   Object.defineProperty(window, "innerHeight", { configurable: true, writable: true, value: height });
 }
 
+let fullscreenImpl: () => Promise<void> = async () => undefined;
+const rootRequestFullscreen = vi.fn(() => fullscreenImpl());
+const fullscreenCalls = (): number => rootRequestFullscreen.mock.calls.length;
+
+/** One spy installed on the document element for the whole file; a case changes `fullscreenImpl` to refuse. */
+function stubFullscreen(): void {
+  fullscreenImpl = async () => undefined;
+  rootRequestFullscreen.mockClear();
+  Object.defineProperty(document.documentElement, "requestFullscreen", {
+    configurable: true,
+    writable: true,
+    value: rootRequestFullscreen,
+  });
+}
+
 function stubOrientation(): void {
   listeners.clear();
   window.matchMedia = ((query: string) => {
@@ -92,6 +107,7 @@ beforeEach(() => {
   installed = true;
   setViewport(844, 390);
   stubOrientation();
+  stubFullscreen();
 });
 
 afterEach(() => {
@@ -215,15 +231,42 @@ describe("TC-PWA-192: the app asks the platform to lock the screen", () => {
     await expect(requestLandscapeLock()).resolves.toBe(false);
   });
 
-  it("does not ask when the API is missing (Safari) or the app is in a browser tab", async () => {
+  it("does not ask when the platform has no lock at all (Safari)", async () => {
     vi.stubGlobal("screen", {});
     expect(await requestLandscapeLock()).toBe(false);
+    expect(fullscreenCalls()).toBe(0);
+  });
 
+  it("TC-PWA-195 asks for fullscreen, then locks, when the app is only a browser tab", async () => {
+    installed = false;
     const lock = vi.fn(async () => undefined);
     vi.stubGlobal("screen", { orientation: { lock } });
+    expect(await requestLandscapeLock()).toBe(true);
+    expect(fullscreenCalls()).toBe(1);
+    expect(lock).toHaveBeenCalledWith("landscape");
+  });
+
+  it("TC-PWA-196 does not ask for fullscreen when the document already owns the screen", async () => {
+    installed = true;
+    const lock = vi.fn(async () => undefined);
+    vi.stubGlobal("screen", { orientation: { lock } });
+    expect(await requestLandscapeLock()).toBe(true);
+    expect(fullscreenCalls()).toBe(0);
+    expect(lock).toHaveBeenCalledWith("landscape");
+  });
+
+  it("TC-PWA-197 still asks for the lock when fullscreen is refused, and never throws", async () => {
     installed = false;
-    expect(await requestLandscapeLock()).toBe(false);
-    expect(lock).not.toHaveBeenCalled();
+    fullscreenImpl = async () => {
+      throw new Error("NotAllowedError");
+    };
+    const lock = vi.fn(async () => {
+      throw new Error("NotSupportedError");
+    });
+    vi.stubGlobal("screen", { orientation: { lock } });
+    await expect(requestLandscapeLock()).resolves.toBe(false);
+    expect(rootRequestFullscreen).toHaveBeenCalledTimes(1);
+    expect(lock).toHaveBeenCalledTimes(1);
   });
 
   it("asks from the gate on the first pointer or key, and only once", async () => {
@@ -236,5 +279,19 @@ describe("TC-PWA-192: the app asks the platform to lock the screen", () => {
       window.dispatchEvent(new Event("keydown"));
     });
     expect(lock).toHaveBeenCalledTimes(1);
+  });
+
+  it("TC-PWA-198 a mouse never sends the page fullscreen", async () => {
+    coarsePointer = false;
+    landscapeQueryMatches = false;
+    setViewport(500, 900);
+    const lock = vi.fn(async () => undefined);
+    vi.stubGlobal("screen", { orientation: { lock } });
+    gate();
+    await act(async () => {
+      window.dispatchEvent(new Event("pointerdown"));
+    });
+    expect(lock).not.toHaveBeenCalled();
+    expect(fullscreenCalls()).toBe(0);
   });
 });

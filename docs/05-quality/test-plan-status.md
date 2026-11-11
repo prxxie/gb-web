@@ -74,3 +74,5 @@ and **AC4** (keyboard-only order, `TC-PWA-161`) | AC2, AC4 |
 
 Two citations of files that never existed were also found and corrected: `US-FND-003` and `US-PWA-002` named
 `apps/web/tests/i18n.test.ts`; the file is `i18n.test.tsx` and it is written.
+
+| `US-PWA-006` | TC-PWA-195..198 | The lock path is now provable in jsdom (fullscreen → `lock`) and a production probe showed `lock()` accepted in a browser tab, but **"the phone actually turned"** still needs a physical Android device in Chrome: headless Chromium accepts the lock with no screen to rotate. iPhone remains manual by platform, not by choice. |
