@@ -13,7 +13,7 @@
  */
 import { describe, expect, it } from "vitest";
 import { TUNABLES, angleFromPull, forceFromPower, powerFromDrag } from "@gbw/core";
-import { addPointer, classify, clearPointers } from "../src/game/viewport";
+import { ANGLE_DEG_PER_PX, addPointer, classify, clearPointers, pullBaseAngle } from "../src/game/viewport";
 
 const SHORT_EDGE = 600; // a landscape phone's shorter screen edge, logical px
 const FULL_DRAG = SHORT_EDGE * TUNABLES.powerDragFullRatio; // 270 px
@@ -103,5 +103,51 @@ describe("TC-MATCH-916: a second finger cancels the pull instead of firing (AC5)
     const one = addPointer(clearPointers(), { id: 1, x: 100, y: 100 });
     const gesture = classify(one, { origin: null, facing: 1, screenShorterEdge: SHORT_EDGE, previousSpread: null });
     expect(gesture.kind).toBe("none");
+  });
+});
+
+/**
+ * TC-MATCH-955: a pull's angle depends on how far the finger travelled, not on how many `pointermove` events reported it.
+ *
+ * `classify` measures `dy` from the press point, so the angle it is given as a base must be the one the barrel had when
+ * the finger went down. Hand-playing a bot match on 2026-11-11 measured the alternative: dragging down 60 px rotated the
+ * barrel from 45° to −10° (55°, its whole window) instead of 15°, and the same drag landed on a different angle depending
+ * on how the browser coalesced the moves. This models the scene's loop — latch at press, one `classify` per event, carry
+ * the result forward — and asserts the two event counts agree.
+ */
+describe("TC-MATCH-955: the angle does not compound per move event", () => {
+  const ORIGIN = { id: 1, x: 400, y: 180 };
+
+  /** What `interpret()` does per `pointermove`: the base is latched, and the running angle follows the latest event. */
+  const dragDown = (steps: readonly number[]): number => {
+    let barrel = 45;
+    const pressAngle = barrel;
+    for (const dy of steps) {
+      const pointers = addPointer(clearPointers(), { id: 1, x: ORIGIN.x, y: ORIGIN.y + dy });
+      const gesture = classify(pointers, {
+        origin: ORIGIN,
+        facing: 1,
+        fullPowerDistance: 380,
+        baseAngle: pullBaseAngle(pressAngle, barrel),
+        previousSpread: null,
+      });
+      if (gesture.kind === "pull") barrel = gesture.angle;
+    }
+    return barrel;
+  };
+
+  it("twelve moves of 5 px land where one move of 60 px lands", () => {
+    const one = dragDown([60]);
+    const twelve = dragDown(Array.from({ length: 12 }, (_, index) => (index + 1) * 5));
+    expect(twelve).toBeCloseTo(one, 6);
+  });
+
+  it("60 px of downward travel lowers the barrel by 15°, not by its whole window", () => {
+    expect(dragDown([60])).toBeCloseTo(45 - 60 * ANGLE_DEG_PER_PX, 6);
+  });
+
+  it("dragging up raises it symmetrically, and sideways travel leaves it alone", () => {
+    expect(dragDown([-60])).toBeCloseTo(45 + 60 * ANGLE_DEG_PER_PX, 6);
+    expect(dragDown([0])).toBeCloseTo(45, 6);
   });
 });

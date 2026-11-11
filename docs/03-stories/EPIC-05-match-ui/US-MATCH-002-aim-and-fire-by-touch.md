@@ -41,7 +41,7 @@ the camera (`US-MATCH-007`), never to aiming.
 | AC3 | a pull released at `power ≥ 0.3` | the finger lifts | Exactly one `fire` is sent with `force = round(power × 25)`, the angle and the active `weaponSlot`; the ring clears and the shot plays locally at once (`TC-MATCH-936`, `TC-MATCH-151`) |
 | AC4 | a pull released below `0.3`, or ended by `pointercancel` | the gesture ends | Nothing is sent, the ring animates back to zero, and a hint `Kéo để lấy lực` appears once (`TC-MATCH-916`, `TC-MATCH-936`) |
 | AC5 | a pull in progress | a second finger lands and pans or pinches | The pull is cancelled **without firing** and the camera gesture takes over (`TC-MATCH-916`, `TC-MATCH-936`) |
-| AC6 | the drag direction | the pull is drawn | The angle follows `atan2(-dy, dx)`, clamped to the mobile's own `angleMin…angleMax`, and the dotted arc previews it with zero wind (`TC-MATCH-936`, `TC-MATCH-151`) |
+| AC6 | the drag direction | the pull is drawn | The angle follows ~~`atan2(-dy, dx)`~~ **superseded 2026-11-09 / `US-MATCH-010`**: the pull *rotates* the barrel from the angle it already had (`baseAngle − dy × 0.25`, latched at press), clamped to the mobile's own `angleMin…angleMax`, and the ring's centre prints it (`TC-MATCH-936`, `TC-MATCH-955`) |
 | AC7 | not the player's turn | a pull is attempted | No ring, no arc, no message; a single hint `Lượt của {tên}` (`TC-MATCH-937`) |
 | AC8 | an eliminated player or a second fire in the same turn | input is attempted | Controls are disabled and the second fire is blocked locally until the turn resolves (`TC-MATCH-937`, `TC-CORE-901`) |
 

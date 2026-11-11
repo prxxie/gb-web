@@ -2,8 +2,8 @@
  * The top strip of the match HUD (`US-MATCH-003`).
  *
  * The weather banner, then one row of three cells: the roster on the left, the wind dead centre, the match controls on
- * the right. The wind used to be absolutely centred over the roster, which put the dial and the EN toggle on top of the
- * health chips (owner's report, 2026-11-08).
+ * the right. The wind used to be absolutely centred over the roster, which put the dial on top of the health chips
+ * (owner's report, 2026-11-08). There is no language toggle here: the owner struck it from the match on 2026-11-09.
  */
 import type { MatchState } from "@gbw/core";
 import { Roster } from "../components/Roster";

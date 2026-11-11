@@ -1,5 +1,17 @@
 # Changelog
 
+## 2026-11-11 — the angle rotates from where you pressed
+
+Hand-playing a bot match found that the barrel's angle compounded with the browser's event rate: `scene.ts` fed
+`classify` the angle the *previous* `pointermove` had produced, and `classify` measures `dy` from the press point, so every
+event re-applied the whole travel. Measured before the fix, a 60 px downward drag swung the barrel **45° → −10°** — its
+entire window — instead of the 15° that `ANGLE_DEG_PER_PX` promises, and the same drag gave different angles in different
+runs. The ceiling hid it: an upward drag clamped to 45° either way, so only downward movements showed the bug.
+
+The base is now latched when the press arms (`pullBaseAngle`, `US-MATCH-010`, `TC-MATCH-955`) and cleared with the gesture,
+so 60 px down reads 30° whether the browser delivers it as one event or twelve. First-hand evidence: every shot in the four
+runs before the fix missed; after it, a 45° / 3.3-bar shot starts landing (`Bắn trúng! … gây 148 sát thương`).
+
 ## 2026-11-08 — one finger pans, a held finger aims
 
 The battlefield is now a gesture surface: a drag moves the camera, a press held still for 300 ms arms the shot. The rule is

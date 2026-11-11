@@ -53,6 +53,19 @@ function distance(a: Point, b: Point): number {
   return Math.hypot(b.x - a.x, b.y - a.y);
 }
 
+/**
+ * The angle a pull rotates from.
+ *
+ * `classify` measures `dy` from the point the finger went down, so it has to be given the angle the barrel had *then*.
+ * Feeding it the current barrel angle — which is what `interpret` used to do — re-applies the whole travel on every
+ * `pointermove`: a 60 px drag rotated the barrel from 45° to −10° (55°) across twelve events instead of the 15° the
+ * constant promises, and the same physical gesture gave a different angle on a device that reported more events. Latch it
+ * when the gesture arms, and leave it alone until the finger lifts.
+ */
+export function pullBaseAngle(pressAngle: number | null, barrelAngle: number): number {
+  return pressAngle ?? barrelAngle;
+}
+
 export function safePointer(state: PointerState, index: number): Point | null {
   return state.pointers[index] ?? null;
 }

@@ -24,7 +24,20 @@ import {
   type PlayerState,
 } from "@gbw/core";
 import { advance, drag, IDLE, lift, liftsAsShot, press, type HoldState } from "./hold";
-import { addPointer, classify, clearPointers, movePointer, removePointer, screenConstant, screenToWorld, viewportFor, worldToScreen, type Point, type PointerState } from "./viewport";
+import {
+  addPointer,
+  classify,
+  clearPointers,
+  movePointer,
+  pullBaseAngle,
+  removePointer,
+  screenConstant,
+  screenToWorld,
+  viewportFor,
+  worldToScreen,
+  type Point,
+  type PointerState,
+} from "./viewport";
 import {
   INTERPOLATION_MS,
   poseOfFrames,
@@ -144,6 +157,8 @@ class BattleScene extends Phaser.Scene {
    * not re-centre between turns, so a player can keep a known angle and only adjust the power.
    */
   private barrelAngle = 45;
+  /** The angle the running pull rotates from, latched when it arms (`pullBaseAngle`). */
+  private pressAngle: number | null = null;
   /** The first pull of a match starts mid-window so the barrel can go both ways; after that it keeps the last angle. */
   private barrelSeeded = false;
 
@@ -203,6 +218,12 @@ class BattleScene extends Phaser.Scene {
     this.weaponSlot = slot;
   }
 
+  /** Drops the running gesture's anchor and its latched angle together, so a later move cannot rotate from a stale base. */
+  private clearOrigin(): void {
+    this.origin = null;
+    this.pressAngle = null;
+  }
+
   setAimAid(enabled: boolean): void {
     this.aimAid = enabled;
   }
@@ -211,7 +232,7 @@ class BattleScene extends Phaser.Scene {
     this.aimAllowed = allowed;
     if (!allowed) {
       // A pull in flight is dropped rather than fired when the right to aim goes away mid-gesture.
-      this.origin = null;
+      this.clearOrigin();
       this.pullPower = 0;
       this.pullAngle = 0;
       this.callbacks.onCancel("gesture");
@@ -348,14 +369,14 @@ class BattleScene extends Phaser.Scene {
           this.callbacks.onItemHold?.(null);
         }
         this.hold = press(pressPoint, now());
-        this.origin = null;
+        this.clearOrigin();
         this.pullPower = 0;
         this.pullAngle = 0;
       } else {
         // A second finger cancels the shot, by design: aiming is a one-finger, one-thought act and a stray thumb must
         // not silently change the angle of a shot already being measured (product decision, 2026-11-08).
         this.previousSpread = this.spread();
-        this.origin = null;
+        this.clearOrigin();
         this.hold = lift();
         this.callbacks.onCancel("gesture");
       }
@@ -383,7 +404,7 @@ class BattleScene extends Phaser.Scene {
           origin: this.origin,
           facing: this.facing(),
           fullPowerDistance: this.fullPowerDistance(),
-          baseAngle: this.barrelAngle,
+          baseAngle: pullBaseAngle(this.pressAngle, this.barrelAngle),
           previousSpread: null,
         });
         const power = gesture.kind === "pull" ? gesture.power : this.pullPower;
@@ -394,7 +415,7 @@ class BattleScene extends Phaser.Scene {
       // The pull is spent: clear the ring and the predicted arc until the next gesture starts.
       this.pullPower = 0;
       this.pullAngle = 0;
-      this.origin = null;
+      this.clearOrigin();
       this.hold = lift();
       this.holdOnSelf = false;
       this.previousSpread = null;
@@ -447,7 +468,7 @@ class BattleScene extends Phaser.Scene {
       origin: this.origin,
       facing: this.facing(),
       fullPowerDistance: this.fullPowerDistance(),
-      baseAngle: this.barrelAngle,
+      baseAngle: pullBaseAngle(this.pressAngle, this.barrelAngle),
       previousSpread: this.previousSpread,
     });
     if (gesture.kind === "pull") {
@@ -486,7 +507,7 @@ class BattleScene extends Phaser.Scene {
         this.holdOnSelf = false;
         this.itemOpen = true;
         this.hold = lift();
-        this.origin = null;
+        this.clearOrigin();
         const at = this.reportedFocus;
         this.callbacks.onItemHold?.(at ? { x: at.x, y: at.y } : null);
         return;
@@ -498,6 +519,8 @@ class BattleScene extends Phaser.Scene {
         this.barrelAngle = this.openAngle();
         this.barrelSeeded = true;
       }
+      // Latch after the seed: the first pull of a match rotates from the angle the barrel opened on.
+      this.pressAngle = this.origin ? this.barrelAngle : null;
     } else if (armed !== this.hold) {
       this.hold = armed;
     }

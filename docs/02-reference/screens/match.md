@@ -160,7 +160,8 @@ counter appears for each team (`TC-CORE-917`). Fog maps shorten the aim arc and 
 
 The match renders **without the app bar**: it is the one route where the shared header (product name + language toggle)
 costs real field. At 844×390 the bar took 77 px, and the canvas is now the whole viewport (`TC-MATCH-910`). The language
-toggle lives in the match HUD beside the turn clock so the control is still one tap away; every other route keeps the bar.
+toggle is **not** hosted inside the match either — the owner struck it on 2026-11-09, because a match is played rather than
+configured; it is one tap away on every other route, and a switch made elsewhere repaints a running match.
 
 ## 8. Controls
 

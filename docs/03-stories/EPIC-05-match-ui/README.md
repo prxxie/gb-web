@@ -31,6 +31,7 @@ Generated from story frontmatter — run `node .agents/scripts/verify-docs.mjs -
 | [US-MATCH-007](US-MATCH-007-zoom-and-pan-the-battlefield.md) | Fullscreen window with pinch zoom and a measuring ruler | P0 | M | done | US-MATCH-001 |
 | [US-MATCH-008](US-MATCH-008-split-the-match-page.md) | Split the match page into hooks and panels | P2 | L | done | US-MATCH-001, US-MATCH-003, US-MATCH-005, US-MATCH-007 |
 | [US-MATCH-009](US-MATCH-009-carry-the-loadout-into-the-match.md) | fix — carry the picked loadout into the match | P1 | S | done | US-ROOM-007, US-MATCH-005 |
+| [US-MATCH-010](US-MATCH-010-angle-rotates-from-press.md) | The angle rotates from where the pull started | P1 | S | done | US-MATCH-002 |
 <!-- /cpt:epic-stories -->
 
 ## Out of scope
