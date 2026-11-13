@@ -11,9 +11,9 @@ angle give the bar; a bar and an angle give the distance and the flight time; a 
 ├───────────────────────────────────────────────────────────────────────────────┤
 │  [ Tính bar ] [ Tính khoảng cách ] [ Tính thời gian ]                          │
 │                                                                               │
-│  Máy      [ Boomer ▾ ]        Góc      [ 45 ] °                                │
+│  Máy      [ Iron Tortoise ▾ ] Góc      [ 45 ]                                  │
 │  Gió      [ 12 ]  ( Đông ) ( Tây )       Chênh cao  [ 0 ] phần                 │
-│  Khoảng cách [ 2.77 ] phần                                                     │
+│  Khoảng cách [ 22.14 ] phần                                                    │
 │                                                                               │
 │  ┌─────────────────────────────────────────────────────────────────────────┐   │
 │  │  Bar 4.00        bay 3.37 s                                              │   │
@@ -27,16 +27,16 @@ angle give the bar; a bar and an angle give the distance and the flight time; a 
 | Field | Type | Source | Notes |
 |-------|------|--------|-------|
 | Mode | segmented control: `bar` · `distance` · `time` | local state, default `bar` | Chooses which one field is the **input** and which answers are printed (`US-BAL-007` AC5) |
-| Máy | select, the seventeen machines (`data/mobiles.md`) | `MOBILES` in `@gbw/core` | Its `weight` gives `gravity`, its `windDrag` gives the wind coefficient — `gravityFor` and `windKFor`, never a typed-in number |
+| Máy | select, the seventeen machines (`data/mobiles.md`) | `MOBILES` in `@gbw/core`, default `mbl-03` | Its `weight` gives `gravity`, its `windDrag` gives the wind coefficient — `gravityFor` and `windKFor`, never a typed-in number. The default is the reference hull, so the screen opens on the calibration shot (§ `US-BAL-007` AC2) |
 | Góc | number, 0–180, step 1, default 45 | local state | The angle the player means to fire at; `facing` is always east, so the answer is the bar or distance for that side of the muzzle |
 | Chênh cao | number, phần, step 0.01, default 0 | local state | The target's height above the muzzle, negative for below (`deltaY` in world units after `× 100`) |
 | Gió | number 0–26 + `Đông`/`Tây` toggle | local state, default 0 | Feeds `windAcceleration(wind, k)` — the wind is horizontal (`tunables.md` § 1.1, `US-CORE-015`) |
-| Khoảng cách | number, phần, step 0.01 | local state, the input in `bar` mode | The only place phần becomes world units: `parts × TUNABLES.partWidth` (`US-BAL-007` § 5) |
-| Bar | number, 0–4.00, step 0.01 | local state, the input in `distance` and `time` modes | Clamped by the solver to `0…4`, like `muzzleVelocity` |
+| Khoảng cách | number, phần, step 0.01, default `22.14` | local state, the input in `bar` mode | The only place phần becomes world units: `parts × TUNABLES.partWidth` (`US-BAL-007` § 5). The default is the calibration distance the default hull reaches at bar 4, angle 45° |
+| Bar | number, 0–4.00, step 0.01, default `3` | local state, the input in `distance` and `time` modes | Clamped by the solver to `0…4`, like `muzzleVelocity` |
 | Answer — bar | fixed 2 decimals | `barForDistance` | Printed with its flight time: `Bar 4.00 · bay 3.37 s` |
 | Answer — distance | fixed 2 decimals, phần | `distanceForBar` | Plus the flight time, same line |
 | Answer — time | fixed 2 decimals, seconds | `timeForShot` | The mode's only answer |
-| Refusal | one sentence | `SolveResult.reason` | Shown in the answer box instead of a number — never a negative bar, `NaN` or `Infinity` (`US-BAL-007` AC3) |
+| Refusal | one sentence | `SolveResult.reason`, a code | The code (`angle` · `bar` · `distance` · `height` · `unreachable` · `wind`) picks the sentence: `practice.invalidAngle`, `practice.invalidHeight` (a half-typed height is `NaN`), `practice.invalidWind`, and `practice.invalidUnreachable` (for `unreachable`, `distance` and `bar`). `@gbw/core` carries no user-facing string, so the screen owns the words. Never a negative bar, `NaN` or `Infinity` (`US-BAL-007` AC3) |
 
 ## Actions
 
@@ -51,8 +51,7 @@ angle give the bar; a bar and an angle give the distance and the flight time; a 
 | State | Behaviour |
 |-------|-----------|
 | Solved | The answer box holds the numbers; the flat-ground sentence is always below it |
-| Refused | The box holds `practice.invalid` and the reason (`góc phải trong 0…180`, `không tới được ở góc này`, `gió quá mạnh cho góc này`); nothing else on screen changes |
-| Never seen the answer yet | The box is empty; no spinner — the solve is synchronous and takes microseconds |
+| Refused | The box holds `practice.invalid` and the reason (`góc phải trong 0…180`, `chênh cao phải là một số`, `gió quá mạnh cho góc này`, `không tới được ở góc này`); nothing else on screen changes. The box is never empty: the solve is synchronous and always returns a value or a reason |
 | Offline | Works unchanged. The page carries `practice.offlineNote` once, and no request is made (`US-PWA-001` §5) |
 | Narrow | Inputs stack in one column below 640 px of content width; the language switch and the notice stay visible |
 
@@ -75,17 +74,18 @@ angle give the bar; a bar and an angle give the distance and the flight time; a 
 `practice.angle`, `practice.height`, `practice.wind`, `practice.windEast`, `practice.windWest`, `practice.distance`,
 `practice.bar`, `practice.answerBar`, `practice.answerDistance`, `practice.answerTime`, `practice.flight`,
 `practice.flatOnly`, `practice.notInMatch`, `practice.offlineNote`, `practice.invalid`,
-`practice.invalidAngle`, `practice.invalidUnreachable`, `practice.invalidWind`.
+`practice.invalidAngle`, `practice.invalidHeight`, `practice.invalidUnreachable`, `practice.invalidWind`, and
+`practice.direction` (the radio group's accessible name).
 
 ## Oracle
 
 | Contract | Checked by |
 |----------|-----------|
 | `bar → distance → bar` round trip across angles 20–85° and bars 0.5–4.0, to ±0.01 bar | `packages/core/tests/solver.test.ts` (TC-BAL-149) |
-| The calibration shot: 2.77 phần at 45°, flat, no wind → bar `4.00`, flight `3.37 s ±0.05` | `packages/core/tests/solver.test.ts` (TC-BAL-150) |
+| The calibration shot: 22.14 phần at 45°, flat, no wind → bar `4.00`, flight `3.37 s ±0.05`, and the 25 ms integrator agrees within 10 u; the rounded 2.77 màn (22.16 phần) is past the bar's reach and is refused, not clamped | `packages/core/tests/solver.test.ts` (TC-BAL-150) |
 | A too-low angle for the height difference and a too-strong headwind return `ok: false` with a reason, never a negative or infinite bar | `packages/core/tests/solver.test.ts` (TC-BAL-151) |
 | The match route's import graph does not reach the solver, and the practice route's reaches nothing in `game/` | `tests/meta/solver-isolation.test.ts` (TC-BAL-152) |
-| The screen shows the three modes, each with its own answer, and the "not in a match" notice exactly once | `apps/web/tests/practice.test.tsx` (TC-BAL-153) |
+| The screen shows the three modes, each with its own answer, the "not in a match" notice exactly once, a cleared height refused instead of printed as `NaN`, and the wind held at `windMax` | `apps/web/tests/practice.test.tsx` (TC-BAL-153) |
 | Every string comes from the vi and en tables; no literal copy in the component | `apps/web/tests/practice.test.tsx` (TC-BAL-154) |
 | The route solves with the network off and never issues a request | `apps/web/tests/practice.test.tsx` (TC-BAL-155), `tests/e2e/practice.spec.ts` |
-| Direct URL, `h1`, keyboard order, 44 px targets, axe AA clean | `tests/e2e/practice.spec.ts` (TC-BAL-155) |
+| Direct URL, menu link, `h1` focused, keyboard mode switch, 44 px targets, one column at 390 px with no sideways scroll | `tests/e2e/practice.spec.ts` (TC-BAL-155) |

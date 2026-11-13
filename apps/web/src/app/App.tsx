@@ -10,13 +10,15 @@ import { ProfilePage } from "../routes/ProfilePage";
 import { ResultsPage } from "../routes/ResultsPage";
 
 /**
- * Two routes are deliberately split out of the first load (`TC-PWA-139`, `NFR-03`):
- * `/match/:code` because Phaser is the largest dependency in the bundle, and `/sign-in` because the
- * Clerk client must not sit in the chunk a player downloads to press "play". Everything reachable
- * from the menu by one tap stays in the initial chunk so a match never waits on a second download.
+ * Three routes are deliberately split out of the first load (`TC-PWA-139`, `NFR-03`):
+ * `/match/:code` because Phaser is the largest dependency in the bundle, `/sign-in` because the
+ * Clerk client must not sit in the chunk a player downloads to press "play", and `/practice` because
+ * the solver is a tool a player opens on purpose (`US-BAL-007`). Everything else reachable from the
+ * menu by one tap stays in the initial chunk so a match never waits on a second download.
  */
 const MatchPage = lazy(() => import("../routes/MatchPage").then((module) => ({ default: module.MatchPage })));
 const SignInPage = lazy(() => import("../routes/SignInPage").then((module) => ({ default: module.SignInPage })));
+const PracticePage = lazy(() => import("../routes/PracticePage").then((module) => ({ default: module.PracticePage })));
 
 function Pending({ messageKey }: { messageKey: string }) {
   const { t } = useLocale();
@@ -46,6 +48,14 @@ const router = createBrowserRouter([
       },
       { path: "/profile", element: <ProfilePage /> },
       { path: "/leaderboard", element: <LeaderboardPage /> },
+      {
+        path: "/practice",
+        element: (
+          <Suspense fallback={<Pending messageKey="common.loading" />}>
+            <PracticePage />
+          </Suspense>
+        ),
+      },
       { path: "/lobby/:code", element: <LobbyPage /> },
       {
         path: "/match/:code",

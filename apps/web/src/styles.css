@@ -1538,3 +1538,132 @@ td {
   color: #93c5fd;
   font-size: 18px;
 }
+
+
+/* --- the practice solver ---------------------------------------------------------------------------------------- */
+/* `US-BAL-007`, `screens/practice.md`: a form, an answer and three sentences. It is the one screen with no canvas and
+   no clock, so it only has to survive a narrow phone and a thumb (`TC-BAL-155`: 44 px targets). */
+
+.practice {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 16px;
+}
+
+.practice__head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.practice__head h1 {
+  margin: 0;
+  font-size: 1.15rem;
+}
+
+.practice__modes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.practice__modes button {
+  min-height: 44px;
+  min-width: 44px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid #2b3b58;
+  background: rgba(22, 33, 58, 0.92);
+  color: var(--ink-dim);
+  font: inherit;
+  cursor: pointer;
+}
+
+.practice__modes button[aria-pressed="true"] {
+  border-color: var(--accent);
+  color: #08101f;
+  background: var(--accent);
+  font-weight: 700;
+}
+
+.practice__fields {
+  display: grid;
+  gap: 10px;
+}
+
+.practice__fields p {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+}
+
+.practice__fields label {
+  min-width: 0;
+  color: var(--ink-dim);
+  font-size: 0.85rem;
+}
+
+.practice__fields input[type="number"],
+.practice__fields select {
+  min-height: 44px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid #2b3b58;
+  background: rgba(8, 15, 28, 0.82);
+  color: var(--ink);
+  font: inherit;
+  /* A phone keyboard on a numeric field is the whole point of a calculator; the widths keep the row on one line. */
+  width: 120px;
+}
+
+.practice__fields input[type="radio"] {
+  width: 24px;
+  height: 24px;
+  margin: 0 4px 0 8px;
+}
+
+/* The two directions are a radio group of their own (`role="radiogroup"`), not a fourth field of the wind row. */
+.practice__direction {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.practice__answer {
+  display: block;
+  min-height: 56px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  border: 1px solid #2b3b58;
+  background: rgba(22, 33, 58, 0.92);
+  color: var(--ink);
+  font: 600 1.05rem/1.4 "Inter", sans-serif;
+}
+
+/* `<output>` holds phrasing content only, so the answer is a span — this is what makes it read as a block. */
+.practice__value {
+  display: block;
+}
+
+.practice__notice {
+  margin: 0;
+  color: var(--ink-dim);
+  font-size: 0.8rem;
+}
+
+@media (max-width: 640px) {
+  .practice__fields p {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .practice__fields input[type="number"],
+  .practice__fields select {
+    width: 100%;
+  }
+}

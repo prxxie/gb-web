@@ -22,6 +22,7 @@ export * from "./protocol.js";
 export * from "./camera.js";
 export * from "./senses.js";
 export * from "./bot.js";
+export * from "./solver.js";
 export * from "./gimmicks.js";
 export * from "./data/mobiles.js";
 export * from "./data/maps.js";

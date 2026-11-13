@@ -115,6 +115,7 @@ export function MainPage(): JSX.Element {
           ) : null}
           <Link to="/profile">{t("main.profile")}</Link>
           <Link to="/leaderboard">{t("main.leaderboard")}</Link>
+          <Link to="/practice">{t("main.practice")}</Link>
         </div>
       </header>
 
