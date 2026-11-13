@@ -93,7 +93,7 @@ describe("TC-BAL-114: a second arc shows the same shot with the wind removed (AC
   it("matches the live flight exactly when there is no wind", () => {
     const state = onTurn(windy(match(), 0));
     const live = aimPreview({ state, localSlot: 0, weaponSlot: 0, angle: 45, power: 2 })!;
-    const base = baselineShot(state, 0, 0, live.angle, live.force)!;
+    const base = baselineShot(state, 0, 0, live.angle, live.bar)!;
     // The sampled dots are the same flight, so the two arcs overlap and the gap the player reads is zero.
     expect(live.baseline).toEqual(sampleByTime(base.path, null, PREVIEW_STEPS));
     expect(live.path.slice(0, live.baseline.length)).toEqual(live.baseline);
@@ -102,7 +102,7 @@ describe("TC-BAL-114: a second arc shows the same shot with the wind removed (AC
   it("diverges once the wind blows, so the gap between the arcs is the wind", () => {
     const state = onTurn(windy(match(), 22));
     const live = aimPreview({ state, localSlot: 0, weaponSlot: 0, angle: 45, power: 2 })!;
-    const base = baselineShot(state, 0, 0, live.angle, live.force)!;
+    const base = baselineShot(state, 0, 0, live.angle, live.bar)!;
     expect(live.baseline).not.toEqual(live.path);
     expect(base.path).not.toEqual(live.path.slice(0, base.path.length));
     // Wind is horizontal only (`US-CORE-001`), so the two arcs differ in x and agree in the muzzle they start from.

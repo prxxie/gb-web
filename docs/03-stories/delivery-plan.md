@@ -4,9 +4,9 @@
 
 | Fact | Value |
 |---|---|
-| Backlog size | 123.5 story-days across 55 stories as first planned; **+18.0 across the nine `EPIC-09` stories added 2026-11-13** (§ Re-plan). Two of the original 55 are refactors queued after `M3`, § Deferred |
+| Backlog size | **141.5 story-days across 73 stories**: 123.5 across the 55 stories as first planned, plus **+18.0** across the nine `EPIC-09` stories added 2026-11-13 (§ Re-plan). Two of the original 55 are refactors queued after `M3`, § Deferred |
 | Capacity assumption | 2 developers + a part-time reviewer ≈ 130 dev-days over 17 weeks (`OQ-15` is still open on team size) |
-| Utilisation | ≈ 88 % (114.5 of 130 dev-days) — the remaining 12 % covers review, the two-phone matrix and the gates |
+| Utilisation | 141.5 story-days against 130 dev-days before the 2026-11-13 re-plan; `EPIC-09` was added as post-`M3` work, so the `M1`–`M3` window still carries the original 123.5 and stays at ≈ 88 % (114.5 of 130) |
 | Milestones | `M1` demo week 4 · `M2` UAT week 11 · `M3` go-live week 17 (`OQ-25`, `OQ-36`) |
 | Scope basis | full GunBound package B (`CR-2026-11-04-gb-gameplay-fidelity`) |
 

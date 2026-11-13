@@ -19,11 +19,12 @@
  * Wire protocol: `docs/02-reference/api/signaling.md`.
  */
 import {
-  TUNABLES, createRoom, type ErrorCode, type MatchEndFrame, type RoomMember, type RoomState, type Snapshot,
+  TUNABLES, createRoom, isCurrentRuleset, type ErrorCode, type MatchEndFrame, type RoomMember, type RoomState, type Snapshot,
   type Team, type WireSnapshot,
 } from "@gbw/core";
 import type { Env } from "./lib/db.js";
 import { hostOf, isLiveHost, planPromotion, withHostChange } from "./room/election.js";
+import { withKnownMobiles } from "./room/identity.js";
 import { armAuthTimeout, freshMeta, gateFrame, openSocket, refuseFrame, type SocketBinding } from "./room/handshake.js";
 import { abandonedEnd, matchStarted, planEnd, startRoom, withStatus } from "./room/match-lifecycle.js";
 import {
@@ -75,7 +76,11 @@ export class Room implements DurableObject {
       const storedStart = await this.ctx.storage.get<number>("matchStartedAt");
       const storedOrigin = await this.ctx.storage.get<string>("origin");
       const storedHostCheck = await this.ctx.storage.get<string[]>("hostCheck");
-      if (stored) this.room = storedSnapshot ? { ...stored, lastSnapshot: storedSnapshot } : stored;
+      // A journal from another ruleset cannot be replayed: the flight constants moved (`US-BAL-004` AC5), so drop it.
+      const snapshot = storedSnapshot && isCurrentRuleset(storedSnapshot) ? storedSnapshot : null;
+      if (storedSnapshot && !snapshot) console.warn("refusing a stored snapshot from another ruleset", storedSnapshot.rulesetVersion);
+      // A stored roster may name a dropped machine; `withKnownMobiles` substitutes the first one (`US-BAL-005` § 5).
+      if (stored) this.room = withKnownMobiles({ ...stored, ...(snapshot ? { lastSnapshot: snapshot } : {}) });
       this.matchStartedAt = storedStart ?? null;
       this.origin = storedOrigin ?? null;
       this.persistedOrigin = storedOrigin ?? null;

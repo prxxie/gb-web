@@ -3,7 +3,7 @@ import {
   angleFromPull,
   clampWindow,
   defaultWindow,
-  forceFromPower,
+  barFromPower,
   panBy,
   pinchTo,
   powerFromDrag,
@@ -146,13 +146,17 @@ describe("TC-BAL-102: the ruler counts parts", () => {
 });
 
 describe("power from a drag", () => {
-  it("maps a drag to a 0–4 power bar and a 0–100 force", () => {
+  it("maps a drag to the 0–4 power bar the shot itself takes", () => {
     expect(powerFromDrag(0, 400)).toBe(0);
     expect(powerFromDrag(400 * 0.45, 400)).toBeCloseTo(4, 1);
     expect(powerFromDrag(10_000, 400)).toBe(4);
-    expect(forceFromPower(4)).toBe(100);
-    expect(forceFromPower(0)).toBe(0);
-    expect(forceFromPower(1.5)).toBe(38);
+    // The bar *is* the wire value now (`US-BAL-004` AC1): no second 0–100 scale to convert.
+    expect(barFromPower(4)).toBe(4);
+    expect(barFromPower(0)).toBe(0);
+    expect(barFromPower(1.5)).toBe(1.5);
+    expect(barFromPower(1.567)).toBe(1.57);
+    expect(barFromPower(9)).toBe(4);
+    expect(barFromPower(-2)).toBe(0);
   });
 
   it("mirrors the angle with the facing direction and stays inside the window", () => {

@@ -1,7 +1,7 @@
 import type { FireInput, ItemId, ItemInput, MatchState, PlayerState, Rng } from "./types.js";
 import { getMobile } from "./data/mobiles.js";
 import { getMap } from "./data/maps.js";
-import { launch, simulateFlight } from "./ballistics.js";
+import { gravityFor, launch, simulateFlight, windKFor } from "./ballistics.js";
 import { TUNABLES } from "./tuning.js";
 import { FORCE_FIELD, returnsOffMapShots } from "./gimmicks.js";
 import type { Terrain } from "./terrain.js";
@@ -9,7 +9,7 @@ import type { Terrain } from "./terrain.js";
 export interface BotConfig {
   /** Aim error in degrees, drawn per shot. 0 makes the bot perfect (used by tests). */
   readonly angleNoiseDeg: number;
-  /** Power error as a fraction of max power. */
+  /** Power error as a fraction of the full 0–4 bar. */
   readonly powerNoise: number;
   /** Chance to reach for the super shot when a target is nearly finished. */
   readonly superShotChance: number;
@@ -43,14 +43,18 @@ function chooseTarget(state: MatchState, bot: PlayerState): PlayerState | undefi
 
 interface Aim {
   readonly angle: number;
-  readonly force: number;
+  readonly bar: number;
   readonly error: number;
 }
+
+/** The bar is `0…4` for every machine (`US-BAL-005` AC3); the bot searches it in a quarter-bar grid. */
+const BAR_MAX = 4;
+const BAR_STEP = 0.25;
 
 /**
  * Aim at a target by simulating the real integrator.
  *
- * A coarse grid over the mobile's own angle window and power range; deterministic for a given state
+ * A coarse grid over the mobile's own angle window and the 0–4 bar; deterministic for a given state
  * and RNG, so a replay reproduces the bot's shots (`NFR-28`).
  */
 export function botShot(
@@ -76,15 +80,17 @@ export function botShot(
     heights: Float64Array.from(state.terrain),
     width: TUNABLES.mapWidth,
   };
-  const gravity = TUNABLES.gravity * map.gravityModifier;
+  // This machine's own gravity and wind coefficient, bent only by the map (`US-BAL-004`).
+  const gravity = gravityFor(mobile) * map.gravityModifier;
+  const windK = windKFor(mobile);
   const wind = state.weather.wind;
 
   const bestFor = (weaponSlot: 0 | 1 | 2): Aim => {
     let bestAngle = (mobile.angleMin + mobile.angleMax) / 2;
-    let bestForce = mobile.maxPower * 0.7;
+    let bestBar = BAR_MAX * 0.7;
     let bestError = Number.POSITIVE_INFINITY;
     for (let angle = mobile.angleMin; angle <= mobile.angleMax; angle += 2) {
-      for (let force = 20; force <= mobile.maxPower; force += 5) {
+      for (let bar = BAR_STEP; bar <= BAR_MAX; bar += BAR_STEP) {
         const projectile = launch({
           id: 0,
           ownerSlot: slot,
@@ -93,11 +99,11 @@ export function botShot(
           from: { x: bot.x, y: bot.y },
           facing: bot.facing,
           angle,
-          force,
+          bar,
         });
         const flight = simulateFlight(
           projectile,
-          { wind, gravity, stepMs: 50, forceX: stage.forceX },
+          { wind, gravity, windK, stepMs: TUNABLES.stepMs, forceX: stage.forceX },
           terrain,
           undefined,
           { returnOffMap: stage.returnsOffMap },
@@ -106,11 +112,11 @@ export function botShot(
         if (error < bestError) {
           bestError = error;
           bestAngle = angle;
-          bestForce = force;
+          bestBar = bar;
         }
       }
     }
-    return { angle: bestAngle, force: bestForce, error: bestError };
+    return { angle: bestAngle, bar: bestBar, error: bestError };
   };
 
   // AC3: the weapon is the one that actually lands closest, simulated per slot rather than assumed.
@@ -130,7 +136,7 @@ export function botShot(
   }
 
   const noiseAngle = (rng.float(0, 1) * 2 - 1) * config.angleNoiseDeg;
-  const noisePower = (rng.float(0, 1) * 2 - 1) * config.powerNoise * mobile.maxPower;
+  const noisePower = (rng.float(0, 1) * 2 - 1) * config.powerNoise * BAR_MAX;
 
   return {
     kind: "fire",
@@ -138,7 +144,7 @@ export function botShot(
     slot,
     weaponSlot,
     angle: Math.min(mobile.angleMax, Math.max(mobile.angleMin, Math.round((pick.angle + noiseAngle) * 10) / 10)),
-    force: Math.max(0, Math.min(mobile.maxPower, Math.round(pick.force + noisePower))),
+    bar: Math.round(Math.max(0, Math.min(BAR_MAX, pick.bar + noisePower)) * 100) / 100,
   };
 }
 
@@ -164,7 +170,7 @@ export function botItemUse(
   if (!bot || bot.eliminated || !Object.values(bot.items).some((count) => count > 0)) return null;
   const target = chooseTarget(state, bot);
   if (!target) return null;
-  // "Out of reach" is measured, not guessed from `maxPower`: the best shot the bot can take is simulated and
+  // "Out of reach" is measured, not guessed from the bar: the best shot the bot can take is simulated and
   // the item is only spent when that shot cannot come within 120 units of the target (`TC-CORE-927`).
   const best = botShot(state, slot, rng, config);
   if (!best) return null;
@@ -184,11 +190,12 @@ export function botItemUse(
       from: { x: bot.x, y: bot.y },
       facing: bot.facing,
       angle: best.angle,
-      force: best.force,
+      bar: best.bar,
     }),
     {
       wind: state.weather.wind,
-      gravity: TUNABLES.gravity * map.gravityModifier,
+      gravity: gravityFor(mobile) * map.gravityModifier,
+      windK: windKFor(mobile),
 
       stepMs: TUNABLES.stepMs,
       forceX: map.gimmicks.includes("force") ? FORCE_FIELD : 0,

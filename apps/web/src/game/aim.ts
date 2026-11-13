@@ -3,17 +3,16 @@
  *
  * The scene owns the gesture and the ring; this module owns the two decisions that have to be provable without a
  * browser: whether the client may aim at all right now (`canAim`), and what exactly goes on the wire when a finger
- * lifts (`fireFromPull`) — once, with the angle clamped to the mobile's own window and the force on the integrator's
- * 0–100 scale.
+ * lifts (`fireFromPull`) — once, with the angle clamped to the mobile's own window and the 0–4 bar the integrator takes.
  */
-import { TUNABLES } from "@gbw/core";
+import { TUNABLES, barFromPower } from "@gbw/core";
 import type { FireInput, MatchState, Mobile } from "@gbw/core";
+
+// The bar the integrator takes is `@gbw/core`'s own (`camera.ts`), re-exported so a caller reads it beside `fireFromPull`.
+export { barFromPower };
 
 /** A release below this power cancels instead of firing (`screens/match.md` § 7, `OQ-38`). */
 export const DEADZONE_POWER = TUNABLES.powerDeadzone;
-
-/** The wire carries `force`, never the float: `round(power × 25)`, clamped to the integrator's scale. */
-export const FORCE_MAX = 100;
 
 /** The ring keeps a fixed screen radius so the number never shrinks when the camera zooms out (`screens/match.md`). */
 export const RING_RADIUS = 64;
@@ -87,12 +86,6 @@ export interface FireContext {
   readonly shot?: { readonly lockedTurn: number | null; readonly turnNumber: number } | undefined;
 }
 
-/** `round(power × 25)`, clamped to 0–100. */
-export function forceFromPower(power: number): number {
-  if (!Number.isFinite(power)) return 0;
-  return Math.max(0, Math.min(FORCE_MAX, Math.round(power * 25)));
-}
-
 /** The angle the shot will actually carry: the pull plus the pad's nudge, clamped to the mobile's window. */
 export function shotAngle(angle: number, aimDelta: number | undefined, mobile: { angleMin: number; angleMax: number }): number {
   return Math.max(mobile.angleMin, Math.min(mobile.angleMax, Math.round(angle + (aimDelta ?? 0))));
@@ -112,7 +105,7 @@ export function fireFromPull(pull: Pull, context: FireContext): FireInput | null
     slot: context.slot,
     weaponSlot: context.weaponSlot,
     angle: shotAngle(pull.angle, context.aimDelta, context.mobile),
-    force: forceFromPower(pull.power),
+    bar: barFromPower(pull.power),
     seq: context.seq,
   };
 }

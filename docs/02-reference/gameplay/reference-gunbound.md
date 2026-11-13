@@ -6,8 +6,9 @@ and scope changes are tracked by change requests in `docs/00-source/change-reque
 
 > **Sourcing.** Nothing here is copied from another product's code, assets, data files or binaries, and no third-party
 > implementation is part of our basis (`OQ-18`). The rules below are genre conventions described in the client's own words
-> and restated by us; the physics is a formula we derived and tuned (`ADR-0005`). Names, art, maps, items and mobiles are
-> original to this project.
+> and restated by us; the **ballistics formula and its parameter table** are the original's, which the client restored to
+> the basis on 2026-11-13 (`CR-2026-11-13`, `ADR-0007`), and no code, asset, data file or binary of that product enters
+> the build. Names, art, maps, items and mobiles are original to this project.
 
 ## 1. Match shape
 
@@ -42,8 +43,9 @@ per-mobile base delay in [`../data/mobiles.md`](../data/mobiles.md).
   (`US-CORE-007`, [`../data/mobiles.md`](../data/mobiles.md)).
 - Every weapon has **power, blast radius and a three-tier falloff — Inner / Mid / Outer** — so damage drops across three
   rings rather than one radius (`US-CORE-003`).
-- A mobile's firing envelope is its own: minimum and maximum angle, maximum power, and an effect type
-  (`explosion` / `laser` / `impact` / `electric`) for feedback.
+- The power bar is the genre's `0…4.0` for every mobile; a mobile's firing envelope is its own minimum and maximum
+  angle, plus an effect type (`explosion` / `laser` / `impact` / `electric`) for feedback. Its `weight` and `windDrag`
+  decide how the shell flies (§ 10).
 - Movement is a turn action paid for with **energy**, bounded by the mobile's move distance and maximum incline
   (`US-CORE-008`).
 
@@ -92,50 +94,57 @@ build without changing the mobile. Ours: cosmetic-first, bonus-capped, and never
 | Missing | Consequence for us |
 |---|---|
 | Every damage/HP number (they lived on servers that no longer exist) | we choose a 1,000-point scale and publish it in `tunables.md` |
-| The ballistics integrator and its constants | we derive one ourselves (`ADR-0005`) and tune it by playtest (`OQ-37`) |
+| The ballistics integrator and its constants | the original's formula and parameter table are the basis again (`ADR-0007`, `CR-2026-11-13`); only its *damage* constants stay ours, and `OQ-37` still tunes by playtest |
 | Any art, audio, map data, item art or names | all original to this project (`OQ-18`) |
 | Rules for 2-player and 3v3 lobbies | ours: the queue and delay model scale to any 2–8 count (`US-ROOM-003`) |
 | A mobile input scheme | ours: touch-only, `CR-2026-11-04-touch-only-viewport` |
 
 ## 10. The physics model we chose
 
-A **constant-acceleration** integrator with **one gravity for the whole roster** and a **wind term with no mass in it**
-— no drag, because a drag term makes the arc feel mushy and hides the wind. It is the shape that produces the genre's
-readable shot: every mobile draws the **same parabola** at the same angle and power, so a range learned on one mobile
-reads on the next, and the wind is a single number a player corrects against rather than a per-mobile handicap.
+A **constant-acceleration** integrator with **per-machine gravity and a per-machine wind coefficient** — no drag, because
+a drag term makes the arc feel mushy and hides the wind. The bar is the genre's `0…4.0` for every mobile, and the arc is
+a stat: a machine's `weight` sets its gravity and its `windDrag` sets how far the same wind carries it. That keeps the
+genre's readable shot — one bar scale, a wind number you correct against — while the roster's mass differences stay
+visible in the fall (`ADR-0007`, `CR-2026-11-13-gb-original-ballistics`).
 
 ```
-v0 = force × speedK                        // one power law for every mobile; speedK 5.9
-vx =  cos(angle) × v0 × facing
-vy = −sin(angle) × v0
-ax =  windCoefficient × m × cos θ          // 105 × m — no divisor
-ay =  windCoefficient × m × sin θ          // 0 in play: GB's wind is horizontal, θ ∈ {0°, 180°}
-vy += (gravity + ay) × dt                  // gravity 152 u/s² for all twenty, ×0.95–1.05 by map
+bar  = clamp(bar, 0, 4)
+v0   = bar × BAR_VELOCITY                  // 232.335 u/s per bar, one power law for every mobile
+vx   =  cos(angle) × v0 × facing
+vy   = −sin(angle) × v0
+g    = BASE_GRAVITY × weight / GRAVITY_WEIGHT          // 390 × weight / 5.78
+k    = WIND_COEFFICIENT × windDrag / WIND_DRAG_REFERENCE²   // 0.222 × windDrag / 0.046²
+ax   =  k × m × WIND_EFFECT × cos θ        // WIND_EFFECT 0.95; θ ∈ {0°, 180°}
+ay   = −k × m × WIND_EFFECT × sin θ        // 0 in play: GB's wind is horizontal
+vy  += (g + ay) × dt                       // a_y = g − k·windEff·sin θ
 ```
 
-Two deliberate departures from what this project shipped before, both of them *towards* the genre:
+Two deliberate departures from what this project shipped before:
 
-- **Gravity is a rule, not a mobile stat.** It used to be `84–128 u/s²` per mobile, which made the same angle and power
-  land anywhere in a 1.37× spread — the opposite of the genre, where the arc is common knowledge and the mobile only
-  decides which angles and shells you get. `Mobile.gravity` and `Mobile.mass` are gone.
-- **The wind push is mass-independent.** It used to be `42 × m / mass`, so the drift was a per-mobile property (62–191
-  units at full wind). In GB the wind moves every mobile alike — the gauge is a *weather* reading, not a mobile reading —
-  and with the divisor gone the only mobile-side input is hang time. `windAcceleration` lost its `mass` argument.
+- **Gravity is a machine stat read from `weight`.** It used to be `84–128 u/s²` per mobile, then one roster-wide value;
+  `ADR-0007` restores the per-machine fall, but through one number the player can see rather than a hidden field: the
+  reference `weight 5.78` reproduces the `390 u/s²` every balance target was tuned against, `mbl-03` and `mbl-11` are
+  twins, and `Mobile.gravity` / `Mobile.mass` do not exist.
+- **The wind push scales with the machine's own `windDrag`.** It used to be `42 × m / mass` (drift 62–191 units) and
+  then one roster-wide coefficient; it is now `0.222 × windDrag ÷ 0.046²` — `4.826` for the
+  reference drag, `9.966` for the draggiest hull, so a heavy hull is pushed *more*, not less. `windAcceleration` takes
+  `(wind, k)` and the step context requires `windK`: there is no default and no mass argument.
 - **The wind is horizontal.** Two directions, east (`sector 0`, `directionDeg 0`) and west (`sector 1`, `180`), because a
   shell in the genre never hangs because the weather blew upwards. Twelve 30° sectors were our own invention.
 
-Fixed **50 ms** step, positions rounded to 0.1, no `Math.random()` in the core (`NFR-28`). Calibration, measured on the
-real integrator: `force 98` at `45°`, `gravity 152`, no wind → **2,182 units in 5.35 s**, i.e. 1.33 map widths at full
-power — the genre's "full power leaves the map" ceiling. Full wind (`m = 26`, `sector 0`) puts `a_x = 2,730 u/s²` — 27 ×
-gravity — on that shot and moves the landing point **100,131 units**: the mass-free coefficient has **not been retuned
-yet** and is currently far past playable, which `tunables.md` § 1.1 records openly. Values, units and the full parameter
-table: [`tunables.md`](tunables.md) § 1; the per-mobile reach and drift table is [`data/mobiles.md`](../data/mobiles.md)
-§ 4.
+Fixed **25 ms** step, positions rounded to 0.1, no `Math.random()` in the core (`NFR-28`). Calibration, measured on the
+real integrator: `mbl-03` (weight 5.78, so `g = 390`) at **bar 4 and 45°**, no wind → **2,203 units in 3.35 s**, i.e.
+1.10 map widths — the genre's "full power leaves the map" ceiling, and every mobile at bar 4 clears the 1,640-unit spawn
+separation. Full wind (`m = 26`, `sector 0`) puts `143.8 u/s²` on that shot (0.37 × its gravity) and moves the landing
+point **+814 units east / −808 west**, two fifths of the map. Values, units (`1 màn = 800 u`, `1 phần = 100 u`) and the
+full parameter table: [`tunables.md`](tunables.md) § 1; the per-mobile reach and drift table is
+[`data/mobiles.md`](../data/mobiles.md) § 4.
 
 **Why not something else** — the alternatives and the reasons they lost are in
-[`ADR-0005`](../../04-decisions/adr/ADR-0005-gb-physics-replica.md): a general physics engine (non-deterministic across
-devices, +300 KB against `NFR-03`), server-side authority (the 10 ms CPU limit on the free tier), precomputed tables
-(free aim plus wind makes the table infinite).
+[`ADR-0005`](../../04-decisions/adr/ADR-0005-gb-physics-replica.md) and
+[`ADR-0007`](../../04-decisions/adr/ADR-0007-original-gb-ballistics.md): a general physics engine (non-deterministic
+across devices, +300 KB against `NFR-03`), server-side authority (the 10 ms CPU limit on the free tier), precomputed
+tables (free aim plus wind makes the table infinite).
 
 ## 11. Where each rule lives in this project
 

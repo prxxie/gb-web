@@ -42,8 +42,8 @@ function match(mapId: string, seats: readonly Seat[] = [seat(0, "A"), seat(1, "B
   });
 }
 
-function fire(state: MatchState, slot: number, weaponSlot: 0 | 1 | 2, angle: number, force: number) {
-  return applyInput(state, { kind: "fire", slot, weaponSlot, angle, force, seq: state.seq }, NOW);
+function fire(state: MatchState, slot: number, weaponSlot: 0 | 1 | 2, angle: number, bar: number) {
+  return applyInput(state, { kind: "fire", slot, weaponSlot, angle, bar, seq: state.seq }, NOW);
 }
 
 function firstOf<K extends MatchEvent["kind"]>(
@@ -246,11 +246,11 @@ describe("gimmicks", () => {
       return { ...state, weather: { ...state.weather, wind: { magnitude: 0, directionDeg: 0, sector: 0 } } };
     };
 
-    const control = firstOf(fire(atRightEdge(calmMatch("map-01")), 0, 0, 45, 98).events, "shot");
+    const control = firstOf(fire(atRightEdge(calmMatch("map-01")), 0, 0, 45, 4).events, "shot");
     expect(control.impact).toBeNull();
     expect(Math.max(...control.path.map((point) => point.x))).toBeGreaterThan(TUNABLES.mapWidth);
 
-    const returned = firstOf(fire(atRightEdge(calmMatch("map-09")), 0, 0, 45, 98).events, "shot");
+    const returned = firstOf(fire(atRightEdge(calmMatch("map-09")), 0, 0, 45, 4).events, "shot");
     expect(returned.impact).not.toBeNull();
     const landing = returned.impact ?? returned.path.at(-1);
     expect(Math.abs(landing?.x ?? 0)).toBeLessThanOrEqual(TUNABLES.mapWidth);

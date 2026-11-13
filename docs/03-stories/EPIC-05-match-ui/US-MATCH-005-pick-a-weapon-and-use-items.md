@@ -72,7 +72,7 @@ export interface ShotPreview {
   slot: number;
   weaponSlot: 0 | 1 | 2;
   angle: number;
-  force: number;
+  bar: number;
   path: readonly Vec2[];
   impact: Vec2 | null;
   radius: number;
@@ -129,7 +129,7 @@ nudge and the mobile's window are applied. Nothing on screen is derived twice: t
 `@gbw/core`, which exports the resolver's own `flightPath`, so bounces, `piercing`, `itm-bunge`, off-map returns and
 the item effects resolve exactly as they will when the shot is fired (bounce and piercing mobile cases compare the
 aid's impact with the `shot` event's). An earlier draft re-walked the projectile with `stepProjectile` and drew a
-class-shaped sine bow: the first disagreed with the engine on eleven of the twenty mobiles, the second would have
+class-shaped sine bow: the first disagreed with the engine on nine of the seventeen mobiles, the second would have
 taught the player a rule the engine does not have.
 
 **Owed before UAT (M2):** `TC-MATCH-943` — the aid as a player sees it. The browser pass on 2026-11-07 proved the strip's

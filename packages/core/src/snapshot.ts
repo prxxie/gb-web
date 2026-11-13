@@ -1,6 +1,6 @@
 import type { PlayerSnapshot, ProjectileSnapshot, Snapshot } from "./types.js";
 import { deserializeTerrain, serializeTerrain, type Terrain } from "./terrain.js";
-import { TUNABLES, roundTo } from "./tuning.js";
+import { RULESET_VERSION, TUNABLES, roundTo } from "./tuning.js";
 import type { MatchState, ScoreState } from "./types.js";
 
 /**
@@ -308,6 +308,26 @@ export function applySnapshot(state: MatchState, snapshot: Snapshot): ApplyResul
 }
 
 /**
+ * True when a snapshot, replay or stored journal was recorded under the ruleset this build simulates.
+ *
+ * `US-BAL-004` AC5: the gravity and wind model changed, so a flight recorded under the old constants would land
+ * somewhere else in this build. The version travels in the wire snapshot (`v`) and in the replay record; a loader
+ * that cannot see it treats the record as foreign rather than guessing.
+ */
+export function isCurrentRuleset(source: { readonly rulesetVersion?: string }): boolean {
+  return source.rulesetVersion === RULESET_VERSION;
+}
+
+/** The readable refusal a loader surfaces when `isCurrentRuleset` says no (`US-BAL-004` AC5). */
+export function assertCurrentRuleset(source: { readonly rulesetVersion?: string }, what = "snapshot"): void {
+  if (isCurrentRuleset(source)) return;
+  const recorded = source.rulesetVersion ?? "unknown";
+  throw new RangeError(
+    `ruleset-mismatch: the ${what} was recorded under ruleset ${recorded}, this build replays ${RULESET_VERSION}`,
+  );
+}
+
+/**
  * Fold a snapshot into the whole state — the adoption a promoted host performs before it publishes again.
  *
  * `applySnapshot` merges the parts a *peer* renders; a new host also has to take over the parts only the
@@ -315,6 +335,8 @@ export function applySnapshot(state: MatchState, snapshot: Snapshot): ApplyResul
  * dead host's clock and the result screen would disagree with everyone else's (`US-NET-003` AC1).
  */
 export function restoreFromSnapshot(state: MatchState, snapshot: Snapshot): MatchState {
+  // Refuse a snapshot from another ruleset before any of it is folded in: half of an old flight is worse than none.
+  assertCurrentRuleset(snapshot);
   const applied = applySnapshot(state, snapshot);
   return {
     ...state,

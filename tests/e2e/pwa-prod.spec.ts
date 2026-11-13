@@ -169,7 +169,7 @@ test.describe("production build: install and offline play", () => {
   // A press has to be held before it arms a shot (`HOLD_MS` 300 ms, `TC-MATCH-911`); a drag on its own pans.
   await page.waitForTimeout(400);
     await page.mouse.move(startX - 120, startY + 90, { steps: 12 });
-    await expect(page.getByTestId("power-value")).not.toHaveText("0.00");
+    await expect(page.getByTestId("power-value")).not.toHaveText("0.0");
     await page.mouse.up();
     // The turn resolves locally and the pull was spent: the readout drops back to zero and no event log is drawn over the
     // field (the owner struck it, 2026-11-09 — it sat mid-screen, over the arc the shell flies).

@@ -39,7 +39,7 @@ GunBound's host sets mode, map and room options, and every player picks up to el
 | AC4 | a loadout exceeds eleven items | it is confirmed | the excess is refused with a visible message (`TC-MATCH-006`) |
 | AC5 | the host changes the map | a non-host views the lobby | the preview updates from `room_state` without a reload (`TC-ROOM-147`) |
 | AC6 | a guest joins | the loadout is opened | guests get the same eleven items for the match (`OQ-05` keeps guests unranked, not unequipped) (`TC-ROOM-151`) |
-| AC7 | a member opens the mobile grid | a mobile is confirmed | twenty mobiles render once each in both team tints, duplicates across members are allowed, and the choice is carried in `room_state` and survives reconnect (`TC-ROOM-153`) |
+| AC7 | a member opens the mobile grid | a mobile is confirmed | seventeen mobiles render once each in both team tints, duplicates across members are allowed, and the choice is carried in `room_state` and survives reconnect (`TC-ROOM-153`) |
 
 
 ## 4. Contract
@@ -72,9 +72,9 @@ Item purchasing, per-mode separate leaderboards (`OQ-28`), map voting.
 
 Follow-ups found while shipping, each one a story of its own:
 
-- The twenty mobile names are English strings rendered as-is (`02-reference/data/mobiles.md`); localising them needs a
+- The seventeen mobile names are English strings rendered as-is (`02-reference/data/mobiles.md`); localising them needs a
   `{ vi, en }` shape like `MapDef.name` and a translation pass over the roster.
-- The grid is twenty `aria-pressed` buttons. Single-choice semantics (`role="radiogroup"`, roving tabindex) and a live
+- The grid is seventeen `aria-pressed` buttons. Single-choice semantics (`role="radiogroup"`, roving tabindex) and a live
   region announcing "saved" are an accessibility story, not a lobby story.
 - `move`, `item` and `snapshot_push` are still unbudgeted in the room (`apps/worker/src/room-do.ts` `charge`); only
   the lobby writes are charged now (`TC-ROOM-712`). That belongs to `US-NET-004`.
@@ -98,6 +98,6 @@ Follow-ups found while shipping, each one a story of its own:
 
 AC1–AC6 shipped on 2026-11-05; this pass closed the two that only looked green.
 
-- **AC7.** `MobileGrid` renders the twenty mobiles once each in both team tints. A pick is a `loadout` frame with `mobileId`; the worker stores it on the member and the grid echoes `room_state` instead of keeping a local copy. `auth` no longer carries `mobileId` — the room owns it. `packages/core` exports `isMobileId` so the parser and the worker share one allowlist.
+- **AC7.** `MobileGrid` renders the seventeen mobiles once each in both team tints. A pick is a `loadout` frame with `mobileId`; the worker stores it on the member and the grid echoes `room_state` instead of keeping a local copy. `auth` no longer carries `mobileId` — the room owns it. `packages/core` exports `isMobileId` so the parser and the worker share one allowlist.
 - **AC5.** `SettingsPanel` renders `map-preview`: the chosen map's name plus a badge per gimmick, straight off `room_state`, so a member sees the host's map change without a reload.
 - **Two defects the e2e run found.** `StrictMode` runs a mount effect twice: the lobby posted `join` twice (200 then 409, and the 409 navigated away) — now deduped per room code in `apps/web/src/routes/LobbyPage.tsx`; and `ensureSession()` minted a second guest identity, so the seat belonged to guest A while the socket authenticated as guest B and the room closed it as an unknown player — now one mint per page load (`TC-ROOM-710`).

@@ -9,7 +9,7 @@ import {
   serializeTerrain,
   type Terrain,
 } from "../src/terrain.js";
-import { launch, simulateFlight } from "../src/ballistics.js";
+import { gravityFor, launch, simulateFlight, windKFor } from "../src/ballistics.js";
 import { getMap } from "../src/data/maps.js";
 import { getMobile } from "../src/data/mobiles.js";
 import { applyInput, createMatch, terrainOf, type Seat } from "../src/match.js";
@@ -107,12 +107,15 @@ describe("terrain carving", () => {
       from: { x: 8, y: 820 },
       facing: 1,
       angle: 10,
-      force: 60,
+      bar: 2.4,
     });
 
-    // One gravity for the whole roster (`tunables.md` § 1.1), so the flight context no longer carries a
-    // per-mobile gravity or a mass for the wind to fight.
-    const flight = simulateFlight(projectile, { wind: CALM, gravity: TUNABLES.gravity }, terrain);
+    // Gravity and the wind coefficient are the machine's own now (`US-BAL-004` AC1/AC2).
+    const flight = simulateFlight(
+      projectile,
+      { wind: CALM, gravity: gravityFor(mobile), windK: windKFor(mobile) },
+      terrain,
+    );
 
     expect(flight.impact).not.toBeNull();
     if (!flight.impact) return;
@@ -135,9 +138,9 @@ describe("terrain carving", () => {
         from: { x: 8, y: 820 },
         facing: 1,
         angle: 10,
-        force: 90,
+        bar: 3.6,
       });
-    const context = { wind: CALM, gravity: TUNABLES.gravity };
+    const context = { wind: CALM, gravity: gravityFor(mobile), windK: windKFor(mobile) };
     const arc = simulateFlight(launchAt("arc"), context, ridge);
     const piercing = simulateFlight(launchAt("piercing"), context, ridge);
 
@@ -167,11 +170,12 @@ describe("terrain carving", () => {
 
     const mobile = getMobile(shooter.mobileId);
     const weapon = mobile.weapons[0];
-    const gravity = TUNABLES.gravity * getMap(state.mapId).gravityModifier;
+    const gravity = gravityFor(mobile) * getMap(state.mapId).gravityModifier;
+    const windK = windKFor(mobile);
     const terrain = terrainOf(state);
 
     // Aim the shot so it lands on the target's own ground.
-    const missFor = (force: number): number => {
+    const missFor = (bar: number): number => {
       const projectile = launch({
         id: 1,
         ownerSlot: 0,
@@ -180,28 +184,28 @@ describe("terrain carving", () => {
         from: { x: shooter.x, y: shooter.y },
         facing: shooter.facing,
         angle: 45,
-        force,
+        bar,
       });
-      const flight = simulateFlight(projectile, { wind: state.weather.wind, gravity }, terrain);
+      const flight = simulateFlight(projectile, { wind: state.weather.wind, gravity, windK }, terrain);
       return Math.abs((flight.impact?.x ?? flight.landingX) - target.x);
     };
-    let bestForce = 1;
-    let bestMiss = missFor(bestForce);
-    for (let force = 1; force <= mobile.maxPower; force += 1) {
-      const miss = missFor(force);
+    let bestBar = 1;
+    let bestMiss = missFor(bestBar);
+    for (let bar = 1; bar <= TUNABLES.powerBarMax; bar += 0.1) {
+      const miss = missFor(bar);
       if (miss < bestMiss) {
         bestMiss = miss;
-        bestForce = force;
+        bestBar = bar;
       }
     }
     // Refine around the coarse minimum so the shell lands inside the crater's centre, not its rim.
-    const coarse = bestForce;
-    for (let force = coarse - 1; force <= coarse + 1; force += 0.05) {
-      if (force < 1 || force > mobile.maxPower) continue;
-      const miss = missFor(force);
+    const coarse = bestBar;
+    for (let bar = coarse - 0.1; bar <= coarse + 0.1; bar += 0.005) {
+      if (bar < 0 || bar > TUNABLES.powerBarMax) continue;
+      const miss = missFor(bar);
       if (miss < bestMiss) {
         bestMiss = miss;
-        bestForce = force;
+        bestBar = bar;
       }
     }
     expect(bestMiss).toBeLessThan(terrain.step);
@@ -210,7 +214,7 @@ describe("terrain carving", () => {
     const ready = { ...state, turn: { ...state.turn, activeSlot: 0 } };
     const after = applyInput(
       ready,
-      { kind: "fire", slot: 0, weaponSlot: 0, angle: 45, force: bestForce, seq: ready.seq },
+      { kind: "fire", slot: 0, weaponSlot: 0, angle: 45, bar: bestBar, seq: ready.seq },
       NOW,
     );
     expect(after.events[0]?.kind).toBe("shot");

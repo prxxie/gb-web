@@ -2,24 +2,38 @@
  * The ruleset constants (`tunables.md` § 1.2). One object, imported everywhere, versioned by
  * `rulesetVersion`: a match recorded under one version is never rated under another.
  */
-export const RULESET_VERSION = "2026-11-09";
+export const RULESET_VERSION = "2026-11-13";
+
+/**
+ * The integrator's own constants (`tunables.md` § 1.1, `ADR-0007`).
+ *
+ * The original's arithmetic: one muzzle law for every machine, gravity from the machine's weight, and a wind push
+ * proportional to its drag. They are named constants rather than `TUNABLES` rows because they are the *formula*, not a
+ * knob a balance pass turns — `rulesetVersion` is what changes when one of them does.
+ */
+/** `v0 = bar × BAR_VELOCITY`, u/s per bar; the bar is `0…4` for every machine. */
+export const BAR_VELOCITY = 232.335;
+/** Gravity at the reference weight, u/s²: `g = BASE_GRAVITY × weight / GRAVITY_WEIGHT`. */
+export const BASE_GRAVITY = 390;
+/** The weight `BASE_GRAVITY` is quoted at (the middle of the roster). */
+export const GRAVITY_WEIGHT = 5.78;
+/** `k = WIND_COEFFICIENT × windDrag / WIND_DRAG_REFERENCE²` — proportional to drag. */
+export const WIND_COEFFICIENT = 0.222;
+/** The drag the coefficient is quoted at: a machine with `0.046` reads `4.826`. */
+export const WIND_DRAG_REFERENCE = 0.046;
+/** The wind reading is an effective magnitude: `windEff = magnitude × WIND_EFFECT`. */
+export const WIND_EFFECT = 0.95;
+/** The fixed 25 ms integration step: at 4 bar the muzzle is 929 u/s, and a 50 ms step is half a blast radius. */
+export const STEP_MS = 25;
 
 export const TUNABLES = {
   rulesetVersion: RULESET_VERSION,
-  /** Fixed simulation step. 20 Hz. */
-  stepMs: 50,
+  /** Fixed simulation step, 40 Hz (`ADR-0007` §5). */
+  stepMs: STEP_MS,
   /** The turn clock (`OQ-03`). */
   turnDurationMs: 20_000,
   /** One extension per turn. */
   turnGraceMs: 20_000,
-  /**
-   * The one gravity every mobile falls under, u/s² (`tunables.md` § 1.1).
-   *
-   * GB has a single gravity for the whole roster: at the same angle and power every mobile draws the same parabola, and
-   * what makes them feel different is the firing envelope and the shell, not the arc. Per-mobile gravity made the angle
-   * and power tables untransferable between mobiles, which is the opposite of the genre.
-   */
-  gravity: 152,
   /**
    * The delay a player pays for thinking (`tunables.md` § 2).
    *
@@ -37,16 +51,6 @@ export const TUNABLES = {
   /** Gauge points per point of damage dealt / taken — dealing fills it twice as fast as being hit. */
   ssChargeDealt: 0.25,
   ssChargeTaken: 0.12,
-  /** `v0 = force * speedK` for every mobile. */
-  speedK: 5.9,
-  /**
-   * `a = windCoefficient * magnitude * (cos θ, sin θ)` — no mass term: GB's wind pushes every mobile alike.
-   *
-   * `0.8 × 26 = 20.8 u/s²` at full wind, a fifth of gravity: on the ~5.7 s hang of an aimed shot that is a ~340-unit
-   * correction, a sixth of the map — decisive, which is what a full-wind reading has to be, and still short of the
-   * 27 × gravity that the mass-free coefficient first produced.
-   */
-  windCoefficient: 1,
   windMax: 26,
   /** GB's wind is horizontal: east or west, nothing else. */
   windSectors: 2,
@@ -110,7 +114,7 @@ export const TUNABLES = {
   powerRingRadiusPx: 64,
   powerRingMinPx: 54,
   powerRingMaxPx: 76,
-  /** The power bar is 0–4.0, the force the integrator uses is 0–100. */
+  /** The power bar is `0…4` for every machine, and the bar is exactly what the integrator takes (`US-BAL-005` AC3). */
   powerBarMax: 4,
   padRingPx: 96,
   rulerBaseSegments: 8,

@@ -83,7 +83,7 @@ The lobby gains a host-only settings column and a per-player loadout step (`US-R
 | Mode | four radio options: Solo, Score, Tag, Jewel | host | `TC-ROOM-151` |
 | Map | eleven maps with a thumbnail and gimmick badges | host | `TC-CORE-920` |
 | Capacity | 4 / 6 / 8 (2 kept for 1v1) | host | `TC-ROOM-071` |
-| Mobile | twenty mobiles in a grid, each shown in both team tints; duplicates allowed | each member | `TC-ROOM-153` |
+| Mobile | seventeen mobiles in a grid, each shown in both team tints; duplicates allowed | each member | `TC-ROOM-153` |
 | Loadout | eleven items across two pages of nine, with quantity and delay cost | each member | `TC-MATCH-006` |
 
 Non-hosts see every control read-only, with the host's current choice and a "host is choosing" note. Starting the match

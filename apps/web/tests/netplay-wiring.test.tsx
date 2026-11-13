@@ -121,7 +121,9 @@ describe("TC-NET-906: a peer sends its shot, the host simulates it (US-NET-002 A
     const frame = sendControlAll.mock.calls[0]![0] as Record<string, unknown>;
     expect(frame).toMatchObject({ t: "input", kind: "fire", turn: 1 });
     expect(typeof frame["angle"]).toBe("number");
-    expect(typeof frame["force"]).toBe("number");
+    expect(typeof frame["bar"]).toBe("number");
+    expect(frame["bar"]).toBeGreaterThanOrEqual(0);
+    expect(frame["bar"]).toBeLessThanOrEqual(4);
     // A peer must not publish a simulation it did not run.
     expect(broadcast).not.toHaveBeenCalled();
   });

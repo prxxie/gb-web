@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { botShot, botTurn, botTurnPlan, DEFAULT_BOT, type BotConfig } from "../src/bot.js";
-import { launch, simulateFlight } from "../src/ballistics.js";
+import { gravityFor, launch, simulateFlight, windKFor } from "../src/ballistics.js";
 import { getMap } from "../src/data/maps.js";
 import { getMobile, MOBILES } from "../src/data/mobiles.js";
 import { ITEMS } from "../src/data/items.js";
@@ -84,7 +84,7 @@ function terrainOf(state: MatchState) {
 }
 
 /** Replay a shot through the real integrator, exactly as `resolveShot` would. */
-function landingError(state: MatchState, angle: number, force: number, weaponSlot: 0 | 1 | 2): number {
+function landingError(state: MatchState, angle: number, bar: number, weaponSlot: 0 | 1 | 2): number {
   const bot = state.players[0]!;
   const mobile = getMobile(bot.mobileId);
   const map = getMap(state.mapId);
@@ -96,11 +96,16 @@ function landingError(state: MatchState, angle: number, force: number, weaponSlo
     from: { x: bot.x, y: bot.y },
     facing: bot.facing,
     angle,
-    force,
+    bar,
   });
   const flight = simulateFlight(
     projectile,
-    { wind: state.weather.wind, gravity: TUNABLES.gravity * map.gravityModifier, stepMs: TUNABLES.stepMs },
+    {
+      wind: state.weather.wind,
+      gravity: gravityFor(mobile) * map.gravityModifier,
+      windK: windKFor(mobile),
+      stepMs: TUNABLES.stepMs,
+    },
     terrainOf(state),
   );
   return Math.abs(flight.landingX - state.players[1]!.x);
@@ -111,8 +116,8 @@ function bestError(state: MatchState, weaponSlot: 0 | 1 | 2): number {
   const mobile = getMobile(state.players[0]!.mobileId);
   let best = Number.POSITIVE_INFINITY;
   for (let angle = mobile.angleMin; angle <= mobile.angleMax; angle += 2) {
-    for (let force = 20; force <= mobile.maxPower; force += 5) {
-      best = Math.min(best, landingError(state, angle, force, weaponSlot));
+    for (let bar = 0.25; bar <= TUNABLES.powerBarMax; bar += 0.25) {
+      best = Math.min(best, landingError(state, angle, bar, weaponSlot));
     }
   }
   return best;
@@ -134,17 +139,17 @@ describe("bot (US-CORE-005)", () => {
     expect(shot.weaponSlot === 0 || shot.weaponSlot === 1 || shot.weaponSlot === 2).toBe(true);
     expect(shot.angle).toBeGreaterThanOrEqual(mobile.angleMin);
     expect(shot.angle).toBeLessThanOrEqual(mobile.angleMax);
-    expect(shot.force).toBeGreaterThanOrEqual(0);
-    expect(shot.force).toBeLessThanOrEqual(mobile.maxPower);
+    expect(shot.bar).toBeGreaterThanOrEqual(0);
+    expect(shot.bar).toBeLessThanOrEqual(TUNABLES.powerBarMax);
     expect(Number.isNaN(shot.angle)).toBe(false);
-    expect(Number.isNaN(shot.force)).toBe(false);
+    expect(Number.isNaN(shot.bar)).toBe(false);
 
     // With a clear line of fire the simulated landing is inside the blast radius: 10 seeds, 10 hits.
     let hits = 0;
     for (let seed = 0; seed < 10; seed += 1) {
       const aimed = botShot(state, 0, createRng(seed), PERFECT);
       if (!aimed) continue;
-      if (landingError(state, aimed.angle, aimed.force, aimed.weaponSlot) <= mobile.weapons[aimed.weaponSlot].radius) {
+      if (landingError(state, aimed.angle, aimed.bar, aimed.weaponSlot) <= mobile.weapons[aimed.weaponSlot].radius) {
         hits += 1;
       }
     }
@@ -160,8 +165,8 @@ describe("bot (US-CORE-005)", () => {
         if (!shot) continue;
         expect(shot.angle).toBeGreaterThanOrEqual(mobile.angleMin);
         expect(shot.angle).toBeLessThanOrEqual(mobile.angleMax);
-        expect(shot.force).toBeGreaterThanOrEqual(0);
-        expect(shot.force).toBeLessThanOrEqual(mobile.maxPower);
+        expect(shot.bar).toBeGreaterThanOrEqual(0);
+        expect(shot.bar).toBeLessThanOrEqual(TUNABLES.powerBarMax);
         expect([0, 1, 2]).toContain(shot.weaponSlot);
       }
     }
@@ -242,7 +247,7 @@ describe("TC-CORE-946: a bot keeps playing when the human's clock runs out (US-C
     const shot = botTurn(next, rng, PERFECT);
     expect(shot?.kind).toBe("fire");
     if (shot?.kind === "fire") {
-      expect(Number.isInteger(shot.force)).toBe(true);
+      expect(Number.isInteger(shot.bar * 4)).toBe(true); // 0.25 grid
       const bot = getMobile(next.players[1]!.mobileId);
       expect(shot.angle).toBeGreaterThanOrEqual(bot.angleMin);
       expect(shot.angle).toBeLessThanOrEqual(bot.angleMax);

@@ -2,7 +2,7 @@
 /**
  * TC-MATCH-914: drag to aim (`US-MATCH-002`).
  *
- * The drag→power mapping, the power→force conversion and the aim angle live in `@gbw/core`
+ * The drag→power mapping, the power→bar conversion and the aim angle live in `@gbw/core`
  * (`camera.ts`) and the gesture arbitration lives in `game/viewport.ts`; both are pure, so the
  * behaviour is tested here without a canvas.
  *
@@ -12,7 +12,7 @@
  * through the Phaser scene (`game/scene.ts`), which cannot run in jsdom.
  */
 import { describe, expect, it } from "vitest";
-import { TUNABLES, angleFromPull, forceFromPower, powerFromDrag } from "@gbw/core";
+import { TUNABLES, angleFromPull, barFromPower, powerFromDrag } from "@gbw/core";
 import { ANGLE_DEG_PER_PX, addPointer, classify, clearPointers, pullBaseAngle } from "../src/game/viewport";
 
 const SHORT_EDGE = 600; // a landscape phone's shorter screen edge, logical px
@@ -47,23 +47,23 @@ describe("TC-MATCH-914: the pull maps drag distance to power", () => {
   });
 });
 
-describe("TC-MATCH-914: the release converts the held power to force", () => {
-  it("force is round(power × 25) on the integrator's 0–100 scale (AC3)", () => {
+describe("TC-MATCH-914: the release hands the held power to the shot as its bar", () => {
+  it("the bar is the power, quantised to 0.01 on the 0–4 scale (AC3)", () => {
     for (const power of [0, 0.3, 1, 1.5, 2, 2.6, 3.2, 4]) {
-      expect(forceFromPower(power)).toBe(Math.round(power * 25));
+      expect(barFromPower(power)).toBe(Math.round(power * 100) / 100);
     }
   });
 
-  it("is clamped to 0–100 and never negative", () => {
-    expect(forceFromPower(-1)).toBe(0);
-    expect(forceFromPower(9)).toBe(100);
-    expect(forceFromPower(forceFromPower(2) / 25)).toBe(50);
+  it("is clamped to 0–4 and never negative", () => {
+    expect(barFromPower(-1)).toBe(0);
+    expect(barFromPower(9)).toBe(4);
+    expect(barFromPower(barFromPower(2))).toBe(2);
   });
 
-  it("the same drag always produces the same power and force (one shot per release)", () => {
+  it("the same drag always produces the same power and bar (one shot per release)", () => {
     const power = powerFromDrag(200, SHORT_EDGE);
     expect(powerFromDrag(200, SHORT_EDGE)).toBe(power);
-    expect(forceFromPower(power)).toBe(forceFromPower(power));
+    expect(barFromPower(power)).toBe(barFromPower(power));
   });
 });
 

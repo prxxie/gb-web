@@ -77,7 +77,8 @@ Red: none — the rule was already implemented and green; this pass added the ca
 ## Delivery status — 2026-11-06
 
 **done.** `packages/core/tests/items.test.ts` — `TC-CORE-906` (Dual keeps the turn and fires twice on the same weapon, a
-second item between the pair is refused, Blood adds 25 % for one shot, Power up lifts the force cap by 20),
+second item between the pair is refused, Blood and Power up add 33 % damage for one shot — a multiplier on damage, never
+on the bar (`data/items.md`, `TC-CORE-906`)),
 `TC-CORE-907` (Energy up 1/2 add 30/60 and charge 5/10 delay), `TC-CORE-908` (Change Wind re-rolls and announces),
 `TC-CORE-909` (Teleport moves 150 px inside the map, Team Teleport gathers the team within 40 px, neither touches the
 turn), `TC-CORE-910` (Bunge returns the shell to the caster), `TC-CORE-911` (Thunder strikes the band at the aim and

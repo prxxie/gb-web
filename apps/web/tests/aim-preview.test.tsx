@@ -89,7 +89,7 @@ describe("TC-MATCH-941: the aim aid shows that weapon's shot (US-MATCH-005 AC2)"
         { slot: 0, weaponSlot: 0, seq: 7, mobile, aimDelta },
       )!;
       expect(preview.angle).toBe(shot.angle);
-      expect(preview.force).toBe(shot.force);
+      expect(preview.bar).toBe(shot.bar);
       expect(preview.angle).toBeGreaterThanOrEqual(mobile.angleMin);
       expect(preview.angle).toBeLessThanOrEqual(mobile.angleMax);
     }

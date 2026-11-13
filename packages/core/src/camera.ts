@@ -170,9 +170,13 @@ export function powerFromDrag(dragDistance: number, shorterEdge: number): number
   return roundTo(fraction * TUNABLES.powerBarMax);
 }
 
-/** Power 0…4 to the force 0…100 the integrator uses. */
-export function forceFromPower(power: number): number {
-  return clamp(Math.round(power * 25), 0, 100);
+/**
+ * Power 0…4 to the bar the integrator takes — quantised to `0.01` (`round(power × 100) / 100`), because the bar *is*
+ * the input now: there is no 0–100 force scale behind it (`US-BAL-005` AC3).
+ */
+export function barFromPower(power: number): number {
+  if (!Number.isFinite(power)) return 0;
+  return clamp(Math.round(power * 100) / 100, 0, TUNABLES.powerBarMax);
 }
 
 /** Aim angle from a pull vector in screen space; the segment comes from the mobile's own window. */

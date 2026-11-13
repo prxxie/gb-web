@@ -68,7 +68,7 @@ they cannot compute — the same job the genre's part grid does (`reference-gunb
 | Turn clock | countdown from **20 s** | `turn.deadlineAt` | Local countdown, re-synced on each snapshot; turns `warning` under 5 s |
 | Turn number | integer | `turn.number` | — |
 | Aim arc | canvas graphics | local input | Dotted, in the mobile's `angleMin…angleMax` window |
-| **Power ring** | gradient arc **around the mobile**, 64 px radius, clockwise from −90° | local input | Numeric value **inside** the ring, `0.0–4.0` (GunBound's power bar); sent as `force = round(power × 25)` |
+| **Power ring** | gradient arc **around the mobile**, 64 px radius, clockwise from −90° | local input | Numeric value **inside** the ring, `0.0–4.0` (GunBound's power bar); sent as that same number — `bar`, quantised to `0.01` and clamped to `4` (`US-BAL-005` AC3) |
 | Angle chip | degrees | local input | Shown while the up/down controls are touched, `37°` |
 | Connection dot | `connected` / `grace` / `disconnected` | `room_state` | Pulsing during grace |
 
@@ -80,7 +80,7 @@ your mobile on your turn (`OQ-40` — this supersedes the optional joystick in s
 | Control | Gesture | Effect | Message | Permission |
 |---------|---------|--------|---------|-----------|
 | Pull power (aim) | **one finger** dragged anywhere on the canvas | Power 0.0–4.0 in proportion to the drag distance; angle from the drag direction; the ring fills around the mobile | — (local) | active slot only |
-| Fire | **release** the one-finger drag | Commits `force = round(power × 25)` and the angle; a release below **0.3** cancels instead of firing | `input{kind:'fire', angle, force, facing, seq, weaponSlot}` on `control` | active slot |
+| Fire | **release** the one-finger drag | Commits the `bar` (the same `0.0–4.0` the ring shows) and the angle; a release below **0.3** cancels instead of firing | `input{kind:'fire', angle, bar, facing, seq, weaponSlot}` on `control` | active slot |
 | Pan window | **two fingers** dragged together | Moves the camera, 1:1 with the centroid, clamped to the map | — (local) | any member |
 | Zoom | pinch in / out (two fingers, separation change > 12 px) | Zoom between `zoomMin` and `zoomMax` about the midpoint | — (local) | any member |
 | Angle up / down | tap or hold the ▲ / ▼ of the four-way pad (**±1° per tap, 10°/s held**) | Rotates the barrel, clamped to the mobile's own `angleMin…angleMax`; the chip shows the value | — (folded into the next `fire`) | active slot |
@@ -127,8 +127,8 @@ a drag. All pad and button targets are ≥ 60 × 60 logical px (`NFR-17`).
 
 | Contract | Checked by |
 |----------|-----------|
-| Aim drag → angle/force within tolerance, a pull under the deadzone sends nothing | `apps/web/tests/aim.test.tsx` (TC-MATCH-914, TC-MATCH-916) |
-| Power ring shows 0.0–4.0 and maps to `force = power × 25` | `apps/web/tests/power-ring.test.tsx` (TC-MATCH-915) |
+| Aim drag → angle/bar within tolerance, a pull under the deadzone sends nothing | `apps/web/tests/aim.test.tsx` (TC-MATCH-914, TC-MATCH-916) |
+| Power ring shows 0.0–4.0 and the wire carries that bar (`TC-BAL-135`) | `apps/web/tests/power-ring.test.tsx` (TC-MATCH-915) |
 | Release below 0.3 cancels; two-finger gesture cancels without firing | `apps/web/tests/gestures.test.tsx` (TC-MATCH-916) |
 | Camera default window 1000 × 600, clamped pan, zoom bounds | `packages/core/tests/camera.test.ts` + `apps/web/tests/camera.test.tsx` (TC-MATCH-918, TC-MATCH-919) |
 | Ruler divisions 8 → 16 as the window widens | `apps/web/tests/ruler.test.tsx` (TC-MATCH-920) |

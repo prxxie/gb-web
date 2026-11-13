@@ -2,20 +2,20 @@
  * The aim aid: the flight the shot will actually take (`US-MATCH-005` AC2).
  *
  * Nothing here re-derives physics. The angle comes from the same helper the `fire` input uses (`shotAngle`), the
- * force from `forceFromPower`, and the flight from `previewShot` in `@gbw/core` — the exporter of the resolver's
+ * bar from `barFromPower`, and the flight from `previewShot` in `@gbw/core` — the exporter of the resolver's
  * own `flightPath`, so bounces, `piercing`, `itm-bunge`, off-map returns, the pad nudge, the item effects and the
  * mobile's angle window are all resolved by the code that will resolve the shot. This module only samples that
  * path into the few dots the scene draws.
  */
 import { TUNABLES, getMobile, previewShot } from "@gbw/core";
 import type { MatchState, Vec2 } from "@gbw/core";
-import { forceFromPower, shotAngle } from "./aim";
+import { barFromPower, shotAngle } from "./aim";
 
 export interface AimPreview {
   /** The slot that will really fire — `itm-dual` can override the picked one (`US-CORE-009` AC2). */
   readonly weaponSlot: 0 | 1 | 2;
   readonly angle: number;
-  readonly force: number;
+  readonly bar: number;
   /** The sampled flight, muzzle first; the last dot is the impact when there is one. */
   readonly path: readonly Vec2[];
   /** The same shot with the wind removed, for the baseline arc (`US-BAL-003` AC2). */
@@ -75,9 +75,9 @@ export function baselineShot(
   slot: number,
   weaponSlot: 0 | 1 | 2,
   angle: number,
-  force: number,
+  bar: number,
 ): ReturnType<typeof previewShot> {
-  return previewShot(withoutWind(state), slot, weaponSlot, angle, force);
+  return previewShot(withoutWind(state), slot, weaponSlot, angle, bar);
 }
 
 export function aimPreview(input: AimPreviewInput): AimPreview | null {
@@ -86,15 +86,15 @@ export function aimPreview(input: AimPreviewInput): AimPreview | null {
   if (!player || player.eliminated || input.state.status !== "playing") return null;
 
   const angle = shotAngle(input.angle, input.aimDelta, getMobile(player.mobileId));
-  const force = forceFromPower(input.power);
-  const shot = previewShot(input.state, input.localSlot, input.weaponSlot, angle, force);
+  const bar = barFromPower(input.power);
+  const shot = previewShot(input.state, input.localSlot, input.weaponSlot, angle, bar);
   if (!shot) return null;
-  const baseline = baselineShot(input.state, input.localSlot, input.weaponSlot, angle, force);
+  const baseline = baselineShot(input.state, input.localSlot, input.weaponSlot, angle, bar);
 
   return {
     weaponSlot: shot.weaponSlot,
     angle: shot.angle,
-    force: shot.force,
+    bar: shot.bar,
     path: sampleByTime(shot.path, shot.impact, PREVIEW_STEPS),
     baseline: baseline ? sampleByTime(baseline.path, null, PREVIEW_STEPS) : [],
     impact: shot.impact,

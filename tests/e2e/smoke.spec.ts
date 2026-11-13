@@ -41,7 +41,7 @@ test.describe("solo demo path", () => {
   // A press has to be held before it arms a shot (`HOLD_MS` 300 ms, `TC-MATCH-911`); a drag on its own pans.
   await page.waitForTimeout(400);
     await page.mouse.move(startX - 120, startY + 90, { steps: 12 });
-    await expect(page.getByTestId("power-value")).not.toHaveText("0.00");
+    await expect(page.getByTestId("power-value")).not.toHaveText("0.0");
     await page.mouse.up();
   });
 

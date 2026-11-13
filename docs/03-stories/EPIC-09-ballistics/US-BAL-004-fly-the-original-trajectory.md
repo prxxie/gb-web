@@ -2,7 +2,7 @@
 id: US-BAL-004
 title: Fly the original trajectory
 epic: EPIC-09-ballistics
-status: ready
+status: done
 priority: P0
 size: M
 depends_on: [US-CORE-001]
@@ -38,7 +38,7 @@ not the genre's arithmetic: at four bar and 45° it flew 2 290 u in **5.49 s** w
 | # | Given | When | Then |
 |---|-------|------|------|
 | AC1 | any machine | a shot is resolved | `v0 = bar × 232.335 u/s` with `bar ∈ [0, 4]`, and gravity is that machine's own `g = 390 × weight / 5.78 u/s²` |
-| AC2 | a wind reading of magnitude `m` and angle `φ` | the step is integrated | `k = 0.222 / windDrag` for the machine, `windEff = m × 0.95`, `aₓ = k · windEff · cos φ`, `a_y = g − k · windEff · sin φ`; in play `φ` is 0° or 180°, so the vertical term is zero |
+| AC2 | a wind reading of magnitude `m` and angle `φ` | the step is integrated | `k = 0.222 × windDrag / 0.046²` for the machine, `windEff = m × 0.95`, `aₓ = k · windEff · cos φ`, `a_y = g − k · windEff · sin φ`; in play `φ` is 0° or 180°, so the vertical term is zero |
 | AC3 | the middle machine (weight 5.78), flat ground, no wind | four bar is fired at 45° | it lands **2 214 ± 20 u** from the muzzle after **3.37 ± 0.05 s** |
 | AC4 | the integrator | a step is taken | the step is **25 ms**; a machine whose `weight` or `windDrag` is missing resolves nothing and reports an error instead of falling back to a default |
 | AC5 | a stored snapshot or replay | it is loaded | it carries `ruleset = 2026-11-13` and a record from an older ruleset is refused with a readable reason |
@@ -50,12 +50,13 @@ not the genre's arithmetic: at four bar and 45° it flew 2 290 u in **5.49 s** w
 export const BAR_VELOCITY = 232.335;   // u/s per bar
 export const BASE_GRAVITY = 390;       // u/s² at the 5.78 reference weight
 export const GRAVITY_WEIGHT = 5.78;    // the weight BASE_GRAVITY is quoted at
-export const WIND_COEFFICIENT = 0.222; // k = WIND_COEFFICIENT / windDrag
+export const WIND_COEFFICIENT = 0.222; // k = WIND_COEFFICIENT × windDrag / WIND_DRAG_REFERENCE²
+export const WIND_DRAG_REFERENCE = 0.046; // a machine whose drag is 0.046 reads 4.826
 export const WIND_EFFECT = 0.95;       // effective magnitude multiplier
 export const STEP_MS = 25;
 
 export function gravityFor(mobile: Mobile): number;      // 390 * weight / 5.78
-export function windKFor(mobile: Mobile): number;        // 0.222 / windDrag
+export function windKFor(mobile: Mobile): number;        // (0.222 / 0.046) * (windDrag / 0.046)
 export function muzzleVelocity(bar: number): number;     // bar * 232.335
 ```
 
@@ -88,10 +89,39 @@ export function muzzleVelocity(bar: number): number;     // bar * 232.335
 
 ## 8. Test notes
 
-Unit: muzzle velocity, per-machine gravity and `k`, the degenerate vertical term, determinism, the ruleset refusal.
-Integration: the calibration shot at three wind readings (±26, 0) — wind at 26 must push the landing by 25 % of gravity's
-effect. Planned cases `TC-BAL-119`–`TC-BAL-128`.
+`TC-BAL-119`–`TC-BAL-128` in `packages/core/tests/ballistics.test.ts`: muzzle velocity per bar, per-machine gravity (390 at
+the reference weight, `506.055` for `mbl-01`) and `k` (4.826 / 5.822 / 9.966), the degenerate vertical term at
+`sector 0`/`1`, the refused missing field, the calibration shot at 2,202.9 u / 3,350 ms and at wind ±26 (+814.3 / −807.5),
+25 ms determinism, and — in `packages/core/tests/snapshot.test.ts` — the `ruleset-mismatch` refusal of a `2026-11-08`
+snapshot.
+
+Red: none — a formula swap has no failing behaviour to watch first: every new pin fails by construction against the
+constants it replaces (`TC-BAL-123`'s 2,202.9 u against `speedK 5.9` / `gravity 152`, `TC-BAL-121`'s 9.966 against
+`windCoefficient 1.0`). The suite that pinned those constants was migrated in the same change (`TC-CORE-020`, `TC-CORE-023`,
+`TC-CORE-924`), not skipped.
 
 ## 9. Open questions
 
 None. The parameter table is adopted by `CR-2026-11-13`; the roster mapping is `US-BAL-005`.
+
+## Delivery status — 2026-11-13
+
+**done.** `packages/core/src/ballistics.ts` carries the model as named constants outside `TUNABLES`
+(`BAR_VELOCITY 232.335`, `BASE_GRAVITY 390`, `GRAVITY_WEIGHT 5.78`, `WIND_COEFFICIENT 0.222`,
+`WIND_DRAG_REFERENCE 0.046`, `WIND_EFFECT 0.95`, `STEP_MS 25`) with `gravityFor`, `windKFor`, `muzzleVelocity` and
+`windAcceleration(wind, k)`; `StepContext` now *requires* `windK`, and `gravityFor`/`windKFor` throw
+`RangeError("cannot resolve a shot: the machine has no weight")` rather than defaulting. `speedK`, `gravity` and
+`windCoefficient` are gone from `TUNABLES`, `RULESET_VERSION` is `2026-11-13`, and `restoreFromSnapshot` refuses a
+snapshot from another ruleset through `assertCurrentRuleset` (`ruleset-mismatch: …`). Every caller moved with it:
+`match.ts` (`launchFor`, `flightPath`, `resolveShot`, `applyInput`), `bot.ts` (quarter-bar grid over `0…4`), the web
+preview, `barFromPower`, the HUD and the wire frame `bar`.
+
+Measured on the new integrator: the calibration shot (`mbl-03`, bar 4, 45°, dead calm, flat probe) lands **2,202.9 u**
+after **3,350 ms** (closed form 2,214.5 u; 134 steps of 25 ms), wind 26 east moves it **+814.3 u** and west **−807.5 u**
+(`TC-BAL-123`, `TC-BAL-124`). The wind coefficient is *proportional* to `windDrag` — `k = 0.222 × windDrag / 0.046²` —
+which is what `US-BAL-005` AC5's arithmetic implied; the inverse reading in AC2 was the contradiction recorded and
+answered as `OQ-44`.
+
+Cases: `TC-BAL-119`–`TC-BAL-128` in `docs/05-quality/test-cases.md`, asserted by `packages/core/tests/ballistics.test.ts`
+(AC1–AC4, calibration, determinism) and `packages/core/tests/snapshot.test.ts` (AC5). Not run: the browser suite — the
+model is pure and its inputs are covered by unit tests, so `pnpm e2e` was left to the release gate.

@@ -23,7 +23,7 @@ table are the basis, the roster is the reference's seventeen machines, and the m
 2. **Muzzle.** `v0 = bar × 232.335 u/s` for every machine, `bar ∈ [0, 4]`. There is no per-machine power cap and no
    `force` scale: the bar *is* the input.
 3. **Gravity is per machine**: `g = 390 × weight / 5.78 u/s²` over the reference weight table (4.20 … 7.50).
-4. **Wind is per machine**: `k = 0.222 / windDrag`, effective magnitude `windEff = magnitude × 0.95`,
+4. **Wind is per machine**: `k = 0.222 × windDrag / 0.046²`, effective magnitude `windEff = magnitude × 0.95`,
    `aₓ = k · windEff · cos φ`, `a_y = g − k · windEff · sin φ`. In play `φ ∈ {0°, 180°}` — the genre's wind is horizontal —
    so the vertical term is zero; the general form stays so a map gimmick can use it.
 5. **Integration**: fixed **25 ms** step, semi-implicit, rendered by interpolation. At 4 bar the muzzle is 929 u/s, so a

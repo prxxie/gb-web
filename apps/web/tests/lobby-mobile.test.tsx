@@ -110,6 +110,11 @@ describe("TC-ROOM-709: the grid (AC7)", () => {
 
     const cells = [...document.querySelectorAll("[data-testid^='mobile-cell-']")];
     expect(cells).toHaveLength(MOBILES.length);
+    // TC-BAL-132: the shrinkage is the point — seventeen cards, one per shipped machine (`US-BAL-005` AC2).
+    expect(cells).toHaveLength(17);
+    expect(MOBILES.map((mobile) => mobile.mobileId)).not.toContain("mbl-06");
+    expect(MOBILES.map((mobile) => mobile.mobileId)).not.toContain("mbl-08");
+    expect(MOBILES.map((mobile) => mobile.mobileId)).not.toContain("mbl-16");
     expect(cells.map((cell) => cell.getAttribute("data-testid"))).toEqual(MOBILES.map((mobile) => `mobile-cell-${mobile.mobileId}`));
 
     for (const mobile of MOBILES) {

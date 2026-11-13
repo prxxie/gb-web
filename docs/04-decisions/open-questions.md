@@ -4,7 +4,7 @@ Questions that block or shape the work and that only the product owner, client, 
 `cpt-decide`. Format: [.agents/rules/02-docs-navigation.md § 5](../../.agents/rules/02-docs-navigation.md#5-open-questions).
 
 <!-- cpt:oq-summary -->
-**Open: 13 · Blocking: 0 · Answered: 29 · Withdrawn: 1**
+**Open: 13 · Blocking: 0 · Answered: 30 · Withdrawn: 1**
 
 | Id | Question | Status | Blocking |
 |---|---|---|---|
@@ -51,6 +51,7 @@ Questions that block or shape the work and that only the product owner, client, 
 | [OQ-41](open-questions.md#oq-41--how-is-wind-expressed-and-when-does-it-change) | How is wind expressed and when does it change? | answered | — |
 | [OQ-42](open-questions.md#oq-42--do-accounts-own-avatar-parts-and-does-the-match-record-keep-the-bonus-totals) | Do accounts own avatar parts, and does the match record keep the bonus totals? | answered | — |
 | [OQ-43](open-questions.md#oq-43--can-a-draw-or-an-abandonment-be-recorded-at-all) | Can a draw or an abandonment be recorded at all? | open | — |
+| [OQ-44](open-questions.md#oq-44--is-the-per-machine-wind-coefficient-proportional-to-winddrag-or-inverse-to-it) | Is the per-machine wind coefficient proportional to `windDrag` or inverse to it? | answered | — |
 <!-- /cpt:oq-summary -->
 
 ---
@@ -566,3 +567,21 @@ Questions that block or shape the work and that only the product owner, client, 
 - **Assumption**: a draw stays unrecorded until the contract answers; the change belongs to `US-RANK-001`, and
   `match_end` should then carry the forfeit flag so the client's retry can reproduce the room's body.
 - **Answer**: —
+
+## OQ-44 — Is the per-machine wind coefficient proportional to `windDrag` or inverse to it?
+
+- **Status**: answered
+- **Raised**: 2026-11-13 while implementing `US-BAL-004` and `US-BAL-005`
+- **Blocks**: —
+- **Context**: three documents stated `k = 0.222 / windDrag` (`US-BAL-004` AC2, `ADR-0007` § 4, `CR-2026-11-13`), while
+  `US-BAL-005` AC5 stated Boomer's coefficient is `2.065 × (0.222 / 0.046) = 9.966` against a table row of
+  `windDrag = 0.0950`. The inverse formula gives `0.222 / 0.0950 = 2.34`, which makes Boomer the **least** wind-sensitive
+  machine on the roster (the mid-weight reads `0.222 / 0.0555 = 4.00`) — the opposite of what AC5 asserts and of the
+  reference's own Boomer.
+- **Question**: which formula is the contract — `k = 0.222 / windDrag`, or the proportional form AC5's arithmetic
+  implies?
+- **Assumption**: —
+- **Answer**: **proportional** — `k = 0.222 × windDrag / 0.046²`, i.e. `(0.222 / 0.046) × (windDrag / 0.046)`. A machine
+  whose drag is `0.046` reads `4.826`, the mid-weight `0.0555` reads `5.82`, and Boomer's `0.0950` reads `9.966` — AC5's
+  number, 1.71× the mid-weight. The § 4 table of `US-BAL-005` is implemented exactly as printed; `US-BAL-004` AC2 and
+  `ADR-0007` § 4 are amended to match. Answered by the product owner on 2026-11-13.

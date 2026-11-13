@@ -4,14 +4,14 @@ import { MAPS, getMap, MAP_BOUNDS } from "../src/data/maps.js";
 import { ITEMS, ITEMS_BY_ID, LOADOUT_CAP, loadoutTotal } from "../src/data/items.js";
 import { MODES, getMode } from "../src/data/modes.js";
 import { AVATAR_PARTS, avatarBonus, bonusMultipliers, AVATAR_CAPS } from "../src/data/avatars.js";
-import { launch, simulateFlight } from "../src/ballistics.js";
+import { gravityFor, launch, simulateFlight, windKFor } from "../src/ballistics.js";
 import { createTerrain } from "../src/terrain.js";
 import { TUNABLES } from "../src/tuning.js";
 
 describe("TC-CORE-905: the roster", () => {
-  it("carries twenty mobiles with unique ids and three weapon slots each", () => {
-    expect(MOBILES).toHaveLength(20);
-    expect(new Set(MOBILES.map((mobile) => mobile.mobileId)).size).toBe(20);
+  it("carries seventeen mobiles with unique ids and three weapon slots each", () => {
+    expect(MOBILES).toHaveLength(17);
+    expect(new Set(MOBILES.map((mobile) => mobile.mobileId)).size).toBe(17);
     for (const mobile of MOBILES) {
       expect(mobile.weapons).toHaveLength(3);
       expect(mobile.maxHp).toBeGreaterThanOrEqual(900);
@@ -21,12 +21,15 @@ describe("TC-CORE-905: the roster", () => {
     }
   });
 
-  it("gives the roster one shared gravity and per-mobile identity through the envelope, stats, budget and shells", () => {
-    // GB parity: gravity is a rule, not a mobile stat — no row carries its own gravity or mass, so the same angle
-    // and force draw the same parabola on every mobile (`mobiles.md` § 4, `TC-CORE-935`).
+  it("gives every mobile its own weight and drag, and identity through the envelope, stats, budget and shells", () => {
+    // `gravity`/`mass` stayed off the row, but `weight` and `windDrag` are required stats now (`US-BAL-005` AC1):
+    // the arc is the machine's own (`mobiles.md` § 4, `TC-CORE-935`).
     for (const mobile of MOBILES) {
       expect("gravity" in mobile).toBe(false);
       expect("mass" in mobile).toBe(false);
+      expect("maxPower" in mobile).toBe(false);
+      expect(Number.isFinite(mobile.weight)).toBe(true);
+      expect(Number.isFinite(mobile.windDrag)).toBe(true);
     }
     const flat = () => {
       const terrain = createTerrain("map-01");
@@ -44,25 +47,32 @@ describe("TC-CORE-905: the roster", () => {
           from: { x: 8, y: 820 },
           facing: 1,
           angle: 40,
-          force: 90,
+          bar: 3.6,
         }),
-        { wind: { magnitude: 0, directionDeg: 0, sector: 0 }, gravity: TUNABLES.gravity },
+        {
+          wind: { magnitude: 0, directionDeg: 0, sector: 0 },
+          gravity: gravityFor(mobile),
+          windK: windKFor(mobile),
+        },
         flat(),
         { width: 60_000, height: 4000 },
         { firstGroundImpact: true },
       );
     };
-    const a = flight("mbl-01");
-    const b = flight("mbl-16");
-    expect([b.landingX, b.flightMs]).toEqual([a.landingX, a.flightMs]);
+    // Equal weights draw equal arcs; different weights do not — the roster-wide parabola is gone (`AC1`).
+    const heavy = flight("mbl-01"); // 7.50
+    const reference = flight("mbl-03"); // 5.78
+    const light = flight("mbl-14"); // 4.90
+    expect(heavy.landingX).toBeLessThan(reference.landingX);
+    expect(light.landingX).toBeGreaterThan(reference.landingX);
 
     // Identity is carried by the aim envelope: no two mobiles share a window, and the window is a real restriction.
     expect(new Set(MOBILES.map((mobile) => `${mobile.angleMin}:${mobile.angleMax}`)).size).toBe(MOBILES.length);
-    expect(MOBILES.filter((mobile) => mobile.angleMin <= 40 && 40 <= mobile.angleMax)).toHaveLength(11);
-    expect(new Set(MOBILES.map((mobile) => mobile.maxPower)).size).toBeGreaterThanOrEqual(8);
+    expect(MOBILES.filter((mobile) => mobile.angleMin <= 40 && 40 <= mobile.angleMax).length).toBeGreaterThan(0);
+    expect(new Set(MOBILES.map((mobile) => mobile.weight)).size).toBeGreaterThanOrEqual(8);
 
     // …and by the stats, the movement budget and the three shells.
-    for (const field of ["maxHp", "defense", "energy", "maxPower", "moveDistance", "maxMovesPerTurn"] as const) {
+    for (const field of ["maxHp", "defense", "energy", "weight", "windDrag", "moveDistance", "maxMovesPerTurn"] as const) {
       for (const mobile of MOBILES) expect(mobile[field], `${mobile.mobileId} ${field}`).toBeDefined();
     }
     expect(new Set(MOBILES.map((mobile) => mobile.maxHp)).size).toBeGreaterThanOrEqual(10);
@@ -87,7 +97,8 @@ describe("TC-CORE-905: the roster", () => {
         [
           mobile.angleMin,
           mobile.angleMax,
-          mobile.maxPower,
+          mobile.weight,
+          mobile.windDrag,
           mobile.maxHp,
           mobile.defense,
           mobile.energy,

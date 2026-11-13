@@ -91,7 +91,7 @@ export function useBattleMount(options: BattleMountOptions): void {
                 {
                   kind: "fire",
                   angle: input.angle,
-                  force: input.force,
+                  bar: input.bar,
                   facing: current.players.find((player) => player.slot === plan.localSlot)?.facing ?? 1,
                   weaponSlot: input.weaponSlot,
                 },

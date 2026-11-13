@@ -2,7 +2,7 @@
 id: US-BAL-005
 title: Field the seventeen reference machines
 epic: EPIC-09-ballistics
-status: ready
+status: done
 priority: P1
 size: M
 depends_on: [US-BAL-004, US-CORE-007]
@@ -35,7 +35,7 @@ the wind sensitivity, and the bar is 0–4 for everyone. Three of our rows dupli
 | AC2 | the three dropped machines (`mbl-06` Silver Ibex, `mbl-08` Volcano Toad, `mbl-16` Sun Lion) | the data, loadout screen, i18n and tests are searched | no reference to them remains, and the loadout screen offers 17 cards |
 | AC3 | any machine | it is fired | the bar is 0–4; `maxPower` no longer exists in the type, the data or the HUD |
 | AC4 | the machines that map to a reference row | they are compared | they keep our names, hull, weapons, angles, HP, shield, energy and effects; only gravity and wind sensitivity come from the mapped row |
-| AC5 | Boomer's counterpart | wind is read | its wind coefficient is `2.065 × (0.222 / 0.046) = 9.966`, i.e. about twice the mid-weight machines' |
+| AC5 | Boomer's counterpart | wind is read | its wind coefficient is `(0.222 / 0.046) × (0.0950 / 0.046) = 9.966`, i.e. about twice the mid-weight machines' (`5.82` at `windDrag 0.0555`) |
 | AC6 | a match record or a marks screen | it names a machine | the id is stable across the drop — no surviving machine changes its `mobileId` |
 
 ## 4. Contract
@@ -85,10 +85,35 @@ Dropped: `mbl-06`, `mbl-08`, `mbl-16`.
 
 ## 8. Test notes
 
-Unit: 17 rows, required fields, the Boomer coefficient, the dropped ids absent. Integration: a loadout with a dropped id
-falls back cleanly. e2e: the loadout screen shows 17 cards and a match runs on a machine with the heaviest and the lightest
-weight. Planned cases `TC-BAL-129`–`TC-BAL-136`.
+`TC-BAL-129`–`TC-BAL-137`, splitting across `packages/core/tests/mobiles.test.ts` (the seventeen rows, the required
+`weight`/`windDrag`, the retired fields, the Boomer coefficient, the dropped ids absent and every survivor's id unchanged),
+`packages/core/src/data/mobiles.ts`'s `resolveMobileId` via `packages/core/tests/match.test.ts` and
+`apps/web/tests/mobile-fallback.test.tsx` (a stored `mbl-16`/`mbl-06` plan resolves to the first machine instead of
+`undefined`), `apps/web/tests/lobby-mobile.test.tsx` (seventeen cards, the three ids never rendered) and
+`tests/meta/dropped-mobiles.test.ts` (nothing in the tree still names them). The flat-probe table of `data/mobiles.md` § 4
+is pinned cell by cell by `TC-BAL-136`.
+
+Red: none — the story replaces data and a type rather than fixing a behaviour, so the failing evidence was
+the *existing* suite pinning the twenty-row contract (`Mobile.maxPower`, `MOBILES` of length 20); it was migrated with the
+change instead of skipped, and `TC-BAL-129`'s length/field assertions fail by construction against the old table.
 
 ## 9. Open questions
 
 None — the client chose "17 khớp" on 2026-11-13.
+
+## Delivery status — 2026-11-13
+
+**done.** `Mobile` carries `weight` and `windDrag` and no longer `maxPower`; `FireInput.force` became `bar` (`0…4`, two
+decimals on the wire). `packages/core/src/data/mobiles.ts` holds exactly the seventeen rows of § 4 in the printed order
+(`mbl-06`, `mbl-08` and `mbl-16` deleted; every surviving id unchanged), `resolveMobileId` falls a stale stored id back to
+the first machine instead of `undefined`, and the loadout renders seventeen cards.
+
+Verified: `TC-BAL-129`–`TC-BAL-136` in `docs/05-quality/test-cases.md`; the roster, the dropped ids, the fallback and the
+seventeen-card grid are asserted in `packages/core/tests/mobiles.test.ts`, `tests/meta/dropped-mobiles.test.ts` and
+`apps/web/tests/lobby-mobile.test.tsx` / `mobile-fallback.test.tsx`; the flat-probe table of `data/mobiles.md` § 4 is pinned
+cell by cell by the integrator itself.
+
+Two deviations, both recorded rather than papered over. § 5's "delete the dropped machines' marks, statistics and
+favourite-machine rows" has nothing to delete: `apps/worker/migrations/` holds only `0001_init.sql` and
+`0002_ranked_reason.sql`, and no marks, statistics or favourite-machine table or column exists — so no migration was
+invented. And `OQ-44` fixed the wind formula as proportional to `windDrag`; § 4's table is implemented exactly as printed.

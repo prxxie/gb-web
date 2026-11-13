@@ -34,7 +34,7 @@ everyone else.
 
 | # | Given | When | Then |
 |---|---|---|---|
-| AC1 | a bot turn with a clear line of fire | the bot acts | it fires within 3 s of wall-clock with angle and force inside the mobile's envelope (`TC-CORE-902`) |
+| AC1 | a bot turn with a clear line of fire | the bot acts | it fires within 3 s of wall-clock with an angle inside the mobile's window and a bar on `0…4` (`TC-CORE-902`) |
 | AC2 | the same seed | two bot matches are run | every bot decision is identical (`TC-CORE-902`) |
 | AC3 | a bot with three weapons | it selects | the chosen `weaponSlot` is the one with the best simulated outcome among the three (`TC-CORE-902`) |
 | AC4 | a bot holding a Power up item | its best raw shot would miss by more than the item can fix | it uses the item and pays its delay (`TC-CORE-927`) |
@@ -63,7 +63,7 @@ hanging an `item` field on a `FireInput` the engine would ignore.
 ## 5. Rules and edge cases
 
 - The bot simulates the shot with the same core functions (no separate physics) and picks the closest landing.
-- Difficulty comes from `accuracy` noise on the angle and force, never from cheating the delay queue.
+- Difficulty comes from `accuracy` noise on the angle and the bar, never from cheating the delay queue.
 - Seeded RNG lives in match state so a resumed match keeps decisions.
 
 ## 6. Implementation notes

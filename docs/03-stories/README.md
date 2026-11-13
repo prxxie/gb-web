@@ -8,9 +8,9 @@ decide, a contract that already exists in `02-reference/`, and tests that prove 
 <!-- cpt:stats -->
 | Stories | Done | In progress | Ready | Blocked | Draft | Closed |
 |---|---|---|---|---|---|---|
-| 73 | 60 | 0 | 13 | 0 | 0 | 0 |
+| 73 | 62 | 0 | 11 | 0 | 0 | 0 |
 
-Open questions: **Open: 13 · Blocking: 0 · Answered: 29 · Withdrawn: 1**
+Open questions: **Open: 13 · Blocking: 0 · Answered: 30 · Withdrawn: 1**
 <!-- /cpt:stats -->
 
 ## Epics
@@ -27,7 +27,7 @@ Open questions: **Open: 13 · Blocking: 0 · Answered: 29 · Withdrawn: 1**
 | [EPIC-06-ranked](EPIC-06-ranked/README.md) | RANK | Results, match records, Elo and leaderboard | 5 | 5 | 0 |
 | [EPIC-07-pwa-i18n](EPIC-07-pwa-i18n/README.md) | PWA | Installable PWA, offline play, bilingual UI and accessibility | 6 | 4 | 0 |
 | [EPIC-08-ops](EPIC-08-ops/README.md) | OPS | Observability, load evidence and release | 4 | 0 | 0 |
-| [EPIC-09-ballistics](EPIC-09-ballistics/README.md) | BAL | Ballistics of the original, played inside one screen | 9 | 3 | 0 |
+| [EPIC-09-ballistics](EPIC-09-ballistics/README.md) | BAL | Ballistics of the original, played inside one screen | 9 | 5 | 0 |
 <!-- /cpt:epics -->
 
 ## Blocked stories

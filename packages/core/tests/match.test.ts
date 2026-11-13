@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { applyInput, createMatch, type Seat } from "../src/match.js";
+import { applyInput, createMatch, previewShot, type Seat } from "../src/match.js";
 import { getMobile } from "../src/data/mobiles.js";
 import { applyGimmicks } from "../src/gimmicks.js";
 import { getMap } from "../src/data/maps.js";
@@ -29,18 +29,18 @@ function match(
 }
 
 describe("match", () => {
-  it("TC-CORE-906: Dual allows two shots, Blood raises damage, Power up lifts the force cap", () => {
+  it("TC-CORE-906: Dual allows two shots, Blood raises damage, Power up lifts the damage multiplier", () => {
     const dual = match([seat(0, "A", "mbl-01", { "itm-dual": 1 }), seat(1, "B")]);
     const used = applyInput(dual, { kind: "item", slot: 0, itemId: "itm-dual", seq: dual.seq }, NOW);
     expect(used.events.some((event) => event.kind === "item")).toBe(true);
-    const first = applyInput(used.state, { kind: "fire", slot: 0, weaponSlot: 0, angle: 45, force: 60, seq: used.state.seq }, NOW);
+    const first = applyInput(used.state, { kind: "fire", slot: 0, weaponSlot: 0, angle: 45, bar: 2.4, seq: used.state.seq }, NOW);
     expect(first.state.turn.activeSlot).toBe(0);
-    const second = applyInput(first.state, { kind: "fire", slot: 0, weaponSlot: 0, angle: 45, force: 60, seq: first.state.seq }, NOW);
+    const second = applyInput(first.state, { kind: "fire", slot: 0, weaponSlot: 0, angle: 45, bar: 2.4, seq: first.state.seq }, NOW);
     expect(second.state.turn.activeSlot).toBe(1);
 
     const plain = match([seat(0, "A"), seat(1, "B")]);
     const harmed = applyInput(
-      applyInput(plain, { kind: "fire", slot: 0, weaponSlot: 0, angle: 45, force: 60, seq: plain.seq }, NOW).state,
+      applyInput(plain, { kind: "fire", slot: 0, weaponSlot: 0, angle: 45, bar: 2.4, seq: plain.seq }, NOW).state,
       { kind: "skip", slot: 1, seq: plain.seq + 1 },
       NOW,
     );
@@ -88,7 +88,7 @@ describe("match", () => {
   it("TC-CORE-910: Bunge shot is accepted and resolves as a normal shot", () => {
     const state = match([seat(0, "A", "mbl-01", { "itm-bunge": 1 }), seat(1, "B")]);
     const armed = applyInput(state, { kind: "item", slot: 0, itemId: "itm-bunge", seq: state.seq }, NOW);
-    const fired = applyInput(armed.state, { kind: "fire", slot: 0, weaponSlot: 0, angle: 30, force: 50, seq: armed.state.seq }, NOW);
+    const fired = applyInput(armed.state, { kind: "fire", slot: 0, weaponSlot: 0, angle: 30, bar: 2, seq: armed.state.seq }, NOW);
     expect(fired.events.some((event) => event.kind === "shot")).toBe(true);
   });
 
@@ -110,14 +110,14 @@ describe("match", () => {
     // GB charges the SS from the fighting instead of granting one per match (`US-CORE-007`), so the gate is the
     // gauge: empty means refused, full means fired and spent.
     const state = match([seat(0, "A"), seat(1, "B")]);
-    const fresh = applyInput(state, { kind: "fire", slot: 0, weaponSlot: 2, angle: 45, force: 50, seq: state.seq }, NOW);
+    const fresh = applyInput(state, { kind: "fire", slot: 0, weaponSlot: 2, angle: 45, bar: 2, seq: state.seq }, NOW);
     expect(fresh.events[0]).toMatchObject({ kind: "reject", reason: "super-shot-not-charged" });
 
     const charged: MatchState = {
       ...state,
       players: state.players.map((player) => (player.slot === 0 ? { ...player, ssCharge: TUNABLES.ssCost } : player)),
     };
-    const fired = applyInput(charged, { kind: "fire", slot: 0, weaponSlot: 2, angle: 45, force: 50, seq: charged.seq }, NOW);
+    const fired = applyInput(charged, { kind: "fire", slot: 0, weaponSlot: 2, angle: 45, bar: 2, seq: charged.seq }, NOW);
     expect(fired.events.some((event) => event.kind === "shot")).toBe(true);
     expect(fired.state.players[0]!.ssCharge).toBe(0);
 
@@ -128,7 +128,7 @@ describe("match", () => {
     };
     const second = applyInput(
       { ...refilled, turn: { ...refilled.turn, activeSlot: 0 } },
-      { kind: "fire", slot: 0, weaponSlot: 2, angle: 45, force: 50, seq: refilled.seq },
+      { kind: "fire", slot: 0, weaponSlot: 2, angle: 45, bar: 2, seq: refilled.seq },
       NOW,
     );
     expect(second.events.some((event) => event.kind === "shot")).toBe(true);
@@ -152,7 +152,7 @@ describe("match", () => {
   it("TC-CORE-915: score mode ends at the turn cap and awards the damage lead", () => {
     const state = match([seat(0, "A"), seat(1, "B")], { mode: "score" });
     let current = state;
-    let result = applyInput(current, { kind: "fire", slot: 0, weaponSlot: 0, angle: 45, force: 60, seq: current.seq }, NOW);
+    let result = applyInput(current, { kind: "fire", slot: 0, weaponSlot: 0, angle: 45, bar: 2.4, seq: current.seq }, NOW);
     current = result.state;
     for (let i = 0; i < TUNABLES.scoreTurnCap * 4 && current.status === "playing"; i += 1) {
       result = applyInput(current, { kind: "skip", slot: current.turn.activeSlot, seq: current.seq }, NOW);
@@ -263,3 +263,21 @@ describe("match", () => {
 function universe(state: { turn: { activeSlot: number } }): number {
   return state.turn.activeSlot;
 }
+
+describe("TC-BAL-125: the previewed path is the 25 ms flight, not a second model (US-BAL-004 AC6)", () => {
+  it("carries one point per 25 ms step and never more than maxFlightMs / 25 of them", () => {
+    const state = match([seat(0, "A", "mbl-03"), seat(1, "B", "mbl-02")]);
+    const quiet = { ...state, weather: { ...state.weather, wind: { magnitude: 0, directionDeg: 0, sector: 0 } } };
+    const preview = previewShot(quiet, 0, 0, 45, 4);
+    expect(preview).not.toBeNull();
+    if (!preview) return;
+    expect(TUNABLES.stepMs).toBe(25);
+    expect(preview.path.length).toBeLessThanOrEqual(TUNABLES.maxFlightMs / TUNABLES.stepMs + 1);
+    // The first point is the muzzle, and each later point is one step of the same integrator the host resolves.
+    const start = quiet.players[0]!;
+    expect(preview.path[0]).toEqual({ x: start.x, y: start.y });
+    expect(preview.bar).toBe(4);
+    // The same shot previewed twice is bit-for-bit identical: no clock, no random in the path.
+    expect(previewShot(quiet, 0, 0, 45, 4)).toEqual(preview);
+  });
+});

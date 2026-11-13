@@ -1,8 +1,19 @@
 import { describe, expect, it } from "vitest";
-import { acceptSnapshot, applySnapshot, encodeBytes, encodeSnapshot, decodeSnapshot, snapshotBytes, toSnapshot } from "../src/snapshot.js";
+import {
+  acceptSnapshot,
+  applySnapshot,
+  assertCurrentRuleset,
+  encodeBytes,
+  encodeSnapshot,
+  decodeSnapshot,
+  isCurrentRuleset,
+  restoreFromSnapshot,
+  snapshotBytes,
+  toSnapshot,
+} from "../src/snapshot.js";
 import { createMatch, type Seat } from "../src/match.js";
 import type { MatchState } from "../src/types.js";
-import { TUNABLES } from "../src/tuning.js";
+import { RULESET_VERSION, TUNABLES } from "../src/tuning.js";
 
 const NOW = 1_700_000_000_000;
 
@@ -162,5 +173,28 @@ describe("TC-NET-903: accepting a snapshot", () => {
     const applied = applySnapshot(state, snapshot);
     expect(applied.players).toHaveLength(8);
     expect(applied.seq).toBeGreaterThanOrEqual(state.seq);
+  });
+});
+
+describe("TC-BAL-127: a snapshot from an older ruleset is refused (US-BAL-004 AC5)", () => {
+  it("declares the current ruleset, and refuses anything recorded under another one", () => {
+    const state = fullMatch();
+    expect(state.rulesetVersion).toBe(RULESET_VERSION);
+    expect(isCurrentRuleset({ rulesetVersion: RULESET_VERSION })).toBe(true);
+
+    // 2026-11-05 is the pre-ballistics build: its flight model is 152 u/s² and a 0–100 force, so replaying it here
+    // would land every shell somewhere else. The loader refuses it with a reason a client can show.
+    const stale = { ...toSnapshot(state, 1), rulesetVersion: "2026-11-05" };
+    expect(isCurrentRuleset(stale)).toBe(false);
+    expect(() => assertCurrentRuleset(stale)).toThrow(/^ruleset-mismatch: the snapshot was recorded under ruleset 2026-11-05, this build replays 2026-11-13$/);
+    expect(() => restoreFromSnapshot({ ...state, seq: 0 }, stale)).toThrow(/ruleset-mismatch/);
+
+    // A payload that does not name a ruleset at all is refused as well, never assumed current.
+    expect(isCurrentRuleset({})).toBe(false);
+    expect(() => assertCurrentRuleset({}, "replay")).toThrow(/the replay was recorded under ruleset unknown/);
+
+    // The current ruleset still restores, so the guard is not a blanket refusal.
+    const restored = restoreFromSnapshot({ ...state, seq: 0 }, toSnapshot(state, 1));
+    expect(restored.rulesetVersion).toBe(RULESET_VERSION);
   });
 });

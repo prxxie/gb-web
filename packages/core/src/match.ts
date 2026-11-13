@@ -13,12 +13,12 @@ import type {
   Weather,
 } from "./types.js";
 import { TUNABLES, roundTo } from "./tuning.js";
-import { getMobile } from "./data/mobiles.js";
+import { getMobile, resolveMobileId } from "./data/mobiles.js";
 import { getMap } from "./data/maps.js";
 import { ITEMS_BY_ID, isItemId } from "./data/items.js";
 import { avatarBonus, bonusMultipliers } from "./data/avatars.js";
 import { carve, createTerrain, groundY, type Terrain } from "./terrain.js";
-import { launch, segmentImpact, stepProjectile } from "./ballistics.js";
+import { gravityFor, launch, segmentImpact, stepProjectile, windKFor } from "./ballistics.js";
 import { applyBlast, damageByTeam, mergeHits, teamStatus, type HitResult } from "./combat.js";
 import { addDelay, advanceTurn, createTurn, nextSlot, thinkingDelay } from "./turn.js";
 import { FORCE_FIELD, returnsOffMapShots } from "./gimmicks.js";
@@ -113,7 +113,11 @@ function commitTerrain(state: MatchState, terrain: Terrain): MatchState {
 function seatsToPlayers(seats: readonly Seat[], map: MapDef): readonly PlayerState[] {
   const teamCounters: Record<Team, number> = { A: 0, B: 0 };
   return seats.map((seat) => {
-    const mobile = getMobile(seat.mobileId);
+    // A seat's pick may have been persisted before the roster changed: an id that no longer exists falls back to the
+    // first machine of the list with a readable log, never to `undefined` (`US-BAL-005` § 5).
+    // (`packages/core` has no console: the web and worker layers log the substitution where they read the plan.)
+    const mobileId = resolveMobileId(seat.mobileId);
+    const mobile = getMobile(mobileId);
     const bonus = bonusMultipliers(avatarBonus(seat.avatarParts ?? []));
     const index = teamCounters[seat.team];
     teamCounters[seat.team] += 1;
@@ -127,7 +131,7 @@ function seatsToPlayers(seats: readonly Seat[], map: MapDef): readonly PlayerSta
       slot: seat.slot,
       accountId: seat.accountId,
       displayName: seat.displayName,
-      mobileId: seat.mobileId,
+      mobileId,
       team: seat.team,
       x: spawn[0],
       y: spawn[1],
@@ -198,11 +202,6 @@ function mobileOf(player: PlayerState): Mobile {
   return getMobile(player.mobileId);
 }
 
-/** One gravity for the whole roster, bent only by the map (`tunables.md` § 1.1). */
-function gravityFor(map: MapDef): number {
-  return TUNABLES.gravity * map.gravityModifier;
-}
-
 interface Flight {
   readonly path: readonly Vec2[];
   readonly impact: Vec2 | null;
@@ -210,11 +209,18 @@ interface Flight {
 }
 
 /** Precompute the whole flight so the client can animate exactly what the host resolved. */
-export function flightPath(state: MatchState, projectile: ReturnType<typeof launch>, map: MapDef): Flight {
+export function flightPath(
+  state: MatchState,
+  projectile: ReturnType<typeof launch>,
+  map: MapDef,
+  mobile: Mobile,
+): Flight {
   const terrain = terrainOf(state);
   const context = {
     wind: state.weather.wind,
-    gravity: gravityFor(map),
+    // The machine's own weight and drag, bent by the map's modifier (`ADR-0007` §3–4, `US-BAL-004` AC1/AC2).
+    gravity: gravityFor(mobile) * map.gravityModifier,
+    windK: windKFor(mobile),
     stepMs: TUNABLES.stepMs,
     forceX: map.gimmicks.includes("force") ? FORCE_FIELD : 0,
   };
@@ -259,7 +265,7 @@ export interface ShotPreview {
   /** The slot that will really fire: `itm-dual` forces one for the rest of the turn (`US-CORE-009` AC2). */
   readonly weaponSlot: 0 | 1 | 2;
   readonly angle: number;
-  readonly force: number;
+  readonly bar: number;
   readonly path: readonly Vec2[];
   readonly impact: Vec2 | null;
   readonly radius: number;
@@ -270,7 +276,7 @@ interface Launched {
   readonly projectile: ReturnType<typeof launch>;
   readonly flight: Flight;
   readonly angle: number;
-  readonly force: number;
+  readonly bar: number;
 }
 
 /**
@@ -282,14 +288,15 @@ function launchFor(
   player: PlayerState,
   weaponSlot: 0 | 1 | 2,
   angle: number,
-  force: number,
+  bar: number,
 ): Launched {
   const mobile = mobileOf(player);
   const weapon = mobile.weapons[weaponSlot];
   const effects = state.effects;
 
   const clampedAngle = Math.min(mobile.angleMax, Math.max(mobile.angleMin, angle));
-  const clampedForce = Math.min(mobile.maxPower, Math.max(0, force));
+  // The bar is 0…4 for every machine: no per-machine cap to clamp to any more (`US-BAL-005` AC3).
+  const clampedBar = Math.min(TUNABLES.powerBarMax, Math.max(0, bar));
   // GB's buffs are damage multipliers, not extra power: Blood +33 %, Power up +33 %, Dual+ +15 % on the second shot.
   const powerMultiplier =
     player.attack *
@@ -305,12 +312,12 @@ function launchFor(
     from: { x: player.x, y: player.y },
     facing: player.facing,
     angle: clampedAngle,
-    force: clampedForce,
+    bar: clampedBar,
     powerMultiplier,
   });
-  const flight = flightPath(state, projectile, getMap(state.mapId));
+  const flight = flightPath(state, projectile, getMap(state.mapId), mobile);
 
-  return { weapon, projectile, flight, angle: clampedAngle, force: clampedForce };
+  return { weapon, projectile, flight, angle: clampedAngle, bar: clampedBar };
 }
 
 /**
@@ -322,7 +329,7 @@ export function previewShot(
   slot: number,
   weaponSlot: 0 | 1 | 2,
   angle: number,
-  force: number,
+  bar: number,
 ): ShotPreview | null {
   if (state.status !== "playing") return null;
   const player = state.players.find((candidate) => candidate.slot === slot);
@@ -330,13 +337,13 @@ export function previewShot(
   const effective = state.effects.dualWeapon ?? weaponSlot;
   if (effective === 2 && player.ssCharge < TUNABLES.ssCost) return null;
 
-  const launched = launchFor(state, player, effective, angle, force);
+  const launched = launchFor(state, player, effective, angle, bar);
 
   return {
     slot,
     weaponSlot: effective,
     angle: launched.angle,
-    force: launched.force,
+    bar: launched.bar,
     path: launched.flight.path,
     impact: launched.flight.impact,
     radius: launched.weapon.radius,
@@ -474,7 +481,7 @@ function resolveShot(
   slot: number,
   weaponSlot: 0 | 1 | 2,
   angle: number,
-  force: number,
+  bar: number,
   now: number,
 ): InputResult {
   const player = state.players.find((candidate) => candidate.slot === slot);
@@ -483,7 +490,7 @@ function resolveShot(
     return { state, events: [{ kind: "reject", slot, reason: "super-shot-not-charged" }] };
   }
   const effects = state.effects;
-  const { weapon, projectile, flight } = launchFor(state, player, weaponSlot, angle, force);
+  const { weapon, projectile, flight } = launchFor(state, player, weaponSlot, angle, bar);
   const events: MatchEvent[] = [];
 
   const terrain = terrainOf(state);
@@ -760,7 +767,7 @@ export function applyInput(state: MatchState, input: MatchInput, now: number): I
   if (input.kind === "fire") {
     // The second shot of a Dual pair follows the first shot's weapon (`US-CORE-009` AC2).
     const weaponSlot = accepted.effects.dualWeapon ?? input.weaponSlot;
-    return resolveShot(accepted, input.slot, weaponSlot, input.angle, input.force, now);
+    return resolveShot(accepted, input.slot, weaponSlot, input.angle, input.bar, now);
   }
   if (input.kind === "skip") {
     const advanced = advance(accepted, now, null);

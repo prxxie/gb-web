@@ -42,10 +42,10 @@ function eightPlayers() {
 }
 
 describe("TC-NET-905: what a peer puts on the wire (US-NET-002 AC1)", () => {
-  it("carries the turn, the seq, the angle, the force, the facing and the weapon slot", () => {
-    const frame = inputFrameOf({ kind: "fire", angle: 47, force: 88, facing: -1, weaponSlot: 1 }, 12, 34);
+  it("carries the turn, the seq, the angle, the bar, the facing and the weapon slot", () => {
+    const frame = inputFrameOf({ kind: "fire", angle: 47, bar: 3.52, facing: -1, weaponSlot: 1 }, 12, 34);
 
-    expect(frame).toEqual({ t: "input", turn: 12, seq: 34, kind: "fire", angle: 47, force: 88, facing: -1, weaponSlot: 1 });
+    expect(frame).toEqual({ t: "input", turn: 12, seq: 34, kind: "fire", angle: 47, bar: 3.52, facing: -1, weaponSlot: 1 });
   });
 
   it("leaves the ballistic fields off a skip, so a skip cannot be read as a shot", () => {
@@ -65,8 +65,8 @@ describe("TC-NET-905: a resent input is dropped, not replayed (US-NET-002 AC4)",
     const state = eightPlayers();
     const turn = state.turn.number;
     const slot = state.turn.activeSlot;
-    const first = applyInput(state, { kind: "fire", slot, weaponSlot: 0, angle: 45, force: 50, seq: 1 }, 0);
-    const second = applyInput(first.state, { kind: "fire", slot, weaponSlot: 0, angle: 45, force: 50, seq: 2 }, 0);
+    const first = applyInput(state, { kind: "fire", slot, weaponSlot: 0, angle: 45, bar: 2, seq: 1 }, 0);
+    const second = applyInput(first.state, { kind: "fire", slot, weaponSlot: 0, angle: 45, bar: 2, seq: 2 }, 0);
 
     expect(first.state.turn.number).not.toBe(turn);
     // The engine answers a second shot in the same turn with a reject event instead of an error; the alias rule is

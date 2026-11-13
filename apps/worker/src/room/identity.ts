@@ -5,7 +5,7 @@
  * is refused here, and every one of these writes is lobby-only: a rename mid-match would desync the roster a
  * peer is already rendering.
  */
-import { isMobileId, type RoomState } from "@gbw/core";
+import { isMobileId, resolveMobileId, type RoomState } from "@gbw/core";
 import { withActivity } from "./presence.js";
 
 /** The identity fields an `auth` frame may carry (`signaling.md` § 2). */
@@ -13,6 +13,17 @@ export interface IdentityFrame {
   readonly mobileId?: string | undefined;
   readonly displayName?: string | undefined;
   readonly avatarId?: string | undefined;
+}
+
+/**
+ * A room restored from storage may name a machine the roster no longer ships: substitution happens here, at the one
+ * place a stored roster is read, and never leaves `undefined` where a stat block is expected (`US-BAL-005` § 5).
+ */
+export function withKnownMobiles(room: RoomState): RoomState {
+  return {
+    ...room,
+    members: room.members.map((member) => ({ ...member, mobileId: resolveMobileId(member.mobileId) })),
+  };
 }
 
 /** Binds the seat to its socket: `connected`, seen, and holding whatever the frame was allowed to change. */

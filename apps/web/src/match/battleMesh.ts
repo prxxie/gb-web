@@ -91,7 +91,7 @@ export function createBattleMesh(options: BattleMeshOptions): Mesh {
               slot,
               weaponSlot: frame.weaponSlot ?? 0,
               angle: frame.angle ?? 0,
-              force: frame.force ?? 0,
+              bar: frame.bar ?? 0,
               seq: frame.seq ?? 0,
             };
       const result = applyInput(current, input as Parameters<typeof applyInput>[1], Date.now());

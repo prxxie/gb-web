@@ -1,15 +1,17 @@
-# mobiles — the twenty playable mobiles
+# mobiles — the seventeen playable mobiles
 
-Twenty mobiles, each an **original** creature: artillery-game stat archetypes and three weapon slots, but our own names,
-silhouettes and palettes (`OQ-18`: nothing copied from any existing game). Names are English; each references a mythical
-beast from a real-world tradition without reproducing any existing character.
+Seventeen mobiles, each an **original** creature: artillery-game stat archetypes and three weapon slots, but our own
+names, silhouettes and palettes (`OQ-18`: nothing copied from any existing game). Names are English; each references a
+mythical beast from a real-world tradition without reproducing any existing character. The roster shipped twenty until
+2026-11-13; three rows were dropped and every surviving `mobileId` kept its number (`US-BAL-005` § 4).
 
-Every mobile has its **own firing envelope**, its **own shell loadout** and its **own movement allowance**: a trajectory
-profile that sets the aim band, an individually tuned `angleMin`/`angleMax`, its own `maxPower` cap, three weapon slots,
-and a per-turn movement budget (distance, number of moves, run multiplier, energy and delay cost). Gravity is not a
-mobile stat: one `TUNABLES.gravity` covers the whole roster (`tunables.md` § 1.1), so the same angle and force draw the
-same parabola on every mobile — what separates them is the envelope and the shell. HP and damage use the 1,000 scale
-(`900–1,200` HP), which reads naturally on a mobile health bar.
+Every mobile has its **own firing envelope**, its **own shell loadout**, its **own flight** and its **own movement
+allowance**: a trajectory profile that sets the aim band, an individually tuned `angleMin`/`angleMax`, three weapon
+slots, and a per-turn movement budget (distance, number of moves, run multiplier, energy and delay cost). Flight is a
+mobile stat through two numbers, `weight` and `windDrag` (`tunables.md` § 1): gravity is `390 × weight ÷ 5.78` and the
+wind coefficient is `0.222 × windDrag ÷ 0.046²`, so a heavy machine drops its shell sooner and a draggy one is pushed
+further by the same wind (`ADR-0007`). HP and damage use the 1,000 scale (`900–1,200` HP), which reads naturally on a
+mobile health bar.
 
 Runtime copy: `packages/core/src/data/mobiles.ts`, versioned by `rulesetVersion` (`NFR-23`). Model source:
 `` — see [`../gameplay/reference-gunbound.md`](../gameplay/reference-gunbound.md).
@@ -19,8 +21,8 @@ Runtime copy: `packages/core/src/data/mobiles.ts`, versioned by `rulesetVersion`
 | Field | Type | Meaning |
 |---|---|---|
 | `mobileId` | `TEXT` | `mbl-01` … `mbl-20` |
-| `name` | string | English display name, rendered as-is (the roster's mobiles are proper nouns, like the maps' `id`); localising the twenty names is a follow-up, tracked on `US-ROOM-007` |
-| `archetype` | enum | `balanced`, `tank`, `sniper`, `bombardier`, `bouncer`, `support`, `glass`, `all-rounder`, `zoner`, `trickster` — exactly two mobiles each |
+| `name` | string | English display name, rendered as-is (the roster's mobiles are proper nouns, like the maps' `id`); localising the seventeen names is a follow-up, tracked on `US-ROOM-007` |
+| `archetype` | enum | `balanced` (2), `tank` (2), `sniper` (1), `bombardier` (1), `bouncer` (2), `support` (1), `glass` (2), `all-rounder` (1), `zoner` (2), `trickster` (2) — seventeen in all |
 | `trajectory` | enum | `standard`, `direct`, `lobber`, `mortar`, `skimmer` — the launch law the mobile starts from (§ 3) |
 | `armor` | `plated` \| `bionic` \| `warded` | the hull class the weapon-type matchup reads (§ 5) — a counter-pick, not a stat | `TC-CORE-933` |
 | `angleMin` / `angleMax` | degrees | **this mobile's** aim window, inside its profile's band; the aim is clamped to it |
@@ -30,40 +32,38 @@ Runtime copy: `packages/core/src/data/mobiles.ts`, versioned by `rulesetVersion`
 | `defense` | number 0.85–1.15 | incoming-damage divisor (higher = tankier) |
 | `energy` | int 78–130 | movement budget for the whole match |
 | `baseDelay` | int 90–120 | starting weight in the turn queue |
-| `maxPower` | int 90–100 | cap on `force` |
+| `weight` | number 4.20–7.50 | sets the machine's gravity: `390 × weight ÷ 5.78` u/s² (`tunables.md` § 1.4) |
+| `windDrag` | number 0.0403–0.0950 | sets its wind coefficient: `0.222 × windDrag ÷ 0.046²` (§ 1.5) |
 | `moveDistance` | int 60–110 | px covered by one move action |
 | `maxMovesPerTurn` | int 1–2 | move actions allowed in one turn |
 | `runMultiplier` | number 1.5–1.9 | distance multiplier for a run, at double energy cost |
 | `moveEnergy` | int 8–14 | energy a walk costs (a run costs twice) |
 | `moveDelay` | int 8–14 | turn-queue delay a move adds |
 | `maxIncline` | degrees 22–44 | climbable slope |
-| `weapons[3]` | array | shot 1, shot 2, super shot — `class`, `power` (180–580), `radius` (38–130), `delay`. There is no per-shell mass and no drag (`tunables.md` § 1.1) |
+| `weapons[3]` | array | shot 1, shot 2, super shot — `class`, `power` (180–580), `radius` (38–130), `delay`. A shell carries no mass of its own: the machine's `weight` sets the gravity it flies under and its `windDrag` the wind it feels (`tunables.md` § 1.1) |
 | `effect` | enum | `explosion` \| `laser` \| `impact` \| `electric` |
 
 ## 1. Stats
 
-| Id | Name | Archetype | Armor | HP | Shield | Regen | Def | Energy | Delay | Max power | Effect |
-|---|---|---|---|---|---|---|---|---|---|---|---|
-| `mbl-01` | Stone Sentinel | balanced | warded | 1,050 | 150 | 20 | 1.00 | 105 | 100 | 98 | explosion |
-| `mbl-02` | River Warden | support | warded | 1,000 | 300 | 40 | 0.90 | 100 | 110 | 94 | impact |
-| `mbl-03` | Iron Tortoise | tank | plated | 1,200 | 200 | 20 | 1.15 | 80 | 120 | 92 | explosion |
-| `mbl-04` | Glacier Mammoth | tank | plated | 1,150 | 250 | 30 | 1.12 | 85 | 118 | 90 | impact |
-| `mbl-05` | Storm Falcon | sniper | bionic | 925 | 0 | 0 | 0.90 | 120 | 95 | 100 | laser |
-| `mbl-06` | Silver Ibex | sniper | bionic | 950 | 50 | 0 | 0.92 | 125 | 93 | 100 | laser |
-| `mbl-07` | Ash Behemoth | bombardier | plated | 1,100 | 100 | 0 | 1.00 | 90 | 115 | 96 | explosion |
-| `mbl-08` | Volcano Toad | bombardier | plated | 1,075 | 150 | 10 | 0.98 | 88 | 113 | 95 | explosion |
-| `mbl-09` | Moon Hare | bouncer | bionic | 975 | 100 | 10 | 0.95 | 115 | 105 | 98 | impact |
-| `mbl-10` | Coral Crab | bouncer | bionic | 990 | 120 | 10 | 0.96 | 112 | 103 | 97 | laser |
-| `mbl-11` | Pale Stag | all-rounder | warded | 1,020 | 280 | 40 | 0.92 | 102 | 108 | 94 | impact |
-| `mbl-12` | Sacred Crane | support | warded | 980 | 260 | 30 | 0.90 | 104 | 106 | 95 | laser |
-| `mbl-13` | Cinder Fox | glass | bionic | 900 | 0 | 0 | 0.85 | 130 | 90 | 100 | explosion |
-| `mbl-14` | Sky Serpent | glass | bionic | 920 | 0 | 0 | 0.86 | 128 | 92 | 100 | laser |
-| `mbl-15` | Jade Dragon | balanced | warded | 1,050 | 150 | 20 | 1.05 | 105 | 100 | 98 | explosion |
-| `mbl-16` | Sun Lion | all-rounder | warded | 1,060 | 180 | 20 | 1.06 | 103 | 101 | 97 | explosion |
-| `mbl-17` | Sand Wyrm | zoner | plated | 1,025 | 150 | 10 | 1.00 | 100 | 110 | 95 | impact |
-| `mbl-18` | Frost Hydra | zoner | plated | 1,040 | 120 | 10 | 1.02 | 98 | 112 | 96 | impact |
-| `mbl-19` | Shadow Cat | trickster | bionic | 950 | 100 | 10 | 0.95 | 125 | 95 | 96 | electric |
-| `mbl-20` | Mist Raven | trickster | bionic | 940 | 80 | 10 | 0.94 | 128 | 93 | 95 | electric |
+| Id | Name | Archetype | Armor | HP | Shield | Regen | Def | Energy | Delay | Weight | Wind drag | Effect |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| `mbl-01` | Stone Sentinel | balanced | warded | 1,050 | 150 | 20 | 1.00 | 105 | 100 | 7.50 | 0.0720 | explosion |
+| `mbl-02` | River Warden | support | warded | 1,000 | 300 | 40 | 0.90 | 100 | 110 | 5.33 | 0.0512 | impact |
+| `mbl-03` | Iron Tortoise | tank | plated | 1,200 | 200 | 20 | 1.15 | 80 | 120 | 5.78 | 0.0555 | explosion |
+| `mbl-04` | Glacier Mammoth | tank | plated | 1,150 | 250 | 30 | 1.12 | 85 | 118 | 4.80 | 0.0460 | impact |
+| `mbl-05` | Storm Falcon | sniper | bionic | 925 | 0 | 0 | 0.90 | 120 | 95 | 5.00 | 0.0480 | laser |
+| `mbl-07` | Ash Behemoth | bombardier | plated | 1,100 | 100 | 0 | 1.00 | 90 | 115 | 6.50 | 0.0624 | explosion |
+| `mbl-09` | Moon Hare | bouncer | bionic | 975 | 100 | 10 | 0.95 | 115 | 105 | 5.33 | 0.0512 | impact |
+| `mbl-10` | Coral Crab | bouncer | bionic | 990 | 120 | 10 | 0.96 | 112 | 103 | 4.80 | 0.0460 | laser |
+| `mbl-11` | Pale Stag | all-rounder | warded | 1,020 | 280 | 40 | 0.92 | 102 | 108 | 5.78 | 0.0555 | impact |
+| `mbl-12` | Sacred Crane | support | warded | 980 | 260 | 30 | 0.90 | 104 | 106 | 5.50 | 0.0528 | laser |
+| `mbl-13` | Cinder Fox | glass | bionic | 900 | 0 | 0 | 0.85 | 130 | 90 | 4.20 | 0.0403 | explosion |
+| `mbl-14` | Sky Serpent | glass | bionic | 920 | 0 | 0 | 0.86 | 128 | 92 | 4.90 | 0.0470 | laser |
+| `mbl-15` | Jade Dragon | balanced | warded | 1,050 | 150 | 20 | 1.05 | 105 | 100 | 4.20 | 0.0403 | explosion |
+| `mbl-17` | Sand Wyrm | zoner | plated | 1,025 | 150 | 10 | 1.00 | 100 | 110 | 6.50 | 0.0624 | impact |
+| `mbl-18` | Frost Hydra | zoner | plated | 1,040 | 120 | 10 | 1.02 | 98 | 112 | 6.00 | 0.0580 | impact |
+| `mbl-19` | Shadow Cat | trickster | bionic | 950 | 100 | 10 | 0.95 | 125 | 95 | 4.80 | 0.0460 | electric |
+| `mbl-20` | Mist Raven | trickster | bionic | 940 | 80 | 10 | 0.94 | 128 | 93 | 4.80 | 0.0950 | electric |
 
 ## 2. Aim window and movement — per mobile
 
@@ -78,9 +78,7 @@ queue weight a move adds, `incline` the steepest slope it can climb.
 | `mbl-03` | Iron Tortoise | skimmer | -8° … 38° | 60 px | 1 | ×1.5 | 14 | +14 | 25° |
 | `mbl-04` | Glacier Mammoth | lobber | 30° … 88° | 65 px | 1 | ×1.6 | 12 | +13 | 22° |
 | `mbl-05` | Storm Falcon | direct | -20° … 25° | 100 px | 2 | ×1.7 | 10 | +9 | 40° |
-| `mbl-06` | Silver Ibex | direct | -15° … 30° | 105 px | 2 | ×1.8 | 9 | +9 | 42° |
 | `mbl-07` | Ash Behemoth | mortar | 45° … 88° | 70 px | 1 | ×1.5 | 13 | +13 | 30° |
-| `mbl-08` | Volcano Toad | mortar | 40° … 85° | 72 px | 1 | ×1.6 | 12 | +12 | 28° |
 | `mbl-09` | Moon Hare | skimmer | -5° … 45° | 95 px | 2 | ×1.8 | 8 | +9 | 38° |
 | `mbl-10` | Coral Crab | skimmer | 0° … 42° | 92 px | 2 | ×1.6 | 9 | +10 | 36° |
 | `mbl-11` | Pale Stag | standard | -12° … 42° | 86 px | 2 | ×1.7 | 9 | +10 | 33° |
@@ -88,7 +86,6 @@ queue weight a move adds, `incline` the steepest slope it can climb.
 | `mbl-13` | Cinder Fox | direct | -18° … 28° | 110 px | 2 | ×1.9 | 8 | +8 | 42° |
 | `mbl-14` | Sky Serpent | direct | -16° … 32° | 108 px | 2 | ×1.9 | 8 | +8 | 44° |
 | `mbl-15` | Jade Dragon | standard | -10° … 50° | 88 px | 2 | ×1.7 | 10 | +10 | 35° |
-| `mbl-16` | Sun Lion | standard | -6° … 46° | 90 px | 2 | ×1.7 | 10 | +11 | 34° |
 | `mbl-17` | Sand Wyrm | mortar | 48° … 88° | 80 px | 1 | ×1.6 | 12 | +12 | 33° |
 | `mbl-18` | Frost Hydra | mortar | 42° … 86° | 78 px | 1 | ×1.6 | 12 | +13 | 31° |
 | `mbl-19` | Shadow Cat | skimmer | -8° … 44° | 105 px | 2 | ×1.8 | 8 | +9 | 40° |
@@ -101,8 +98,9 @@ a long aim window and a big movement budget never come together.
 ## 3. Weapons — three slots, three shells
 
 `class power/radius dDelay`. Power is the Inner-tier damage before `defense`; `dDelay` is the turn-queue weight the shot
-adds. A shell carries no weight of its own: there is no per-shell mass, no mobile `mass` and no drag
-(`tunables.md` § 1.1), so the class and the power in the slot are the whole difference two shots can have.
+adds. A shell carries no mass of its own — the machine's `weight` sets the gravity it flies under and `windDrag` the wind
+it feels — and there is no
+per-shell drag (`tunables.md` § 1.1), so the class and the power in the slot are the whole difference two shots can have.
 
 | Id | Name | Shot 1 | Shot 2 | Super shot |
 |---|---|---|---|---|
@@ -111,9 +109,7 @@ adds. A shell carries no weight of its own: there is no per-shell mass, no mobil
 | `mbl-03` | Iron Tortoise | arc 250/90 d105 | plated | bounce 240/80 d120 | arc 520/120 d200 |
 | `mbl-04` | Glacier Mammoth | lob 250/95 d112 | bounce 230/82 d118 | arc 510/118 d200 |
 | `mbl-05` | Storm Falcon | flat 260/60 d100 | bionic | piercing 280/55 d115 | beam 480/40 d200 |
-| `mbl-06` | Silver Ibex | flat 250/58 d98 | arc 270/65 d112 | beam 490/42 d198 |
 | `mbl-07` | Ash Behemoth | lob 260/100 d110 | plated | cluster 240/90 d120 | lob 550/130 d200 |
-| `mbl-08` | Volcano Toad | lob 250/98 d112 | bounce 230/85 d122 | cluster 540/128 d200 |
 | `mbl-09` | Moon Hare | bounce 240/80 d100 | bionic | flat 220/65 d110 | bounce 500/110 d200 |
 | `mbl-10` | Coral Crab | bounce 230/78 d102 | arc 220/70 d112 | beam 470/45 d198 |
 | `mbl-11` | Pale Stag | arc 230/85 d100 | warded | flat 200/70 d110 | cluster 460/120 d200 |
@@ -121,7 +117,6 @@ adds. A shell carries no weight of its own: there is no per-shell mass, no mobil
 | `mbl-13` | Cinder Fox | flat 300/60 d95 | bionic | arc 280/70 d110 | arc 580/90 d195 |
 | `mbl-14` | Sky Serpent | flat 290/58 d96 | cluster 270/85 d118 | beam 560/44 d196 |
 | `mbl-15` | Jade Dragon | arc 250/80 d100 | warded | piercing 270/60 d118 | arc 510/115 d200 |
-| `mbl-16` | Sun Lion | arc 250/82 d100 | bounce 230/78 d116 | cluster 500/122 d200 |
 | `mbl-17` | Sand Wyrm | lob 240/95 d108 | plated | piercing 260/60 d120 | cluster 500/125 d200 |
 | `mbl-18` | Frost Hydra | lob 240/96 d110 | arc 250/80 d112 | lob 530/130 d200 |
 | `mbl-19` | Shadow Cat | bounce 230/70 d98 | bionic | cluster 220/85 d116 | arc 460/100 d195 |
@@ -130,56 +125,53 @@ adds. A shell carries no weight of its own: there is no per-shell mass, no mobil
 No two mobiles share the same class triple, and every super shot hits harder than that mobile's shot 1 (1.8–2.0× power) at
 the cost of double delay.
 
-## 4. Trajectory — one gravity, so the envelope sets the arc
+## 4. Trajectory — the machine's own weight and drag set the arc
 
-Gravity is a rule, not a mobile stat: one `TUNABLES.gravity` covers the whole roster and only the map's
-`gravityModifier` bends it (`tunables.md` § 1.1). Every mobile therefore flies **the same parabola** at the same angle
-and force (`TC-CORE-935`) — which is the genre's point: a range learned on one mobile transfers to the next. What
-separates the twenty is the firing envelope (the angle window of § 2 and the `maxPower` cap) and the shell in the slot
-(§ 3).
+Flight is two per-machine numbers, not one roster rule (`ADR-0007`, `tunables.md` § 1): gravity is
+`390 × weight ÷ 5.78` and the wind coefficient is `0.222 × windDrag ÷ 0.046²`, both bent only by the map's
+`gravityModifier`. A heavy machine therefore flies **a shorter parabola than a light one** at the same bar — which is
+the genre's point: the bar, not a per-machine power cap, is what a player learns. What separates the seventeen is the
+firing envelope (the angle window of § 2), the weight and drag below, and the shell in the slot (§ 3).
 
-The table is computed by the real integrator (`tunables.md` § 1.1: pure parabola, no drag), at the mobile's `maxPower`,
-at 45° or the nearest angle its window allows, in dead calm, on a flat probe, measured to the **first** ground contact,
-the probe being 60,000 units wide so the shell lands instead of being clamped at the map edge — a `bounce` shell
-rebounds afterwards, so its total travel is longer than the range below. The drift column is the same shot in a
-`10`-unit wind on sector 0 (east): GB's wind carries no mass term, so the only mobile-side input is the hang time —
-two mobiles fired at the same angle and force drift by exactly the same amount. At the shipped `windCoefficient` (1.0)
-that is `0.5 × 10 × t²` units, so the column is simply the hang time squared: a full wind (26) bends the calibration
-shot 378 units, three ruler divisions, and a `10` bends it by a sixth of that.
+The table is computed by the real integrator (`tunables.md` § 1.2: 25 ms step, pure parabola, no drag), at the mobile's
+**bar 4**, at 45° or the nearest angle its window allows, in dead calm, on a flat probe, measured to the **first** ground
+contact, the probe being 60,000 units wide so the shell lands instead of being clamped at the map edge — a `bounce`
+shell rebounds afterwards, so its total travel is longer than the range below. `TC-BAL-136` pins every cell. The drift
+column is the same shot in a `10`-unit wind on sector 0 (east): the wind acceleration is
+`k × 10 × 0.95` with `k` the machine's own coefficient, so the drift is `0.5 × k × 9.5 × t²` — proportional to the
+machine's drag and to the square of its hang time (`TC-CORE-925`).
 
-Read the range column against the **1,640-unit spawn separation**: at full power every mobile throws between 1.12× and
-1.33× that separation, which is the genre's ceiling — full power overshoots the enemy without leaving the map. The bar a
-player actually shoots at sits around **3.4** for the whole roster (not at the bottom of the scale), and the hang time at
-that force is **4.7 s**, so a turn resolves in about five seconds.
+Read the range column against the **1,640-unit spawn separation**: at bar 4 every machine throws between 1.03× and 1.85×
+that separation, so full power reaches the enemy on every mobile without leaving the map. The calibration shot — `mbl-03`,
+the reference weight 5.78 — lands **2,203 units** away after **3.35 s**; a full 26-unit wind moves it **+814 units**
+east and **−808** west (`TC-BAL-123`, `TC-BAL-124`).
 
-| Id | Name | Range at max power | Hang time | Drift at wind +10 |
-|---|---|---|---|---|
-| `mbl-01` | Stone Sentinel | **2,174 units** at 45° | 5.3 s | 147 units |
-| `mbl-02` | River Warden | **2,003 units** at 45° | 5.2 s | 133 units |
-| `mbl-03` | Iron Tortoise | **1,860 units** at 38° | 4.3 s | 94 units |
-| `mbl-04` | Glacier Mammoth | **1,840 units** at 45° | 4.9 s | 120 units |
-| `mbl-05` | Storm Falcon | **1,725 units** at 25° | 3.3 s | 55 units |
-| `mbl-06` | Silver Ibex | **1,957 units** at 30° | 3.9 s | 76 units |
-| `mbl-07` | Ash Behemoth | **2,088 units** at 45° | 5.3 s | 141 units |
-| `mbl-08` | Volcano Toad | **2,046 units** at 45° | 5.2 s | 136 units |
-| `mbl-09` | Moon Hare | **2,174 units** at 45° | 5.3 s | 147 units |
-| `mbl-10` | Coral Crab | **2,125 units** at 42° | 5.0 s | 122 units |
-| `mbl-11` | Pale Stag | **1,992 units** at 42° | 4.8 s | 119 units |
-| `mbl-12` | Sacred Crane | **2,046 units** at 45° | 5.2 s | 136 units |
-| `mbl-13` | Cinder Fox | **1,869 units** at 28° | 3.6 s | 68 units |
-| `mbl-14` | Sky Serpent | **2,033 units** at 32° | 4.1 s | 85 units |
-| `mbl-15` | Jade Dragon | **2,174 units** at 45° | 5.3 s | 147 units |
-| `mbl-16` | Sun Lion | **2,132 units** at 45° | 5.3 s | 145 units |
-| `mbl-17` | Sand Wyrm | **2,041 units** at 48° | 5.5 s | 145 units |
-| `mbl-18` | Frost Hydra | **2,088 units** at 45° | 5.3 s | 141 units |
-| `mbl-19` | Shadow Cat | **2,093 units** at 44° | 5.2 s | 129 units |
-| `mbl-20` | Mist Raven | **1,924 units** at 35° | 4.2 s | 85 units |
+| Id | Name | Weight | Wind drag | Range at bar 4 | Hang time | Drift at wind +10 |
+|---|---|---|---|---|---|---|
+| `mbl-01` | Stone Sentinel | 7.50 | 0.0720 | **1,696 units** at 45° | 2.6 s | 242 units |
+| `mbl-02` | River Warden | 5.33 | 0.0512 | **2,389 units** at 45° | 3.7 s | 342 units |
+| `mbl-03` | Iron Tortoise | 5.78 | 0.0555 | **2,138 units** at 38° | 2.9 s | 237 units |
+| `mbl-04` | Glacier Mammoth | 4.80 | 0.0460 | **2,654 units** at 45° | 4.1 s | 380 units |
+| `mbl-05` | Storm Falcon | 5.00 | 0.0480 | **1,953 units** at 25° | 2.3 s | 124 units |
+| `mbl-07` | Ash Behemoth | 6.50 | 0.0624 | **1,958 units** at 45° | 3.0 s | 280 units |
+| `mbl-09` | Moon Hare | 5.33 | 0.0512 | **2,389 units** at 45° | 3.7 s | 342 units |
+| `mbl-10` | Coral Crab | 4.80 | 0.0460 | **2,648 units** at 42° | 3.8 s | 331 units |
+| `mbl-11` | Pale Stag | 5.78 | 0.0555 | **2,198 units** at 42° | 3.2 s | 275 units |
+| `mbl-12` | Sacred Crane | 5.50 | 0.0528 | **2,315 units** at 45° | 3.5 s | 332 units |
+| `mbl-13` | Cinder Fox | 4.20 | 0.0403 | **2,512 units** at 28° | 3.1 s | 191 units |
+| `mbl-14` | Sky Serpent | 4.90 | 0.0470 | **2,336 units** at 32° | 3.0 s | 207 units |
+| `mbl-15` | Jade Dragon | 4.20 | 0.0403 | **3,034 units** at 45° | 4.6 s | 435 units |
+| `mbl-17` | Sand Wyrm | 6.50 | 0.0624 | **1,946 units** at 48° | 3.1 s | 312 units |
+| `mbl-18` | Frost Hydra | 6.00 | 0.0580 | **2,122 units** at 45° | 3.2 s | 306 units |
+| `mbl-19` | Shadow Cat | 4.80 | 0.0460 | **2,655 units** at 44° | 4.0 s | 364 units |
+| `mbl-20` | Mist Raven | 4.80 | 0.0950 | **2,491 units** at 35° | 3.3 s | 513 units |
 
-The roster spans a factor of 1.26 in reach — `mbl-01`, `mbl-09` and `mbl-15` reach **3,680 units** at 45° where
-`mbl-05` reaches **2,930** at 25° — and the `maxPower` cap (90–100) accounts for the middle of that spread. Drift spans
-2.8× for one reason only: hang time. `mbl-17` hangs 8.7 s and drifts 39,968 units; `mbl-05` hangs 5.2 s and drifts
-14,331. That is the roster's shape — low windows throw flat and short, high windows lob far and sit in the wind, and
-the eleven mobiles whose window reaches 45° land at the same distance whenever they are given the same force.
+The roster spans a factor of **1.79** in reach — `mbl-15` Jade Dragon (weight 4.20, window reaching 45°) reaches
+**3,034 units** where `mbl-01` Stone Sentinel (weight 7.50) reaches **1,696** — and weight is the whole of that spread:
+the four 4.80-weight machines land within 0.4 % of each other at the same angle, and the two 4.20-weight machines are
+twins. Drift spans **4.1×** for two reasons at once: a draggier machine (`mbl-20`, drag 0.0950, 2.06× the reference)
+and a longer hang. `mbl-20` drifts 513 units where `mbl-05` drifts 124. That is the roster's shape — low windows throw
+flat and short, high windows lob far and sit in the wind, and weight decides how far the lob goes.
 
 ## 5. Art brief (original silhouettes, AI-generated per `OQ-12`)
 
@@ -190,9 +182,7 @@ the eleven mobiles whose window reaches 45° land at the same distance whenever 
 | `mbl-03` | Iron Tortoise | World-bearing turtle (Chinese) | plated | low dome shell, stubby legs, heavy cannon on the shell | iron, bronze, dark red |
 | `mbl-04` | Glacier Mammoth | Frozen colossus (Norse) | huge shaggy mass, tusks of ice, snow-capped back | ice white, slate, deep blue |
 | `mbl-05` | Storm Falcon | Thunder bird (North American) | bionic | narrow wings, lightning-tipped beak, feather blades | storm grey, electric blue, white |
-| `mbl-06` | Silver Ibex | Mountain climber (Alpine) | spiral horns, lean frame, hooves of polished silver | silver, charcoal, ice blue |
 | `mbl-07` | Ash Behemoth | Volcanic beast (Mesopotamian) | plated | hunched back splitting into vents, glowing cracks | ash grey, ember orange, black |
-| `mbl-08` | Volcano Toad | Fire-bellied toad (Mesoamerican) | wide squat body, throat sac, lava-veined skin | lava red, obsidian, sulphur yellow |
 | `mbl-09` | Moon Hare | Lunar hare (East Asian) | bionic | long ears as stabilisers, spring-loaded legs | moon white, lilac, pearl grey |
 | `mbl-10` | Coral Crab | Sea-shell walker (Pacific) | wide carapace, one heavy claw cannon, barnacle armour | coral pink, teal, sand |
 | `mbl-11` | Pale Stag | White stag (Celtic) | warded | antlers carrying hanging lanterns, slender legs | bone white, forest green, gold |
@@ -200,7 +190,6 @@ the eleven mobiles whose window reaches 45° land at the same distance whenever 
 | `mbl-13` | Cinder Fox | Nine-tailed fox (Korean) | bionic | multiple tails fanning out, low profile, flame tips | cinder orange, charcoal, cream |
 | `mbl-14` | Sky Serpent | Feathered serpent (Mesoamerican) | coiled body, plume crest, wing-fins | turquoise, jade, obsidian |
 | `mbl-15` | Jade Dragon | Oriental dragon (Vietnamese) | warded | long sinuous body, whiskers, pearl orb on the forehead | jade green, imperial gold, ivory |
-| `mbl-16` | Sun Lion | Solar lion (Egyptian) | mane as a sun disc, straight forelegs, kohl markings | sun gold, lapis, terracotta |
 | `mbl-17` | Sand Wyrm | Serpent of the dunes (South Asian) | plated | hooded head, segmented body half-buried | ochre, burnt sienna, bone |
 | `mbl-18` | Frost Hydra | Many-headed serpent (Slavic) | three necks, icicle spines, frozen scales | frost blue, white, steel |
 | `mbl-19` | Shadow Cat | Night cat (West African) | bionic | sleek low body, tail with a blade, glowing eyes | charcoal, violet, copper |
@@ -223,8 +212,9 @@ or film. Each mobile renders in both team tints.
 
 ## 7. Balance notes
 
-Two mobiles per archetype give a safe pick and a sharper pick: e.g. `Iron Tortoise` (1,200 HP, 60 px, one move) versus
-`Glacier Mammoth` (1,150 HP, 250 shield, 65 px, one move, more delay).
+Ten archetypes hold two picks and four hold one after the 2026-11-13 drop; a pair gives a safe pick and a sharper one,
+e.g. `Iron Tortoise` (1,200 HP, 60 px, one move) versus `Glacier Mammoth` (1,150 HP, 250 shield, 65 px, one move, more
+delay).
 
 Within an archetype the two picks sit inside **±10 % of each other** on damage per delay (shot 1 power ÷ delay); across
 archetypes the spread is deliberate — `mbl-12` Sacred Crane 2.06 at the bottom, `mbl-13` Cinder Fox 3.16 at the top —

@@ -21,7 +21,8 @@ export interface InputFrame {
   readonly seq: number;
   readonly kind: "fire" | "skip";
   readonly angle?: number;
-  readonly force?: number;
+  /** The power bar, `0…4` (`US-BAL-005` AC3); it replaced the 0–100 `force` scale. */
+  readonly bar?: number;
   readonly facing?: 1 | -1;
   /**
    * Which of the mobile's weapons fired. `signaling.md` did not list it, which made a peer's super shot land as the
@@ -33,7 +34,7 @@ export interface InputFrame {
 export interface InputSource {
   readonly kind: "fire" | "skip";
   readonly angle?: number | undefined;
-  readonly force?: number | undefined;
+  readonly bar?: number | undefined;
   readonly facing?: 1 | -1 | undefined;
   readonly weaponSlot?: 0 | 1 | 2 | undefined;
 }
@@ -45,7 +46,7 @@ export function inputFrameOf(input: InputSource, turn: number, seq: number): Inp
     seq,
     kind: input.kind,
     ...(input.angle === undefined ? {} : { angle: input.angle }),
-    ...(input.force === undefined ? {} : { force: input.force }),
+    ...(input.bar === undefined ? {} : { bar: input.bar }),
     ...(input.facing === undefined ? {} : { facing: input.facing }),
     ...(input.weaponSlot === undefined ? {} : { weaponSlot: input.weaponSlot }),
   };

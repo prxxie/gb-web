@@ -80,7 +80,16 @@ export interface Mobile {
   readonly energy: number;
   /** Starting weight in the turn queue. */
   readonly baseDelay: number;
-  readonly maxPower: number;
+  /**
+   * The machine's weight on the reference scale (`mobiles.md` § 1, `US-BAL-005`). Gravity is derived from it:
+   * `g = 390 × weight / 5.78` (`ballistics.ts`), so the weight *is* the arc and there is no separate gravity field.
+   */
+  readonly weight: number;
+  /**
+   * How much the wind moves this machine (`mobiles.md` § 1). The wind coefficient is proportional to it:
+   * `k = 0.222 × windDrag / 0.046²`, so a draggy machine is blown further, not less.
+   */
+  readonly windDrag: number;
   readonly moveDistance: number;
   readonly maxMovesPerTurn: number;
   readonly runMultiplier: number;
@@ -125,7 +134,7 @@ export interface MapDef {
   readonly windRange: { readonly min: number; readonly max: number };
   /** The authored terrain, RLE over tenths — what the loader validates and a joiner can rebuild from. */
   readonly terrain: string;
-  /** Multiplies every mobile's gravity (`tunables.md` § 1.2). */
+  /** Multiplies every mobile's own gravity (`tunables.md` § 1.2) — it scales the arc, never replaces the weight. */
   readonly gravityModifier: number;
   /** Terrain generator seed. */
   readonly seed: number;
@@ -243,7 +252,8 @@ export interface FireInput {
   readonly slot: number;
   readonly weaponSlot: 0 | 1 | 2;
   readonly angle: number;
-  readonly force: number;
+  /** The power bar, `0…4` for every machine — there is no per-machine cap (`US-BAL-005` AC3). */
+  readonly bar: number;
   /** Monotonic per sender; the host keeps the last value (`alias`, no rollback). */
   readonly seq: number;
 }

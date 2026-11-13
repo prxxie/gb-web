@@ -4,7 +4,7 @@ import { LOCALES, loadLocale, saveLocale, translate } from "../src/i18n";
 import en from "../src/i18n/en.json";
 import vi from "../src/i18n/vi.json";
 import { addPointer, classify, clearPointers, movePointer, screenToWorld, viewportFor } from "../src/game/viewport";
-import { defaultWindow, powerFromDrag, rulerLayout, forceFromPower, angleFromPull, TUNABLES } from "@gbw/core";
+import { defaultWindow, powerFromDrag, rulerLayout, barFromPower, angleFromPull, TUNABLES } from "@gbw/core";
 
 describe("TC-PWA-130: locale tables", () => {
   it("carries the same keys in Vietnamese and English", () => {
@@ -63,8 +63,8 @@ describe("TC-MATCH-915/916: gestures", () => {
 
   it("ignores a pull shorter than the deadzone", () => {
     expect(powerFromDrag(10, shorter)).toBeLessThan(0.3);
-    expect(forceFromPower(0)).toBe(0);
-    expect(forceFromPower(4)).toBe(100);
+    expect(barFromPower(0)).toBe(0);
+    expect(barFromPower(4)).toBe(4);
   });
 
   it("mirrors the angle when the mobile faces the other way", () => {

@@ -33,15 +33,15 @@ class in `packages/core/src/data/mobiles.ts` resolves to one of seven behaviours
 
 | # | Given | When | Then |
 |---|---|---|---|
-| AC1 | `mbl-01` (`standard` band) and no wind | the shot is fired with angle 45, force 98 | it lands at 3,680 ± 1 units after 8.6 s, the golden sample `TC-CORE-020` records |
-| AC2 | `tunables.json` `gravity = 100 u/s²`, `stepMs = 50` | the projectile is stepped 100 times (5 s) | vertical speed grew by exactly `100 × 5 = 500 u/s` and no step mutates shared state (`TC-CORE-020`) |
-| AC3 | force 0 | the shot is fired | the projectile drops inside 2 s and the turn ends (`TC-CORE-029`) |
-| AC4 | the same shot on `mbl-03` (`mass 169`) and on `mbl-13` (`mass 118`), wind `m = 26`, `sector 0` | each is stepped | drift equals `½ · (42 × 26 / mass) · t²`, so `mbl-13` drifts ~50 % further than `mbl-03` (`TC-CORE-023`, `TC-CORE-925`) |
-| AC4b | wind `m = 20` at `sector 3` (90°, blowing up) and at `sector 9` (270°, blowing down) | each is stepped on `mbl-01` | the upward wind adds ~5 u/s less than `gravity` per second (longer hang), the downward wind adds to it (shorter hang) — `θ` changes the arc, not only the drift (`TC-CORE-023`) |
+| AC1 | `mbl-01` (weight 7.50 → `g = 390 × 7.50 ÷ 5.78 = 506.06`) and no wind | the shot is fired with angle 45, bar 4 | it lands at 1,696 ± 1 units, the golden sample `TC-CORE-020` records |
+| AC2 | `STEP_MS = 25`, `g = 506.055` | the projectile is stepped 100 times (2.5 s) | vertical speed grew by exactly `506.055 × 2.5 = 1,265 u/s` — `12.65` per step — and no step mutates shared state (`TC-CORE-020`) |
+| AC3 | bar 0 | the shot is fired | the projectile drops inside 2 s and the turn ends (`TC-CORE-029`) |
+| AC4 | the same shot on `mbl-03` (drag 0.0555 → `k = 5.822`) and on `mbl-20` (drag 0.0950 → `k = 9.966`), wind `m = 26`, `sector 0` | each is stepped | drift equals `½ · k · 0.95 · m · t²`, so the draggier hull drifts `1.71×` as far at equal hang time (`TC-CORE-023`, `TC-CORE-925`) |
+| AC4b | a wind reading at `sector 0` (0°, east) and `sector 1` (180°, west) | each is stepped | only `ax` changes sign; `ay = 0`, because the genre's wind is horizontal — the general `−k · windEff · sin θ` form exists for a map gimmick, not for play (`TC-CORE-023`) |
 | AC5 | an angle outside the mobile's `angleMin/angleMax` | aim is committed | the angle is clamped, never rejected (`TC-CORE-022`) |
-| AC6 | a `direct` mobile (`g 84`) and a `mortar` mobile (`g 128`) | both fire at full force | the direct shot reaches ~2,043 units, the mortar ~1,491: lower gravity means a flatter, longer arc (`TC-CORE-924`) |
+| AC6 | a light mobile (`mbl-15`, weight 4.20 → `g 283.5`) and a heavy one (`mbl-01`, weight 7.50 → `g 506.06`) | both fire at bar 4 on their own best angle | the light reaches 3,034 units at 45°, the heavy 1,696 at 45°: lower gravity means a flatter, longer arc (`TC-CORE-924`) |
 | AC7 | a `bounce` shot aimed at flat terrain | it is fired | it bounces up to `bounceRestitution` losses, detonating no later than the third bounce (`TC-CORE-913`) |
-| AC8 | the same seed, angle, force and map | the shot is simulated on two runs | positions match bit-for-bit (`TC-CORE-020`) |
+| AC8 | the same seed, angle, bar and map | the shot is simulated on two runs | positions match bit-for-bit (`TC-CORE-020`) |
 
 ## 4. Contract
 
@@ -51,27 +51,31 @@ export type ShotClass = 'arc'|'flat'|'lob'|'bounce'|'cluster'|'piercing'|'beam';
 export interface Weapon { class: ShotClass; power: number; radius: number; delay: number }
 
 export interface Projectile {
-  id: number; owner: number; weapon: Weapon;
+  id: number; ownerSlot: number; weaponSlot: 0 | 1 | 2; shotClass: ShotClass;
   x: number; y: number; vx: number; vy: number;
-  mass: number; gravity: number;
-  bounces: number; ageMs: number; dead: boolean;
+  ageMs: number; bouncesLeft: number; power: number; radius: number; piercing: boolean;
 }
 
-export function launch(shot: { angle: number; force: number; facing: 1 | -1 },
-                       weapon: Weapon, ballistics: { gravity: number; mass: number },
-                       from: { x: number; y: number }): Projectile;
-export interface Wind { magnitude: number; directionDeg: number; sector: number } // 0–26; ×30; 0–11
+export interface StepContext {
+  wind: Wind; gravity: number; windK: number;   // gravityFor(mobile) × map.gravityModifier, windKFor(mobile)
+  stepMs?: number; forceX?: number;            // 25 by default; a `force` map's constant push
+}
+export interface Wind { magnitude: number; directionDeg: number; sector: 0 | 1 } // 0–26; ×0.95; sector × 180°
 
-export function windVector(w: Wind): { mx: number; my: number }; // magnitude × (cos θ, sin θ)
+export function windAcceleration(w: Wind, k: number): { ax: number; ay: number };
 
-export function stepProjectile(p: Projectile, env: { weather: { wind: Wind } },
-                               tunables: Tunables, dtMs: number): Projectile;
+export function launch(options: { id: number; ownerSlot: number; weaponSlot: 0 | 1 | 2; weapon: Weapon;
+                                  from: { x: number; y: number }; facing: 1 | -1; angle: number; bar: number;
+                                  powerMultiplier: number }): Projectile;
+
+export function stepProjectile(p: Projectile, context: StepContext): Projectile;
 ```
 
-Per the equations in [`tunables.md`](../../02-reference/gameplay/tunables.md) § 1.1: `v0 = force × speedK` (`speedK 4.55`
-for every mobile, as in GB), `vx = cos(angle) × v0 × facing`, `vy = −sin(angle) × v0`; each 50 ms step applies
-`ax = 42 × mx / mass`, `ay = −gravity + 42 × my / mass` (polar wind resolved by `windVector`), then integrates with **no drag term** — the model
-has none; positions round to `0.1` (`TC-CORE-040`).
+Per the equations in [`tunables.md`](../../02-reference/gameplay/tunables.md) § 1.1: `v0 = bar × BAR_VELOCITY`
+(`BAR_VELOCITY 232.335` for every mobile, `bar 0…4`), `vx = cos(angle) × v0 × facing`, `vy = −sin(angle) × v0`; each
+25 ms step applies `ax = k · windEff · cos θ + forceX`, `ay = gravity − k · windEff · sin θ` (`k` and `gravity` from the
+machine, `windEff = magnitude × 0.95`), then integrates with **no drag term** — the model has none; positions round to
+`0.1`, velocities do not (`TC-CORE-023`).
 
 Requirements: `NFR-28`, `NFR-29`.
 

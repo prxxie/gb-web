@@ -1,5 +1,15 @@
-import type { Projectile, ShotClass, Vec2, Weapon, Wind } from "./types.js";
-import { TUNABLES, roundTo } from "./tuning.js";
+import type { Mobile, Projectile, ShotClass, Vec2, Weapon, Wind } from "./types.js";
+import {
+  BAR_VELOCITY,
+  BASE_GRAVITY,
+  GRAVITY_WEIGHT,
+  TUNABLES,
+  WIND_COEFFICIENT,
+  WIND_DRAG_REFERENCE,
+  WIND_EFFECT,
+  clamp,
+  roundTo,
+} from "./tuning.js";
 import { heightAt, isUnderGround, slopeAt } from "./terrain.js";
 
 export interface WindAcceleration {
@@ -7,23 +17,69 @@ export interface WindAcceleration {
   readonly ay: number;
 }
 
+/** A machine's weight, or a refusal: a shot cannot be resolved without one (`US-BAL-004` AC4). */
+function requiredNumber(value: number | undefined, field: "weight" | "windDrag"): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    throw new RangeError(`cannot resolve a shot: the machine has no ${field}`);
+  }
+  return value;
+}
+
+/**
+ * Gravity is the machine's weight, in u/s² (`tunables.md` § 1.1, `US-BAL-004` AC1):
+ *
+ * ```
+ * g = BASE_GRAVITY × weight / GRAVITY_WEIGHT       // 5.78 is the reference weight, so the middle machine gets 390
+ * ```
+ *
+ * A heavy machine falls faster and therefore flies shorter at the same bar, which is what makes the roster a set of
+ * trajectories rather than one arc with different numbers printed on it.
+ */
+export function gravityFor(mobile: Pick<Mobile, "weight">): number {
+  const weight = requiredNumber(mobile.weight, "weight");
+  return (BASE_GRAVITY * weight) / GRAVITY_WEIGHT;
+}
+
+/**
+ * The machine's wind coefficient (`US-BAL-004` AC2, `US-BAL-005` AC5):
+ *
+ * ```
+ * k = WIND_COEFFICIENT × windDrag / WIND_DRAG_REFERENCE²
+ * ```
+ *
+ * Proportional to the machine's drag: a machine with `windDrag 0.046` reads `4.826`, the mid-weight `0.0555` reads
+ * `5.82`, and Boomer's `0.0950` reads `9.966` — about twice the mid-weight machines.
+ */
+export function windKFor(mobile: Pick<Mobile, "windDrag">): number {
+  const windDrag = requiredNumber(mobile.windDrag, "windDrag");
+  return (WIND_COEFFICIENT * windDrag) / (WIND_DRAG_REFERENCE * WIND_DRAG_REFERENCE);
+}
+
+/** `v0 = bar × BAR_VELOCITY`, with the bar clamped to `0…4`: a negative bar is 0, not a reversed shot. */
+export function muzzleVelocity(bar: number): number {
+  if (!Number.isFinite(bar)) return 0;
+  return clamp(bar, 0, 4) * BAR_VELOCITY;
+}
+
 /**
  * Wind enters the integrator as a plain acceleration (`tunables.md` § 1.1):
  *
  * ```
- * ax = windCoefficient × magnitude × cos θ
- * ay = −windCoefficient × magnitude × sin θ      // zero for GB's horizontal wind, added to gravity otherwise
+ * windEff = magnitude × WIND_EFFECT
+ * ax = k × windEff × cos φ
+ * ay = −k × windEff × sin φ      // zero for GB's horizontal wind, added to gravity otherwise
  * ```
  *
- * `θ` is `0°` (east) or `180°` (west): the genre's wind is horizontal, so the vertical term stays zero in play and the
- * formula keeps the general shape for a map gimmick that ever needs it. There is **no mass term** — in GB the wind
- * pushes every mobile by the same amount, which is what makes a wind reading transferable between mobiles.
+ * `φ` is `0°` (east) or `180°` (west): the genre's wind is horizontal, so the vertical term stays zero in play and the
+ * formula keeps the general shape for a map gimmick that ever needs it. `k` comes from the machine (`windKFor`), so the
+ * wind reading is *not* the same correction for every machine — that is the point of a drag value per machine.
  */
-export function windAcceleration(wind: Wind, coefficient: number = TUNABLES.windCoefficient): WindAcceleration {
+export function windAcceleration(wind: Wind, k: number): WindAcceleration {
   const radians = (wind.directionDeg * Math.PI) / 180;
+  const windEff = wind.magnitude * WIND_EFFECT;
   return {
-    ax: coefficient * wind.magnitude * Math.cos(radians),
-    ay: -coefficient * wind.magnitude * Math.sin(radians),
+    ax: k * windEff * Math.cos(radians),
+    ay: -k * windEff * Math.sin(radians),
   };
 }
 
@@ -35,17 +91,18 @@ export interface LaunchOptions {
   readonly from: Vec2;
   readonly facing: -1 | 1;
   readonly angle: number;
-  readonly force: number;
+  /** The power bar, `0…4` (`US-BAL-005` AC3). */
+  readonly bar: number;
   /** `itm-blood` / `itm-power-up` / avatar attack, already resolved into one factor. */
   readonly powerMultiplier?: number;
 }
 
 const BOUNCE_LIMIT: Partial<Record<ShotClass, number>> = { bounce: 3 };
 
-/** A shot leaves the muzzle: `v0 = force × speedK`, split into `vx`/`vy` by the aim angle. */
+/** A shot leaves the muzzle: `v0 = muzzleVelocity(bar)`, split into `vx`/`vy` by the aim angle. */
 export function launch(options: LaunchOptions): Projectile {
   const radians = (options.angle * Math.PI) / 180;
-  const v0 = options.force * TUNABLES.speedK;
+  const v0 = muzzleVelocity(options.bar);
   const power = Math.round(options.weapon.power * (options.powerMultiplier ?? 1));
   return {
     id: options.id,
@@ -69,8 +126,10 @@ export function launch(options: LaunchOptions): Projectile {
 
 export interface StepContext {
   readonly wind: Wind;
-  /** `TUNABLES.gravity` × the map's modifier — one value for the whole roster. */
+  /** `gravityFor(mobile) × map.gravityModifier` — this machine's own gravity, bent only by the map. */
   readonly gravity: number;
+  /** `windKFor(mobile)` — this machine's wind coefficient, with no default (`US-BAL-004` AC2). */
+  readonly windK: number;
   readonly stepMs?: number;
   /** Constant sideways acceleration a `force` map adds, in units/s² (`TC-CORE-918`). */
   readonly forceX?: number;
@@ -82,7 +141,7 @@ export interface StepContext {
  */
 export function stepProjectile(projectile: Projectile, context: StepContext): Projectile {
   const dt = (context.stepMs ?? TUNABLES.stepMs) / 1000;
-  const wind = windAcceleration(context.wind);
+  const wind = windAcceleration(context.wind, context.windK);
   const vx = projectile.vx + wind.ax * dt + (context.forceX ?? 0) * dt;
   const vy = projectile.vy + (context.gravity + wind.ay) * dt;
   return {

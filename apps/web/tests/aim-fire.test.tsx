@@ -4,7 +4,7 @@ import {
   canAim,
   DEADZONE_POWER,
   fireFromPull,
-  forceFromPower,
+  barFromPower,
   RING_RADIUS,
   RING_START,
   ringColor,
@@ -20,16 +20,18 @@ function context(overrides: Partial<Parameters<typeof fireFromPull>[1]> = {}) {
 describe("TC-MATCH-936: a release becomes exactly one fire input (US-MATCH-002 AC3, AC4, AC6, AC8)", () => {
   it("carries the slot, the active weapon and the sender's own seq", () => {
     const input = fireFromPull({ power: 1.3, angle: 45 }, context({ weaponSlot: 2, seq: 19 }));
-    expect(input).toEqual({ kind: "fire", slot: 1, weaponSlot: 2, angle: 45, force: 33, seq: 19 });
+    expect(input).toEqual({ kind: "fire", slot: 1, weaponSlot: 2, angle: 45, bar: 1.3, seq: 19 });
   });
 
-  it("sends force = round(power × 25) and never the float", () => {
-    expect(fireFromPull({ power: 0.4, angle: 45 }, context())?.force).toBe(10);
-    expect(fireFromPull({ power: 1.3, angle: 45 }, context())?.force).toBe(33);
-    expect(fireFromPull({ power: 4, angle: 45 }, context())?.force).toBe(100);
-    expect(forceFromPower(0)).toBe(0);
-    expect(forceFromPower(9)).toBe(100);
-    expect(forceFromPower(Number.NaN)).toBe(0);
+  it("sends the 0–4 bar itself, quantised to 0.01 and clamped", () => {
+    expect(fireFromPull({ power: 0.4, angle: 45 }, context())?.bar).toBe(0.4);
+    expect(fireFromPull({ power: 1.3, angle: 45 }, context())?.bar).toBe(1.3);
+    expect(fireFromPull({ power: 4, angle: 45 }, context())?.bar).toBe(4);
+    expect(barFromPower(0)).toBe(0);
+    expect(barFromPower(9)).toBe(4);
+    expect(barFromPower(Number.NaN)).toBe(0);
+    // The bar is the wire value and the integrator value at once: no 0–100 scale in between (`US-BAL-004` AC1).
+    expect(fireFromPull({ power: 2.345, angle: 45 }, context())?.bar).toBe(2.35);
   });
 
   it("sends nothing below the dead zone, or for a power that is not a number", () => {
@@ -48,8 +50,8 @@ describe("TC-MATCH-936: a release becomes exactly one fire input (US-MATCH-002 A
   it("drops a release once this client already fired in the turn (AC8)", () => {
     const shot = { lockedTurn: 4, turnNumber: 4 };
     expect(fireFromPull({ power: 3, angle: 45 }, context({ shot }))).toBeNull();
-    expect(fireFromPull({ power: 3, angle: 45 }, context({ shot: { lockedTurn: 4, turnNumber: 5 } }))?.force).toBe(75);
-    expect(fireFromPull({ power: 3, angle: 45 }, context({ shot: { lockedTurn: null, turnNumber: 5 } }))?.force).toBe(75);
+    expect(fireFromPull({ power: 3, angle: 45 }, context({ shot: { lockedTurn: 4, turnNumber: 5 } }))?.bar).toBe(3);
+    expect(fireFromPull({ power: 3, angle: 45 }, context({ shot: { lockedTurn: null, turnNumber: 5 } }))?.bar).toBe(3);
   });
 });
 

@@ -62,7 +62,7 @@ orange into the body.
 
 Authoring canvas is given in **pixels at 4 px/unit**, i.e. `world units × 4`.
 
-### 4.1 Mobiles — 20 units × 3 files each
+### 4.1 Mobiles — 17 units × 3 files each
 
 | File | Canvas | Anchor | Content |
 |------|--------|--------|---------|
@@ -70,7 +70,7 @@ Authoring canvas is given in **pixels at 4 px/unit**, i.e. `world units × 4`.
 | `mobile/<id>_accent.png` | 384 × 256 | bottom-centre, same grid | only the panels that should carry the team colour, as flat white shapes with alpha — the client tints them |
 | `mobile/<id>_wreck.png` | 384 × 256 | bottom-centre | the destroyed silhouette: same footprint, crushed, no barrel, cooled ash tones; the client fades it to 55 % |
 
-The 20 ids and the traits that should show in the silhouette:
+The 17 ids and the traits that should show in the silhouette:
 
 | id | Name | Archetype | Trajectory | HP / shield | Effect | Shot classes (1 / 2 / super) | Angle window |
 |----|------|-----------|-----------|-------------|--------|------------------------------|--------------|
@@ -79,9 +79,7 @@ The 20 ids and the traits that should show in the silhouette:
 | `mbl-03` | Iron Tortoise | tank | skimmer | 1200 / 200 | explosion | arc r90 / bounce r80 / arc r120 | −8…38° |
 | `mbl-04` | Glacier Mammoth | tank | lobber | 1150 / 250 | impact | lob r95 / bounce r82 / arc r118 | 30…88° |
 | `mbl-05` | Storm Falcon | sniper | direct | 925 / 0 | laser | flat r60 / piercing r55 / beam r40 | −20…25° |
-| `mbl-06` | Silver Ibex | sniper | direct | 950 / 50 | laser | flat r58 / arc r65 / beam r42 | −15…30° |
 | `mbl-07` | Ash Behemoth | bombardier | mortar | 1100 / 100 | explosion | lob r100 / cluster r90 / lob r130 | 45…88° |
-| `mbl-08` | Volcano Toad | bombardier | mortar | 1075 / 150 | explosion | lob r98 / bounce r85 / cluster r128 | 40…85° |
 | `mbl-09` | Moon Hare | bouncer | skimmer | 975 / 100 | impact | bounce r80 / flat r65 / bounce r110 | −5…45° |
 | `mbl-10` | Coral Crab | bouncer | skimmer | 990 / 120 | laser | bounce r78 / arc r70 / beam r45 | 0…42° |
 | `mbl-11` | Pale Stag | all-rounder | standard | 1020 / 280 | impact | arc r85 / flat r70 / cluster r120 | −12…42° |
@@ -89,7 +87,6 @@ The 20 ids and the traits that should show in the silhouette:
 | `mbl-13` | Cinder Fox | glass | direct | 900 / 0 | explosion | flat r60 / arc r70 / arc r90 | −18…28° |
 | `mbl-14` | Sky Serpent | glass | direct | 920 / 0 | laser | flat r58 / cluster r85 / beam r44 | −16…32° |
 | `mbl-15` | Jade Dragon | balanced | standard | 1050 / 150 | explosion | arc r80 / piercing r60 / arc r115 | −10…50° |
-| `mbl-16` | Sun Lion | all-rounder | standard | 1060 / 180 | explosion | arc r82 / bounce r78 / cluster r122 | −6…46° |
 | `mbl-17` | Sand Wyrm | zoner | mortar | 1025 / 150 | impact | lob r95 / piercing r60 / cluster r125 | 48…88° |
 | `mbl-18` | Frost Hydra | zoner | mortar | 1040 / 120 | impact | lob r96 / arc r80 / lob r130 | 42…86° |
 | `mbl-19` | Shadow Cat | trickster | skimmer | 950 / 100 | electric | bounce r70 / cluster r85 / arc r100 | −8…44° |

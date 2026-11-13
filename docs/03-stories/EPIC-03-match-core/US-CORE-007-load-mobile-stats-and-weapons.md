@@ -33,13 +33,13 @@ and **three weapon slots** (shot 1, shot 2, super shot) ``. Our data table is
 
 | # | Given | When | Then |
 |---|---|---|---|
-| AC1 | the twenty mobile records | they are loaded | every record validates against the schema and the clamps in `data/mobiles.md` (`TC-CORE-905`) |
-| AC2 | a mobile with three weapons | a `weaponSlot` is selected | the matching weapon's class, power and radius are used, and the shot flies with **the mobile's** `gravity` and `mass` (`TC-CORE-912`, `TC-CORE-925`) |
+| AC1 | the seventeen mobile records | they are loaded | every record validates against the schema and the clamps in `data/mobiles.md` (`TC-CORE-905`) |
+| AC2 | a mobile with three weapons | a `weaponSlot` is selected | the matching weapon's class, power and radius are used, and the shot flies with **the mobile's** `weight`-derived gravity and `windDrag`-derived wind coefficient (`TC-CORE-912`, `TC-CORE-925`; `US-BAL-004` AC1/AC2) |
 | AC3 | the super shot | the gauge is full (100) | it fires, the gauge drops to 0, and damage dealt or taken refills it — so a second SS is possible in the same match (`TC-CORE-922`) |
 | AC4 | a data file with an out-of-range value | it is loaded | the loader throws at build time, not at runtime (`TC-FND-002`) |
 | AC5 | a `rulesetVersion` bump | the client boots | the version is read from the data bundle and sent in the snapshot (`TC-CORE-040`) |
 | AC6 | two players pick the same mobile | the match starts | it is allowed; nothing in the rules keys on `mobileId` (`TC-ROOM-148`) |
-| AC7 | every mobile's `gravity` and `mass` | each fires at its `maxPower` on a flat probe map | the landing distance and hang time match the simulated table in `data/mobiles.md` § 4 within ±1 unit (`TC-CORE-924`) |
+| AC7 | every mobile's `weight` and `windDrag` | each fires at bar 4 on a flat probe map | the landing distance, hang time and wind drift match the simulated table in `data/mobiles.md` § 4 within ±1 unit (`TC-CORE-924`) |
 | AC8 | `maxHp 1050`, `maxShield 150`, `power 240` | the record is loaded | values are accepted as-is on the 1,000 scale, and the loader rejects an `maxHp` outside `900–1200` (`TC-CORE-905`) |
 
 ## 4. Contract
@@ -47,11 +47,11 @@ and **three weapon slots** (shot 1, shot 2, super shot) ``. Our data table is
 ```ts
 export interface Mobile {
   mobileId: string; name: { vi: string; en: string };
-  gravity: number; mass: number;              // 84–128 u/s², 118–169 — the per-mobile physics pair, § 1.1
+  weight: number; windDrag: number;           // 4.20–7.50, 0.0403–0.0950 — the per-mobile physics pair, `tunables.md` § 1
   maxHp: number; maxShield: number; shieldRegen: number; energy: number;
   bodyWidth: number; bodyHeight: number;
   trajectory: 'standard'|'direct'|'lobber'|'mortar'|'skimmer';
-  angleMin: number; angleMax: number; maxPower: number;   // this mobile's own aim window
+  angleMin: number; angleMax: number;         // this mobile's own aim window (the bar is 0…4 for everyone)
   moveDistance: number; maxMovesPerTurn: 1 | 2; runMultiplier: number;
   moveEnergy: number; moveDelay: number; maxIncline: number;
   baseDelay: number; defense: number;
@@ -67,8 +67,9 @@ Requirements: `NFR-29`.
 - Balance edits touch JSON only; a `rulesetVersion` bump makes in-flight ranked matches unranked.
 - `angleMin > angleMax` is a load error, never silently swapped — and so is an `angleMin`/`angleMax` that falls outside the
   mobile's trajectory-profile band (`tunables.md` § 4.2).
-- `gravity` and `mass` are the *only* physics numbers a mobile carries: `Weapon` has no `density`, because GB has neither
-  drag nor a per-shell mass (`reference-gunbound.md` § 10).
+- `weight` and `windDrag` are the *only* physics numbers a mobile carries: `weight` sets its gravity
+  (`390 × weight / 5.78`, `tunables.md` § 1.1) and `windDrag` its wind coefficient (`0.222 × windDrag / 0.046²`), while
+  `Weapon` has no `density`, because GB has no drag and no per-shell mass (`reference-gunbound.md` § 10, `ADR-0007`).
 - Super shot availability lives in match state (`weaponsLeft[2]`), not in the record.
 
 ## 6. Implementation notes

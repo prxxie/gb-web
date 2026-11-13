@@ -8,7 +8,7 @@
  *
  * The module is pure: the page decides *when* to adopt, this decides *what* the adoption is (`NFR-22`).
  */
-import { restoreFromSnapshot, type MatchState, type Snapshot } from "@gbw/core";
+import { assertCurrentRuleset, isCurrentRuleset, restoreFromSnapshot, type MatchState, type Snapshot } from "@gbw/core";
 
 /** The parts of `host_changed` the adoption reads. */
 export interface HostChanged {
@@ -28,6 +28,8 @@ export interface Adoption {
   readonly seq: number;
   /** Whether the snapshot was adopted, or the room restarted its numbering. */
   readonly adopted: boolean;
+  /** Why a snapshot was refused and the room restarted instead (`US-BAL-004` AC5), else `null`. */
+  readonly refusedReason?: string | null;
 }
 
 /** A room that dropped before its first publish restarts here (`AC3`). */
@@ -46,6 +48,18 @@ export function adoptHostChanged(prev: MatchState | null, message: HostChanged):
 
   if (message.lastSnapshot === null) {
     return { state: { ...prev, seq: FRESH_SEQ }, hostGeneration, seq: FRESH_SEQ, adopted: false };
+  }
+
+  // A snapshot from another ruleset cannot be adopted — the old constants would move every shot (`AC5`). Refuse it
+  // with a readable reason and restart the numbering, exactly like a room that dropped before its first publish.
+  if (!isCurrentRuleset(message.lastSnapshot)) {
+    let refusedReason = "ruleset-mismatch";
+    try {
+      assertCurrentRuleset(message.lastSnapshot);
+    } catch (error) {
+      refusedReason = error instanceof Error ? error.message : refusedReason;
+    }
+    return { state: { ...prev, seq: FRESH_SEQ }, hostGeneration, seq: FRESH_SEQ, adopted: false, refusedReason };
   }
 
   const adopted = restoreFromSnapshot(prev, message.lastSnapshot);

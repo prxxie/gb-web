@@ -51,7 +51,8 @@ export function MatchAimOverlays(props: MatchAimOverlaysProps): JSX.Element {
           <span className="match__power-angle" data-testid="ring-angle">
             {Math.round(aimAngle)}°
           </span>
-          <span className="match__power-number">{power.toFixed(2)}</span>
+          {/* The bar itself, 0.0–4.0 (`US-BAL-005` AC3): one decimal is what the ring can carry. */}
+          <span className="match__power-number">{power.toFixed(1)}</span>
         </div>
       </div>
     </>

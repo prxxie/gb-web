@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { launch, simulateFlight, windAcceleration } from "../src/ballistics.js";
+import { gravityFor, launch, simulateFlight, windAcceleration, windKFor } from "../src/ballistics.js";
 import { getMobile } from "../src/data/mobiles.js";
 import { applyInput, createMatch, type Seat } from "../src/match.js";
 import { createRng } from "../src/rng.js";
@@ -81,14 +81,14 @@ const EAST = (magnitude: number): Wind => ({ magnitude, directionDeg: 0, sector:
 const WEST = (magnitude: number): Wind => ({ magnitude, directionDeg: 180, sector: 1 });
 
 /**
- * `mbl-01` shot 1 at 45°, force 98 — the calibration shot — unless a shorter shot is asked for. A short shot is
- * what a drift can be read from: at force 98 and wind 26 the shell lands ~100,000 units downrange.
+ * `mbl-03` (weight 5.78, g = 390) shot 1 at 45°, four bar — the calibration shot (`US-BAL-004` AC3).
  *
+ * Gravity and the wind coefficient are the machine's own now, so the shot carries both into the integrator.
  * `fromX` moves the muzzle: a westward shot has to start well inside the plane, because terrain only exists for
  * `x ≥ 0` and a shell blown west of the world edge falls through it instead of landing on it.
  */
-function shoot(wind: Wind, force = 98, fromX = 8) {
-  const mobile = getMobile("mbl-01");
+function shoot(wind: Wind, bar = 4, fromX = 8) {
+  const mobile = getMobile("mbl-03");
   const projectile = launch({
     id: 1,
     ownerSlot: 0,
@@ -97,9 +97,14 @@ function shoot(wind: Wind, force = 98, fromX = 8) {
     from: { x: fromX, y: 820 },
     facing: 1,
     angle: 45,
-    force,
+    bar,
   });
-  return simulateFlight(projectile, { wind, gravity: TUNABLES.gravity }, flat(), BOUNDS);
+  return simulateFlight(
+    projectile,
+    { wind, gravity: gravityFor(mobile), windK: windKFor(mobile) },
+    flat(),
+    BOUNDS,
+  );
 }
 
 describe("weather (US-CORE-015)", () => {
@@ -186,8 +191,8 @@ describe("weather (US-CORE-015)", () => {
     expect(isCalm(calmWeather)).toBe(true);
     expect(describeWind(CALM)).toBe("calm");
 
-    // No `mass` argument any more: the push is the weather's alone, so a calm roll is zero for every mobile.
-    const acceleration = windAcceleration(CALM);
+    // The push is the weather times the machine's coefficient, so a calm roll is zero for every mobile.
+    const acceleration = windAcceleration(CALM, windKFor(getMobile("mbl-03")));
     expect(acceleration.ax).toBe(0);
     // A zero magnitude leaves the vertical term as `-0`: numerically no acceleration either way.
     expect(acceleration.ay).toBeCloseTo(0);
@@ -212,17 +217,18 @@ describe("weather (US-CORE-015)", () => {
   });
 
   it("TC-CORE-023: drift equals ½·a_x·t² for the shot's own flight time", () => {
-    // The calibration shot itself: 5.35 s of hang is long enough that the closed form and the integrator have to
-    // agree to better than 5 %, and 2,176 units of range still lands well inside the 20,000-unit probe.
-    const calm = shoot(CALM, 98);
-    const east = shoot(EAST(26), 98);
+    // The calibration shot itself: 3.35 s of hang is long enough that the closed form and the integrator have to
+    // agree to better than 5 %, and 2,203 units of range still lands well inside the 120,000-unit probe.
+    const k = windKFor(getMobile("mbl-03"));
+    const calm = shoot(CALM);
+    const east = shoot(EAST(26));
     const seconds = calm.flightMs / 1000;
-    const expected = 0.5 * windAcceleration(EAST(26)).ax * seconds ** 2;
+    const expected = 0.5 * windAcceleration(EAST(26), k).ax * seconds ** 2;
 
-    // The closed form is the reference: `a_x = 1.0 × 26 = 26 u/s²`, `t = 5.35 s` → 372 units, and the integrator
-    // measures 379 of them. Quantising the position to 0.1 per step costs the rest; a drift that stops tracking
-    // `½·a·t²` at all is the regression this catches.
-    expect(expected).toBeCloseTo(372.1, 0);
+    // The closed form is the reference: `a_x = 5.82 × 24.7 = 143.8 u/s²`, `t = 3.35 s` → 807 units, and the
+    // integrator measures 814 of them. Quantising the position to 0.1 per step costs the rest; a drift that stops
+    // tracking `½·a·t²` at all is the regression this catches.
+    expect(expected).toBeCloseTo(807.2, 0);
     const drift = east.landingX - calm.landingX;
     expect(drift).toBeGreaterThan(expected * 0.95);
     expect(drift).toBeLessThanOrEqual(expected * 1.05);
@@ -237,8 +243,8 @@ describe("weather (US-CORE-015)", () => {
     // muzzle well inside the plane — terrain only exists for `x ≥ 0`, so a shell blown past the world edge would
     // fall through it instead of landing on it.
     const westMuzzle = 20_000;
-    const westCalm = shoot(CALM, 98, westMuzzle);
-    const westDrift = shoot(WEST(26), 98, westMuzzle).landingX - westCalm.landingX;
+    const westCalm = shoot(CALM, 4, westMuzzle);
+    const westDrift = shoot(WEST(26), 4, westMuzzle).landingX - westCalm.landingX;
     expect(westDrift).toBeLessThan(0);
     expect(Math.abs((westDrift + drift) / drift)).toBeLessThan(0.05);
 
@@ -246,7 +252,7 @@ describe("weather (US-CORE-015)", () => {
     const half = shoot(EAST(13));
     expect(Math.abs(((half.landingX - calm.landingX) * 2 - drift) / drift)).toBeLessThan(0.05);
 
-    expect(windAcceleration(EAST(26)).ax).toBe(TUNABLES.windCoefficient * 26);
+    expect(windAcceleration(EAST(26), k).ax).toBeCloseTo(k * 26 * 0.95, 9);
   });
 
   it("TC-CORE-928: an eight-player mid-round snapshot carries the weather under 800 bytes", () => {
@@ -265,28 +271,27 @@ describe("weather (US-CORE-015)", () => {
   });
 });
 
-describe("TC-CORE-960: full wind (26) bends the full-force shot by a fifth of the map (US-CORE-015 AC6)", () => {
-  it("pushes the calibration shot ~378 units downrange — three ruler divisions, a sixth of gravity", () => {
+describe("TC-CORE-960: full wind (26) bends the four-bar shot by two fifths of the map (US-BAL-004 AC2)", () => {
+  it("pushes the calibration shot ~814 units downrange — six and a half ruler divisions", () => {
     const calm = shoot(CALM);
     const pushed = shoot(EAST(26));
     const drift = pushed.landingX - calm.landingX;
 
-    // Measured on the calibration shot: `mbl-01` shot 1, 45°, force 98 hangs 5.35 s and the wind push is
-    // `a_x = 1.0 × 26 = 26 u/s²`, so `½·a·t² = 372` and the integrator lands 377.5 units further on.
-    expect(calm.landingX).toBeCloseTo(2_182.4, 1);
-    expect(pushed.landingX).toBeCloseTo(2_559.9, 1);
-    expect(drift).toBeCloseTo(377.5, 1);
-    // The closed form is the reference; the quantised integrator runs ~1.5 % hot on a 5.35 s hang.
-    expect(drift / (0.5 * windAcceleration(EAST(26)).ax * (calm.flightMs / 1000) ** 2)).toBeCloseTo(1, 1);
+    // Measured on the calibration shot: `mbl-03` shot 1, 45°, four bar hangs 3.35 s and the wind push is
+    // `a_x = 5.82 × 24.7 = 143.8 u/s²`, so `½·a·t² = 807` and the integrator lands 814 units further on.
+    expect(calm.landingX).toBeCloseTo(2_202.9, 1);
+    expect(pushed.landingX).toBeCloseTo(3_017.2, 1);
+    expect(drift).toBeCloseTo(814.3, 1);
+    // The closed form is the reference; the quantised integrator runs ~1 % hot on a 3.35 s hang.
+    const k = windKFor(getMobile("mbl-03"));
+    expect(drift / (0.5 * windAcceleration(EAST(26), k).ax * (calm.flightMs / 1000) ** 2)).toBeCloseTo(1, 1);
 
-    // The scale, stated plainly: three 125-unit ruler divisions, a fifth of the map, and a sixth of gravity sideways.
-    // The first pass at the mass-free formula used the old 105 coefficient and threw the same shot 100,130 units —
-    // 50 map widths — which is why the coefficient is the number that has to be re-derived, not the formula.
-    expect(drift / TUNABLES.rulerUnitTarget).toBeGreaterThan(2.5);
-    expect(drift / TUNABLES.rulerUnitTarget).toBeLessThan(3.5);
-    expect(windAcceleration(EAST(26)).ax / TUNABLES.gravity).toBeCloseTo(0.171, 3);
-    expect(drift / TUNABLES.mapWidth).toBeGreaterThan(0.15);
-    expect(drift / TUNABLES.mapWidth).toBeLessThan(0.25);
+    // The scale, stated plainly: six and a half 125-unit ruler divisions and two fifths of the two-model map.
+    expect(drift / TUNABLES.rulerUnitTarget).toBeGreaterThan(6);
+    expect(drift / TUNABLES.rulerUnitTarget).toBeLessThan(7);
+    expect(windAcceleration(EAST(26), k).ax / gravityFor(getMobile("mbl-03"))).toBeCloseTo(0.369, 2);
+    expect(drift / TUNABLES.mapWidth).toBeGreaterThan(0.35);
+    expect(drift / TUNABLES.mapWidth).toBeLessThan(0.45);
   });
 });
 

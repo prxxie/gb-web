@@ -1,5 +1,25 @@
 # Changelog
 
+## 2026-11-13 — the ballistics are the original's again, and the roster is seventeen
+
+The client reversed the provenance rule for the physics alone (`CR-2026-11-13`, `ADR-0007`), so the integrator is the
+original's formula instead of ours (`US-BAL-004`): `v0 = bar × 232.335`, `g = 390 × weight ÷ 5.78`, wind
+`k × magnitude × 0.95` with `k = 0.222 × windDrag ÷ 0.046²`, a **25 ms** step. `speedK`, `gravity` and `windCoefficient`
+left `TUNABLES`; `RULESET_VERSION` is `2026-11-13`, and a snapshot recorded under another ruleset is refused instead of
+replayed (`assertCurrentRuleset`). The calibration shot now lands **2,202.9 u** after **3,350 ms**, and a 26-unit wind
+moves it **814 u** east.
+
+`OQ-44` settled the one contradiction in the source documents: the wind coefficient is **proportional** to `windDrag`
+(Boomer `0.0950` → `9.966`), not inverse to it.
+
+The roster is the reference's seventeen machines (`US-BAL-005`): `weight` and `windDrag` arrive, `maxPower` and the 0–100
+`force` scale are gone — the bar is `0…4` for every machine, on the wire as `bar`. `mbl-06` Silver Ibex, `mbl-08`
+Volcano Toad and `mbl-16` Sun Lion are deleted, and a stored loadout naming one falls back to the first machine instead
+of `undefined`. Reach spans **1.79×** from `mbl-01` (1,696 u) to `mbl-15` (3,034 u).
+
+`TC-BAL-119`–`TC-BAL-136` are new; `TC-CORE-020`, `TC-CORE-023` and `TC-CORE-924` are rewritten on the new model, and the
+stories they belong to (`US-CORE-001`, `US-CORE-007`, `US-CORE-005`, `US-CORE-009`, `US-ROOM-007`, `US-MATCH-005`) follow.
+
 ## 2026-11-13 — the aim aid only shows what the player can see
 
 The aid used to draw the whole flight, which on a 2.5-màn map revealed the landing point of a shot the player cannot see

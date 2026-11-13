@@ -42,7 +42,7 @@ async function pull(page: Page, dx: number, dy: number): Promise<{ power: string
   // A press has to be held before it arms a shot (`HOLD_MS` 300 ms, `TC-MATCH-911`); a drag on its own pans.
   await page.waitForTimeout(400);
   await page.mouse.move(startX + dx, startY + dy, { steps: 12 });
-  await expect(page.getByTestId("power-value")).not.toHaveText("0.00", { timeout: 4_000 });
+  await expect(page.getByTestId("power-value")).not.toHaveText("0.0", { timeout: 4_000 });
   await page.waitForTimeout(200);
   const readout = {
     power: await page.getByTestId("power-value").innerText(),

@@ -1,16 +1,23 @@
 import { describe, expect, it } from "vitest";
 import { MOBILES, getMobile } from "../src/data/mobiles.js";
-import { launch, simulateFlight, stepProjectile, windAcceleration } from "../src/ballistics.js";
+import {
+  gravityFor,
+  launch,
+  muzzleVelocity,
+  simulateFlight,
+  stepProjectile,
+  windAcceleration,
+  windKFor,
+} from "../src/ballistics.js";
 import { TUNABLES } from "../src/tuning.js";
-import type { Wind } from "../src/types.js";
+import type { Mobile, Wind } from "../src/types.js";
 
 /**
  * A flat probe wide enough to contain the whole flight.
  *
- * `simulateFlight` stops at `mapBounds`, so on the real 2,000 × 1,200 map a full-power shell reports where it
- * *left* the map instead of where it *lands*. The rebalance made that the normal case — the calibration shot now
- * flies 3,680 units — so every range assertion here is measured on a flat 120,000-unit plane with 120,000-unit
- * bounds, and the one test that is *about* the map passes the real bounds explicitly.
+ * `simulateFlight` stops at `mapBounds`, so on the real 2,000 × 1,200 map a full-bar shell reports where it *left*
+ * the map instead of where it *lands*. Every range assertion here is measured on a flat 120,000-unit plane; the one
+ * test that is *about* the map passes the real bounds explicitly.
  */
 const PROBE_WIDTH = 120_000;
 const BOUNDS = { width: PROBE_WIDTH, height: TUNABLES.mapHeight };
@@ -23,11 +30,15 @@ const flat = (y = 820) => ({
 });
 
 const CALM: Wind = { magnitude: 0, directionDeg: 0, sector: 0 };
+/** map-01's spawn separation, in units. */
+const SEPARATION = 1_640;
 /** Sector 0 = east (`directionDeg 0`), GB's only two wind directions. */
-const SEPARATION = 1_640; // map-01's spawn separation
 const EAST = (magnitude: number): Wind => ({ magnitude, directionDeg: 0, sector: 0 });
 /** Sector 1 = west (`directionDeg 180`). */
 const WEST = (magnitude: number): Wind => ({ magnitude, directionDeg: 180, sector: 1 });
+
+/** The contract's three pinned coefficients (`US-BAL-005` AC5, amended 2026-11-13 to be proportional to the drag). */
+const MID_WEIGHT_K = 5.8227788279773165;
 
 interface ShotOptions {
   /** Fire this mobile's shot 1 with another mobile, to hold the shell constant while the shooter varies. */
@@ -35,7 +46,7 @@ interface ShotOptions {
   readonly bounds?: { width: number; height: number };
 }
 
-function shoot(mobileId: string, angle: number, force: number, wind: Wind = CALM, options: ShotOptions = {}) {
+function shoot(mobileId: string, angle: number, bar: number, wind: Wind = CALM, options: ShotOptions = {}) {
   const mobile = getMobile(mobileId);
   const projectile = launch({
     id: 1,
@@ -45,145 +56,197 @@ function shoot(mobileId: string, angle: number, force: number, wind: Wind = CALM
     from: { x: 8, y: 820 },
     facing: 1,
     angle,
-    force,
+    bar,
   });
-  // One gravity for the whole roster (`tunables.md` § 1.1): no per-mobile term reaches the integrator.
-  const flight = simulateFlight(projectile, { wind, gravity: TUNABLES.gravity }, flat(), options.bounds ?? BOUNDS);
+  const flight = simulateFlight(
+    projectile,
+    { wind, gravity: gravityFor(mobile), windK: windKFor(mobile) },
+    flat(),
+    options.bounds ?? BOUNDS,
+  );
   return { ...flight, mobile };
 }
 
 describe("ballistics", () => {
-  it("TC-CORE-020: mbl-01 shot 1 at 45°, force 98, no wind lands at ~2,182 units in 5.35 s", () => {
-    // Measured, not guessed: `v0 = 98 × 6.2 = 607.6` and `range = v0² / g = 3,692` before the 0.1 position
-    // quantum takes its few units. The pre-rebalance pin was 1,986 units in 6.3 s (`speedK 4.55`, `g 105`).
-    const flight = shoot("mbl-01", 45, 98);
-    expect(flight.landingX).toBeCloseTo(2_182.4, 1);
-    expect(flight.flightMs).toBe(5_350);
-    expect(flight.steps).toBe(107);
-    expect(flight.offMap).toBe(false);
+  it("TC-BAL-119: the muzzle follows the bar — 232.335 u/s per bar, clamped to 0…4", () => {
+    expect(muzzleVelocity(0)).toBe(0);
+    expect(muzzleVelocity(1)).toBeCloseTo(232.335, 10);
+    expect(muzzleVelocity(4)).toBeCloseTo(929.34, 10);
+    // The bar is clamped, never extrapolated (`US-BAL-004` AC1, § 5): nine bar is four, a negative bar is rest.
+    expect(muzzleVelocity(9)).toBe(muzzleVelocity(4));
+    expect(muzzleVelocity(-3)).toBe(0);
 
-    // One gravity, so the step is the same for every shell: `vy` grows by exactly `g × dt = 7.6 u/s` per 50 ms.
-    expect(TUNABLES.gravity).toBe(152);
-    const mobile = getMobile("mbl-01");
-    const projectile = launch({
+    // It reaches the projectile's initial speed, split by the angle.
+    const shot = launch({
       id: 1,
       ownerSlot: 0,
       weaponSlot: 0,
-      weapon: mobile.weapons[0],
-      from: { x: 8, y: 820 },
+      weapon: getMobile("mbl-03").weapons[0],
+      from: { x: 0, y: 0 },
       facing: 1,
-      angle: 45,
-      force: 98,
+      angle: 0,
+      bar: 4,
     });
-    const stepped = stepProjectile(projectile, { wind: CALM, gravity: TUNABLES.gravity });
-    expect(stepped.vy - projectile.vy).toBeCloseTo(7.6, 10);
-
-    // Run-to-run identity: the same inputs draw the same parabola.
-    expect(shoot("mbl-01", 45, 98)).toEqual(flight);
+    expect(shot.vx).toBeCloseTo(929.3, 1);
+    expect(shot.vy).toBeCloseTo(0, 10);
   });
 
-  it("TC-CORE-021: the sector sets the side and Δx grows monotonically with the magnitude", () => {
-    // Force 40 at 45° hangs 3.5 s and stays inside the probe, so every one of these is a landing point, not a
-    // truncated exit — which is what makes the drift readable rather than a boundary artefact.
-    const calm = shoot("mbl-01", 45, 40);
-    const drift = [5, 13, 20, 26].map((magnitude) => shoot("mbl-01", 45, 40, EAST(magnitude)).landingX - calm.landingX);
+  it("TC-BAL-120: gravity is the machine's weight — 390 u/s² at the 5.78 reference", () => {
+    // `g = 390 × weight / 5.78`: the reference machine is exactly 390, and the roster spans 283…506 (`US-BAL-004` AC1).
+    expect(gravityFor({ weight: 5.78 })).toBeCloseTo(390, 9);
+    expect(gravityFor({ weight: 7.5 })).toBeCloseTo(506.055, 2);
+    expect(gravityFor({ weight: 4.2 })).toBeCloseTo(283.391, 2);
+
+    const heavy = shoot("mbl-01", 45, 4); // weight 7.50
+    const light = shoot("mbl-13", 45, 4); // weight 4.20
+    expect(heavy.landingX).toBeLessThan(light.landingX);
+    expect(heavy.flightMs).toBeLessThan(light.flightMs);
+
+    // The step applies that machine's own gravity: `vy` grows by `g × 0.025` per step.
+    const shot = launch({
+      id: 1,
+      ownerSlot: 0,
+      weaponSlot: 0,
+      weapon: getMobile("mbl-03").weapons[0],
+      from: { x: 0, y: 0 },
+      facing: 1,
+      angle: 45,
+      bar: 4,
+    });
+    const stepped = stepProjectile(shot, { wind: CALM, gravity: gravityFor({ weight: 5.78 }), windK: 0 });
+    expect(stepped.vy - shot.vy).toBeCloseTo(9.75, 10); // 390 × 0.025
+    expect(stepped.ageMs).toBe(25);
+  });
+
+  it("TC-BAL-121: the wind coefficient is proportional to the drag — Boomer reads 9.966", () => {
+    // k = (0.222 / 0.046) × (windDrag / 0.046). Proportional to the drag, not inverse (`US-BAL-005` AC5).
+    expect(windKFor({ windDrag: 0.046 })).toBeCloseTo(4.826, 3);
+    expect(windKFor({ windDrag: 0.0555 })).toBeCloseTo(MID_WEIGHT_K, 9);
+    expect(windKFor({ windDrag: 0.095 })).toBeCloseTo(9.9669, 3);
+    // Boomer's appetite is about twice the mid-weight machines', and its mapped row keeps the printed 0.0950.
+    expect(windKFor({ windDrag: 0.095 }) / MID_WEIGHT_K).toBeCloseTo(1.711, 2);
+
+    // The roster-wide span follows the drag column: no machine reads a coefficient the table does not imply.
+    for (const mobile of MOBILES) {
+      expect(windKFor(mobile), mobile.mobileId).toBeCloseTo((0.222 / 0.046) * (mobile.windDrag / 0.046), 9);
+    }
+  });
+
+  it("TC-BAL-122: the vertical wind term exists and is zero for GB's horizontal wind", () => {
+    const k = MID_WEIGHT_K;
+    // `windEff = 26 × 0.95 = 24.7`, so `aₓ = k × 24.7`.
+    expect(windAcceleration(EAST(26), k).ax).toBeCloseTo(k * 24.7, 9);
+    expect(windAcceleration(EAST(26), k).ay).toBeCloseTo(0, 10); // `-0`: no vertical term
+    expect(windAcceleration(WEST(26), k).ax).toBeCloseTo(-k * 24.7, 9);
+    expect(windAcceleration(WEST(26), k).ay).toBeCloseTo(0, 10);
+
+    // A calm roll pushes nothing, whatever the coefficient.
+    expect(windAcceleration(CALM, k).ax).toBeCloseTo(0, 10);
+    expect(windAcceleration(CALM, k).ay).toBeCloseTo(0, 10);
+
+    // The general formula keeps its shape for a map gimmick that ever needs vertical wind: θ = 270° blows upward.
+    expect(windAcceleration({ magnitude: 26, directionDeg: 270, sector: 0 }, k).ay).toBeGreaterThan(0);
+
+    // Doubling `k` doubles the push: the coefficient is the only scale factor.
+    expect(windAcceleration(EAST(26), k * 2).ax).toBeCloseTo(windAcceleration(EAST(26), k).ax * 2, 9);
+  });
+
+  it("TC-BAL-123: the calibration shot — the 5.78 machine, four bar, 45°, lands 2 214 ± 20 u in 3.37 ± 0.05 s", () => {
+    // The middle machine: Iron Tortoise's mapped row is `turtle`, weight 5.78 ⇒ g = 390 (`US-BAL-004` AC3).
+    const flight = shoot("mbl-03", 45, 4);
+    expect(flight.mobile.weight).toBe(5.78);
+    expect(gravityFor(flight.mobile)).toBeCloseTo(390, 9);
+    expect(Math.abs(flight.landingX - 2_214)).toBeLessThanOrEqual(20);
+    expect(Math.abs(flight.flightMs - 3_370)).toBeLessThanOrEqual(50);
+    expect(flight.offMap).toBe(false);
+    // Closed form: `v0² / g = 929.34² / 390 = 2 214`; the 0.1 position quantum takes the rest.
+    expect(muzzleVelocity(4) ** 2 / 390).toBeCloseTo(2_214.5, 1);
+  });
+
+  it("TC-BAL-124: wind bends the calibration shot by the amount the machine's k implies", () => {
+    const calm = shoot("mbl-03", 45, 4);
+    const k = windKFor(getMobile("mbl-03"));
+    // `aₓ = k × 24.7`, and the flight is `t` long: `Δx ≈ ½·aₓ·t²` plus the integrator's own rounding.
+    const predicted = 0.5 * (k * 24.7) * (calm.flightMs / 1_000) ** 2;
+    const east = shoot("mbl-03", 45, 4, EAST(26)).landingX - calm.landingX;
+    const west = shoot("mbl-03", 45, 4, WEST(26)).landingX - calm.landingX;
+    expect(east).toBeGreaterThan(predicted * 0.95);
+    expect(east).toBeLessThan(predicted * 1.05);
+    // Symmetric up to the 0.1 quantum the flat probe rounds on.
+    expect(Math.abs(west + east)).toBeLessThan(15);
+    // 814 units on the 26 reading: a fifth of the map, and no small correction.
+    expect(east).toBeCloseTo(814.3, 0);
+
+    // Monotonic in the magnitude, and each sector pushes its own way.
+    const drift = [5, 13, 20, 26].map((magnitude) => shoot("mbl-03", 45, 4, EAST(magnitude)).landingX - calm.landingX);
     expect(drift[0]).toBeGreaterThan(0);
     for (let index = 1; index < drift.length; index += 1) {
       expect(drift[index]!, `magnitude step ${index}`).toBeGreaterThan(drift[index - 1]!);
     }
 
-    // Sector 1 is the other half of GB's wind: it pushes the same shot the other way.
-    const upwind = shoot("mbl-01", 45, 40, WEST(26)).landingX - calm.landingX;
-    expect(upwind).toBeLessThan(0);
-  });
-
-  it("TC-CORE-023: every mobile draws the same parabola and drifts by the same amount", () => {
-    // Before the rebalance this case asserted a *premise the genre does not have*: `mbl-13` (`mass 118`) drifted
-    // further than `mbl-03` (`mass 169`) because the wind was divided by mass. GB has one gravity for the roster and
-    // a wind that pushes every mobile alike, so the arc and the drift belong to the angle, the power and the weather
-    // — never to the mobile. At the same angle and power the old light/heavy pair is now pixel-identical.
-    const light = "mbl-13"; // the old mass-118 mobile
-    const heavy = "mbl-03"; // the old mass-169 mobile
-    const calmLight = shoot(light, 20, 60);
-    const calmHeavy = shoot(heavy, 20, 60);
-    expect(calmLight.landingX).toBe(521.7);
-    expect(calmHeavy.landingX).toBe(calmLight.landingX);
-    expect(calmHeavy.flightMs).toBe(calmLight.flightMs);
-
-    // Same wind, same drift: 32.4 units for both, whatever their angle window and shell.
-    const driftLight = shoot(light, 20, 60, EAST(26)).landingX - calmLight.landingX;
-    const driftHeavy = shoot(heavy, 20, 60, EAST(26)).landingX - calmHeavy.landingX;
-    expect(driftLight).toBeCloseTo(32.4, 1);
-    expect(driftHeavy).toBeCloseTo(driftLight, 6);
-
-    // The property is roster-wide: every mobile that may fire at 20° with a plain shell lands in the same spot and
-    // drifts the same distance. A returning per-mobile gravity or mass term breaks this at once.
-    const plain = MOBILES.filter(
-      (mobile) =>
-        !["bounce", "piercing"].includes(mobile.weapons[0].shotClass) &&
-        mobile.angleMin <= 20 &&
-        mobile.angleMax >= 20,
-    );
-    expect(plain.length).toBeGreaterThanOrEqual(8);
-    for (const mobile of plain) {
-      const still = shoot(mobile.mobileId, 20, 60);
-      expect(still.landingX, `${mobile.mobileId} calm`).toBe(521.7);
-      expect(still.flightMs, `${mobile.mobileId} hang time`).toBe(1_550);
-      const windy = shoot(mobile.mobileId, 20, 60, EAST(26));
-      expect(windy.landingX - still.landingX, `${mobile.mobileId} drift`).toBeCloseTo(32.4, 1);
+    // The correction is a property of the pick (`AC2`, AC5): each machine's drift follows its *own* k and its own hang
+    // time. Glacier Mammoth (`windDrag 0.0460`) hangs ~4.05 s and drifts ~ ½·k·24.7·t²; Mist Raven's bounce shell
+    // keeps it in the air too long for the closed form, so the check runs on the arc/lob machines.
+    for (const id of ["mbl-04", "mbl-03"]) {
+      const still = shoot(id, 45, 4);
+      const blown = shoot(id, 45, 4, EAST(26)).landingX - still.landingX;
+      const expected = 0.5 * windKFor(getMobile(id)) * 24.7 * (still.flightMs / 1_000) ** 2;
+      expect(blown / expected, id).toBeCloseTo(1, 1);
     }
   });
 
-  it("TC-CORE-925: the wind push is the weather's alone — no mass term, no vertical component", () => {
-    // `windAcceleration(wind, coefficient?)` lost its `mass` parameter: one wind reading is one push for the whole
-    // roster (`tunables.md` § 1.1), which is what makes a wind count transferable between mobiles in GB.
-    // `0.8 × 26 = 20.8 u/s²` — a fifth of gravity, and no divisor anywhere in the formula.
-    expect(windAcceleration(EAST(26)).ax).toBeCloseTo(26, 10);
-    expect(windAcceleration(EAST(26)).ay).toBeCloseTo(0, 10); // `-0` for a horizontal wind, i.e. no vertical term
-    expect(windAcceleration(WEST(26)).ax).toBeCloseTo(-26, 10);
-    expect(windAcceleration(WEST(26)).ay).toBeCloseTo(0, 10);
-
-    // Horizontal only: neither direction touches `vy`, so wind can never make a shell hang. The general formula
-    // keeps its shape for a map gimmick that ever needs vertical wind (`θ = 270°` blows from the north, upward).
-    expect(windAcceleration({ magnitude: 26, directionDeg: 270, sector: 0 }).ay).toBeGreaterThan(0);
-
-    // The coefficient is the only scale factor: half of it is half the push.
-    expect(windAcceleration(EAST(26), TUNABLES.windCoefficient / 2).ax).toBeCloseTo(13, 10);
+  it("TC-BAL-125: the same shot resolves twice to the same bits, in at most maxFlightMs / 25 points", () => {
+    const first = shoot("mbl-03", 45, 4, EAST(26));
+    const second = shoot("mbl-03", 45, 4, EAST(26));
+    expect(second).toEqual(first);
+    expect(second.steps).toBe(first.steps);
+    expect(first.steps).toBeLessThanOrEqual(TUNABLES.maxFlightMs / 25);
+    expect(TUNABLES.stepMs).toBe(25);
+    expect(first.flightMs % 25).toBe(0);
   });
 
-  it("TC-CORE-011: a different tunables file produces a different trajectory", () => {
-    const mobile = getMobile("mbl-01");
-    // `v0 = force × speedK`, so scaling `force` by the `speedK` ratio reproduces the trajectory the other tunables
-    // file would draw.
-    const make = (speedK: number) =>
-      launch({
-        id: 1,
-        ownerSlot: 0,
-        weaponSlot: 0,
-        weapon: mobile.weapons[0],
-        from: { x: 8, y: 820 },
-        facing: 1,
-        angle: 45,
-        force: 98 * (speedK / TUNABLES.speedK),
-      });
-    const context = { wind: CALM, gravity: TUNABLES.gravity };
-    const slow = simulateFlight(make(4.0), context, flat(), BOUNDS);
-    const fast = simulateFlight(make(5.0), context, flat(), BOUNDS);
-    expect(fast.landingX).toBeGreaterThan(slow.landingX);
+  it("TC-BAL-126: a machine without weight or drag resolves nothing and says why", () => {
+    // AC4: a missing or non-finite stat is an error, never a default that quietly changes the arc.
+    expect(() => gravityFor({ weight: undefined } as unknown as Pick<Mobile, "weight">)).toThrow(
+      "cannot resolve a shot: the machine has no weight",
+    );
+    expect(() => gravityFor({ weight: Number.NaN })).toThrow("no weight");
+    expect(() => windKFor({ windDrag: Number.POSITIVE_INFINITY })).toThrow("no windDrag");
+    expect(() => windKFor({} as Pick<Mobile, "windDrag">)).toThrow("no windDrag");
+
+    // Every shipped row carries both, so the guard never fires on real data.
+    for (const mobile of MOBILES) {
+      expect(Number.isFinite(gravityFor(mobile)), mobile.mobileId).toBe(true);
+      expect(Number.isFinite(windKFor(mobile)), mobile.mobileId).toBe(true);
+    }
+  });
+
+  it("TC-BAL-128: every machine crosses the spawn separation at four bar, and none overshoots the map by more than 3×", () => {
+    expect(TUNABLES.mapWidth).toBe(2_000);
+    for (const mobile of MOBILES) {
+      const angle = Math.min(mobile.angleMax, Math.max(mobile.angleMin, 45));
+      const flight = shoot(mobile.mobileId, angle, 4);
+      // One bar and one muzzle for the roster, but a per-machine gravity: the reach comes from weight and aim band.
+      expect(flight.landingX, mobile.mobileId).toBeGreaterThan(SEPARATION);
+      expect(flight.landingX, mobile.mobileId).toBeLessThan(SEPARATION * 3);
+      // The shell's own power stays inside the documented weapon band (`mobiles.md` § 3).
+      for (const weapon of mobile.weapons) {
+        expect(weapon.power, `${mobile.mobileId} power`).toBeGreaterThanOrEqual(150);
+        expect(weapon.power, `${mobile.mobileId} power`).toBeLessThanOrEqual(650);
+      }
+    }
   });
 
   it("TC-CORE-029: a shot that leaves the map never lands", () => {
-    // The real `map-01` bounds, not the probe. After the retune a mobile's own `maxPower` no longer throws the shell
-    // out of the window (`TC-CORE-924`), so the case fires past it on purpose: the miss path still has to resolve the
-    // turn instead of hanging on `maxFlightMs`.
-    const flight = shoot("mbl-01", 45, 200, EAST(26), { bounds: MAP_BOUNDS });
+    // mbl-20 overshoots the 2,000-unit map at four bar: the miss path still resolves the turn instead of hanging.
+    const flight = shoot("mbl-20", 45, 4, CALM, { bounds: MAP_BOUNDS });
     expect(flight.offMap).toBe(true);
     expect(flight.impact).toBeNull();
   });
 
   it("TC-CORE-913: a bouncing shell bounces on flat ground and a piercing shell crosses a hill", () => {
-    const mobile = getMobile("mbl-01");
-    const context = { wind: CALM, gravity: TUNABLES.gravity };
+    const mobile = getMobile("mbl-03");
+    const context = { wind: CALM, gravity: gravityFor(mobile), windK: windKFor(mobile) };
     const bounceWeapon = { ...mobile.weapons[0], shotClass: "bounce" as const };
     const bouncing = launch({
       id: 1,
@@ -193,7 +256,7 @@ describe("ballistics", () => {
       from: { x: 8, y: 820 },
       facing: 1,
       angle: 45,
-      force: 40,
+      bar: 2,
     });
     const bounced = simulateFlight(bouncing, context, flat(), BOUNDS);
     expect(bounced.landingX).toBeGreaterThan(0);
@@ -209,33 +272,16 @@ describe("ballistics", () => {
       from: { x: 8, y: 820 },
       facing: 1,
       angle: 10,
-      force: 90,
+      bar: 3.6,
     });
     const pierced = simulateFlight(piercing, context, ridge, BOUNDS);
     expect(pierced.landingX).toBeGreaterThan(520);
   });
 
-  it("TC-CORE-924: every mobile reaches across the map at maxPower on a flat probe", () => {
-    expect(TUNABLES.mapWidth).toBe(2_000);
-    for (const mobile of MOBILES) {
-      const angle = Math.min(mobile.angleMax, Math.max(mobile.angleMin, 45));
-      const flight = shoot(mobile.mobileId, angle, mobile.maxPower);
-      // One gravity and one power law, so the roster's spread comes from the aim band alone. The genre's own ceiling
-      // is that full power overshoots the enemy without leaving the map: every mobile throws at least 1.05× the
-      // spawn separation and none more than 2.2×, so the top of the bar is a real choice and not the only option.
-      expect(flight.landingX, mobile.mobileId).toBeGreaterThan(SEPARATION * 1.05);
-      expect(flight.landingX, mobile.mobileId).toBeLessThan(SEPARATION * 2.2);
-      for (const weapon of mobile.weapons) {
-        expect(weapon.power, `${mobile.mobileId} power`).toBeGreaterThanOrEqual(150);
-        expect(weapon.power, `${mobile.mobileId} power`).toBeLessThanOrEqual(650);
-      }
-    }
-  });
-
   it("quantises positions, not velocities, so the wind stays linear in the magnitude", () => {
     // `roundTo` is the 0.1 position quantum that keeps a snapshot compact. Quantising `vx` as well would throw away
-    // up to 20 % of the wind push and make the drift non-linear (`TC-CORE-023` promises it is linear).
-    const mobile = getMobile("mbl-01");
+    // up to 20 % of the wind push and make the drift non-linear (`TC-BAL-124` promises it is linear).
+    const mobile = getMobile("mbl-03");
     const projectile = launch({
       id: 1,
       ownerSlot: 0,
@@ -244,14 +290,18 @@ describe("ballistics", () => {
       from: { x: 0, y: 0 },
       facing: 1,
       angle: 30,
-      force: 50,
+      bar: 2,
     });
-    const stepped = stepProjectile(projectile, { wind: EAST(26), gravity: TUNABLES.gravity });
+    const stepped = stepProjectile(projectile, {
+      wind: EAST(26),
+      gravity: gravityFor(mobile),
+      windK: windKFor(mobile),
+    });
     // The step lands on the 0.1 grid…
     expect(Math.abs(stepped.x * 10 - Math.round(stepped.x * 10))).toBeLessThan(1e-6);
     expect(Math.abs(stepped.y * 10 - Math.round(stepped.y * 10))).toBeLessThan(1e-6);
-    // …but `vx` takes the whole 1.04 u/s of this step's wind (`20.8 × 0.05`) instead of being snapped.
-    expect(stepped.vx).toBeCloseTo(projectile.vx + 1.3, 9);
-    expect(stepped.ageMs).toBe(50);
+    // …but `vx` takes the whole wind of this step (`k × 24.7 × 0.025`) instead of being snapped.
+    expect(stepped.vx).toBeCloseTo(projectile.vx + windKFor(mobile) * 24.7 * 0.025, 9);
+    expect(stepped.ageMs).toBe(25);
   });
 });

@@ -11,7 +11,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, render, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import type { BattleCallbacks } from "../src/game/scene";
-import type { ServerMessage } from "@gbw/core";
+import { RULESET_VERSION, type ServerMessage } from "@gbw/core";
 import { rejectionCounts, resetRejections } from "../src/net/diagnostics";
 
 const setState = vi.fn();
@@ -126,7 +126,7 @@ const SNAPSHOT = {
   scores: { score: { A: 0, B: 0 }, activeTeam: "A", jewels: [] },
   status: "playing",
   winnerTeam: null,
-  rulesetVersion: "2026-11-05",
+  rulesetVersion: RULESET_VERSION,
 } as const;
 
 function hostChanged(to: string): ServerMessage {

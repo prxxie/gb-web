@@ -5,7 +5,7 @@
  * it already has, plus the record the room answered with (`match_recorded`), which is the only place the
  * rating deltas exist. The screen never computes a rating itself — an absent record renders as `—`.
  */
-import type { RankedReason } from "@gbw/core";
+import { resolveMobileId, type RankedReason } from "@gbw/core";
 import type { WinCondition } from "./outcome";
 
 export type MatchResult = "win" | "loss" | "abandon";
@@ -91,7 +91,7 @@ export function readResult(roomCode: string): ResultPayload | null {
       localSlot: parsed.localSlot,
       mapId: parsed.mapId ?? "map-01",
       maxPlayers: parsed.maxPlayers ?? 2,
-      mobileId: parsed.mobileId ?? "mbl-01",
+      mobileId: resolveMobileId(parsed.mobileId),
       kind: parsed.kind === "bot" ? "bot" : "online",
       isHost: parsed.isHost ?? false,
       submission: parsed.submission ?? null,

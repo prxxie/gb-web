@@ -93,7 +93,7 @@ test.describe("one shell in the air", () => {
     await page.waitForTimeout(450);
     await page.mouse.move(origin.x + 300, origin.y + 8, { steps: 8 });
     await page.waitForTimeout(120);
-    // The chip prints the angle and the power in one string ("45°0.00"): the power is the trailing decimal.
+    // The chip prints the angle and the power in one string ("45°0.0"): the power is the trailing decimal.
     const chip = (await page.getByTestId("power-value").textContent()) ?? "";
     const power = Number.parseFloat(chip.match(/(\d+\.\d+)\s*$/)?.[1] ?? "NaN");
     await page.mouse.up();

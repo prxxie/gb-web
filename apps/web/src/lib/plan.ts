@@ -5,7 +5,7 @@
  * match screen reads it back. It lives in its own module because the result screen needs it too: `Chơi lại`
  * on a practice match starts a fresh plan without going through the menu (`US-RANK-005` AC4, AC7).
  */
-import { MAPS, makeRoomCode, type Seat } from "@gbw/core";
+import { MAPS, makeRoomCode, resolveMobileId, type Seat } from "@gbw/core";
 
 export interface PlannedMatch {
   readonly kind: "bot" | "online";
@@ -32,7 +32,14 @@ export const PLAN_KEY = "gbw.match";
 export function readPlan(): PlannedMatch | null {
   try {
     const raw = sessionStorage.getItem(PLAN_KEY);
-    return raw ? (JSON.parse(raw) as PlannedMatch) : null;
+    if (!raw) return null;
+    const plan = JSON.parse(raw) as PlannedMatch;
+    // A plan written before the roster changed can name a machine this build no longer ships. Normalise it here, at
+    // the one place a stored plan is read, so no screen ever hands `undefined` to `getMobile` (`US-BAL-005` § 5).
+    return {
+      ...plan,
+      seats: plan.seats.map((seat) => ({ ...seat, mobileId: resolveMobileId(seat.mobileId) })),
+    };
   } catch {
     return null;
   }
