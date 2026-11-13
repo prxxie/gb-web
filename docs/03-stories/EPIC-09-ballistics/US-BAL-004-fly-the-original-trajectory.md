@@ -123,5 +123,6 @@ which is what `US-BAL-005` AC5's arithmetic implied; the inverse reading in AC2 
 answered as `OQ-44`.
 
 Cases: `TC-BAL-119`–`TC-BAL-128` in `docs/05-quality/test-cases.md`, asserted by `packages/core/tests/ballistics.test.ts`
-(AC1–AC4, calibration, determinism) and `packages/core/tests/snapshot.test.ts` (AC5). Not run: the browser suite — the
-model is pure and its inputs are covered by unit tests, so `pnpm e2e` was left to the release gate.
+(AC1–AC4, calibration, determinism) and `packages/core/tests/snapshot.test.ts` (AC5). The browser suite runs green with
+the new bar too: `pnpm e2e` **91 passed** (2026-11-13) — one assertion in `tests/e2e/pwa-prod.spec.ts` still expected the
+old two-decimal readout and was corrected to `0.0`.

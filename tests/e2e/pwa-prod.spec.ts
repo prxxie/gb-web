@@ -174,7 +174,7 @@ test.describe("production build: install and offline play", () => {
     // The turn resolves locally and the pull was spent: the readout drops back to zero and no event log is drawn over the
     // field (the owner struck it, 2026-11-09 — it sat mid-screen, over the arc the shell flies).
     await expect(page.getByTestId("event-feed")).toHaveCount(0);
-    await expect(page.getByTestId("power-value")).toHaveText(/0\.00/);
+    await expect(page.getByTestId("power-value")).toHaveText(/0\.0$/);
   });
 });
 
