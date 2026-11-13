@@ -54,6 +54,7 @@ import { clampProgress } from "./interpolate";
 import { armFullscreen } from "../lib/fullscreen";
 import { IMPACT_MS, clampFlightMs } from "./flight";
 import { aimPreview } from "./preview";
+import { clipToWindow } from "./viewport";
 
 
 export interface BattleCallbacks {
@@ -74,6 +75,8 @@ export interface BattleCallbacks {
    * shooter's feet in parts of a screen, which is the only unit the game speaks in.
    */
   readonly onProbe?: (point: { readonly x: number; readonly y: number } | null) => void;
+  /** Where the aid's arc ended, in world units, and whether the window cut it (`US-BAL-003` AC1). */
+  readonly onPreview?: (info: { readonly maxX: number | null; readonly clipped: boolean }) => void;
   /**
    * The item wheel (owner's layout, 2026-11-09): a press **held on this client's own mobile** opens it at that point, and
    * a press anywhere else closes it (`null`). A hold on the field still arms a shot — only a hold on the hull is a loadout.
@@ -1033,23 +1036,62 @@ class BattleScene extends Phaser.Scene {
         aimDelta: this.aimDelta,
       }) : null;
       if (preview) {
-        // The arc has to be readable at a glance on a night map: a thin line under brighter, larger dots. 2 px at
-        // 40 % was invisible in a real screenshot (2026-11-08), which made the aid look broken next to the ring.
-        graphics.lineStyle(px(1.5), 0xffffff, 0.35);
-        graphics.beginPath();
-        graphics.moveTo(preview.path[0]?.x ?? 0, preview.path[0]?.y ?? 0);
-        for (const dot of preview.path.slice(1)) graphics.lineTo(dot.x, dot.y);
-        graphics.strokePath();
+        // The arc is clipped to the window before anything is drawn (`US-BAL-003` AC1): an aid that shows the whole
+        // flight hands the player the landing point of a shot they cannot see, which is the exact information the
+        // one-screen rule withholds. The baseline is the same shot with the wind taken out (AC2) — the gap between the
+        // two arcs is the wind, and reading that gap is the skill the aid is supposed to teach.
+        const shown = clipToWindow(preview.path, this.window);
+        const base = clipToWindow(preview.baseline, this.window);
+        this.callbacks.onPreview?.({
+          maxX: shown.length > 0 ? Math.round((shown[shown.length - 1] as { x: number }).x) : null,
+          clipped: shown.length < preview.path.length,
+        });
+
+        // The baseline goes underneath, neutral and thin: it is the reference, not the answer.
+        if (base.length > 1) {
+          graphics.lineStyle(px(1.5), 0x9fb4d8, 0.45);
+          graphics.beginPath();
+          graphics.moveTo((base[0] as { x: number; y: number }).x, (base[0] as { x: number; y: number }).y);
+          for (const point of base.slice(1) as readonly { x: number; y: number }[]) graphics.lineTo(point.x, point.y);
+          graphics.strokePath();
+        }
+
+        // The live arc: a thin line under brighter, larger dots (2 px at 40 % was invisible in a real screenshot).
+        if (shown.length > 1) {
+          graphics.lineStyle(px(1.5), 0xffffff, 0.35);
+          graphics.beginPath();
+          graphics.moveTo((shown[0] as { x: number; y: number }).x, (shown[0] as { x: number; y: number }).y);
+          for (const point of shown.slice(1) as readonly { x: number; y: number }[]) graphics.lineTo(point.x, point.y);
+          graphics.strokePath();
+        }
+
+        // Ten equal time ticks (AC3). Ticks closer than 6 px on screen are dropped — at low power a 25 ms step is a smear
+        // that reads as one fat dot — and no tick is drawn at the clipped end: a dot on the edge would mark *where* the
+        // arc leaves, which is a bigger hint than the line itself.
+        const dotCount = preview.path.length === shown.length ? shown.length : shown.length - 1;
+        const minGap = px(TUNABLES.previewDotMinPx);
         graphics.fillStyle(0xffffff, 0.9);
-        for (const dot of preview.path) graphics.fillCircle(dot.x, dot.y, px(2.5));
-        // No impact means the shot leaves the map: a blast ring in the sky would be a promise nobody keeps.
-        if (preview.impact) {
+        let lastKept: { x: number; y: number } | null = null;
+        for (let index = 0; index < dotCount; index += 1) {
+          const dot = shown[index] as { x: number; y: number };
+          if (lastKept && Math.hypot(dot.x - lastKept.x, dot.y - lastKept.y) < minGap) continue;
+          graphics.fillCircle(dot.x, dot.y, px(2.5));
+          lastKept = dot;
+        }
+        // No impact means the shot leaves the map: a blast ring in the sky would be a promise nobody keeps. It is also
+        // only drawn when the aid could see it — a ring beyond the edge is the answer itself.
+        if (preview.impact && !this.clippedAway(shown, preview.path)) {
           graphics.lineStyle(px(2), 0xffffff, 0.55);
           // The blast radius is a world length (it is what the engine carves), so only its stroke stays screen-sized.
           graphics.strokeCircle(preview.impact.x, preview.impact.y, preview.radius);
         }
       }
     }
+  }
+
+  /** Whether the window cut the arc, i.e. whether the blast ring would be describing something the player cannot see. */
+  private clippedAway(shown: readonly { x: number; y: number }[], path: readonly { x: number; y: number }[]): boolean {
+    return shown.length < path.length;
   }
 
   shutdown(): void {

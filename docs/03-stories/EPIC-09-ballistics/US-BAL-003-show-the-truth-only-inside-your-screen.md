@@ -2,7 +2,7 @@
 id: US-BAL-003
 title: Show the truth only inside your screen
 epic: EPIC-09-ballistics
-status: ready
+status: done
 priority: P0
 size: S
 depends_on: [US-MATCH-002, US-BAL-002]
@@ -43,8 +43,11 @@ costs.
 /** The preview, clipped to what the player may see. */
 export function clipToWindow(path: readonly Vec2[], window: CameraWindow): readonly Vec2[];
 /** The same shot with wind removed, for the baseline arc. */
-export function baselineShot(state: MatchState, slot: number, weaponSlot: 0 | 1 | 2, angle: number, bar: number): ShotPreview;
+export function baselineShot(state: MatchState, slot: number, weaponSlot: 0 | 1 | 2, angle: number, force: number): ShotPreview;
 ```
+
+Superseded in place: the draft contract above took `bar`, but nothing in the repo speaks bars yet — the wire field and the
+resolver take `force` (`US-BAL-004` introduces bars), so the baseline takes `force` and the conversion stays in one place.
 
 ## 5. Rules and edge cases
 
@@ -67,10 +70,29 @@ export function baselineShot(state: MatchState, slot: number, weaponSlot: 0 | 1 
 
 ## 8. Test notes
 
-Unit: `clipToWindow` (inside, crossing, fully outside), baseline equality when wind is zero, dot spacing at 25 ms.
-e2e: with the aid on, no pixel of the arc is drawn past the window edge — asserted through the scene's exposed preview
-points, not by screenshot diffing. Planned cases `TC-BAL-113`–`TC-BAL-118`.
+`TC-BAL-113` (`clipToWindow`: inside, crossing with a trimmed segment, muzzle already outside, left edge, vertical segment),
+`TC-BAL-114` (baseline equality at wind 0, divergence at wind 22), `TC-BAL-115` (11 ticks at frames 0…100 of 101, collapse on
+a short flight, last dot on the impact) in `apps/web/tests/preview-clip.test.tsx`; `TC-BAL-116`/`TC-BAL-117` (the drawn arc
+ends at the edge; off by default and remembered across a reload) in `tests/e2e/aim-aid.spec.ts`.
+
+Red: `apps/web/tests/preview-clip.test.tsx` — the aid's arc was the whole flight (58 raw resolver points on a 2 màn shot), so
+`TC-BAL-113`'s first assertion (`toHaveLength(3)`) and `TC-BAL-115`'s tick count both failed against `previewDots: 24`, and
+`data-preview-max-x` did not exist to read.
 
 ## 9. Open questions
 
 None.
+
+<!-- delivery:2026-11-13 -->
+
+## Delivery status — 2026-11-13
+
+**done.** `clipToWindow` in `apps/web/src/game/viewport.ts` (horizontal clipping — a shell arcs above the top of the frame in
+every artillery game, so `x` is the axis the secret lives on; the crossing point is computed by trimming the last segment, and
+the scene draws no tick and no blast ring there). `baselineShot` and `sampleByTime` in `apps/web/src/game/preview.ts`, with
+`PREVIEW_STEPS` moved into `TUNABLES.previewSteps` (10) and the 6 px minimum gap into `TUNABLES.previewDotMinPx`; `previewDots:
+24` is superseded — a fixed count said nothing about the flight.
+
+The scene publishes `data-preview-max-x` / `data-preview-clipped` on the match screen so the rule is observable from a test
+instead of a screenshot diff. The blast ring is withheld when the window cut the arc: a ring in the unseen half of the map is
+the landing point, which is the answer the aid must not give.

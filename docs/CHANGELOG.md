@@ -1,5 +1,16 @@
 # Changelog
 
+## 2026-11-13 — the aim aid only shows what the player can see
+
+The aid used to draw the whole flight, which on a 2.5-màn map revealed the landing point of a shot the player cannot see
+(`US-BAL-003`). Now: the arc is clipped at the window's left/right edge with the last segment trimmed and no tick or blast ring
+at the crossing; a second neutral arc shows the same shot with the wind removed, so the gap between them is the wind; and the
+dots are ten equal **time** steps (`TUNABLES.previewSteps`, `dt = flightMs / 10`) with a 6 px minimum gap instead of a fixed
+count of dots along a curve. `previewDots: 24` is superseded.
+
+`TC-BAL-113`–`TC-BAL-117` are new. The scene publishes `data-preview-max-x` / `data-preview-clipped`, so "the aid drew nothing
+past the edge" is asserted in numbers rather than by comparing screenshots.
+
 ## 2026-11-13 — one screen is the game, and it is measured in parts
 
 The field now shows **exactly one screen** (`US-BAL-002`): `windowOnBoth` is gone, so an opponent more than one màn away is

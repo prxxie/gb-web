@@ -6,7 +6,7 @@
  * keeps "what the player meant" testable without a browser, which is the same reason the rules engine
  * is separate (`NFR-22`).
  */
-import { powerFromDrag, angleFromPull, pinchTo, panBy, type CameraWindow } from "@gbw/core";
+import { powerFromDrag, angleFromPull, pinchTo, panBy, type CameraWindow, type Vec2 } from "@gbw/core";
 
 /** Vertical travel that turns the barrel one degree: 180 px of drag sweeps 45°, a comfortable thumb arc. */
 export const ANGLE_DEG_PER_PX = 0.25;
@@ -178,4 +178,46 @@ export { angleFromPull, panBy, pinchTo, powerFromDrag };
  */
 export function screenConstant(pixels: number, scale: number): number {
   return pixels / (Number.isFinite(scale) && scale > 0 ? scale : 1);
+}
+
+/**
+ * The aid's arc, clipped to what the player may see (`US-BAL-003` AC1).
+ *
+ * The aid used to draw the whole flight, and on a 2.5-màn map that revealed the landing point of a shot the player could
+ * not see — the one-screen rule of `US-BAL-002` would be pointless with it on. Clipping is **horizontal only**: a shell
+ * arcs above the top of the frame in every artillery game, so the vertical extent carries no information about *where* the
+ * opponent is. `x` is the axis the secret lives on.
+ *
+ * The crossing point is computed, not guessed: the last segment is trimmed at the edge so the arc visually ends exactly on
+ * the boundary, and the caller is expected to draw the line but no dot there (a dot at the edge would be a marker for
+ * "here is where it leaves", which is a different and larger hint than the line itself).
+ */
+export function clipToWindow(path: readonly Vec2[], window: CameraWindow): readonly Vec2[] {
+  const left = window.x;
+  const right = window.x + window.width;
+  const inside = (point: Vec2): boolean => point.x >= left && point.x <= right;
+  const clipped: Vec2[] = [];
+  for (let index = 0; index < path.length; index += 1) {
+    const point = path[index] as Vec2;
+    if (index === 0) {
+      // A shot whose muzzle is already outside the frame has nothing to show: the target is not the only thing off screen.
+      if (!inside(point)) return [];
+      clipped.push(point);
+      continue;
+    }
+    if (inside(point)) {
+      clipped.push(point);
+      continue;
+    }
+    const previous = path[index - 1] as Vec2;
+    const edge = point.x < left ? left : right;
+    const span = point.x - previous.x;
+    // A vertical segment cannot cross a vertical edge; guard anyway so a degenerate path cannot produce NaN.
+    if (span === 0) return clipped;
+    const t = (edge - previous.x) / span;
+    clipped.push({ x: edge, y: previous.y + (point.y - previous.y) * t });
+    // The arc stops at the edge: the flight beyond it is the part the player has to calculate.
+    return clipped;
+  }
+  return clipped;
 }

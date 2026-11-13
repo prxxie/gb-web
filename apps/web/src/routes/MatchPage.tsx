@@ -62,6 +62,8 @@ export function MatchPage(): JSX.Element {
   /** The width the field is showing, in world units: one screen, or the whole map while measuring (`US-BAL-002`). */
   const [fieldWidth, setFieldWidth] = useState<number | null>(null);
   const [fieldX, setFieldX] = useState<number | null>(null);
+  /** Where the aid's arc stopped, and whether the window cut it (`US-BAL-003` AC1) — the aid's honesty, observable. */
+  const [preview, setPreview] = useState<{ maxX: number | null; clipped: boolean } | null>(null);
   const aimHud = useAimHud(plan, state);
   const weapons = useWeaponSelect({ ssCharge: localPlayer?.ssCharge ?? 0, battle: wiring.battle });
   const chat = useMatchChat({ plan, wiring });
@@ -91,6 +93,7 @@ export function MatchPage(): JSX.Element {
       setFieldWidth(Math.round(next.width));
       setFieldX(Math.round(next.x));
     },
+    onPreview: setPreview,
   });
   useBattleSync({
     wiring,
@@ -134,6 +137,8 @@ export function MatchPage(): JSX.Element {
       data-cinematic={engine.cinematic ? "true" : "false"}
       data-field-width={fieldWidth ?? ""}
       data-field-x={fieldX ?? ""}
+      data-preview-max-x={preview?.maxX ?? ""}
+      data-preview-clipped={preview?.clipped ? "true" : "false"}
     >
       <div className="sr-only" role="status" aria-live="polite" data-testid="match-announce">
         {announcement}

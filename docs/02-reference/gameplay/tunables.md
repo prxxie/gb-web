@@ -340,7 +340,10 @@ the numbers behind it.
 | `rulerSegments` | `clamp(round(visibleWidth / 100), 8, 24)` | one division is one part at every zoom: 8 at one screen, 20 at the whole map |
 | `rulerUnit` | **100 units** (one part) | the label is the part's number on the map, not an offset |
 | `interpolateMs` | 100 ms | the screen draws one state behind and catches up within this gap — a state that lands mid-blend continues from the drawn pixel instead of jumping (`US-MATCH-001` AC2) |
-| `previewDots` | 24 | how many dots the aim aid samples the resolved flight into — a dotted line, not a curve, so the count is drawing, not physics (`US-MATCH-005` AC2) |
+| ~~`previewDots`~~ | ~~24~~ | **superseded 2026-11-13 by `previewSteps`** (`US-BAL-003`): a fixed dot count said nothing about the flight — a 200-unit lob and a 2 000-unit shot got the same number of dots |
+| `previewSteps` | **10** | dots per aid preview, one per equal **time** step (`dt = flightMs / 10`) — a tick a player can count against the wind (`US-BAL-003` AC3) |
+| `previewDotMinPx` | **6 px** | ticks closer than this on screen are dropped; at low power a 25 ms step is a smear |
+| `previewClip` | the camera window | the aid's arc is clipped at the window's left/right edge, and no tick or blast ring is drawn at the crossing (`US-BAL-003` AC1) |
 
 **Why the ruler doubles.** A single part scale cannot serve both views: 125-unit divisions would be unreadable at the whole
 map, and 62.5-unit divisions would be noise at half map. Doubling the division count keeps one division at ~125 world

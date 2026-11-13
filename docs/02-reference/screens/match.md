@@ -191,3 +191,10 @@ The battlefield is a **gesture surface**, not a canvas with buttons on it:
 The canvas is rasterised at the device's pixel density, capped at 2 (`US-MATCH-011`): the game size is
 `cssSize × ratio` and the canvas is styled back down to its parent, so drawing happens in device pixels while gestures and
 screen constants stay in CSS pixels.
+
+## Aim aid
+
+Off by default and stored (`gb.aimAid`, never a URL flag). It draws the resolver's own flight (`US-MATCH-005` AC2), **clipped
+to the window's left/right edge** with the last segment trimmed and no tick or blast ring at the crossing (`US-BAL-003` AC1),
+a second neutral arc of the same shot with the wind removed so the gap between them is the wind (AC2), and ten equal **time**
+ticks with a 6 px minimum gap (AC3). The scene publishes `data-preview-max-x` and `data-preview-clipped` on the match screen.

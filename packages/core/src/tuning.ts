@@ -117,8 +117,13 @@ export const TUNABLES = {
   rulerUnitTarget: 125,
   /** How long the screen takes to catch up to a new state — `US-MATCH-001` AC2 (`tunables.md` § 9). */
   interpolateMs: 100,
-  /** How many dots the aim aid samples the resolved flight into (`US-MATCH-005` AC2). */
-  previewDots: 24,
+  /**
+   * Dots per aim-aid preview (`US-BAL-003` AC3): ten equal **time** steps, not a fixed count of dots along a curve. Replaces
+   * `previewDots: 24`, whose count said nothing about the flight — a long shot and a short one got the same dots.
+   */
+  previewSteps: 10,
+  /** Ticks closer than this on screen are dropped: at low power a 25 ms step is a smear that reads as one fat dot. */
+  previewDotMinPx: 6,
 } as const;
 
 export type Tunables = typeof TUNABLES;

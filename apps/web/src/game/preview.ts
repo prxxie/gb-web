@@ -18,14 +18,19 @@ export interface AimPreview {
   readonly force: number;
   /** The sampled flight, muzzle first; the last dot is the impact when there is one. */
   readonly path: readonly Vec2[];
+  /** The same shot with the wind removed, for the baseline arc (`US-BAL-003` AC2). */
+  readonly baseline: readonly Vec2[];
   /** The blast centre, `null` when the shot leaves the map. */
   readonly impact: Vec2 | null;
   /** The weapon's blast radius — the ring drawn at the landing point. */
   readonly radius: number;
 }
 
-/** How many dots the flight is sampled into — enough for a clean dotted line, few enough to draw cheaply. */
-export const PATH_DOTS = TUNABLES.previewDots;
+/**
+ * Dots per flight (`US-BAL-003` AC3). Ten equal **time** steps, not equal distance: the resolver samples its path at a
+ * fixed `stepMs`, so equal index spacing *is* equal time — and a time tick is what a player can count against the wind.
+ */
+export const PREVIEW_STEPS = TUNABLES.previewSteps;
 
 export interface AimPreviewInput {
   readonly state: MatchState;
@@ -37,15 +42,42 @@ export interface AimPreviewInput {
   readonly aimDelta?: number | undefined;
 }
 
-/** Stride the resolver's path down to `PATH_DOTS` points, ending on the impact when the engine found one. */
-function sample(path: readonly Vec2[], impact: Vec2 | null): readonly Vec2[] {
-  const every = Math.max(1, Math.ceil(path.length / PATH_DOTS));
+/**
+ * Stride the resolver's path into `steps` equal time steps.
+ *
+ * The path is the resolver's own samples at a fixed `stepMs`, so index spacing is time spacing. The impact is appended
+ * when the engine found one and the last tick did not already land on it — the ring has to sit where the shell stops.
+ */
+export function sampleByTime(path: readonly Vec2[], impact: Vec2 | null, steps: number): readonly Vec2[] {
+  if (path.length === 0) return [];
+  const lastIndex = path.length - 1;
   const dots: Vec2[] = [];
-  for (let index = 0; index < path.length; index += every) dots.push(path[index] as Vec2);
-  const last = path[path.length - 1] as Vec2;
-  if (dots[dots.length - 1] !== last) dots.push(last);
+  for (let step = 0; step <= steps; step += 1) {
+    const index = Math.round((step / steps) * lastIndex);
+    const point = path[index] as Vec2;
+    const previous = dots[dots.length - 1];
+    if (previous && previous.x === point.x && previous.y === point.y) continue;
+    dots.push(point);
+  }
+  const last = path[lastIndex] as Vec2;
   if (impact && (last.x !== impact.x || last.y !== impact.y)) dots.push(impact);
   return dots;
+}
+
+/** The state with the wind taken out of it: only the wind is different, so the two arcs differ only by the wind. */
+function withoutWind(state: MatchState): MatchState {
+  return { ...state, weather: { ...state.weather, wind: { ...state.weather.wind, magnitude: 0 } } };
+}
+
+/** The same shot with the wind removed (`US-BAL-003` AC2) — the baseline an aid needs to teach what wind costs. */
+export function baselineShot(
+  state: MatchState,
+  slot: number,
+  weaponSlot: 0 | 1 | 2,
+  angle: number,
+  force: number,
+): ReturnType<typeof previewShot> {
+  return previewShot(withoutWind(state), slot, weaponSlot, angle, force);
 }
 
 export function aimPreview(input: AimPreviewInput): AimPreview | null {
@@ -54,14 +86,17 @@ export function aimPreview(input: AimPreviewInput): AimPreview | null {
   if (!player || player.eliminated || input.state.status !== "playing") return null;
 
   const angle = shotAngle(input.angle, input.aimDelta, getMobile(player.mobileId));
-  const shot = previewShot(input.state, input.localSlot, input.weaponSlot, angle, forceFromPower(input.power));
+  const force = forceFromPower(input.power);
+  const shot = previewShot(input.state, input.localSlot, input.weaponSlot, angle, force);
   if (!shot) return null;
+  const baseline = baselineShot(input.state, input.localSlot, input.weaponSlot, angle, force);
 
   return {
     weaponSlot: shot.weaponSlot,
     angle: shot.angle,
     force: shot.force,
-    path: sample(shot.path, shot.impact),
+    path: sampleByTime(shot.path, shot.impact, PREVIEW_STEPS),
+    baseline: baseline ? sampleByTime(baseline.path, null, PREVIEW_STEPS) : [],
     impact: shot.impact,
     radius: shot.radius,
   };

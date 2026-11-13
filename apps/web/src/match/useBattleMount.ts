@@ -31,16 +31,19 @@ export interface BattleMountOptions {
   readonly onProbe?: (point: { readonly x: number; readonly y: number } | null) => void;
   /** The camera window, so the page can publish the scale the field is at (`US-BAL-002`). */
   readonly onCamera?: (window: CameraWindow) => void;
+  /** Where the aim aid's arc ended and whether the window cut it (`US-BAL-003` AC1). */
+  readonly onPreview?: (info: { readonly maxX: number | null; readonly clipped: boolean }) => void;
 }
 
 export function useBattleMount(options: BattleMountOptions): void {
-  const { container, plan, state, commit, mobile, wiring, aim, weapons, hostingRef, onMeasureRefused, onProbe, onCamera } = options;
+  const { container, plan, state, commit, mobile, wiring, aim, weapons, hostingRef, onMeasureRefused, onProbe, onCamera, onPreview } = options;
   const { battle, mesh, socket, seq, stateRef, hostGeneration } = wiring;
   const { weaponSlotRef, lockedTurnRef, setLockedTurn } = weapons;
   const { aimDeltaRef, cancelPull, setFocus, setItemWheelAt, setPower, setPullAngle } = aim;
   // The camera window still drives the scene; the ruler that printed it is gone (`screens/match.md` § 8).
   const [, setCamera] = useState<CameraWindow | null>(null);
   const reportCamera = onCamera;
+  const reportPreview = onPreview;
 
   useEffect(() => {
     if (!container.current || !state || !plan) return;
@@ -119,6 +122,7 @@ export function useBattleMount(options: BattleMountOptions): void {
           setCamera(window);
           reportCamera?.(window);
         },
+        onPreview: (info) => reportPreview?.(info),
       },
     });
     // A remounted scene starts on slot 0 and no nudge; hand it what the strip and the pad are showing.
