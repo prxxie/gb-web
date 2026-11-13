@@ -78,7 +78,11 @@ test.describe("the battlefield renders at the screen's density", () => {
     expect(await waitForMyTurn(page)).toBe(true);
 
     let opened = false;
-    for (const [fx, fy] of [[0.1, 0.65], [0.13, 0.65], [0.16, 0.7], [0.2, 0.62], [0.08, 0.58], [0.24, 0.68]]) {
+    // The window is one screen wide and centred on the shooter (`US-BAL-002`), so the hull sits around a quarter of the
+    // way across, not at the tenth a half-map window put it at.
+    for (const [fx, fy] of [
+      [0.22, 0.7], [0.26, 0.68], [0.3, 0.72], [0.2, 0.66], [0.34, 0.7], [0.1, 0.65], [0.16, 0.7], [0.4, 0.68],
+    ]) {
       if (!(await waitForMyTurn(page))) break;
       const point = await page.evaluate(([x, y]) => ({ x: Math.round(innerWidth * x), y: Math.round(innerHeight * y) }), [fx, fy]);
       await page.mouse.move(point.x, point.y);

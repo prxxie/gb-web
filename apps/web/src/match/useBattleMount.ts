@@ -25,15 +25,22 @@ export interface BattleMountOptions {
   readonly weapons: MatchWeapons;
   /** The role as the renderer holds it (`US-NET-003` AC2). */
   readonly hostingRef: RefObject<boolean>;
+  /** The field is open to measure and refused a press (`US-BAL-002` AC4). */
+  readonly onMeasureRefused?: () => void;
+  /** A tap on the field, in world units, for the HUD's measure readout (`US-BAL-001` AC3). */
+  readonly onProbe?: (point: { readonly x: number; readonly y: number } | null) => void;
+  /** The camera window, so the page can publish the scale the field is at (`US-BAL-002`). */
+  readonly onCamera?: (window: CameraWindow) => void;
 }
 
 export function useBattleMount(options: BattleMountOptions): void {
-  const { container, plan, state, commit, mobile, wiring, aim, weapons, hostingRef } = options;
+  const { container, plan, state, commit, mobile, wiring, aim, weapons, hostingRef, onMeasureRefused, onProbe, onCamera } = options;
   const { battle, mesh, socket, seq, stateRef, hostGeneration } = wiring;
   const { weaponSlotRef, lockedTurnRef, setLockedTurn } = weapons;
   const { aimDeltaRef, cancelPull, setFocus, setItemWheelAt, setPower, setPullAngle } = aim;
   // The camera window still drives the scene; the ruler that printed it is gone (`screens/match.md` § 8).
   const [, setCamera] = useState<CameraWindow | null>(null);
+  const reportCamera = onCamera;
 
   useEffect(() => {
     if (!container.current || !state || !plan) return;
@@ -44,6 +51,10 @@ export function useBattleMount(options: BattleMountOptions): void {
       callbacks: {
         // The pad rings the mobile the player is shooting (`US-MATCH-003` AC11).
         onFocus: (point) => setFocus(point),
+        // A field opened to measure refuses shots; the page says so once (`US-BAL-002` AC4).
+        onMeasureRefused: () => onMeasureRefused?.(),
+        // A tap on the field reports a point to measure against (`US-BAL-001` AC3).
+        onProbe: (point) => onProbe?.(point),
         // A press held on this client's own hull fans the loadout out around it (`owner`, 2026-11-09).
         onItemHold: (point) => setItemWheelAt(point),
         onPull: (value, angle) => {
@@ -104,7 +115,10 @@ export function useBattleMount(options: BattleMountOptions): void {
           setPower(0);
         },
         onCancel: (reason) => cancelPull(reason),
-        onCamera: (window) => setCamera(window),
+        onCamera: (window) => {
+          setCamera(window);
+          reportCamera?.(window);
+        },
       },
     });
     // A remounted scene starts on slot 0 and no nudge; hand it what the strip and the pad are showing.

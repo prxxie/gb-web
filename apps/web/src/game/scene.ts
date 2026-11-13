@@ -12,7 +12,9 @@ import Phaser from "phaser";
 import {
   TUNABLES,
   defaultWindow,
-  windowOnBoth,
+  isMeasuring,
+  windowOn,
+  windowMeasuring,
   clampWindow,
   panBy,
   pinchTo,
@@ -48,6 +50,7 @@ import {
   type UnitPose,
 } from "./interpolate";
 import { ANGLE_RING_RADIUS, RING_RADIUS, RING_START, angleArc, anglePoint, ringColor, ringSweep } from "./aim";
+import { clampProgress } from "./interpolate";
 import { armFullscreen } from "../lib/fullscreen";
 import { IMPACT_MS, clampFlightMs } from "./flight";
 import { aimPreview } from "./preview";
@@ -64,6 +67,13 @@ export interface BattleCallbacks {
    * rings the mobile instead of covering it; `null` means the mobile is not on screen and the pad falls back.
    */
   readonly onFocus?: (point: { readonly x: number; readonly y: number } | null) => void;
+  /** A press was refused because the field is zoomed out to measure (`US-BAL-002` AC4): the page announces it once. */
+  readonly onMeasureRefused?: () => void;
+  /**
+   * A tap on the field, in world units (`US-BAL-001` AC3): the page prints the distance and the height difference to the
+   * shooter's feet in parts of a screen, which is the only unit the game speaks in.
+   */
+  readonly onProbe?: (point: { readonly x: number; readonly y: number } | null) => void;
   /**
    * The item wheel (owner's layout, 2026-11-09): a press **held on this client's own mobile** opens it at that point, and
    * a press anywhere else closes it (`null`). A hold on the field still arms a shot — only a hold on the hull is a loadout.
@@ -91,6 +101,11 @@ export interface BattleHandle {
    * bar, and reading the arc is the skill. The aid is a training wheel, not the game.
    */
   setAimAid(enabled: boolean): void;
+  /**
+   * Open the field to the whole map to measure, or snap it back to one screen (`US-BAL-002` AC3). The measure view
+   * closes itself after `TUNABLES.measureReturnMs`, and **no shot may be fired while it is open** (AC4).
+   */
+  setMeasuring(on: boolean): void;
   destroy(): void;
 }
 
@@ -181,6 +196,11 @@ class BattleScene extends Phaser.Scene {
   private pullPower = 0;
   private pullAngle = 0;
   private aimAllowed = true;
+  /** The field is opened to the whole map to measure, and no shot may leave while it is (`US-BAL-002` AC3/AC4). */
+  private measuring = false;
+  private measureUntil = 0;
+  /** While a shell is in the air the camera rides it, and the turn's own framing waits (`US-BAL-002` AC5). */
+  private followUntil = 0;
   /** The weapon slot the strip has selected; the preview and the ring use this class (`US-MATCH-005` AC2). */
   private weaponSlot: 0 | 1 | 2 = 0;
   /** The pad's angle nudge, mirrored from the page: the preview must carry the angle the shot will carry. */
@@ -246,6 +266,42 @@ class BattleScene extends Phaser.Scene {
     }
   }
 
+  setMeasuring(on: boolean): void {
+    if (on) this.openMeasure();
+    else this.closeMeasure();
+  }
+
+  /** May this client start a pull right now? Never while the field is open to measure (`US-BAL-002` AC4). */
+  private canAimNow(): boolean {
+    return this.aimAllowed && !this.measuring;
+  }
+
+  private get aspectRatio(): number {
+    return this.scale.width / Math.max(1, this.scale.height);
+  }
+
+  /** Open the field to the whole map so a distance can be counted, and arm the snap-back (`US-BAL-002` AC3). */
+  private openMeasure(): void {
+    const centre = this.window.x + this.window.width / 2;
+    this.measuring = true;
+    this.measureUntil = now() + TUNABLES.measureReturnMs;
+    this.window = windowMeasuring(this.aspectRatio, centre);
+    // An open measure view ends any pull in progress: the scale the player was reading has just changed.
+    this.clearOrigin();
+    this.pullPower = 0;
+    this.callbacks.onPull(0, this.barrelAngle);
+    this.callbacks.onCamera(this.window);
+  }
+
+  /** Snap back to exactly one screen around whoever is shooting. */
+  private closeMeasure(): void {
+    if (!this.measuring) return;
+    this.measuring = false;
+    this.measureUntil = 0;
+    this.frameOn(this.state.turn.activeSlot, this.state);
+    this.callbacks.onCamera(this.window);
+  }
+
   setState(state: MatchState, localSlot: number, events: readonly MatchEvent[] = []): void {
     const previousActiveSlot = this.state.turn.activeSlot;
     // Start the segment where the screen actually is, so a state that lands mid-blend continues from the drawn
@@ -269,6 +325,8 @@ class BattleScene extends Phaser.Scene {
       slot: hit.slot,
       amount: Number((hit as { damage?: number; amount?: number }).damage ?? (hit as { amount?: number }).amount ?? 0),
     }));
+    // The camera rides this shell to its impact, and the next turn's framing waits until it lands (`US-BAL-002` AC5).
+    this.followUntil = startedAt + clampFlightMs(event.flightMs) + IMPACT_MS;
     this.flying.push({
       path: event.path,
       startedAt,
@@ -281,6 +339,31 @@ class BattleScene extends Phaser.Scene {
     });
     const from = event.path[0];
     if (from) this.flashes.push({ x: from.x, y: from.y, at: startedAt });
+  }
+
+  /**
+   * Ride the shell in the air (`US-BAL-002` AC5).
+   *
+   * The window is one screen wide, so a 2.5-màn shot leaves the frame almost immediately. Following the shell is what
+   * makes the blind part *aiming* rather than *everything*: the player learns where the shot went, and never sees the
+   * target while choosing. The pan is eased so it reads as a camera, not a cut.
+   */
+  private rideTheShell(time: number): void {
+    if (this.measuring) return;
+    const shot = this.flying.find((candidate) => (time - candidate.startedAt) / candidate.flightMs < 1);
+    if (!shot || shot.path.length < 2) return;
+    const progress = clampProgress((time - shot.startedAt) / shot.flightMs);
+    const at = Math.min(shot.path.length - 1, Math.floor(progress * (shot.path.length - 1)));
+    const point = shot.path[at];
+    if (!point) return;
+    const framed = windowOn(point.x, this.aspectRatio, point.y);
+    // Ease 18 % of the way each frame: fast enough to keep the shell on screen, slow enough not to jitter.
+    this.window = clampWindow({
+      ...this.window,
+      x: this.window.x + (framed.x - this.window.x) * 0.18,
+      y: this.window.y + (framed.y - this.window.y) * 0.18,
+    });
+    this.callbacks.onCamera(this.window);
   }
 
   /** Tell the page where this client's mobile landed; a 2 px threshold keeps React out of every frame. */
@@ -318,26 +401,27 @@ class BattleScene extends Phaser.Scene {
   }
 
   /**
-   * Frame the turn: the shooter **and** the opponent it is shooting at.
+   * Frame the turn on **one screen** around the shooter (`US-BAL-002` AC2).
    *
-   * Following only the shooter left the target 1,640 units away on a 2,000-unit map — off screen — so the player was
-   * aiming at a number with no enemy to aim at. `windowOnBoth` keeps the pair in frame and `clampWindow` keeps the
-   * result inside the map.
+   * The previous rule framed the shooter *and* its opponent, which on a 2,000-unit map put a 1,640-unit gap in one
+   * window — that is the opposite of the genre's information budget: anything past one màn is meant to be calculated,
+   * not seen. The camera still nudges the shooter clear of the loadout strip on the left.
    */
   private frameOn(slot: number, state: MatchState): void {
     const shooter = state.players.find((candidate) => candidate.slot === slot);
     if (!shooter) return;
-    const opponents = state.players.filter((candidate) => candidate.team !== shooter.team && !candidate.eliminated);
-    const target = opponents[0] ?? state.players.find((candidate) => candidate.slot !== shooter.slot);
+    // A shell still in the air owns the camera: framing the next turn now would cut the shot the player is watching.
+    if (now() < this.followUntil && !this.measuring) return;
     const aspect = this.scale.width / Math.max(1, this.scale.height);
-    const framed = target
-      ? windowOnBoth(shooter.x, target.x, aspect, Math.min(shooter.y, target.y))
-      : windowOnBoth(shooter.x, shooter.x, aspect, shooter.y);
+    const framed = windowOn(shooter.x, aspect, shooter.y);
     // The loadout strip and the power readout hang on the left of the HUD, over the team-A spawn: nudge the frame so
     // this client's own mobile sits clear of them instead of behind them.
     const local = state.players.find((candidate) => candidate.slot === this.localSlot);
     const nudge = local && local.x < framed.x + framed.width / 2 ? -framed.width * 0.07 : framed.width * 0.07;
     this.window = clampWindow({ ...framed, x: framed.x + nudge });
+    // The page shows the scale the field is at (one screen, or the whole map while measuring): publish it here so the
+    // first frame already carries it (`US-BAL-002`).
+    this.callbacks.onCamera(this.window);
   }
 
   create(): void {
@@ -364,6 +448,14 @@ class BattleScene extends Phaser.Scene {
       return { id: event.pointerId, x: event.clientX - rect.left, y: event.clientY - rect.top };
     };
     const down = (event: PointerEvent): void => {
+      if (this.measuring) {
+        // A field opened to measure is not a firing range (`US-BAL-002` AC4). This press **only** puts the screen back:
+        // it is not passed on as a shot, because a press that closes the view and then aims would make the measure view a
+        // free look at the map with the barrel already loaded.
+        this.closeMeasure();
+        this.callbacks.onMeasureRefused?.();
+        return;
+      }
       canvas.setPointerCapture?.(event.pointerId);
       this.pointers = addPointer(this.pointers, toPoint(event));
       if (this.pointers.pointers.length === 1) {
@@ -371,7 +463,7 @@ class BattleScene extends Phaser.Scene {
         // decides, and `origin` stays null until the hold fires, so a drag that never arms cannot fire on release
         // (`US-MATCH-002` AC7/AC8).
         const pressPoint = toPoint(event);
-        const onSelf = this.aimAllowed && this.onOwnHull(pressPoint);
+        const onSelf = this.canAimNow() && this.onOwnHull(pressPoint);
         this.holdOnSelf = onSelf;
         // A press anywhere but the hull dismisses the wheel; the hull itself re-opens it after the hold.
         if (this.itemOpen && !onSelf) {
@@ -421,6 +513,17 @@ class BattleScene extends Phaser.Scene {
         const angle = gesture.kind === "pull" ? gesture.angle : this.pullAngle;
         if (power >= TUNABLES.powerDeadzone) this.callbacks.onRelease(power, angle);
         else this.callbacks.onCancel(event.type === "pointercancel" ? "pointercancel" : "deadzone");
+      }
+      // A tap that neither pulled nor panned is a measurement, not a shot: report where it landed so the HUD can
+      // print the distance in parts (`US-BAL-001` AC3).
+      if (wasSingle && this.hold.phase === "pending" && !this.holdOnSelf && this.callbacks.onProbe) {
+        const world = screenToWorld(
+          this.window,
+          viewportFor(this.window, this.scale.width, this.scale.height),
+          point.x * this.renderScale,
+          point.y * this.renderScale,
+        );
+        this.callbacks.onProbe({ x: world.x, y: world.y });
       }
       // The pull is spent: clear the ring and the predicted arc until the next gesture starts.
       this.pullPower = 0;
@@ -516,11 +619,24 @@ class BattleScene extends Phaser.Scene {
       );
       this.window = pinchTo(this.window, gesture.scale, center.x, center.y);
       this.previousSpread = this.spread();
+      // Zooming past one screen is the measure view (`US-BAL-002` AC3): it re-arms the snap-back timer, and coming back
+      // inside one screen closes it.
+      if (isMeasuring(this.window)) {
+        this.measuring = true;
+        this.measureUntil = now() + TUNABLES.measureReturnMs;
+      } else {
+        this.measuring = false;
+        this.measureUntil = 0;
+      }
       this.callbacks.onCamera(this.window);
     }
   }
 
   override update(): void {
+    // A measure view is temporary by construction: it closes itself, so the player never has to find a button to get
+    // their screen back (`US-BAL-002` AC3).
+    if (this.measuring && now() >= this.measureUntil) this.closeMeasure();
+    this.rideTheShell(now());
     // The hold timer lives here because only the frame loop knows time passed without a move.
     const armed = advance(this.hold, now());
     if (armed.phase === "pulling" && this.hold.phase === "pending") {
@@ -537,7 +653,7 @@ class BattleScene extends Phaser.Scene {
       }
       this.hold = armed;
       // Only a player who may shoot gets a ring; everyone else keeps panning (`AC7`).
-      this.origin = this.aimAllowed && armed.origin ? { id: 0, x: armed.origin.x, y: armed.origin.y } : null;
+      this.origin = this.canAimNow() && armed.origin ? { id: 0, x: armed.origin.x, y: armed.origin.y } : null;
       if (this.origin && !this.barrelSeeded) {
         this.barrelAngle = this.openAngle();
         this.barrelSeeded = true;
@@ -865,8 +981,9 @@ class BattleScene extends Phaser.Scene {
     const frame = frames.find((candidate) => candidate.slot === this.localSlot);
     const player = this.state.players.find((candidate) => candidate.slot === this.localSlot);
     if (!frame || !player || frame.eliminated) return;
-    // The ring and the preview only exist while this client may actually shoot (`US-MATCH-002` AC7).
-    if (!this.aimAllowed) return;
+    // The ring and the preview only exist while this client may actually shoot (`US-MATCH-002` AC7), and never while the
+    // field is open to measure (`US-BAL-002` AC4).
+    if (!this.canAimNow()) return;
 
     // The mobile's own firing window, drawn before the pull ring so it reads as the ground the ring sits on: a dim fan from
     // `angleMin` to `angleMax` with the current angle lit (owner's request, 2026-11-09). It is on screen whenever this client
@@ -974,6 +1091,7 @@ export function mountBattle(options: Options): BattleHandle {
   return {
     setState: (state, localSlot, events) => scene.setState(state, localSlot, events),
     setAimAllowed: (allowed) => scene.setAimAllowed(allowed),
+    setMeasuring: (on) => scene.setMeasuring(on),
     setWeaponSlot: (slot) => scene.setWeaponSlot(slot),
     setAimDelta: (delta) => scene.setAimDelta(delta),
     setAimAid: (enabled) => scene.setAimAid(enabled),

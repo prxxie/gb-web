@@ -24,11 +24,13 @@ export interface MatchTopBarProps {
   readonly aimAid: boolean;
   readonly onToggleChat: () => void;
   readonly onToggleAimAid: () => void;
+  /** Open the whole map to measure (`US-BAL-002` AC3/AC6). It snaps back on its own, so this is not a toggle. */
+  readonly onMeasure: () => void;
 }
 
 export function MatchTopBar(props: MatchTopBarProps): JSX.Element {
   const { t } = useLocale();
-  const { state, chatOpen, chat, clock, aimAngle, aimAid, onToggleChat, onToggleAimAid } = props;
+  const { state, chatOpen, chat, clock, aimAngle, aimAid, onToggleChat, onToggleAimAid, onMeasure } = props;
   return (
     <>
       {/* One banner per wind roll, 1.5 s, dismissed by a tap (`US-MATCH-003` AC10). */}
@@ -64,6 +66,16 @@ export function MatchTopBar(props: MatchTopBarProps): JSX.Element {
           <div className="match__clock" data-testid="turn-clock">
             {clock}s
           </div>
+          <button
+            type="button"
+            className="match__measure"
+            data-testid="measure"
+            aria-label={t("match.measure.hint")}
+            title={t("match.measure.hint")}
+            onClick={onMeasure}
+          >
+            <span aria-hidden="true">⤢</span>
+          </button>
           <button
             type="button"
             className={aimAid ? "match__aid match__aid--on" : "match__aid"}

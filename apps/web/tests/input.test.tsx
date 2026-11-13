@@ -4,7 +4,7 @@ import { LOCALES, loadLocale, saveLocale, translate } from "../src/i18n";
 import en from "../src/i18n/en.json";
 import vi from "../src/i18n/vi.json";
 import { addPointer, classify, clearPointers, movePointer, screenToWorld, viewportFor } from "../src/game/viewport";
-import { defaultWindow, powerFromDrag, rulerLayout, forceFromPower, angleFromPull } from "@gbw/core";
+import { defaultWindow, powerFromDrag, rulerLayout, forceFromPower, angleFromPull, TUNABLES } from "@gbw/core";
 
 describe("TC-PWA-130: locale tables", () => {
   it("carries the same keys in Vietnamese and English", () => {
@@ -85,17 +85,19 @@ describe("TC-MATCH-915/916: gestures", () => {
 });
 
 describe("TC-MATCH-919/921: camera and ruler", () => {
-  it("shows half the map by default and the whole map when zoomed out", () => {
+  it("shows one screen by default and the whole map when measuring", () => {
     const window = defaultWindow(5 / 3);
-    expect(window.width).toBeCloseTo(1000, 0);
-    expect(window.height).toBeCloseTo(600, 0);
+    expect(window.width).toBeCloseTo(TUNABLES.manWidth, 0);
+    expect(window.height).toBeCloseTo(TUNABLES.manWidth / (5 / 3), 0);
     const zoomedOut = { x: 0, y: 0, width: 2000, height: 1200 };
-    expect(rulerLayout(zoomedOut).segments).toBe(16);
+    expect(rulerLayout(zoomedOut).segments).toBe(20);
     expect(rulerLayout(window).segments).toBe(8);
     for (const candidate of [window, zoomedOut, { x: 0, y: 0, width: 1400, height: 840 }]) {
       const layout = rulerLayout(candidate);
+      // One division is one part at every zoom (`US-BAL-001` AC2).
+      expect(layout.unitsPerDivision).toBe(TUNABLES.partWidth);
       expect(layout.segments).toBeGreaterThanOrEqual(8);
-      expect(layout.segments).toBeLessThanOrEqual(16);
+      expect(layout.segments).toBeLessThanOrEqual(24);
     }
   });
 });

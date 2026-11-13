@@ -21,7 +21,12 @@ export function MatchNotices(props: MatchNoticesProps): JSX.Element {
     <>
       {status === "reconnecting" ? <div className="overlay">{t("match.reconnecting")}</div> : null}
 
-      {banner ? <div className="banner">{banner}</div> : null}
+      {/* The banner carries refusals a player must hear, not only see (`US-BAL-002` AC6). */}
+      {banner ? (
+        <div className="banner" role="status" aria-live="polite" data-testid="banner">
+          {banner}
+        </div>
+      ) : null}
       {hint ? (
         <div className="match__hint" data-testid="pull-hint">
           {hint}

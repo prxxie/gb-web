@@ -1,5 +1,19 @@
 # Changelog
 
+## 2026-11-13 — one screen is the game, and it is measured in parts
+
+The field now shows **exactly one screen** (`US-BAL-002`): `windowOnBoth` is gone, so an opponent more than one màn away is
+off the frame and hitting it is the player's calculation, not the camera's generosity. A measure view opens the whole map,
+refuses every shot while it is open (a press only closes it), snaps back on its own after 1.5 s, and after a release the
+camera rides the shell to its impact.
+
+The screen is also a unit (`US-BAL-001`): **1 màn = 8 phần = 800 units**, 1 phần = 100 units, the map 2.5 màn. The ruler
+carries one division per part at every zoom and labels it with the part's number on the map, so a tick learned in one match
+means the same distance in the next. A tap on the ground prints `Δ 2.3 phần · cao -0.8 phần`.
+
+`TC-BAL-101`–`TC-BAL-110` are new; `TC-MATCH-918` (framing) and `TC-MATCH-920` (125-unit divisions) are superseded in
+place. `tunables.md` § 9 and `screens/match.md` § Camera and zoom / Ruler are rewritten with the stories.
+
 ## 2026-11-11 — one shell in the air at a time
 
 Reported from a bot match: "đạn vừa bay ra thì bot bên kia đã bắn rồi". The engine resolves a shot in one tick, so the

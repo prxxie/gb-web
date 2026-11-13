@@ -23,8 +23,8 @@ Generated from story frontmatter — run `node .agents/scripts/verify-docs.mjs -
 <!-- cpt:epic-stories -->
 | Id | Title | Priority | Size | Status | Depends on |
 |---|---|---|---|---|---|
-| [US-BAL-001](US-BAL-001-measure-the-map-in-parts-of-a-screen.md) | Measure the map in parts of a screen | P0 | M | ready | US-CORE-007 |
-| [US-BAL-002](US-BAL-002-see-one-screen-and-fire-the-rest-blind.md) | See one screen and fire the rest blind | P0 | M | ready | US-MATCH-007, US-BAL-001 |
+| [US-BAL-001](US-BAL-001-measure-the-map-in-parts-of-a-screen.md) | Measure the map in parts of a screen | P0 | M | done | US-CORE-007 |
+| [US-BAL-002](US-BAL-002-see-one-screen-and-fire-the-rest-blind.md) | See one screen and fire the rest blind | P0 | M | done | US-MATCH-007, US-BAL-001 |
 | [US-BAL-003](US-BAL-003-show-the-truth-only-inside-your-screen.md) | Show the truth only inside your screen | P0 | S | ready | US-MATCH-002, US-BAL-002 |
 | [US-BAL-004](US-BAL-004-fly-the-original-trajectory.md) | Fly the original trajectory | P0 | M | ready | US-CORE-001 |
 | [US-BAL-005](US-BAL-005-field-the-seventeen-reference-machines.md) | Field the seventeen reference machines | P1 | M | ready | US-BAL-004, US-CORE-007 |

@@ -25,31 +25,35 @@ canvas fills the screen; the HUD floats above it and never reserves layout space
 
 ## Camera and zoom
 
-The camera shows a **window** onto the 2000 × 1200-unit map, not the whole map.
+The camera shows a **window** onto the 2000 × 1200-unit map — and that window is **exactly one screen** (`US-BAL-002`).
+The screen is the game's unit: **1 màn = 8 phần = 800 units**, so 1 phần = 100 units and the map is 2.5 màn across
+(`US-BAL-001`).
 
 | Property | Value | Notes |
 |---|---|---|
-| Default window | **1000 × 600 units** — half the map each way | the height is fixed at 600 units and the width follows the screen: 1000 on a 5:3 screen, wider on a landscape phone (844 × 313 is 2.7:1, so ~1617 units), so the box is never cropped and the extra width comes as more battlefield, never as a smaller box |
-| Zoom out limit | whole map (2000 × 1200) | `zoomMin` |
-| Zoom in limit | 4 × default (250 × 150 units) | `zoomMax`, enough to aim at a 44-unit-wide crater |
-| Pan | two-finger drag, 1:1 with the finger centroid | clamped so the window never leaves the map bounds |
+| Default window | **800 units wide**, height `800 / aspect` | the width is the information budget and never grows: a 5:3 screen shows 800 × 480, a 2.7:1 phone 800 × 296. The canvas aspect buys **height**, never width — a wider phone used to see 1,617 units, i.e. two screens, and range stopped transferring between devices |
+| Framing | follows the shooter | the feet sit ~70 % down the frame; an opponent more than one màn away is **off screen by design**, and hitting it is the player's calculation |
+| Follow | the camera rides the shell after a release | the wind and the landing are learned *after* the shot; the target is never revealed while aiming |
+| Measure | button or pinch out | opens the whole map (2000 units, twenty parts), refuses every shot while open, and snaps back to 800 units after **2.5 s** or on the next press — which only closes the view, it does not fire |
+| Zoom in limit | 4 × default (250 units wide) | enough to aim at a 44-unit crater |
+| Pan | two-finger drag, 1:1 with the finger centroid | clamped so the window never leaves the map bounds; panning never widens the window |
 | Zoom | pinch (separation change > 12 px) about the pinch midpoint | also `wheel` on desktop |
-| Follow | none — the camera stays where the player left it | on your turn, if the window does not contain your mobile, a one-shot pan brings it back into view |
+| Published state | `data-field-width` on the match screen | the width in world units — `800` at rest, `2000` while measuring; the e2e asserts the rule through it |
 
 ## Ruler (bottom edge)
 
-The bottom strip is a measuring ruler in **parts**, drawn in screen space so it is always legible:
+The bottom strip is a measuring ruler in **parts** (`US-BAL-001`), drawn in screen space so it is always legible. One
+division is **always one part — 100 units** — at every zoom, and each label is that part's **number on the map**, so a tick
+a player learned in one match means the same distance in the next.
 
 | Zoom state | Divisions across the window | World units per division |
 |---|---|---|
-| default window (½ map) | **8** | 125 |
-| every step out | 9 … 15 | `visibleWidth / n` |
-| whole map | **16** | 125 |
+| one screen (800) | **8** | 100 |
+| measuring (2000) | **20** | 100 |
 
-Rule: `segments = clamp(round(8 × visibleWidth / 1000), 8, 16)` — the count grows as the window widens and lands on 16 at
-full-map zoom. Every division is labelled with its world width; every fourth division is a major tick with a number. The
-ruler is the player's protractor substitute for the arc they cannot compute — the same job GunBound's part-grid does
-(`reference-gunbound.md` § 10).
+Rule: `segments = clamp(round(visibleWidth / 100), 8, 24)`. The ruler is the player's protractor substitute for the arc
+they cannot compute — the same job the genre's part grid does (`reference-gunbound.md` § 10). A tap on the ground prints a
+**probe**: `Δ 2.3 phần · cao -0.8 phần`, the distance and height difference from the shooter's feet to the tapped point.
 
 ## Fields
 

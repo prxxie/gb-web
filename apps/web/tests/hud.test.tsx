@@ -24,11 +24,11 @@ describe("TC-MATCH-923: wind dial", () => {
 });
 
 describe("TC-MATCH-920: ruler", () => {
-  it("shows eight divisions at the default window and sixteen zoomed out", () => {
-    const { rerender } = render(<Ruler window={defaultWindow(5 / 3)} unitLabel="ô" />);
+  it("shows eight divisions at one screen and twenty across the whole map", () => {
+    const { rerender } = render(<Ruler window={defaultWindow(5 / 3)} unitLabel="phần" />);
     expect(screen.getByTestId("ruler").getAttribute("data-segments")).toBe("8");
-    rerender(<Ruler window={{ x: 0, y: 0, width: 2000, height: 1200 }} unitLabel="ô" />);
-    expect(screen.getByTestId("ruler").getAttribute("data-segments")).toBe("16");
+    rerender(<Ruler window={{ x: 0, y: 0, width: 2000, height: 1200 }} unitLabel="phần" />);
+    expect(screen.getByTestId("ruler").getAttribute("data-segments")).toBe("20");
   });
 });
 

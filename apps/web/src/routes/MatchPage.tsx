@@ -11,7 +11,7 @@
  */
 import { useRef, useState } from "react";
 import { useParams } from "react-router-dom";
-import { TUNABLES, createTerrain, getMobile } from "@gbw/core";
+import { TUNABLES, createTerrain, getMobile, formatParts } from "@gbw/core";
 import { useLocale } from "../app/providers";
 import { MatchAimOverlays } from "../match/MatchAimOverlays";
 import { MatchBottomBar } from "../match/MatchBottomBar";
@@ -57,6 +57,11 @@ export function MatchPage(): JSX.Element {
   const mobile = getMobile(localPlayer?.mobileId ?? "mbl-01");
   const isMyTurn = Boolean(state && localPlayer && state.turn.activeSlot === localPlayer.slot && state.status === "playing");
 
+  /** A tapped field point to measure against, in world units (`US-BAL-001` AC3). */
+  const [probe, setProbe] = useState<{ x: number; y: number } | null>(null);
+  /** The width the field is showing, in world units: one screen, or the whole map while measuring (`US-BAL-002`). */
+  const [fieldWidth, setFieldWidth] = useState<number | null>(null);
+  const [fieldX, setFieldX] = useState<number | null>(null);
   const aimHud = useAimHud(plan, state);
   const weapons = useWeaponSelect({ ssCharge: localPlayer?.ssCharge ?? 0, battle: wiring.battle });
   const chat = useMatchChat({ plan, wiring });
@@ -80,6 +85,12 @@ export function MatchPage(): JSX.Element {
     aim: aimHud,
     weapons,
     hostingRef: hosting.hostingRef,
+    onMeasureRefused: () => setBanner(t("match.measure.refused")),
+    onProbe: setProbe,
+    onCamera: (next) => {
+      setFieldWidth(Math.round(next.width));
+      setFieldX(Math.round(next.x));
+    },
   });
   useBattleSync({
     wiring,
@@ -117,7 +128,13 @@ export function MatchPage(): JSX.Element {
   }
 
   return (
-    <div className="match" data-testid="match-screen" data-cinematic={engine.cinematic ? "true" : "false"}>
+    <div
+      className="match"
+      data-testid="match-screen"
+      data-cinematic={engine.cinematic ? "true" : "false"}
+      data-field-width={fieldWidth ?? ""}
+      data-field-x={fieldX ?? ""}
+    >
       <div className="sr-only" role="status" aria-live="polite" data-testid="match-announce">
         {announcement}
       </div>
@@ -132,6 +149,7 @@ export function MatchPage(): JSX.Element {
           aimAid={aimHud.aimAid}
           onToggleChat={chat.toggleOpen}
           onToggleAimAid={aimHud.toggleAimAid}
+          onMeasure={() => wiring.battle.current?.setMeasuring(true)}
         />
 
         <MatchAimOverlays
@@ -163,6 +181,16 @@ export function MatchPage(): JSX.Element {
           onSkip={inputs.onSkip}
           onChat={chat.send}
         />
+
+        {probe && localPlayer ? (
+          // The distance and the height difference in parts of a screen: the unit the game is spoken in (`US-BAL-001`).
+          <div className="match__probe" data-testid="probe" role="note">
+            {t("match.probe", {
+              dx: formatParts(Math.abs(probe.x - localPlayer.x)),
+              dy: formatParts(probe.y - localPlayer.y),
+            })}
+          </div>
+        ) : null}
 
         <MatchNotices status={status} banner={banner} hint={aimHud.hint} />
       </div>

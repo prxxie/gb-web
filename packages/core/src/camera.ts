@@ -36,61 +36,79 @@ function safeAspect(aspect: number): number {
 }
 
 export function defaultWindow(aspect: number): CameraWindow {
-  // Height is the floor, width the consequence: a screen wider than 5:3 keeps its 600 units of height and
-  // gains margin on both sides (`docs/02-reference/screens/match.md` § 5), it never loses the sky.
-  const height = Math.min(TUNABLES.mapHeight, TUNABLES.viewDefaultHeight);
-  const width = Math.min(TUNABLES.mapWidth, Math.max(TUNABLES.viewDefaultWidth, height * safeAspect(aspect)));
-  return { x: (TUNABLES.mapWidth - width) / 2, y: TUNABLES.mapHeight - height, width, height };
-}
-
-/**
- * Follow a player: centre horizontally, keep the ground anchored (clamped inside the map).
- *
- * The window takes the screen's aspect: the height stays the documented 600 units and a screen wider than
- * 5:3 gains width. Fixing the width instead would crop the height on a landscape phone (844 × 313 is 2.7:1,
- * so 1,000 units of width show only ~371 of the 600) and push the shooter's feet off the canvas and under
- * the HUD — `TC-MATCH-918`.
- */
-export function windowOn(
-  targetX: number,
-  aspect: number,
-  groundY: number = TUNABLES.mapHeight,
-): CameraWindow {
-  const height = Math.min(TUNABLES.mapHeight, TUNABLES.viewDefaultHeight);
-  const width = Math.min(TUNABLES.mapWidth, Math.max(TUNABLES.viewDefaultWidth, height * safeAspect(aspect)));
-  // Anchor the frame just under the target's feet, so the mobile sits in the lower third with room to
-  // lob upward, and the frame never scrolls past the map's ground line.
-  const bottom = Math.min(TUNABLES.mapHeight, groundY + height * GROUND_MARGIN);
-  return clampWindow({ x: targetX - width / 2, y: bottom - height, width, height });
+  // One screen is the whole information budget (`US-BAL-002`): the width is fixed and the canvas aspect buys height,
+  // never width, so two phones with different screens play the same game.
+  return windowOnOneScreen(TUNABLES.mapWidth / 2, aspect);
 }
 
 /** How far below the target's feet the frame extends, as a fraction of the window height. */
 const GROUND_MARGIN = 0.3;
 
 /**
- * The frame that holds **both** mobiles a turn involves (`US-MATCH-007`).
+ * The frame that shows **exactly one screen** (`US-BAL-002` AC1).
  *
- * `windowOn` follows the shooter, which in a 1v1 on a 2,000-unit map puts the target 1,640 units away — off screen,
- * so the player aims at a number instead of at an opponent. This frames the pair instead: the width is the span
- * between them plus a margin on each side, the height keeps the 600 units of sky the screen reference asks for, and
- * `clampWindow` keeps the result inside the map and inside the zoom limits.
+ * The width is the information budget and it is not negotiable: 800 units, eight parts of 100 (`US-BAL-001`). The canvas
+ * aspect buys **height**, never width, because a wider phone seeing more of the map would make range untransferable
+ * between devices — the opposite of what the ruler is for. A canvas taller than the map (a portrait window, which the
+ * orientation gate refuses anyway) falls back to the map's height and takes the width it can.
+ *
+ * The frame is anchored just under the target's feet: the ground band sits at the bottom of the map, and framing it
+ * vertically centred would spend half the screen on empty sky (`docs/02-reference/screens/match.md` § Camera and zoom).
  */
-export function windowOnBoth(
-  firstX: number,
-  secondX: number,
+export function windowOnOneScreen(
+  targetX: number,
   aspect: number,
   groundY: number = TUNABLES.mapHeight,
 ): CameraWindow {
-  const span = Math.abs(secondX - firstX);
-  const margin = Math.max(TUNABLES.viewDefaultWidth * 0.18, span * 0.12);
-  const height = Math.min(TUNABLES.mapHeight, TUNABLES.viewDefaultHeight);
-  const width = Math.min(
-    TUNABLES.mapWidth,
-    Math.max(TUNABLES.viewDefaultWidth, height * safeAspect(aspect), span + margin * 2),
-  );
-  const centre = (firstX + secondX) / 2;
+  const safe = safeAspect(aspect);
+  let width = Math.min(TUNABLES.manWidth, TUNABLES.mapWidth);
+  let height = width / safe;
+  if (height > TUNABLES.mapHeight) {
+    height = TUNABLES.mapHeight;
+    width = Math.min(TUNABLES.mapWidth, height * safe);
+  }
   const bottom = Math.min(TUNABLES.mapHeight, groundY + height * GROUND_MARGIN);
-  return clampWindow({ x: centre - width / 2, y: bottom - height, width, height });
+  return clampWindow({ x: targetX - width / 2, y: bottom - height, width, height });
+}
+
+/** Follow a player on one screen. Kept as the name the renderer and the tests already use. */
+export function windowOn(
+  targetX: number,
+  aspect: number,
+  groundY: number = TUNABLES.mapHeight,
+): CameraWindow {
+  return windowOnOneScreen(targetX, aspect, groundY);
+}
+
+/** The window a measure zoom opens to: the whole map, so a player can count parts to the far edge (`US-BAL-002` AC3). */
+export function windowMeasuring(aspect: number, anchorX: number = TUNABLES.mapWidth / 2): CameraWindow {
+  const safe = safeAspect(aspect);
+  const width = TUNABLES.mapWidth;
+  const height = Math.min(TUNABLES.mapHeight, width / safe);
+  const bottom = Math.min(TUNABLES.mapHeight, TUNABLES.mapHeight);
+  return clampWindow({ x: anchorX - width / 2, y: bottom - height, width, height });
+}
+
+/** Whether a window is still showing one screen, or has been opened up to measure (`US-BAL-002` AC4). */
+export function isMeasuring(window: CameraWindow, tolerance: number = 1.05): boolean {
+  return window.width > TUNABLES.manWidth * tolerance;
+}
+
+/** A distance in parts of a screen, which is the unit the game is spoken in (`US-BAL-001`). */
+export function partsOf(units: number): number {
+  return roundTo(units / TUNABLES.partWidth);
+}
+
+/** The inverse of `partsOf`, for a number a player typed. */
+export function unitsOf(parts: number): number {
+  return roundTo(parts * TUNABLES.partWidth);
+}
+
+/** `1.2 phần` — one decimal, no `-0.0`, because the HUD prints it verbatim. */
+export function formatParts(units: number): string {
+  const parts = Math.round(partsOf(units) * 10) / 10;
+  const safe = Object.is(parts, -0) ? 0 : parts;
+  return `${safe < 0 ? "-" : ""}${Math.abs(safe).toFixed(1)} phần`;
 }
 
 /** Zoom is expressed as a window width: 250 (closest) … 2,000 (whole map). */
@@ -132,14 +150,17 @@ export function pinchTo(window: CameraWindow, factor: number, anchorX: number, a
 }
 
 /**
- * Ruler divisions: eight while the window is the default 1,000 units wide, sixteen at the whole map.
- * Every division is the same 125 world units at both ends, so a player's learned "one tick" never changes.
+ * Ruler divisions: **one division is always one part** (`US-BAL-001` AC2) — 100 units — so a tick a player learned at one
+ * screen is the same tick at the whole map. The count follows the window: 8 across one screen, 20 at 2.5 màn.
  */
 export function rulerLayout(window: CameraWindow): RulerLayout {
-  const segments = clamp(Math.round((8 * window.width) / TUNABLES.viewDefaultWidth), 8, 16);
-  const unitsPerDivision = roundTo(window.width / segments);
+  const segments = clamp(Math.round(window.width / TUNABLES.partWidth), TUNABLES.partsPerMan, TUNABLES.partsPerMan * 3);
+  const unitsPerDivision = TUNABLES.partWidth;
+  // The label is the part's **number on the map**, so a tick a player learned in one match still means the same distance
+  // in the next one, at any zoom (`US-BAL-001` AC2).
+  const first = Math.round(window.x / TUNABLES.partWidth);
   const labels: number[] = [];
-  for (let i = 0; i <= segments; i += 1) labels.push(roundTo(i * unitsPerDivision));
+  for (let i = 0; i <= segments; i += 1) labels.push(roundTo(first + i));
   return { segments, unitsPerDivision, labels };
 }
 

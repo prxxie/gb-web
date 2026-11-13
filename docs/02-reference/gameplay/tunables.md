@@ -322,10 +322,14 @@ the numbers behind it.
 
 | Constant | Value | Why |
 |---|---|---|
-| `viewDefault` | 1000 × 600 units | half the map each way. Fixed height, aspect-following width: a 2.7:1 phone window is ~1617 × 600, so the window always matches the canvas and nothing is cropped |
-| framing | follows the active mobile | at the start of a turn the window centres on the shooting mobile and keeps its feet ~70 % down the frame, so the shot has room to arc; a pan by the player overrides it until the next turn |
-| `zoomMin` (widest) | whole map, 2000 × 1200 | the strategic view |
-| `zoomMax` (closest) | 250 × 150 units (4 × default) | a 44-unit crater fills the ring, so aim can be placed precisely |
+| `manWidth` | **800 units** | one screen, the unit every distance is spoken in (`US-BAL-001`) |
+| `partsPerMan` | **8** | one part = `manWidth / partsPerMan` = **100 units**; the map is 2.5 màn |
+| `viewDefault` | 800 × `800 / aspect` | the window is exactly one screen wide; the canvas aspect buys height, never width (`US-BAL-002`) |
+| framing | follows the active mobile | at the start of a turn the window centres on the shooting mobile and keeps its feet ~70 % down the frame; the opponent is off screen past one màn, by design |
+| follow | the shell in the air | after a release the camera rides the shot to its impact, eased 18 % a frame; the next turn's framing waits for it |
+| `measureReturnMs` | **2500 ms** | a measure zoom (whole map) closes itself; a press while it is open only closes it and fires nothing |
+| `zoomMin` (widest) | whole map, 2000 units | the measure view |
+| `zoomMax` (closest) | 250 units wide | a 44-unit crater fills the ring, so aim can be placed precisely |
 | `panClamp` | window edge never leaves `mapBounds` | no lost player, no off-map void |
 | `pinchThreshold` | 12 px separation change | distinguishes a pan from a zoom |
 | `powerDragFull` | 0.45 × the shorter screen edge | full power is one comfortable thumb sweep, not a corner-to-corner drag |
@@ -333,8 +337,8 @@ the numbers behind it.
 | power → force | `force = round(power × 25)` | the power bar shows 0–4.0, the wire field `force` is 0–100 |
 | `powerRingRadius` | 64 px screen | always the same size, so the number inside is readable while zooming |
 | `padRing` | 96 px from the sprite | the four-way pad never covers the mobile or the barrel |
-| `rulerSegments` | `clamp(round(8 × visibleWidth / 1000), 8, 16)` | 8 divisions at the default window, 16 at full-map zoom |
-| `rulerUnit` | visibleWidth / `rulerSegments` world units per division | 125 units at 1000-wide, 125 again at 2000-wide/16 |
+| `rulerSegments` | `clamp(round(visibleWidth / 100), 8, 24)` | one division is one part at every zoom: 8 at one screen, 20 at the whole map |
+| `rulerUnit` | **100 units** (one part) | the label is the part's number on the map, not an offset |
 | `interpolateMs` | 100 ms | the screen draws one state behind and catches up within this gap — a state that lands mid-blend continues from the drawn pixel instead of jumping (`US-MATCH-001` AC2) |
 | `previewDots` | 24 | how many dots the aim aid samples the resolved flight into — a dotted line, not a curve, so the count is drawing, not physics (`US-MATCH-005` AC2) |
 

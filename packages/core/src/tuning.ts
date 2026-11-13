@@ -87,8 +87,20 @@ export const TUNABLES = {
   scoreTurnCap: 12,
   /** `heal` gimmick: fraction of a 1,200 HP pool restored each round. */
   healFraction: 0.08,
+  /**
+   * The original's information unit (`US-BAL-001`): one screen is eight parts and the map is 2.5 of them. Every distance
+   * the game speaks in is a part of this, and the resting camera shows exactly one.
+   */
+  manWidth: 800,
+  partsPerMan: 8,
+  partWidth: 100,
+  /**
+   * How long a measure zoom stays open before it snaps back to one screen (`US-BAL-002` AC3). 1.5 s was picked first and
+   * is too short to count twenty parts with a thumb on a phone — and it made the refusal fire only when the device was idle.
+   */
+  measureReturnMs: 2500,
   /** Camera (`tunables.md` § 9). */
-  viewDefaultWidth: 1000,
+  viewDefaultWidth: 800,
   viewDefaultHeight: 600,
   zoomMaxWidth: 250,
   zoomMaxHeight: 150,

@@ -10,7 +10,6 @@
 TC-CORE-926 apps/web/tests/hud.test.tsx
 TC-MATCH-006 apps/web/tests/match-controls.test.tsx
 TC-MATCH-902 tests/e2e/smoke.spec.ts
-TC-MATCH-918 packages/core/tests/camera.test.ts
 TC-MATCH-919 packages/core/tests/camera.test.ts
 TC-MATCH-920 packages/core/tests/camera.test.ts
 TC-NET-067 packages/core/tests/movement.test.ts

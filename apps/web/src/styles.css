@@ -1511,3 +1511,30 @@ td {
   align-items: center;
   justify-content: center;
 }
+
+/* The measure readout: a tapped field point, printed in parts of a screen (`US-BAL-001` AC3). */
+.match__probe {
+  position: absolute;
+  left: 50%;
+  bottom: 96px;
+  transform: translateX(-50%);
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(8, 15, 28, 0.82);
+  border: 1px solid #334155;
+  color: #cbd5e1;
+  font: 600 12px/1.2 "Inter", sans-serif;
+  letter-spacing: 0.02em;
+  pointer-events: none;
+}
+.match__measure {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 999px;
+  border: 1px solid #334155;
+  background: rgba(15, 23, 42, 0.72);
+  color: #93c5fd;
+  font-size: 18px;
+}

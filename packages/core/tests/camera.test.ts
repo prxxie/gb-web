@@ -11,28 +11,45 @@ import {
   rulerLayout,
   windowFromZoom,
   windowOn,
+  windowMeasuring,
   zoomOf,
+  formatParts,
+  isMeasuring,
+  partsOf,
+  unitsOf,
 } from "../src/camera.js";
+import { TUNABLES } from "../src/tuning.js";
 import { MAP_BOUNDS } from "../src/data/maps.js";
 
 const WIDE = 5 / 3;
 
-describe("TC-MATCH-918: the window", () => {
-  it("opens on one half of the map in each direction", () => {
+describe("TC-BAL-105: the window shows exactly one screen", () => {
+  it("opens on one screen — 800 units wide — whatever the canvas aspect", () => {
     const window = defaultWindow(WIDE);
-    expect(window.width).toBeCloseTo(MAP_BOUNDS.width / 2, 0);
-    expect(window.height).toBeCloseTo(MAP_BOUNDS.height / 2, 0);
+    expect(window.width).toBe(TUNABLES.manWidth);
+    // The aspect buys height, never width: 800 / (5/3).
+    expect(window.height).toBeCloseTo(TUNABLES.manWidth / WIDE, 0);
+    expect(window.width / window.height).toBeCloseTo(WIDE, 2);
   });
 
-  it("keeps a portrait-ish viewport inside the map height", () => {
-    const tall = defaultWindow(1);
-    expect(tall.height).toBeLessThanOrEqual(MAP_BOUNDS.height / 2);
-    expect(tall.width).toBeLessThanOrEqual(MAP_BOUNDS.width / 2);
+  it("gives a 2.7:1 phone the same 800 units of width and less sky", () => {
+    // The old rule kept 600 units of height and let this phone see 1,620 units across, i.e. two screens: range stopped
+    // transferring between devices. Width is now the invariant (`US-BAL-002` AC1).
+    const phone = windowOn(MAP_BOUNDS.width * 0.3, 2.7, MAP_BOUNDS.height * 0.55);
+    expect(phone.width).toBe(TUNABLES.manWidth);
+    expect(phone.height).toBeCloseTo(TUNABLES.manWidth / 2.7, 0);
+    expect(phone.width / phone.height).toBeCloseTo(2.7, 2);
+  });
+
+  it("falls back to the map height on a canvas taller than the map", () => {
+    // Portrait is refused by the orientation gate, but a window must never be wider than one screen *because* of it.
+    const tall = windowOn(MAP_BOUNDS.width / 2, 0.5);
+    expect(tall.height).toBeLessThanOrEqual(MAP_BOUNDS.height);
+    expect(tall.width).toBeLessThanOrEqual(TUNABLES.manWidth);
   });
 
   it("sits on the ground line so the battlefield is visible, not the sky", () => {
     const window = defaultWindow(WIDE);
-    // The bottom edge is the map's ground line, so terrain and mobiles are always in frame.
     expect(window.y + window.height).toBeCloseTo(MAP_BOUNDS.height, 0);
     expect(window.y).toBeGreaterThanOrEqual(MAP_BOUNDS.height / 2);
   });
@@ -53,16 +70,29 @@ describe("TC-MATCH-918: the window", () => {
     expect(feetFromTop).toBeLessThan(0.8);
   });
 
-  it("gives a 2.7:1 phone the same 600 units of height and the extra width, never a crop", () => {
-    // A phone in landscape is 2.7:1 (844 × 313 above the HUD). A window that keeps 1,000 units of width there
-    // shows only ~371 of its 600 units of height, which pushes the shooter's feet under the HUD.
-    const phone = windowOn(MAP_BOUNDS.width * 0.3, 2.7, MAP_BOUNDS.height * 0.55);
-    expect(phone.height).toBeCloseTo(600, 0);
-    expect(phone.width).toBeCloseTo(600 * 2.7, 0);
-    // The window now matches the screen, so the whole window is visible and the feet land 70 % down.
-    expect(phone.width / phone.height).toBeCloseTo(2.7, 1);
-    const feetFromTop = (MAP_BOUNDS.height * 0.55 - phone.y) / phone.height;
-    expect(feetFromTop).toBeCloseTo(0.7, 1);
+  it("TC-BAL-106: keeps an opponent more than one screen away off the frame", () => {
+    // The spawn gap on the 2,000-unit map is 1,640 units: 2.05 màn. The window is 800 wide, so the target cannot be in it.
+    const shooterX = 180;
+    const targetX = 1820;
+    const window = windowOn(shooterX, WIDE, MAP_BOUNDS.height);
+    expect(Math.abs(targetX - shooterX)).toBeGreaterThan(TUNABLES.manWidth);
+    expect(targetX).toBeGreaterThan(window.x + window.width);
+  });
+
+  it("TC-BAL-101: measures in parts of a screen", () => {
+    expect(partsOf(TUNABLES.manWidth)).toBe(8);
+    expect(partsOf(250)).toBeCloseTo(2.5, 1);
+    expect(unitsOf(2.5)).toBe(250);
+    expect(formatParts(120)).toBe("1.2 phần");
+    expect(formatParts(-80)).toBe("-0.8 phần");
+    expect(formatParts(-0.01)).toBe("0.0 phần");
+  });
+
+  it("TC-BAL-104: opens the whole map to measure and recognises the state", () => {
+    const measure = windowMeasuring(WIDE);
+    expect(measure.width).toBe(TUNABLES.mapWidth);
+    expect(isMeasuring(measure)).toBe(true);
+    expect(isMeasuring(defaultWindow(WIDE))).toBe(false);
   });
 
   it("never leaves the map", () => {
@@ -105,12 +135,13 @@ describe("TC-MATCH-920: panning", () => {
   });
 });
 
-describe("the ruler", () => {
-  it("counts eight divisions at the default window and sixteen at the whole map", () => {
+describe("TC-BAL-102: the ruler counts parts", () => {
+  it("counts eight divisions at one screen and twenty at the whole map, each one a part", () => {
     expect(rulerLayout(defaultWindow(WIDE)).segments).toBe(8);
-    expect(rulerLayout({ x: 0, y: 0, width: 2000, height: 1200 }).segments).toBe(16);
+    expect(rulerLayout(defaultWindow(WIDE)).unitsPerDivision).toBe(100);
+    expect(rulerLayout({ x: 0, y: 0, width: 2000, height: 1200 }).segments).toBe(20);
     const layout = rulerLayout(defaultWindow(WIDE));
-    expect(layout.unitsPerDivision).toBeCloseTo(layout.segments === 8 ? 125 : 250, 0);
+    expect(layout.unitsPerDivision).toBe(TUNABLES.partWidth);
   });
 });
 

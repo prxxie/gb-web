@@ -2,7 +2,7 @@
 id: US-BAL-001
 title: Measure the map in parts of a screen
 epic: EPIC-09-ballistics
-status: ready
+status: done
 priority: P0
 size: M
 depends_on: [US-CORE-007]
@@ -72,9 +72,25 @@ export const PART_WIDTH = MAN_WIDTH / PARTS_PER_MAN; // 100
 
 ## 8. Test notes
 
-Unit: constants and the ruler's divisions, and the part width being scale-free. e2e: the HUD shows phần for a known
-distance and a known height difference. Planned cases `TC-BAL-101`–`TC-BAL-104`.
+`TC-BAL-101` (constants and the map in màn), `TC-BAL-102` (the ruler: one division is one part at every zoom, labels are
+map part numbers), `TC-BAL-103` (the probe on a tap), `TC-BAL-104` (parts round-trip and the window keeps the aspect) —
+`packages/core/tests/camera.test.ts`, `apps/web/tests/ruler.test.tsx`, `tests/e2e/one-screen.spec.ts`.
+
+Red: `packages/core/tests/camera.test.ts` — `partsOf`/`unitsOf`/`formatParts` did not exist and every ruler case reported
+**125** units per division against the old `rulerUnitTarget`, so `TC-BAL-101`/`TC-BAL-102` could not pass until the part
+constants replaced it.
 
 ## 9. Open questions
 
 None.
+
+<!-- delivery:2026-11-13 -->
+
+## Delivery status — 2026-11-13
+
+**done.** `manWidth 800 / partsPerMan 8 / partWidth 100` in `packages/core/src/tuning.ts`, `partsOf`/`unitsOf`/`formatParts`
+in `camera.ts`, the ruler re-based on parts (`segments = clamp(round(width / 100), 8, 24)`, labels are map part numbers), and
+the HUD prints a tapped point as `Δ 2.3 phần · cao -0.8 phần` (`data-testid="probe"`). The window's width is published as
+`data-field-width` on the match screen so the rule is observable from a test.
+
+Superseded in place: `TC-MATCH-918`'s framing half and `TC-MATCH-920` (a division was 125 units, now one part).

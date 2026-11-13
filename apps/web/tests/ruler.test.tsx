@@ -1,9 +1,9 @@
 // @vitest-environment jsdom
 /**
- * TC-MATCH-920: the bottom ruler (`US-MATCH-007` AC5/AC8, `docs/02-reference/screens/match.md`).
+ * TC-BAL-104: the bottom ruler (`US-BAL-001` AC2, `docs/02-reference/screens/match.md`).
  *
- * One division is 125 world units at the default window *and* at the whole-map zoom, which is what
- * makes a wind push readable against a shot distance. The ruler is drawn from the same
+ * One division is **one part of a screen** — 100 world units — at every zoom, and its label is the part's number on the
+ * map, so a distance a player learned in one match means the same thing in the next. The ruler is drawn from the same
  * `CameraWindow` the physics positions are expressed in, so the two cannot drift apart.
  */
 import { describe, expect, it } from "vitest";
@@ -11,7 +11,7 @@ import { render, screen } from "@testing-library/react";
 import { TUNABLES, defaultWindow, rulerLayout, type CameraWindow } from "@gbw/core";
 import { Ruler } from "../src/components/Ruler";
 
-const UNIT_LABEL = "đơn vị";
+const UNIT_LABEL = "phần";
 const DEFAULT = defaultWindow(5 / 3);
 const WHOLE_MAP: CameraWindow = { x: 0, y: 0, width: TUNABLES.mapWidth, height: TUNABLES.mapHeight };
 
@@ -20,70 +20,65 @@ function divisionWorlds(window: CameraWindow): number {
   return rulerLayout(window).unitsPerDivision;
 }
 
-describe("TC-MATCH-920: the ruler divides the visible window", () => {
-  it("draws 8 divisions of 125 units at the default window", () => {
+describe("US-BAL-001 AC2: the ruler divides the visible window into parts", () => {
+  it("draws 8 divisions of one part each across one screen", () => {
     const layout = rulerLayout(DEFAULT);
     expect(layout.segments).toBe(8);
-    expect(layout.unitsPerDivision).toBe(TUNABLES.rulerUnitTarget);
-    expect(layout.labels).toEqual([0, 125, 250, 375, 500, 625, 750, 875, 1000]);
+    expect(layout.unitsPerDivision).toBe(TUNABLES.partWidth);
+    // The labels are the parts' numbers on the map, not offsets from the window's left edge.
+    expect(layout.labels).toEqual([6, 7, 8, 9, 10, 11, 12, 13, 14]);
   });
 
-  it("draws 16 divisions of 125 units at the whole-map zoom", () => {
+  it("counts every part of the whole map when opened up to measure", () => {
     const layout = rulerLayout(WHOLE_MAP);
-    expect(layout.segments).toBe(16);
-    expect(layout.unitsPerDivision).toBe(TUNABLES.rulerUnitTarget);
+    expect(layout.segments).toBe(TUNABLES.mapWidth / TUNABLES.partWidth);
+    expect(layout.unitsPerDivision).toBe(TUNABLES.partWidth);
     expect(layout.labels[0]).toBe(0);
-    expect(layout.labels[layout.labels.length - 1]).toBe(TUNABLES.mapWidth);
+    expect(layout.labels[layout.labels.length - 1]).toBe(TUNABLES.mapWidth / TUNABLES.partWidth);
   });
 
-  it("reads 125 units per division at both ends of a zoom round trip (AC8)", () => {
-    expect(divisionWorlds(DEFAULT)).toBe(TUNABLES.rulerUnitTarget);
-    expect(divisionWorlds(WHOLE_MAP)).toBe(TUNABLES.rulerUnitTarget);
-    // In between, the reported unit is exactly the visible width split by the segment count.
+  it("keeps one division equal to one part at any zoom (AC2)", () => {
+    expect(divisionWorlds(DEFAULT)).toBe(TUNABLES.partWidth);
+    expect(divisionWorlds(WHOLE_MAP)).toBe(TUNABLES.partWidth);
     for (const width of [1250, 1400, 1600]) {
       const layout = rulerLayout({ ...DEFAULT, width });
-      expect(layout.unitsPerDivision).toBeCloseTo(round1(width / layout.segments), 2);
+      expect(layout.unitsPerDivision).toBe(TUNABLES.partWidth);
+      expect(layout.segments).toBe(Math.round(width / TUNABLES.partWidth));
     }
   });
 
-  it("never drops below 8 divisions, even when zoomed in", () => {
+  it("never shows fewer than 8 divisions, even zoomed right in", () => {
     const zoomed = rulerLayout({ x: 900, y: 700, width: TUNABLES.zoomMaxWidth, height: TUNABLES.zoomMaxHeight });
-    expect(zoomed.segments).toBe(8);
-    expect(zoomed.unitsPerDivision).toBe(round1(TUNABLES.zoomMaxWidth / 8));
+    expect(zoomed.segments).toBe(TUNABLES.partsPerMan);
+    expect(zoomed.unitsPerDivision).toBe(TUNABLES.partWidth);
   });
 });
 
-describe("TC-MATCH-920: a 125-unit step in the simulation is one division", () => {
-  it("measures the physics' own world units (the map is 2000 units wide)", () => {
-    const layout = rulerLayout(DEFAULT);
-    const oneDivision = layout.labels[1]! - layout.labels[0]!;
-    expect(oneDivision).toBe(TUNABLES.rulerUnitTarget);
-    // A shell that travels 1000 world units crosses the whole default window, i.e. 8 divisions.
-    expect(Math.round(1000 / layout.unitsPerDivision)).toBe(8);
-    expect(layout.labels[layout.labels.length - 1]).toBe(DEFAULT.width);
+describe("US-BAL-001 AC2: a part is the unit the simulation is measured in", () => {
+  it("measures the map as eight parts to a screen and 2.5 screens across", () => {
+    expect(TUNABLES.manWidth).toBe(TUNABLES.partWidth * TUNABLES.partsPerMan);
+    expect(TUNABLES.mapWidth / TUNABLES.manWidth).toBe(2.5);
+    // A shell that travels one whole screen crosses exactly eight divisions.
+    expect(TUNABLES.manWidth / TUNABLES.partWidth).toBe(TUNABLES.partsPerMan);
   });
 });
 
-describe("TC-MATCH-920: the DOM ruler exposes every division", () => {
-  it("renders one label per division plus the origin, 9 at the default window", () => {
+describe("US-BAL-001 AC2: the DOM ruler exposes every division", () => {
+  it("renders one label per division plus the origin: 9 at one screen, 21 at the whole map", () => {
     const { rerender } = renderRuler(DEFAULT);
     expect(screen.getAllByTitle(new RegExp(UNIT_LABEL))).toHaveLength(9);
     rerender(WHOLE_MAP);
-    expect(screen.getAllByTitle(new RegExp(UNIT_LABEL))).toHaveLength(17);
+    expect(screen.getAllByTitle(new RegExp(UNIT_LABEL))).toHaveLength(21);
   });
 
-  it("labels each division with its world width (AC5)", () => {
+  it("labels each division with its part number (AC2)", () => {
     renderRuler(WHOLE_MAP);
-    // The last division sits at the map's right edge: 2000 world units, not "16".
     const labels = screen.getAllByTitle(new RegExp(UNIT_LABEL)).map((node) => node.textContent ?? "");
-    expect(labels[labels.length - 1]).toBe(String(TUNABLES.mapWidth));
-    expect(labels[1]).toBe(String(TUNABLES.rulerUnitTarget));
+    expect(labels[0]).toBe("0");
+    expect(labels[labels.length - 1]).toBe(String(TUNABLES.mapWidth / TUNABLES.partWidth));
+    expect(labels[1]).toBe("1");
   });
 });
-
-function round1(value: number): number {
-  return Math.round(value * 10) / 10;
-}
 
 function renderRuler(window: CameraWindow): { rerender: (next: CameraWindow) => void } {
   const view = render(<Ruler window={window} unitLabel={UNIT_LABEL} />);

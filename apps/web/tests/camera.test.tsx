@@ -29,27 +29,29 @@ function expectInsideMap(window: CameraWindow): void {
   expect(window.y + window.height).toBeLessThanOrEqual(MAP.height);
 }
 
-describe("TC-MATCH-918: the opening window", () => {
-  it("is 1000 × 600 — half the map each way — and sits inside the bounds (AC2)", () => {
-    const window = defaultWindow(5 / 3);
-    expect(window.width).toBe(TUNABLES.viewDefaultWidth);
-    expect(window.height).toBe(TUNABLES.viewDefaultHeight);
-    expectInsideMap(window);
+describe("TC-BAL-105: the opening window shows exactly one screen", () => {
+  it("is one screen wide and never wider, whatever the canvas aspect", () => {
+    // `US-BAL-002` AC1: the width is the information budget — 800 units, eight parts of 100 — and the aspect buys
+    // height. A 16:9 canvas used to show 1,066 units, i.e. a third of a screen more map than a 5:3 one.
+    for (const aspect of [5 / 3, 16 / 9, 2.7]) {
+      const window = defaultWindow(aspect);
+      expect(window.width).toBe(TUNABLES.manWidth);
+      expect(window.width / window.height).toBeCloseTo(aspect, 2);
+      expectInsideMap(window);
+    }
   });
 
-  it("keeps 600 units of height on a wider-than-5:3 screen and shows extra width (AC2)", () => {
-    // screens/match.md § 5: "a wider-than-5:3 screen keeps 600 units of height and shows extra
-    // width as margin". Height must not drop below half the map.
-    const window = defaultWindow(16 / 9);
-    expect(window.height).toBe(TUNABLES.viewDefaultHeight);
-    expect(window.width).toBeGreaterThanOrEqual(TUNABLES.viewDefaultWidth);
-    expectInsideMap(window);
+  it("is the same 800 units a 2.7:1 phone and a tablet see", () => {
+    const phone = defaultWindow(2.7);
+    const tablet = defaultWindow(4 / 3);
+    expect(phone.width).toBe(tablet.width);
+    expect(phone.height).toBeLessThan(tablet.height);
   });
 
-  it("is never smaller than half the map on a narrow screen", () => {
+  it("still shows one screen on a square canvas", () => {
     const window = defaultWindow(1);
-    expect(window.width).toBeGreaterThanOrEqual(TUNABLES.viewDefaultWidth);
-    expect(window.height).toBeGreaterThanOrEqual(TUNABLES.viewDefaultHeight);
+    expect(window.width).toBe(TUNABLES.manWidth);
+    expect(window.height).toBe(TUNABLES.manWidth);
     expectInsideMap(window);
   });
 });
@@ -133,10 +135,11 @@ describe("TC-MATCH-919: a pinch zooms about the midpoint, inside the limits (AC3
     expect((anchorY - zoomed.y) / zoomed.height).toBeCloseTo(0.5, 2);
   });
 
-  it("a zoom in and back out returns to the 125-units-a-division view (AC8)", () => {
+  it("a zoom in and back out returns to the one-screen view (AC3)", () => {
     const start = defaultWindow(5 / 3);
-    const zoomed = pinchTo(start, 4, start.x + start.width / 2, start.y + start.height / 2);
-    const back = pinchTo(zoomed, 0.25, zoomed.x + zoomed.width / 2, zoomed.y + zoomed.height / 2);
+    // Two stops each way: four would hit the 250-unit zoom limit and the round trip could not return (`TC-MATCH-919`).
+    const zoomed = pinchTo(start, 2, start.x + start.width / 2, start.y + start.height / 2);
+    const back = pinchTo(zoomed, 0.5, zoomed.x + zoomed.width / 2, zoomed.y + zoomed.height / 2);
     expect(back.width).toBeCloseTo(start.width, 1);
     expect(back.height).toBeCloseTo(start.height, 1);
   });

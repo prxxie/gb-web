@@ -1,7 +1,7 @@
 {
-  "measured": "2026-11-11",
+  "measured": "2026-11-13",
   "unit": "KiB gzip",
-  "note": "A ratchet: `pnpm budget` fails when a bucket grows past its number. Raise the number in the same change that adds the weight, so the diff shows what the payload cost. `shell` is what every route pays (the entry plus its vendor chunk); `match` is the Phaser route, which the service worker precaches but a cold load never fetches. 2026-11-08: match 386 -> 388 KiB gzip, css 3 -> 4, total 543 -> 546 (shot animation, terrain/sky). 2026-11-09 (angle ring): match 388 -> 390, total 546 -> 548 — dead `ItemSlots` and the event-feed strings came out first. 2026-11-09 (weather tray): shell 153 -> 154 and css 4 -> 5 — four weather-kind strings and the tray's layout, after moving the per-kind ink into the component so the stylesheet did not carry four decorative rules. 2026-11-11 (US-MATCH-010): match 390 -> 391 — the angle bug fix (`pullBaseAngle`, the latched `pressAngle` field and\n`clearOrigin`), about 0.1 KiB. Nothing came out first: the bucket was recorded at exactly 390 and the fix is a correctness\nchange with no dead weight to trade, so the ratchet moves by the one KiB it needs. 2026-11-10 (US-MATCH-009): total 548 -> 550 — the loadout mapping in the lobby and the practice\nstarter kit, so the item tray a player picked is no longer empty in every match.",
+  "note": "A ratchet: `pnpm budget` fails when a bucket grows past its number. Raise the number in the same change that adds the weight, so the diff shows what the payload cost. `shell` is what every route pays (the entry plus its vendor chunk); `match` is the Phaser route, which the service worker precaches but a cold load never fetches. 2026-11-08: match 386 -> 388 KiB gzip, css 3 -> 4, total 543 -> 546 (shot animation, terrain/sky). 2026-11-09 (angle ring): match 388 -> 390, total 546 -> 548 — dead `ItemSlots` and the event-feed strings came out first. 2026-11-09 (weather tray): shell 153 -> 154 and css 4 -> 5 — four weather-kind strings and the tray's layout, after moving the per-kind ink into the component so the stylesheet did not carry four decorative rules. 2026-11-11 (US-MATCH-010): match 390 -> 391 — the angle bug fix (`pullBaseAngle`, the latched `pressAngle` field and\n`clearOrigin`), about 0.1 KiB. Nothing came out first: the bucket was recorded at exactly 390 and the fix is a correctness\nchange with no dead weight to trade, so the ratchet moves by the one KiB it needs. 2026-11-10 (US-MATCH-009): total 548 -> 550 — the loadout mapping in the lobby and the practice\nstarter kit, so the item tray a player picked is no longer empty in every match. 2026-11-13 (US-BAL-001/US-BAL-002): match 391 -> 392 and total 550 -> 551 — the measure view (open, snapped back on a timer, refused shots), the probe readout and the camera-window publishing, about 0.1 KiB each. Nothing came out first: `windowOnBoth` and its margins were deleted in the same change, which is why the growth is a rounding step rather than a KiB.",
   "buckets": {
     "shell": {
       "chunks": "^index-.*\\.js$",
@@ -9,7 +9,7 @@
     },
     "match": {
       "chunks": "^MatchPage-.*\\.js$",
-      "maxKiB": 391
+      "maxKiB": 392
     },
     "signin": {
       "chunks": "^SignInPage-.*\\.js$",
@@ -20,5 +20,5 @@
       "maxKiB": 5
     }
   },
-  "totalMaxKiB": 550
+  "totalMaxKiB": 551
 }
