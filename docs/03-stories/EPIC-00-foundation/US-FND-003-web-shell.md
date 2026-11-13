@@ -16,7 +16,7 @@ refs: [02-reference/screens/README.md, 01-overview/conventions.md, 01-overview/n
 ## 1. Story
 
 **As a** player opening the link
-**I want** a landscape shell that routes between the seven screens, loads the right language and survives an API
+**I want** a landscape shell that routes between the eight screens, loads the right language and survives an API
 failure
 **so that** every later screen story adds a route body instead of a layout.
 
@@ -36,7 +36,7 @@ and the failure path players will actually hit on a flaky mobile network.
 
 | # | Given | When | Then |
 |---|-------|------|------|
-| AC1 | The shell running | Each of the seven routes is opened directly by URL | Every route renders its own `h1` and nothing else throws; unknown paths redirect to `/` |
+| AC1 | The shell running | Each of the eight routes is opened directly by URL | Every route renders its own `h1` and nothing else throws; unknown paths redirect to `/` |
 | AC1a | a match is open | the app bar steps aside | `/match/:code` renders without the shared bar so the battlefield owns the viewport. ~~the language toggle moves into the match HUD~~ **superseded 2026-11-09**: the owner struck the toggle from the match as well — no `locale-toggle` renders inside a match, and every other route keeps its own (`TC-MATCH-910`) |
 | AC2 | The shell running with no `locale` in storage | The app starts | It renders in `vi`, the toggle shows `VI`, and every visible string comes from the locale table |
 | AC3 | The locale set to `en` | The app is reloaded | It renders in `en` and the choice persists in `localStorage` under `gbw.locale` |

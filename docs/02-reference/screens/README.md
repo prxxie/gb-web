@@ -1,6 +1,6 @@
 # Screens
 
-Seven routes, one landscape layout. There is no design file in `docs/00-source/` — the layout tables in these files **are**
+Eight routes, one landscape layout. There is no design file in `docs/00-source/` — the layout tables in these files **are**
 the design reference, and the components follow them ([NFR-17](../../01-overview/nonfunctional-requirements.md),
 [NFR-19](../../01-overview/nonfunctional-requirements.md)).
 
@@ -15,6 +15,7 @@ the design reference, and the components follow them ([NFR-17](../../01-overview
 | `/lobby/:code` | Lobby | member of a room | session token | [lobby.md](lobby.md) | US-ROOM-002 |
 | `/match/:code` | Match (canvas) | member of a room | session token | [match.md](match.md) | US-MATCH-001 |
 | `/results/:code` | Results | member of a room | session token | [results.md](results.md) | US-RANK-005 |
+| `/practice` | Practice solver | everyone | none | [practice.md](practice.md) | US-BAL-007 |
 
 `roles` uses the role names from [roles-and-permissions.md](../../01-overview/roles-and-permissions.md). The `story` column names the story that builds the screen.
 
@@ -29,6 +30,7 @@ flowchart LR
     Lobby["/lobby/:code"]
     Match["/match/:code"]
     Results["/results/:code"]
+    Practice["/practice"]
     Offline["bot match<br/>(no route, in /match)"]
 
     Main -->|"Đăng nhập / Sign in"| SignIn
@@ -37,6 +39,8 @@ flowchart LR
     Main -->|"Tạo phòng / Create room"| Lobby
     Main -->|"Vào phòng / Join by code"| Lobby
     Main -->|"Chơi với máy / Play offline"| Offline
+    Main -->|"Công cụ tính toán / Practice solver"| Practice
+    Practice -->|"back"| Main
     SignIn -->|"success"| Main
     Profile --> Main
     Board --> Main

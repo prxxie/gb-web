@@ -16,7 +16,7 @@ free-tier cost ceilings throughout (`docs/00-source/brief.md` §6, §10; source 
 
 Three layers were still open when this ADR was written:
 
-- **Non-gameplay UI** — seven screens (main, sign-in, profile, leaderboard, lobby, match HUD, results) carry lists,
+- **Non-gameplay UI** — eight screens (main, sign-in, profile, leaderboard, lobby, match HUD, results) carry lists,
   forms, modals and focus management that a canvas does badly.
 - **Auth** — v1 needs accounts for server-side Elo (`OQ-05`, `OQ-26`), and building session handling by hand is the
   single largest security risk in a 3-month delivery (`docs/04-decisions/open-questions.md` OQ-26).

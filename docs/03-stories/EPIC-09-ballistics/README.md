@@ -29,7 +29,7 @@ Generated from story frontmatter — run `node .agents/scripts/verify-docs.mjs -
 | [US-BAL-004](US-BAL-004-fly-the-original-trajectory.md) | Fly the original trajectory | P0 | M | done | US-CORE-001 |
 | [US-BAL-005](US-BAL-005-field-the-seventeen-reference-machines.md) | Field the seventeen reference machines | P1 | M | done | US-BAL-004, US-CORE-007 |
 | [US-BAL-006](US-BAL-006-let-the-bot-fire-blind-too.md) | Let the bot fire blind too | P1 | M | ready | US-BAL-002, US-CORE-005 |
-| [US-BAL-007](US-BAL-007-solve-the-shot-with-the-original-algebra.md) | Solve the shot with the original algebra | P1 | S | ready | US-BAL-004 |
+| [US-BAL-007](US-BAL-007-solve-the-shot-with-the-original-algebra.md) | Solve the shot with the original algebra | P1 | M | ready | US-BAL-004 |
 | [US-BAL-008](US-BAL-008-check-the-integrator-against-the-algebra.md) | Check the integrator against the algebra | P2 | S | ready | US-BAL-004, US-BAL-007 |
 | [US-BAL-009](US-BAL-009-split-a-shot-on-the-reference-milestones.md) | Split a shot on the reference milestones | P2 | M | ready | US-BAL-004, US-CORE-009 |
 <!-- /cpt:epic-stories -->

@@ -1,5 +1,23 @@
 # Changelog
 
+## 2026-11-14 — CR-2026-11-14-practice-solver-screen — the practice route is a real screen
+
+`US-BAL-007` assumed a "practice route" that the doc set never had: the seven screens were main, sign-in, profile,
+leaderboard, lobby, match and results, and "practice" meant a practice *match*. The client chose to specify the surface
+rather than drop the criterion, so the reference engine's three closed-form answers (bar from distance, distance from bar,
+flight time for either) get their own public screen at `/practice`, reachable from the main menu, working offline, and
+deliberately absent from the match route's import graph — the shot is the calculation.
+
+- Added: `02-reference/screens/practice.md` (fields, states, copy keys, oracle table), the `Solver` glossary entry, and
+  the row for `US-BAL-007` in `reference-gunbound.md` § 11.
+- Modified: `screens/README.md` (eight routes, index row, navigation map), `screens/main.md` (one link and its copy key),
+  `US-BAL-007` (AC5 names the route and the screen doc, § 4 carries the page's context, § 7 narrowed, **S → M**,
+  cases renumbered to `TC-BAL-149`–`TC-BAL-155`), `delivery-plan.md` (W8 18.0 → 19.5, backlog 141.5 → 143.0),
+  `acceptance-signoff.md` (`G1` and `G2` re-opened).
+- Closed: none. Rework of done stories: none — the "seven routes" prose in `US-PWA-002`, `US-PWA-004`, `US-FND-003` and
+  `ADR-0001` was corrected to eight, which is a doc sync, not a behaviour change; the new surface is covered by
+  `US-BAL-007`'s own acceptance criteria and cases.
+
 ## 2026-11-13 — the ballistics are the original's again, and the roster is seventeen
 
 The client reversed the provenance rule for the physics alone (`CR-2026-11-13`, `ADR-0007`), so the integrator is the

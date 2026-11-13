@@ -4,9 +4,9 @@
 
 | Fact | Value |
 |---|---|
-| Backlog size | **141.5 story-days across 73 stories**: 123.5 across the 55 stories as first planned, plus **+18.0** across the nine `EPIC-09` stories added 2026-11-13 (§ Re-plan). Two of the original 55 are refactors queued after `M3`, § Deferred |
+| Backlog size | **143.0 story-days across 73 stories**: 123.5 across the 55 stories as first planned, plus **+19.5** across the nine `EPIC-09` stories added 2026-11-13 (§ Re-plan), `US-BAL-007` having grown from S to M when the practice screen was specified (`CR-2026-11-14-practice-solver-screen`). Two of the original 55 are refactors queued after `M3`, § Deferred |
 | Capacity assumption | 2 developers + a part-time reviewer ≈ 130 dev-days over 17 weeks (`OQ-15` is still open on team size) |
-| Utilisation | 141.5 story-days against 130 dev-days before the 2026-11-13 re-plan; `EPIC-09` was added as post-`M3` work, so the `M1`–`M3` window still carries the original 123.5 and stays at ≈ 88 % (114.5 of 130) |
+| Utilisation | 143.0 story-days against 130 dev-days before the 2026-11-13 re-plan; `EPIC-09` was added as post-`M3` work, so the `M1`–`M3` window still carries the original 123.5 and stays at ≈ 88 % (114.5 of 130) |
 | Milestones | `M1` demo week 4 · `M2` UAT week 11 · `M3` go-live week 17 (`OQ-25`, `OQ-36`) |
 | Scope basis | full GunBound package B (`CR-2026-11-04-gb-gameplay-fidelity`) |
 
@@ -24,7 +24,7 @@ order, then priority. Each wave lists the **gates** — open questions that must
 | **W5** — full battles (M2) | 8–11 | 17 | `US-CORE-010`, `US-CORE-011`, `US-CORE-012`, `US-CORE-013`, `US-MATCH-006`, `US-NET-003`, `US-NET-004`, `US-AUTH-002`, `US-PWA-003` | `OQ-26` (Clerk app + privacy policy) |
 | **W6** — identity + ranks | 10–13 | 14 | `US-AUTH-003`, `US-AUTH-004`, `US-CORE-005`, `US-MATCH-004`, `US-PWA-001`, `US-RANK-001`, `US-RANK-002`, `US-RANK-005` | — |
 | **W7** — polish + go-live (M3) | 13–17 | 15.5 | `US-RANK-003`, `US-RANK-004`, `US-PWA-002`, `US-PWA-004`, `US-OPS-001`, `US-OPS-002`, `US-OPS-003`, `US-OPS-004` | `OQ-33` (load target) |
-| **W8** — ballistics of the original | post-`M3` | 18 | `US-BAL-001` → `US-BAL-003` (6.0) · `US-BAL-004`, `US-BAL-008` (3.5) · `US-BAL-005`, `US-BAL-006` (5.0) · `US-BAL-007`, `US-BAL-009` (3.5) | none — the two forks were answered by the client on 2026-11-13 |
+| **W8** — ballistics of the original | post-`M3` | 19.5 | `US-BAL-001` → `US-BAL-003` (6.0) · `US-BAL-004`, `US-BAL-008` (3.5) · `US-BAL-005`, `US-BAL-006` (5.0) · `US-BAL-007` (2.5), `US-BAL-009` (1.0) | none — the two forks were answered by the client on 2026-11-13 |
 
 ## Re-plan 2026-11-13 — the ballistics of the original (`EPIC-09`)
 
@@ -34,7 +34,7 @@ fire. `ADR-0005` is superseded by `ADR-0007`.
 
 | Effect | Where |
 |---|---|
-| Nine new stories, four sub-waves, 18.0 story-days | `EPIC-09-ballistics` (wave `W8`, after `M3`) |
+| Nine new stories, four sub-waves, 18.0 story-days (19.5 after `CR-2026-11-14-practice-solver-screen`) | `EPIC-09-ballistics` (wave `W8`, after `M3`) |
 | Physics constants, the power scale and the step | `US-BAL-004` supersedes the constants section of `US-CORE-001` |
 | Camera framing (both mobiles in one window) | `US-BAL-002` supersedes `US-MATCH-007` and `TC-MATCH-918` |
 | Roster, per-machine gravity and wind | `US-BAL-005` supersedes the stat-table part of `US-CORE-007` |

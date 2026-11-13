@@ -27,6 +27,7 @@ The entry point: play now, join a friend, look at the board, or sign in. Reachab
 | Room code input | 6-char text input, `inputMode="text"`, uppercase, `autocapitalize="characters"` | `^[A-HJ-NP-Z2-9]{6}$`; invalid chars are not accepted as typed | local | Enables `Vào` |
 | `Vào` | primary button | Code complete | `GET /rooms/:code` then `/lobby/:code` | Joins; `404`/`410`/`409` render as inline banner |
 | `Bảng xếp hạng` | text link | — | — | → `/leaderboard` |
+| `Công cụ tính toán` | text link, beside `Bảng xếp hạng` | — | local | → `/practice`, the flat-ground solver (`CR-2026-11-14-practice-solver-screen`) |
 | `Đăng nhập` / `Hồ sơ` | text link / avatar | — | `GET /me` when signed in | → `/sign-in` or `/profile` |
 | Language switch | `VI`/`EN` toggle | — | `localStorage.gbw.locale` | Re-renders all copy in place (`NFR-18`) |
 
@@ -43,7 +44,7 @@ The entry point: play now, join a friend, look at the board, or sign in. Reachab
 
 ## Copy keys
 
-`main.playBot`, `main.createRoom`, `main.joinRoom`, `main.roomCode`, `main.join`, `main.leaderboard`,
+`main.playBot`, `main.createRoom`, `main.joinRoom`, `main.roomCode`, `main.join`, `main.leaderboard`, `main.practice`,
 `main.signIn`, `main.profile`, `main.maxPlayers`, `main.error.createFailed`, `main.error.joinFailed`,
 `main.offline.hint`, `main.guestHint`.
 

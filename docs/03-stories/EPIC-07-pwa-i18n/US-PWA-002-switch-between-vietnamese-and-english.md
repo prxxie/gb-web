@@ -35,7 +35,7 @@ code change, if English is dropped.
 
 | # | Given | When | Then |
 |---|-------|------|------|
-| AC1 | An `en` player | They walk all seven routes and one match | No Vietnamese text appears outside user-generated names (`TC-PWA-130`) |
+| AC1 | An `en` player | They walk all eight routes and one match | No Vietnamese text appears outside user-generated names (`TC-PWA-130`) |
 | AC2 | The same walk in `vi` | It is repeated | No English text appears except product nouns documented in the glossary |
 | AC3 | The two locale files | They are compared | The key sets are identical; a missing key fails CI |
 | AC4 | The toggle | It is used mid-match | Only DOM HUD text changes; the canvas is untouched and the match is not interrupted |

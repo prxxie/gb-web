@@ -33,6 +33,7 @@ Every domain term and status value, with the identifier it carries in code and i
 | Gravity | Downward acceleration of a projectile, `u/s²` | `tunables.gravity` = `100` default, `85–120` per map, × profile `1.00–1.15` | The source's `0.35`-per-tick value cannot coexist with its `2,000`-unit map (`tunables.md` § 1.1) |
 | HP | Hit points of a player | `member.hp`, `maxHp` = `100` | 0 = eliminated for the rest of the match |
 | Blast damage | Damage from an explosion, scaled by distance | `damage = round(baseDamage * (1 - dist / blastRadius))` | Base/radius live in the tunables (`OQ-02`) |
+| Solver | The flat-ground closed form of the shot — bar from distance, distance from bar, flight time for either | `solver` module (`barForDistance`, `distanceForBar`, `timeForShot`) | The practice screen's engine (`US-BAL-007`); never imported by the match route, and it ignores terrain by construction. Not to be confused with the **resolver** (the 25 ms integrator) |
 | Snapshot | Full simulation state broadcast by the host | `snapshot` message on the `state` channel | Also the migration unit |
 | Input packet | One player's action for the current turn | `input` message on the `control` channel | Reliable + ordered |
 | Control channel | Reliable, ordered WebRTC data channel | `control` (`ordered: true`) | Input, events, chat |

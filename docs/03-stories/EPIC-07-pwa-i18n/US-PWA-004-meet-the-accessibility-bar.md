@@ -34,7 +34,7 @@ text and the scene is `aria-hidden`. The bar is WCAG 2.2 AA on the DOM surfaces,
 
 | # | Given | When | Then |
 |---|-------|------|------|
-| AC1 | All seven routes | `axe-core` runs with the WCAG 2.2 AA rule set | Zero violations on each route (`TC-PWA-158`) |
+| AC1 | All eight routes | `axe-core` runs with the WCAG 2.2 AA rule set | Zero violations on each route (`TC-PWA-158`) |
 | AC2 | Any screen at 200 % browser text size | It is rendered | No clipped text, no overlap, and the canvas keeps its aspect ratio (`TC-PWA-159`) |
 | AC3 | Every interactive control on `/lobby/:code` and `/match/:code` | Its box is measured | Each is ≥ 44×44 logical px, fire/skip ≥ 60×60, spacing ≥ 8 px (`TC-PWA-160`) |
 | AC4 | Keyboard only (desktop) | Tab through menu, lobby and results | Focus is visible, the order is logical, and no focus trap exists outside dialogs (`TC-PWA-161`) |

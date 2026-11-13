@@ -161,3 +161,4 @@ tables (free aim plus wind makes the table infinite).
 | Eleven maps | `US-CORE-012` | [`tunables.md`](tunables.md) § 5 |
 | Avatar bonuses | `US-CORE-013` | [`tunables.md`](tunables.md) § 8 |
 | Weather per round, east-or-west wind | `US-CORE-015` | [`tunables.md`](tunables.md) § 1.3 |
+| The closed form of § 10, as a practice tool | `US-BAL-007` | [`../screens/practice.md`](../screens/practice.md) |
