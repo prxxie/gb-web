@@ -43,6 +43,10 @@ everyone else.
 
 ## 4. Contract
 
+> Superseded by [`US-BAL-006`](../EPIC-09-ballistics/US-BAL-006-let-the-bot-fire-blind-too.md) § 4: the bot decides from
+> `Senses` (one seat's window) instead of the raw `MatchState`, takes a `Difficulty`, and `botTurnPlan` became `botTurn`
+> returning `BotInput`. The noise config below is gone — the difficulty's budget replaces it.
+
 ```ts
 export interface BotConfig {
   angleNoiseDeg: number;   // aim error drawn per shot; 0 makes the bot perfect
