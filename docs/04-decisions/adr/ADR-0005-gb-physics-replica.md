@@ -1,10 +1,15 @@
 ---
 id: ADR-0005
 title: GunBound physics is replicated by our own deterministic integrator in packages/core
-status: accepted
+status: superseded
 date: 2026-11-04
 supersedes: []
 ---
+
+**Superseded by `ADR-0007` (2026-11-13).** The client reversed the provenance constraint for the ballistics alone
+(`CR-2026-11-13`): the original formula and its parameter table are the basis again, the roster is the reference's
+seventeen machines, and the camera shows one screen. The reasoning below is kept as the record of why the previous model
+looked the way it did — do not follow it.
 
 ## Context
 
