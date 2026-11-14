@@ -212,6 +212,25 @@ export interface RoomResponse {
   readonly settings?: { readonly maxPlayers: number; readonly mode: string; readonly mapId: string };
 }
 
+export interface PublicRoomSummary {
+  readonly roomCode: string;
+  readonly status: "waiting" | "playing";
+  readonly mode: "solo" | "score" | "tag" | "jewel";
+  readonly mapId: string;
+  readonly seated: number;
+  readonly maxPlayers: number;
+  readonly joinable: boolean;
+  readonly updatedAt: string;
+}
+
+export interface PublicRoomPage {
+  readonly rooms: readonly PublicRoomSummary[];
+  readonly nextCursor: string | null;
+  readonly request_id: string;
+}
+
+export type RoomDirectoryFilter = "waiting" | "playing" | undefined;
+
 export interface TurnCredentials {
   readonly iceServers: readonly { urls: string | readonly string[]; username?: string; credential?: string }[];
   readonly ttlSeconds: number;
@@ -263,8 +282,27 @@ export const api = {
     request<LeaderboardResponse>(`/leaderboard${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""}`, { token }),
   createRoom: (
     token: string,
-    body: { displayName: string; mobileId: string; avatarId: string; maxPlayers: number; mode: string; mapId: string },
+    body: {
+      displayName: string;
+      mobileId: string;
+      avatarId: string;
+      maxPlayers: number;
+      mode: string;
+      mapId: string;
+      isPrivate: boolean;
+    },
   ) => request<RoomResponse>("/rooms", { method: "POST", body, token }),
+  listRooms: (options: {
+    readonly status?: RoomDirectoryFilter;
+    readonly cursor?: string | null;
+    readonly signal?: AbortSignal;
+  } = {}) => {
+    const query = new URLSearchParams();
+    if (options.status) query.set("status", options.status);
+    if (options.cursor) query.set("cursor", options.cursor);
+    const suffix = query.size > 0 ? `?${query.toString()}` : "";
+    return request<PublicRoomPage>(`/rooms${suffix}`, options.signal ? { signal: options.signal } : {});
+  },
   joinRoom: (
     token: string,
     roomCode: string,

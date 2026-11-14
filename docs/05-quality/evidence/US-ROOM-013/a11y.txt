@@ -1,0 +1,31 @@
+- dialog "Phòng công khai":
+  - heading "Phòng công khai" [level=2]
+  - button "Đóng"
+  - group "Phòng công khai":
+    - button "Tất cả"
+    - button "Đang chờ" [pressed]
+    - button "Đang chơi"
+    - button "Làm mới"
+  - list:
+    - listitem:
+      - strong: 64D92P
+      - text: Sinh tồn Đồng Bằng Đá Lớn 1/2 Đang chờ
+      - button "Vào phòng 64D92P": Vào phòng
+    - listitem:
+      - strong: 69PD9V
+      - text: Sinh tồn Đồng Bằng Đá Lớn 1/2 Đang chờ
+      - button "Vào phòng 69PD9V": Vào phòng
+    - listitem:
+      - strong: GRCVCD
+      - text: Sinh tồn Đồng Bằng Đá Lớn 2/2 Đang chờ
+    - listitem:
+      - strong: CQMG89
+      - text: Sinh tồn Đồng Bằng Đá Lớn 1/2 Đang chờ
+      - button "Vào phòng CQMG89": Vào phòng
+    - listitem:
+      - strong: 4TKBE6
+      - text: Sinh tồn Đồng Bằng Đá Lớn 2/2 Đang chờ
+    - listitem:
+      - strong: 39KL8C
+      - text: Sinh tồn Đồng Bằng Đá Lớn 1/4 Đang chờ
+      - button "Vào phòng 39KL8C": Vào phòng

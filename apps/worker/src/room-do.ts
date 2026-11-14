@@ -18,11 +18,9 @@
  *
  * Wire protocol: `docs/02-reference/api/signaling.md`.
  */
-import {
-  TUNABLES, createRoom, isCurrentRuleset, type ErrorCode, type MatchEndFrame, type RoomMember, type RoomState, type Snapshot,
-  type Team, type WireSnapshot,
-} from "@gbw/core";
+import { TUNABLES, createRoom, isCurrentRuleset, type ErrorCode, type MatchEndFrame, type RoomMember, type RoomState, type Snapshot, type Team, type WireSnapshot } from "@gbw/core";
 import type { Env } from "./lib/db.js";
+import { RoomDirectoryWriter } from "./room/directory.js";
 import { hostOf, isLiveHost, planPromotion, withHostChange } from "./room/election.js";
 import { withKnownMobiles } from "./room/identity.js";
 import { armAuthTimeout, freshMeta, gateFrame, openSocket, refuseFrame, type SocketBinding } from "./room/handshake.js";
@@ -60,16 +58,16 @@ export class Room implements DurableObject {
   private recorded: RecordedMatch | null = null;
   /** Whether a player still holds an open socket; the election and both sweeps ask this. */
   private readonly isOpen = (playerId: string): boolean => this.sockets.has(playerId);
+  private readonly directory: RoomDirectoryWriter;
   /** The session a socket still holds; `POST /matches` accepts any player's, host first. */
   private readonly tokenOf = (socket: WebSocket): string | null => this.meta.get(socket)?.token ?? null;
-
   constructor(
     private readonly ctx: DurableObjectState,
     private readonly env: Env,
   ) {
     // An unnamed room: the Worker mints the code and hands it over with the host's first join, so a code that was
     // never minted leaves this empty — that is what tells a real room from a ghost (`rooms.md` § 404).
-    this.room = createRoom({ roomCode: "", now: Date.now() });
+    this.directory = new RoomDirectoryWriter(env.GBW_DB); this.room = createRoom({ roomCode: "", now: Date.now() });
     void this.ctx.blockConcurrencyWhile(async () => {
       const stored = await this.ctx.storage.get<RoomState>("room");
       const storedSnapshot = await this.ctx.storage.get<Snapshot>("snapshot");
@@ -92,6 +90,7 @@ export class Room implements DurableObject {
     await this.ctx.storage.put("room", this.room);
     await this.ctx.storage.put("hostCheck", this.hostCheck);
     if (this.room.lastSnapshot) await this.ctx.storage.put("snapshot", this.room.lastSnapshot);
+    await this.directory.persist(this.ctx.storage, this.room, this.matchStartedAt);
   }
 
   async fetch(request: Request): Promise<Response> {
@@ -310,6 +309,7 @@ export class Room implements DurableObject {
           break;
         case "close":
           this.room = action.room;
+          await this.directory.close(this.room.roomCode);
           await this.ctx.storage.deleteAll();
           broadcastFrame(this.sockets, roomClosed(action.reason));
           for (const socket of this.sockets.values()) socket.close(CLOSE_ROOM_CLOSED, "room closed");

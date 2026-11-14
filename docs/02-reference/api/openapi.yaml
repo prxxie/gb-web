@@ -143,6 +143,63 @@ paths:
                 $ref: '#/components/schemas/Problem'
 
   /rooms:
+    get:
+      tags:
+        - Rooms
+      summary: Browse public rooms on demand
+      operationId: listPublicRooms
+      security: []
+      description: |
+        A bounded snapshot for the main-menu browser. The client loads it only when the panel opens, a filter changes
+        or the player refreshes. The Room DO remains authoritative when a room is selected.
+      parameters:
+        - name: status
+          in: query
+          required: false
+          description: Omitted means all public rooms; `lobby` is projected as `waiting`.
+          schema:
+            type: string
+            enum:
+              - waiting
+              - playing
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 20
+        - name: cursor
+          in: query
+          required: false
+          description: Opaque keyset cursor.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Public room snapshot in `updatedAt DESC, roomCode ASC` order.
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+                example: public, max-age=5
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicRoomPage'
+        '400':
+          description: The cursor is invalid or truncated.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '422':
+          description: The status is unknown or the limit is outside 1…50.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
     post:
       tags:
         - Rooms
@@ -774,6 +831,69 @@ components:
         stats:
           type: object
           description: Read-model echo; ignored, never written.
+    PublicRoomSummary:
+      type: object
+      required:
+        - roomCode
+        - status
+        - mode
+        - mapId
+        - seated
+        - maxPlayers
+        - joinable
+        - updatedAt
+      properties:
+        roomCode:
+          type: string
+          pattern: '^[A-HJ-NP-Z2-9]{6}$'
+        status:
+          type: string
+          enum:
+            - waiting
+            - playing
+        mode:
+          type: string
+          enum:
+            - solo
+            - score
+            - tag
+            - jewel
+        mapId:
+          type: string
+        seated:
+          type: integer
+          minimum: 0
+          maximum: 8
+        maxPlayers:
+          type: integer
+          enum:
+            - 2
+            - 4
+            - 6
+            - 8
+        joinable:
+          type: boolean
+        updatedAt:
+          type: string
+          format: date-time
+    PublicRoomPage:
+      type: object
+      required:
+        - rooms
+        - nextCursor
+        - request_id
+      properties:
+        rooms:
+          type: array
+          maxItems: 50
+          items:
+            $ref: '#/components/schemas/PublicRoomSummary'
+        nextCursor:
+          type:
+            - string
+            - 'null'
+        request_id:
+          type: string
     RoomSettings:
       type: object
       required:

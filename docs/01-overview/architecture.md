@@ -51,14 +51,18 @@ drawn client-to-client because the data never leaves the browsers except through
 | `apps/web` scene | Rendering, touch input, HUD wiring, applying snapshots | Phaser 4.2 (canvas), `Phaser.Scale.FIT` | Nothing beyond the frame |
 | `packages/core` | Ballistics, turn order, damage, snapshot encode/decode, tunables | Pure TypeScript, no DOM/Phaser/network imports | Nothing |
 | `apps/worker` API | HTTP endpoints, JWT verification, Elo, D1 writes, rate limits | Cloudflare Workers (ES modules) | Writes `match_record`, `rating_history` |
-| `apps/worker` `Room` DO | One instance per room: roster, teams, signaling relay, host election, host snapshot cache | Durable Objects, `ctx.storage`, alarms | `RoomState`, `lastSnapshot` |
-| D1 `GBW_DB` | Durable records: accounts, profiles, matches, rating history | D1 (SQLite) | The system of record |
+| `apps/worker` `Room` DO | One instance per room: roster, teams, signaling relay, host election, host snapshot cache; writes the public directory projection on lifecycle transitions | Durable Objects, `ctx.storage`, alarms | `RoomState`, `lastSnapshot` |
+| D1 `GBW_DB` | Durable records: accounts, profiles, matches, rating history and the public `room_directory` read model | D1 (SQLite) | The system of record |
 | Clerk | Identity, sessions, OAuth, deletion | Managed service | The only place an email is stored |
 | Cloudflare TURN | Relay when NAT traversal fails | Managed service | Nothing (no logging of credentials) |
 
 The dependency direction is strict: `core` imports nothing from `web` or `worker`; `web` and `worker` both import
 `core`; the DO never imports UI code. This is what makes the simulation unit-testable without a browser
 (`NFR-22`).
+
+Public room discovery never enumerates Durable Objects. The Worker reads the indexed `room_directory` projection from
+D1 and caches the page for at most five seconds. Selecting a room re-enters the normal join route; only then does the
+Room DO become involved, and it remains the authority for seats, signaling and migration (`ADR-0008`).
 
 ## Key flows
 

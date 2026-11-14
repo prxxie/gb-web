@@ -13,6 +13,7 @@ import { DatabaseSync } from "node:sqlite";
 import { beforeEach, describe, expect, it } from "vitest";
 
 const MIGRATION = readFileSync(new URL("../migrations/0001_init.sql", import.meta.url), "utf8");
+const ROOM_DIRECTORY_MIGRATION = "../migrations/0003_room_directory.sql";
 
 interface Column {
   readonly name: string;
@@ -188,6 +189,55 @@ describe("TC-FND-100 : migrations produce the documented indexes", () => {
 
   it("indexes rating_history by (account_id, created_at)", () => {
     expect(has("rating_history", ["account_id", "created_at"])).toBe(true);
+  });
+});
+
+describe("TC-ROOM-722 / TC-ROOM-724: the public room directory migration", () => {
+  beforeEach(() => {
+    db = new DatabaseSync(":memory:");
+    db.exec("PRAGMA foreign_keys = ON");
+    db.exec(MIGRATION);
+    db.exec(readFileSync(new URL("../migrations/0002_ranked_reason.sql", import.meta.url), "utf8"));
+    db.exec(readFileSync(new URL(ROOM_DIRECTORY_MIGRATION, import.meta.url), "utf8"));
+  });
+
+  it("creates the documented room_directory columns", () => {
+    const expected: Expected = [
+      ["room_code", "TEXT", true],
+      ["status", "TEXT", true],
+      ["mode", "TEXT", true],
+      ["map_id", "TEXT", true],
+      ["seated", "INTEGER", true],
+      ["max_players", "INTEGER", true],
+      ["is_private", "INTEGER", true],
+      ["joinable", "INTEGER", true],
+      ["created_at", "TEXT", true],
+      ["updated_at", "TEXT", true],
+      ["expires_at", "TEXT", true],
+    ];
+
+    expect(shape("room_directory")).toEqual(expected);
+  });
+
+  it("indexes the public filter/order and expiry lookup", () => {
+    const indexParts = Object.values(indexes("room_directory"));
+    expect(indexParts).toContainEqual(["is_private", "status", "updated_at", "room_code"]);
+    expect(indexParts).toContainEqual(["expires_at"]);
+  });
+
+  it("refuses an unknown public status and a private flag outside 0/1", () => {
+    expect(() =>
+      db.exec(`INSERT INTO room_directory
+        (room_code, status, mode, map_id, seated, max_players, is_private, joinable, created_at, updated_at, expires_at)
+        VALUES ('ABC234', 'ended', 'solo', 'map-01', 1, 2, 0, 0,
+                '2026-11-14T00:00:00Z', '2026-11-14T00:00:00Z', '2026-11-14T00:10:00Z')`),
+    ).toThrow(/CHECK/i);
+    expect(() =>
+      db.exec(`INSERT INTO room_directory
+        (room_code, status, mode, map_id, seated, max_players, is_private, joinable, created_at, updated_at, expires_at)
+        VALUES ('ABC235', 'waiting', 'solo', 'map-01', 1, 2, 2, 1,
+                '2026-11-14T00:00:00Z', '2026-11-14T00:00:00Z', '2026-11-14T00:10:00Z')`),
+    ).toThrow(/CHECK/i);
   });
 });
 

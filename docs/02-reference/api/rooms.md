@@ -15,7 +15,7 @@ Request body:
 | Field | Type | Required | Rule |
 |-------|------|----------|------|
 | `maxPlayers` | integer | yes | One of `2, 4, 6, 8` (even: two equal teams) |
-| `isPrivate` | boolean | no | `false` default; private rooms are not listed anywhere, and v1 has no public list — the field exists for the future |
+| `isPrivate` | boolean | no | `false` default; private rooms are omitted from the public directory and remain joinable by code |
 
 ```json
 { "maxPlayers": 4 }
@@ -33,6 +33,57 @@ Response `201`:
 
 Errors: `422 validation` (`maxPlayers` not in the set), `401 unauthenticated`, `429 rate-limited`.
 Code exhaustion (all 32⁶ codes in use) is not a real scenario; on a collision the Worker retries 5 times, then `500`.
+
+## GET /rooms
+
+Returns a bounded snapshot of public rooms for the main-menu browser. The list is deliberately not live: the client
+loads it when the panel opens, when a filter changes or when the player refreshes, and never polls.
+
+Auth: none. Cache: `Cache-Control: public, max-age=5`.
+
+Query:
+
+| Field | Type | Required | Rule |
+|---|---|---|---|
+| `status` | `waiting \| playing` | no | Omitted means all public rooms; `lobby` is projected as `waiting`; ended and abandoned rooms are absent |
+| `limit` | integer | no | Default 20, minimum 1, maximum 50 |
+| `cursor` | opaque string | no | Keyset cursor; an invalid or truncated value is `400 bad-request` |
+
+The fixed order is `updated_at DESC, room_code ASC`. `updatedAt` is returned as ISO-8601 UTC. A row is visible only
+when `is_private = 0` and `expires_at > now`.
+
+Response `200`:
+
+```json
+{
+  "rooms": [
+    {
+      "roomCode": "K7M2QX",
+      "status": "waiting",
+      "mode": "solo",
+      "mapId": "map-01",
+      "seated": 2,
+      "maxPlayers": 4,
+      "joinable": true,
+      "updatedAt": "2026-11-14T09:15:00Z"
+    }
+  ],
+  "nextCursor": null,
+  "request_id": "uuid"
+}
+```
+
+`joinable` is true only while the room is `waiting` and `seated < maxPlayers`. A `playing` room is view-only because v1
+has no spectator or late-join flow. Selecting a waiting room enters `POST /rooms/{code}/join`; the Room DO is then the
+authority and may refuse a stale row with `404`, `409` or `410`.
+
+The response contains no host or player names, account ids, guest ids, player ids, IP addresses, tokens or socket data.
+
+Errors: `400 bad-request` (invalid cursor), `422 validation` (unknown status or out-of-range limit).
+
+The directory is written by the Room DO on create, join, leave, start and close. Heartbeat, chat and snapshot traffic
+never writes it. A waiting row expires 10 minutes after its last directory lifecycle write (`updated_at + 10 min`);
+a playing row expires at `matchStartedAt + 24 h`; a closed room deletes its row.
 
 ## POST /rooms/{code}/join
 
@@ -104,5 +155,8 @@ report to the player ("no relay available") instead of failing the connection ou
 | `POST /rooms` accepts only `2,4,6,8`; returns a code matching the alphabet | `apps/worker/tests/rooms.test.ts` (TC-ROOM-071) |
 | Rate limits and `Retry-After` | `apps/worker/tests/rooms.test.ts` (TC-ROOM-072) |
 | `GET /rooms/{code}` leaks no identity fields | `apps/worker/tests/rooms.test.ts` — schema whitelist assertion (TC-AUTH-075) |
+| `GET /rooms` returns public waiting/playing rows only, in the fixed order, with no identity or socket fields | `apps/worker/tests/rooms.test.ts` (TC-ROOM-722, TC-ROOM-727) |
+| `GET /rooms` page boundaries are stable and an invalid cursor is `400` | `apps/worker/tests/rooms.test.ts` (TC-ROOM-723) |
+| Directory rows follow create/join/leave/start/close and expire without heartbeat writes | `apps/worker/tests/room-directory.test.ts` (TC-ROOM-724) |
 | TURN credential TTL and absence from logs | `apps/worker/tests/turn.test.ts` (TC-ROOM-051) |
 | SDP is relayed byte-identical and never stored | `apps/worker/tests/room-relay.test.ts` (TC-ROOM-050) |

@@ -1116,6 +1116,153 @@ td {
   }
 }
 
+/*
+ * The match menu has three primary paths. At the reference landscape size the generic two-column short-screen layout
+ * still put the join path below the fold, so the menu alone uses three equal cards under its header.
+ */
+@media (orientation: landscape) and (max-height: 520px) {
+  .screen.menu {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    align-content: start;
+  }
+
+  .screen.menu > header {
+    grid-column: 1 / -1;
+  }
+
+  .screen.menu > .card {
+    min-width: 0;
+    height: 100%;
+    padding: 8px;
+    gap: 5px;
+  }
+
+  .screen.menu .row {
+    gap: 6px;
+  }
+
+  .screen.menu select,
+  .screen.menu input,
+  .screen.menu .card > button {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .screen.menu .card > .row > select {
+    flex: 1 1 0;
+  }
+
+  .screen.menu > header {
+    padding: 6px 8px;
+    gap: 4px 8px;
+  }
+}
+
+.menu__section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.menu__visibility {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.menu__visibility input {
+  width: 20px;
+  height: 20px;
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+.public-rooms__backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  padding: calc(12px + var(--safe-top)) calc(12px + var(--safe-right)) calc(12px + var(--safe-bottom))
+    calc(12px + var(--safe-left));
+  background: rgba(4, 9, 20, 0.78);
+}
+
+.public-rooms {
+  width: min(720px, 100%);
+  max-height: 100%;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--bg-raised);
+  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.5);
+}
+
+.public-rooms__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.public-rooms__filters {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.public-rooms__filters button[aria-pressed="true"] {
+  border-color: var(--accent);
+  background: #1b3b68;
+}
+
+.public-rooms__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.public-rooms__row {
+  display: grid;
+  grid-template-columns: minmax(7ch, auto) minmax(6ch, 1fr) minmax(8ch, 1fr) auto auto auto;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid #24324c;
+  border-radius: 10px;
+  background: #101a2e;
+}
+
+.public-rooms__row button {
+  min-height: 44px;
+  min-width: 44px;
+  padding: 0 12px;
+}
+
+@media (max-width: 620px), (max-height: 430px) {
+  .public-rooms {
+    padding: 10px;
+    gap: 8px;
+  }
+
+  .public-rooms__row {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .public-rooms__row button {
+    grid-column: 1 / -1;
+  }
+}
+
 /* --- The match bar, per the owner's layout (2026-11-08): S1 S2 SS · skip · six item slots · the wind to come · the
    teams' health and the gold earned, in that order, left to right. ------------------------------------------------ */
 .match__wind {

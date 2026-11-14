@@ -27,6 +27,7 @@ Rules: a guest token grants room create/join, TURN and WS only — every `/me` a
 |--------|------|---------|------|---------|--------|------|-------|
 | POST | `/sessions` | Mint a session token (guest or registered) | optional Clerk JWT | 201 | 401, 422, 429 | [accounts.md](accounts.md#post-sessions) | US-AUTH-001 |
 | GET | `/turn-credentials` | Short-lived TURN credentials | session token | 200 | 401, 429 | [rooms.md](rooms.md#get-turn-credentials) | US-ROOM-006 |
+| GET | `/rooms` | Browse public rooms on demand | none | 200 | 400, 422 | [rooms.md](rooms.md#get-rooms) | US-ROOM-013 |
 | POST | `/rooms` | Create a room | session token | 201 | 401, 422, 429 | [rooms.md](rooms.md#post-rooms) | US-ROOM-001 |
 | GET | `/rooms/{code}` | Joinability preview | none | 200 | 404, 410 | [rooms.md](rooms.md#get-roomscode) | US-ROOM-001 |
 | POST | `/rooms/{code}/join` | Join a lobby that still has a free slot | session token | 200 | 401, 404, 409, 410 | [rooms.md](rooms.md#post-roomscodejoin) | US-ROOM-002 |
@@ -44,14 +45,14 @@ Rules: a guest token grants room create/join, TURN and WS only — every `/me` a
 | Concern | Rule |
 |---------|------|
 | Content type | `application/json; charset=utf-8`; errors `application/problem+json` |
-| Success bodies | The resource itself, or `{ "items": [...], "next_cursor": "...", "has_more": true }` for a collection |
+| Success bodies | The resource itself, or `{ "items": [...], "next_cursor": "...", "has_more": true }` for a collection. `GET /rooms` is the documented room-directory exception: `{ "rooms": [...], "nextCursor": string \| null }` |
 | Ids | UUIDv4 strings, server-minted; a client never proposes an id except `roomCode` in a path |
 | Dates | ISO-8601 UTC with `Z` |
 | Enums | The exact strings in the [glossary](../../01-overview/glossary.md#status-values-in-one-place) |
 | Nullability | `null` = known to be absent; an omitted key = not part of this representation |
-| Pagination | Cursor only, `limit` default 20 / max 100; an unparsable `cursor` → `400` |
+| Pagination | Cursor only, `limit` default 20 / max 100; an unparsable `cursor` → `400`. `GET /rooms` is bounded to max 50 and uses its room-specific cursor/envelope in [rooms.md](rooms.md#get-rooms) |
 | Idempotency | `POST /matches` accepts `Idempotency-Key`; a replay within 24 h returns the stored `201` body |
-| Caching | `GET /leaderboard` → `Cache-Control: public, max-age=30`; everything else `no-store` |
+| Caching | `GET /leaderboard` → `Cache-Control: public, max-age=30`; `GET /rooms` → `public, max-age=5`; everything else `no-store` |
 | Versioning | The path carries `v1`. A breaking change means `v2` + a deprecation window of one release |
 | Request tracing | Every response and problem body carries `request_id`; the log line uses the same id (`NFR-24`) |
 
@@ -88,7 +89,6 @@ one log line and one endpoint.
 
 ## Contract tests
 
-`apps/worker/tests/api-contract.test.ts` asserts, for every row of the endpoint index: the success status, the error status
-for an unauthenticated call, the `application/problem+json` content type on every 4xx, and that no problem body contains a
-stack trace or SQL (TC-FND-070). OpenAPI is not kept in v1 — this table is the contract, and `cpt-review` diffs a change
-against it.
+`apps/worker/tests/api-contract.test.ts` asserts route-level statuses and error envelopes, while
+`tests/meta/openapi.test.ts` checks that every documented path exists in the OpenAPI artifact with a problem response
+(`TC-FND-070`). The endpoint index and `openapi.yaml` are both contract sources and change together.

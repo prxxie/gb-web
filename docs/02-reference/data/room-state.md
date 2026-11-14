@@ -1,7 +1,9 @@
 # Data — room state (Durable Object)
 
 Room state is **ephemeral**: it lives in the `Room` Durable Object (`env.ROOM.idFromName(roomCode)`) and is deleted when
-the room ends. It is never written to D1 — only the finished `match_record` is ([ADR-0003](../../04-decisions/adr/ADR-0003-data-d1.md)).
+the room ends. The full `RoomState` is never written to D1; only the finished `match_record` and the narrow public
+`room_directory` projection are ([ADR-0003](../../04-decisions/adr/ADR-0003-data-d1.md),
+[ADR-0008](../../04-decisions/adr/ADR-0008-public-room-directory.md)).
 
 ### The terrain mask travels with the snapshot, not in every snapshot
 
@@ -64,6 +66,10 @@ round trip of the shot. `applySnapshot` returns the decoded heights, and the cal
 | Winner, duration, ruleset | `match_record` |
 | Rating effect | `rating_history` |
 | Everything else (transient membership, ICE, snapshots) | Nowhere — deliberately dropped |
+
+The public browser reads a separate D1 projection (`room_directory`) that contains only code, public lifecycle status,
+mode, map, seat counts and expiry. It contains no account id, guest id, player id, socket, token or ICE data. The DO
+upserts it on create, join, leave, start and close; heartbeat and snapshot traffic never touches it.
 
 ## Oracle
 

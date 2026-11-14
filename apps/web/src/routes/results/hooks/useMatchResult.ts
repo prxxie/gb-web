@@ -239,6 +239,7 @@ export function useMatchResult(roomCode: string): MatchResultActions {
         maxPlayers: payload.maxPlayers,
         mode: payload.mode,
         mapId: payload.mapId,
+        isPrivate: false,
       });
       // The lobby reuses the seat this call created, exactly as the menu's create-room does.
       sessionStorage.setItem(`gbw.room.${room.roomCode}`, room.playerId);

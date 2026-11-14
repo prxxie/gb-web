@@ -2,7 +2,8 @@
 
 Two stores, one owner each ([ADR-0003](../../04-decisions/adr/ADR-0003-data-d1.md)):
 
-- **D1** (`GBW_DB`) — every durable record: `account`, `profile`, `match_record`, `match_player`, `rating_history`.
+- **D1** (`GBW_DB`) — every durable record: `account`, `profile`, `match_record`, `match_player`, `rating_history` and
+  the public `room_directory` projection.
 - **Durable Object storage** — ephemeral room state only, deleted when a room closes (`room-state.md`).
 
 Migrations live in `apps/worker/migrations/NNNN_<slug>.sql`, are applied with
@@ -17,6 +18,7 @@ Migrations live in `apps/worker/migrations/NNNN_<slug>.sql`, are applied with
 | `match_record` | One played match | [matches.md](matches.md) | Worker `POST /api/v1/matches` |
 | `match_player` | Per-player outcome and contribution | [matches.md](matches.md) | Same call, same transaction |
 | `rating_history` | Audit trail of every rating change | [matches.md](matches.md) | Same call, same transaction |
+| `room_directory` | Bounded public projection of live rooms for `GET /rooms` | this file | Room DO on create/join/leave/start/close; never heartbeat or snapshot traffic |
 
 ## Diagram
 
@@ -77,6 +79,19 @@ erDiagram
         INTEGER delta
         TEXT created_at
     }
+    room_directory {
+        TEXT room_code PK
+        TEXT status
+        TEXT mode
+        TEXT map_id
+        INTEGER seated
+        INTEGER max_players
+        INTEGER is_private
+        INTEGER joinable
+        TEXT created_at
+        TEXT updated_at
+        TEXT expires_at
+    }
 ```
 
 ## Storage conventions
@@ -92,6 +107,12 @@ erDiagram
 | Naming | `snake_case` columns, plural-free table names (`match_record`, not `matches`) |
 | PII | No email, phone, address or IP columns anywhere (`NFR-13`) |
 
+`room_directory` is not a copy of `RoomState`. It contains only the fields needed by the public browser:
+`status` is projected as `waiting | playing` (`lobby` becomes `waiting`), `joinable` is derived from status and seats,
+and private rooms are excluded by the query. Its indexes are `(is_private, status, updated_at DESC, room_code)` and
+`expires_at`. The Room DO updates it on create, join, leave, start and close; heartbeat, chat and snapshot paths do not
+write it.
+
 ## Oracle
 
 | Contract | Checked by |
@@ -101,3 +122,5 @@ erDiagram
 | `match_record` / `match_player` / `rating_history` written in one batch, once per match | `apps/worker/tests/matches.test.ts` (TC-RANK-110, TC-RANK-111) |
 | Leaderboard index serves the keyset page without a table scan | `apps/worker/tests/leaderboard.test.ts` (`EXPLAIN QUERY PLAN` assertion, TC-RANK-104) |
 | `RoomState` / `Member` shape and persistence via `ctx.storage` | `apps/worker/tests/room.test.ts` (TC-ROOM-147…TC-ROOM-073) |
+| Public directory filter, expiry and private-room exclusion | `apps/worker/tests/rooms.test.ts` (TC-ROOM-722, TC-ROOM-727) |
+| Directory lifecycle writes and projection indexes | `apps/worker/tests/room-directory.test.ts` (TC-ROOM-724) |

@@ -1,5 +1,65 @@
 # Changelog
 
+## 2026-11-14 — CR-2026-11-14-public-room-browser — public rooms are a cached D1 snapshot
+
+The main menu gains a on-demand public-room browser. The list is a D1 projection refreshed only on open, filter change
+or explicit refresh; it never polls or enumerates Durable Objects. Selecting a waiting room returns to the existing
+join and signaling path, where the Room DO remains the live authority. Private rooms stay joinable by code but never
+appear in the directory.
+
+- Added: `US-ROOM-013`, `ADR-0008`, `room_directory` data contract, `GET /rooms`, and `TC-ROOM-722`–`TC-ROOM-728`.
+- Shipped: the Room DO lifecycle projection (best-effort D1 sync with a hibernation-safe key), the bounded cached list,
+  the on-demand menu dialog with keyboard focus containment, and the public/private create choice. Branch-commit Vitest:
+  145 files / 1,235 cases (1,234 pass, 1 skipped); full Playwright: 103 pass.
+- Modified: API/OpenAPI/screen/data/architecture references, delivery plan (`149.0` story-days; W7 `22.5`), test cases,
+  gate baseline and ADR set.
+- Closed: none. Rework of done stories: none.
+- Safety flags: one additive D1 migration with no backfill; directory rows for pre-existing rooms start empty.
+
+## 2026-11-14 — CR-2026-11-14-playtest-and-free-tier-capacity — replay gaps closed, Free tier measured
+
+The replay follow-up removed the duplicate guest profile link, named the four menu fields and made the loadout wheel
+leave when its turn ends. The Cloudflare re-baseline corrected the stale TURN and Durable Objects assumptions and
+measured the accepted launch load.
+
+- Added: `US-MATCH-014`, `US-OPS-005`, `TC-ROOM-720`, `TC-ROOM-721`, `TC-MATCH-969`, `TC-OPS-186`–`TC-OPS-189`.
+- Modified: menu and wheel behavior, accessibility tests, `screens/main.md`, `screens/match.md`, `NFR-05`,
+  `environment-setup.md`, `project-overview.md`, `runbook.md`, `slo.md`, `delivery-plan.md`, `test-cases.md`,
+  `acceptance-signoff.md`, and the bundle ratchet (`556 → 557 KiB` total).
+- Closed: none. Rework of done stories: none; the fixes are tracked by the new follow-up stories.
+- Measured: local 50-room/two-seat run with 30 s overlap was 50/50 ready, 0 % errors, p50 340 ms, p95 894 ms. Cloudflare
+  analytics was not collected because Wrangler is not authenticated; the production 120–150 DO requests/room
+  measurement and current official limits show Free is not enough for the accepted 50-concurrent-room online launch.
+  Durable Objects requests/day is the first limit, and standalone TURN is paid.
+
+## 2026-11-14 — CR-2026-11-14-match-playtest-fixes — the bot-match loop stays with the player
+
+The 2026-11-14 hand playtest found that the camera rode a shell to its impact and never returned to the next active
+seat. The same session exposed controls that accepted taps while the field was busy, a touch item wheel that printed
+`EN/CH/PO/BU/TE`, no first-turn explanation of hold-then-drag aiming, a weather banner that leaked a sector index, and a
+landscape menu whose join action sat below the fold.
+
+- Added: `US-MATCH-013`; `TC-MATCH-964`–`TC-MATCH-968`, `TC-ROOM-719`.
+- Modified: match camera/scene, match HUD lock and focus publication, item wheel and item copy, first-turn hint, weather
+  banner copy, landscape menu layout, `screens/main.md`, `screens/match.md`, `delivery-plan.md` W7 (15.5 → 18.0 days),
+  `05-quality/test-cases.md`, `05-quality/acceptance-signoff.md`.
+- Closed: none.
+- Rework of done stories: `US-MATCH-001`, `US-MATCH-002`, `US-MATCH-003`, `US-MATCH-005`, `US-MATCH-007`,
+  `US-MATCH-011`, `US-MATCH-012`, `US-ROOM-001` (their records stay `done`; the rework is tracked by `US-MATCH-013`).
+
+## 2026-11-14 - CR-2026-11-14-close-split-shot-milestones - the split milestones were the tortoise's rays, not Dual
+
+The reference timing table describes Iron Tortoise's fork/time-bomb projectile: two intertwined rays converge at each
+milestone and then separate again. `US-BAL-009` had interpreted the table as a list of delays for the second shell of the
+`itm-dual` item, so its HUD, refusal rule and replay contract described the wrong mechanic.
+
+- Added: none.
+- Modified: `03-stories/EPIC-09-ballistics/README.md`, `03-stories/delivery-plan.md` (W8 18.5, active backlog 142.0),
+  `05-quality/test-cases.md` (closed-story coverage gaps, not reusable test ids),
+  `05-quality/acceptance-signoff.md` (G1 baseline note and history; G3 counts).
+- Closed: `US-BAL-009`. No code had shipped for it.
+- Rework of done stories: none. A future fork/time-bomb story needs its own projectile contract.
+
 ## 2026-11-14 — CR-2026-11-14-practice-solver-screen — the practice route is a real screen
 
 `US-BAL-007` assumed a "practice route" that the doc set never had: the seven screens were main, sign-in, profile,

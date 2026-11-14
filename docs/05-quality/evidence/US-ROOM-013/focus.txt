@@ -1,0 +1,3 @@
+backwards=true
+forwards=true
+trigger=public-rooms

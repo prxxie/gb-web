@@ -19,7 +19,7 @@ players climb an Elo ladder; guests and a bot mode need no account.
 <!-- cpt:stats -->
 | Stories | Done | In progress | Ready | Blocked | Draft | Closed |
 |---|---|---|---|---|---|---|
-| 73 | 65 | 0 | 8 | 0 | 0 | 0 |
+| 74 | 66 | 0 | 8 | 0 | 0 | 0 |
 
 Open questions: **Open: 13 · Blocking: 0 · Answered: 31 · Withdrawn: 1**
 <!-- /cpt:stats -->

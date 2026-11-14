@@ -16,7 +16,7 @@ import { createSession, deleteMe, getMe, patchMe } from "./routes/accounts.js";
 import { health } from "./routes/health.js";
 import { leaderboard } from "./routes/leaderboard.js";
 import { myMatches, submitMatch } from "./routes/matches.js";
-import { createRoom, joinRoomByCode, roomPreview, roomSocket, turnCredentials } from "./routes/rooms.js";
+import { createRoom, joinRoomByCode, listRooms, roomPreview, roomSocket, turnCredentials } from "./routes/rooms.js";
 
 export { Room } from "./room-do.js";
 
@@ -159,6 +159,7 @@ async function routeToHandler(request: Request, env: Env, url: URL, requestId: s
     return health(env, requestId, request.headers.get("x-gbw-version") ?? env.VERSION ?? "dev");
   }
   if (rest === "/sessions" && request.method === "POST") return await createSession(request, env);
+  if (rest === "/rooms" && request.method === "GET") return await listRooms(request, env);
   if (rest === "/rooms" && request.method === "POST") {
     return await createRoom(request, env, await requiredSession(request, env), url.origin);
   }

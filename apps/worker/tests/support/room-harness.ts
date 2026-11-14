@@ -144,7 +144,7 @@ export interface HarnessPlayer {
 }
 
 export class RoomHarness {
-  readonly ctx = new FakeContext();
+  readonly ctx: FakeContext;
   readonly do: Room;
   private readonly origin: string | null;
   private readonly members = new Map<string, RoomMember>();
@@ -153,11 +153,15 @@ export class RoomHarness {
    * `origin` is the public base the object posts a finished match to (`US-RANK-001`). Tests that reach
    * `POST /matches` pass it and stub `fetch`; everything else leaves it out, so the request never happens.
    */
-  constructor(options: { readonly origin?: string } = {}) {
+  constructor(options: { readonly origin?: string; readonly db?: D1Database; readonly context?: FakeContext } = {}) {
+    this.ctx = options.context ?? new FakeContext();
     this.origin = options.origin ?? null;
     this.do = new Room(
       this.ctx as unknown as ConstructorParameters<typeof Room>[0],
-      { SESSION_TOKEN_SECRET: HARNESS_SECRET } as unknown as ConstructorParameters<typeof Room>[1],
+      {
+        SESSION_TOKEN_SECRET: HARNESS_SECRET,
+        ...(options.db ? { GBW_DB: options.db } : {}),
+      } as unknown as ConstructorParameters<typeof Room>[1],
     );
   }
 

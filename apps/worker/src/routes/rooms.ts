@@ -12,6 +12,12 @@ import {
   type Snapshot,
 } from "@gbw/core";
 import type { Env } from "../lib/db.js";
+import {
+  decodeRoomDirectoryCursor,
+  encodeRoomDirectoryCursor,
+  findRoomDirectoryPage,
+  type RoomDirectoryCursor,
+} from "../lib/db.js";
 import { ProblemError } from "../lib/problem.js";
 import { ipLimit, RULES } from "../lib/ratelimit.js";
 import type { SessionToken } from "../lib/session.js";
@@ -69,6 +75,71 @@ export interface CreateRoomInput {
   readonly isPrivate: boolean;
 }
 
+function directoryStatus(url: URL): "waiting" | "playing" | null {
+  if (!url.searchParams.has("status")) return null;
+  const raw = url.searchParams.get("status");
+  if (raw === "waiting" || raw === "playing") return raw;
+  throw new ProblemError("validation", "One or more fields are invalid", [
+    { field: "status", detail: "must be waiting or playing" },
+  ]);
+}
+
+function directoryLimit(url: URL): number {
+  if (!url.searchParams.has("limit")) return 20;
+  const raw = url.searchParams.get("limit");
+  if (raw === null || !/^\d+$/.test(raw)) {
+    throw new ProblemError("validation", "One or more fields are invalid", [
+      { field: "limit", detail: "must be an integer from 1 to 50" },
+    ]);
+  }
+  const parsed = Number(raw);
+  if (!Number.isSafeInteger(parsed) || parsed < 1 || parsed > 50) {
+    throw new ProblemError("validation", "One or more fields are invalid", [
+      { field: "limit", detail: "must be an integer from 1 to 50" },
+    ]);
+  }
+  return parsed;
+}
+
+/**
+ * Public room discovery (`US-ROOM-013`). This is a D1 read model, never a live subscription: the caller decides
+ * when to ask, and selecting a row re-enters the authoritative room object through `joinRoomByCode`.
+ */
+export async function listRooms(request: Request, env: Env): Promise<Response> {
+  const url = new URL(request.url);
+  const status = directoryStatus(url);
+  const limit = directoryLimit(url);
+  const rawCursor = url.searchParams.get("cursor");
+  const after: RoomDirectoryCursor | null =
+    rawCursor === null ? null : decodeRoomDirectoryCursor(rawCursor);
+  const { rows, hasMore } = await findRoomDirectoryPage(
+    env.GBW_DB,
+    status,
+    after,
+    limit,
+    new Date().toISOString(),
+  );
+  const rooms = rows.map((row) => ({
+    roomCode: row.room_code,
+    status: row.status,
+    mode: row.mode,
+    mapId: row.map_id,
+    seated: row.seated,
+    maxPlayers: row.max_players,
+    joinable: row.joinable === 1,
+    updatedAt: row.updated_at,
+  }));
+  const last = rows[rows.length - 1];
+  return Response.json(
+    {
+      rooms,
+      nextCursor:
+        hasMore && last ? encodeRoomDirectoryCursor({ updatedAt: last.updated_at, roomCode: last.room_code }) : null,
+    },
+    { headers: { "cache-control": "public, max-age=5" } },
+  );
+}
+
 export async function createRoom(
   request: Request,
   env: Env,
@@ -91,7 +162,7 @@ export async function createRoom(
   const maxPlayers = field.oneOf(body["maxPlayers"], "maxPlayers", ALLOWED_CAPACITIES) as RoomSettings["maxPlayers"];
   const mode = field.oneOf(body["mode"] ?? "solo", "mode", ["solo", "score", "tag", "jewel"] as const);
   const mapId = field.string(body["mapId"] ?? "map-01", "mapId");
-  const isPrivate = typeof body["isPrivate"] === "boolean" ? body["isPrivate"] : false;
+  const isPrivate = body["isPrivate"] === undefined ? false : field.boolean(body["isPrivate"], "isPrivate");
   field.done();
 
   const playerId = crypto.randomUUID();

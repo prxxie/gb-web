@@ -109,6 +109,25 @@ describe("POST /rooms", () => {
     expect(response.status).toBe(422);
   });
 
+  it("TC-ROOM-728: rejects a non-boolean isPrivate instead of publishing the room", async () => {
+    // Arrange
+    const rig = createRig();
+    const token = await rig.token(accountSubject(HOST));
+
+    // Act
+    const response = await rig.request("POST", "/rooms", {
+      token,
+      body: { maxPlayers: 2, isPrivate: "true" },
+    });
+    const body = (await response.json()) as { type: string; errors?: { field: string }[] };
+
+    // Assert
+    expect(response.status).toBe(422);
+    expect(body.type).toContain("/validation");
+    expect(body.errors?.map((error) => error.field)).toContain("isPrivate");
+    expect(rig.db.rows("room_directory")).toEqual([]);
+  });
+
   it("TC-ROOM-120: the code only uses the documented alphabet", async () => {
     // Arrange
     const rig = createRig();
@@ -182,6 +201,160 @@ describe("POST /rooms", () => {
     expect(response.headers.get("content-type")).toContain("application/problem+json");
     expect(body.type).toContain("/problems/unauthenticated");
     expect(typeof body.request_id).toBe("string");
+  });
+});
+
+interface DirectorySeed {
+  readonly roomCode: string;
+  readonly status: "waiting" | "playing";
+  readonly mode?: "solo" | "score" | "tag" | "jewel";
+  readonly mapId?: string;
+  readonly seated?: number;
+  readonly maxPlayers?: 2 | 4 | 6 | 8;
+  readonly isPrivate?: boolean;
+  readonly joinable?: boolean;
+  readonly updatedAt?: string;
+  readonly expiresAt?: string;
+}
+
+function seedDirectory(rig: TestRig, seed: DirectorySeed): void {
+  rig.db.sql
+    .prepare(
+      `INSERT INTO room_directory
+        (room_code, status, mode, map_id, seated, max_players, is_private, joinable, created_at, updated_at, expires_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    )
+    .run(
+      seed.roomCode,
+      seed.status,
+      seed.mode ?? "solo",
+      seed.mapId ?? "map-01",
+      seed.seated ?? 1,
+      seed.maxPlayers ?? 4,
+      seed.isPrivate ? 1 : 0,
+      (seed.joinable ?? seed.status === "waiting") ? 1 : 0,
+      "2026-11-14T09:00:00.000Z",
+      seed.updatedAt ?? "2026-11-14T09:15:00.000Z",
+      seed.expiresAt ?? "2099-11-14T09:25:00.000Z",
+    );
+}
+
+describe("GET /rooms", () => {
+  beforeEach(() => resetLimits());
+
+  it("TC-ROOM-722: returns only public unexpired rooms under the requested status", async () => {
+    // Arrange
+    const rig = createRig();
+    seedDirectory(rig, { roomCode: "ABC234", status: "waiting", updatedAt: "2026-11-14T09:10:00.000Z" });
+    seedDirectory(rig, {
+      roomCode: "ABC235",
+      status: "playing",
+      joinable: false,
+      updatedAt: "2026-11-14T09:12:00.000Z",
+      expiresAt: "2099-11-15T09:12:00.000Z",
+    });
+    seedDirectory(rig, { roomCode: "ABC236", status: "waiting", isPrivate: true });
+    seedDirectory(rig, {
+      roomCode: "ABC237",
+      status: "waiting",
+      expiresAt: "2026-11-14T09:20:00.000Z",
+    });
+
+    // Act
+    const all = (await (await rig.request("GET", "/rooms")).json()) as {
+      rooms: { roomCode: string; status: string; joinable: boolean }[];
+    };
+    const waiting = (await (await rig.request("GET", "/rooms?status=waiting")).json()) as {
+      rooms: { roomCode: string }[];
+    };
+    const playing = (await (await rig.request("GET", "/rooms?status=playing")).json()) as {
+      rooms: { roomCode: string }[];
+    };
+
+    // Assert
+    expect(all.rooms.map((room) => [room.roomCode, room.status])).toEqual([
+      ["ABC235", "playing"],
+      ["ABC234", "waiting"],
+    ]);
+    expect(all.rooms[0]?.joinable).toBe(false);
+    expect(waiting.rooms.map((room) => room.roomCode)).toEqual(["ABC234"]);
+    expect(playing.rooms.map((room) => room.roomCode)).toEqual(["ABC235"]);
+  });
+
+  it("TC-ROOM-723: pages by the fixed keyset without duplicates and refuses a bad cursor", async () => {
+    // Arrange
+    const rig = createRig();
+    seedDirectory(rig, { roomCode: "ABC234", status: "waiting" });
+    seedDirectory(rig, { roomCode: "ABC235", status: "waiting" });
+    seedDirectory(rig, { roomCode: "ABC236", status: "waiting" });
+
+    // Act
+    const first = (await (await rig.request("GET", "/rooms?limit=2")).json()) as {
+      rooms: { roomCode: string }[];
+      nextCursor: string | null;
+    };
+    const second = (await (
+      await rig.request("GET", `/rooms?limit=2&cursor=${encodeURIComponent(first.nextCursor ?? "")}`)
+    ).json()) as { rooms: { roomCode: string }[]; nextCursor: string | null };
+    const invalid = await rig.request("GET", "/rooms?cursor=not-a-cursor");
+    const forged = Buffer.from(JSON.stringify({ v: 1, u: "garbage", r: "ABC234" })).toString("base64url");
+    const forgedResponse = await rig.request("GET", `/rooms?cursor=${forged}`);
+    const nullResponse = await rig.request("GET", "/rooms?cursor=bnVsbA");
+
+    // Assert
+    expect(first.rooms.map((room) => room.roomCode)).toEqual(["ABC234", "ABC235"]);
+    expect(first.nextCursor).toEqual(expect.any(String));
+    expect(second.rooms.map((room) => room.roomCode)).toEqual(["ABC236"]);
+    expect(second.nextCursor).toBeNull();
+    expect(invalid.status).toBe(400);
+    expect(((await invalid.json()) as { type: string }).type).toContain("/bad-request");
+    expect(forgedResponse.status).toBe(400);
+    expect(nullResponse.status).toBe(400);
+  });
+
+  it("TC-ROOM-727: exposes only the documented public room fields and caches for five seconds", async () => {
+    // Arrange
+    const rig = createRig();
+    seedDirectory(rig, { roomCode: "ABC234", status: "waiting", seated: 2, maxPlayers: 4 });
+
+    // Act
+    const response = await rig.request("GET", "/rooms");
+    const raw = await response.text();
+    const body = JSON.parse(raw) as {
+      rooms: Record<string, unknown>[];
+      nextCursor: string | null;
+      request_id: string;
+    };
+
+    // Assert
+    expect(Object.keys(body).sort()).toEqual(["nextCursor", "request_id", "rooms"]);
+    expect(Object.keys(body.rooms[0] ?? {}).sort()).toEqual([
+      "joinable",
+      "mapId",
+      "maxPlayers",
+      "mode",
+      "roomCode",
+      "seated",
+      "status",
+      "updatedAt",
+    ]);
+    for (const forbidden of ["accountId", "guestId", "playerId", "host", "token", "wsUrl", "socket", "ip"]) {
+      expect(raw).not.toContain(forbidden);
+    }
+    expect(response.headers.get("cache-control")).toBe("public, max-age=5");
+  });
+
+  it("rejects an unknown status and a limit outside 1…50 with 422 validation", async () => {
+    // Arrange
+    const rig = createRig();
+
+    // Act / Assert
+    for (const query of ["status=", "status=lobby", "limit=", "limit=0", "limit=51", "limit=2.5", "limit=nope"]) {
+      const response = await rig.request("GET", `/rooms?${query}`);
+      const body = (await response.json()) as { type: string };
+      expect(response.status, query).toBe(422);
+      expect(body.type, query).toContain("/validation");
+    }
   });
 });
 

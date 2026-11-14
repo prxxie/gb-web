@@ -1,12 +1,13 @@
 /**
  * Main menu (`US-MATCH-001` entry point, `docs/02-reference/screens/main.md`).
  */
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useOnline } from "../lib/online.js";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { MOBILES, MODES, MAPS, type ModeId } from "@gbw/core";
 import { useLocale, useSession } from "../app/providers";
 import { ApiError, api, errorMessage } from "../lib/api";
+import { PublicRoomDialog } from "../components/PublicRoomDialog";
 import { botMatchPlan, writePlan } from "../lib/plan";
 import type { JSX } from "react";
 
@@ -21,6 +22,9 @@ export function MainPage(): JSX.Element {
   const [capacity, setCapacity] = useState<number>(2);
   const [mode, setMode] = useState<ModeId>("solo");
   const [code, setCode] = useState("");
+  const [isPrivate, setIsPrivate] = useState(false);
+  const [roomsOpen, setRoomsOpen] = useState(false);
+  const roomsTrigger = useRef<HTMLButtonElement>(null);
   const [busy, setBusy] = useState(false);
   // A lobby that could not be entered hands its reason back here (`LobbyPage`), so the menu can say it.
   const handedOver = (useLocation().state as { error?: string } | null)?.error ?? null;
@@ -59,6 +63,7 @@ export function MainPage(): JSX.Element {
         maxPlayers: capacity,
         mode,
         mapId,
+        isPrivate,
       });
       // The lobby reuses the seat this call created instead of creating a second one.
       sessionStorage.setItem(`gbw.room.${room.roomCode}`, room.playerId);
@@ -95,8 +100,13 @@ export function MainPage(): JSX.Element {
     }
   };
 
+  const closePublicRooms = (): void => {
+    setRoomsOpen(false);
+    window.setTimeout(() => roomsTrigger.current?.focus(), 0);
+  };
+
   return (
-    <div className="screen">
+    <div className="screen menu">
       <header className="card">
         <h1>{t("app.title")}</h1>
         <p className="muted menu__tagline">{t("app.tagline")}</p>
@@ -113,9 +123,18 @@ export function MainPage(): JSX.Element {
               </span>
             )
           ) : null}
-          <Link to="/profile">{t("main.profile")}</Link>
+          {session?.subject.kind === "account" ? <Link to="/profile">{t("main.profile")}</Link> : null}
           <Link to="/leaderboard">{t("main.leaderboard")}</Link>
           <Link to="/practice">{t("main.practice")}</Link>
+          <button
+            ref={roomsTrigger}
+            type="button"
+            className="ghost"
+            data-testid="public-rooms"
+            onClick={() => setRoomsOpen(true)}
+          >
+            {t("main.rooms")}
+          </button>
         </div>
       </header>
 
@@ -124,6 +143,8 @@ export function MainPage(): JSX.Element {
         <label className="row">
           <span className="muted">{t("lobby.mobile")}</span>
           <select
+            id="main-mobile"
+            name="mobile"
             data-testid="mobile-picker"
             value={mobileId}
             onChange={(event) => setMobileId(event.target.value)}
@@ -142,16 +163,43 @@ export function MainPage(): JSX.Element {
       </section>
 
       <section className="card">
-        <h2>{t("main.createRoom")}</h2>
+        <div className="menu__section-head">
+          <h2>{t("main.createRoom")}</h2>
+          <label className="menu__visibility">
+            <input
+              id="main-room-visibility"
+              name="isPrivate"
+              type="checkbox"
+              checked={isPrivate}
+              onChange={(event) => setIsPrivate(event.target.checked)}
+              disabled={busy}
+            />
+            <span>{t("main.rooms.private")}</span>
+          </label>
+        </div>
         <div className="row">
-          <select value={capacity} onChange={(event) => setCapacity(Number(event.target.value))} disabled={busy}>
+          <select
+            id="main-capacity"
+            name="maxPlayers"
+            aria-label={t("main.capacity")}
+            value={capacity}
+            onChange={(event) => setCapacity(Number(event.target.value))}
+            disabled={busy}
+          >
             {CAPACITIES.map((value) => (
               <option key={value} value={value}>
                 {value} — {t("main.capacity")}
               </option>
             ))}
           </select>
-          <select value={mode} onChange={(event) => setMode(event.target.value as ModeId)} disabled={busy}>
+          <select
+            id="main-mode"
+            name="mode"
+            aria-label={t("main.mode")}
+            value={mode}
+            onChange={(event) => setMode(event.target.value as ModeId)}
+            disabled={busy}
+          >
             {MODES.map((entry) => (
               <option key={entry.modeId} value={entry.modeId}>
                 {t(`main.mode.${entry.modeId}`)}
@@ -174,6 +222,8 @@ export function MainPage(): JSX.Element {
       <section className="card">
         <h2>{t("main.joinRoom")}</h2>
         <input
+          id="main-room-code"
+          name="roomCode"
           type="text"
           inputMode="text"
           autoCapitalize="characters"
@@ -197,6 +247,16 @@ export function MainPage(): JSX.Element {
         </button>
         {error ? <p className="muted">{error}</p> : null}
       </section>
+      {roomsOpen ? (
+        <PublicRoomDialog
+          session={session}
+          onClose={closePublicRooms}
+          onJoined={(roomCode, playerId) => {
+            sessionStorage.setItem(`gbw.room.${roomCode}`, playerId);
+            navigate(`/lobby/${roomCode}`);
+          }}
+        />
+      ) : null}
     </div>
   );
 }

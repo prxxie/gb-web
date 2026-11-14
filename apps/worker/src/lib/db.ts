@@ -333,6 +333,59 @@ export async function findLeaderboard(
   };
 }
 
+export interface RoomDirectoryRow {
+  readonly room_code: string;
+  readonly status: "waiting" | "playing";
+  readonly mode: "solo" | "score" | "tag" | "jewel";
+  readonly map_id: string;
+  readonly seated: number;
+  readonly max_players: number;
+  readonly joinable: number;
+  readonly updated_at: string;
+}
+
+export interface RoomDirectoryCursor {
+  readonly updatedAt: string;
+  readonly roomCode: string;
+}
+
+/**
+ * One bounded keyset page of the public projection. The predicate is fixed here rather than supplied by the client:
+ * only the two documented status values can reach the SQL, and the ordering includes the unique room code.
+ */
+export async function findRoomDirectoryPage(
+  db: D1Database,
+  status: "waiting" | "playing" | null,
+  after: RoomDirectoryCursor | null,
+  limit: number,
+  nowValue: string,
+): Promise<{ rows: RoomDirectoryRow[]; hasMore: boolean }> {
+  const where = ["is_private = 0", "expires_at > ?"];
+  const binds: (string | number)[] = [nowValue];
+  if (status !== null) {
+    where.push("status = ?");
+    binds.push(status);
+  }
+  if (after !== null) {
+    where.push("(updated_at < ? OR (updated_at = ? AND room_code > ?))");
+    binds.push(after.updatedAt, after.updatedAt, after.roomCode);
+  }
+  binds.push(limit + 1);
+
+  const rows = await db
+    .prepare(
+      `SELECT room_code, status, mode, map_id, seated, max_players, joinable, updated_at
+         FROM room_directory
+        WHERE ${where.join(" AND ")}
+        ORDER BY updated_at DESC, room_code ASC
+        LIMIT ?`,
+    )
+    .bind(...binds)
+    .all<RoomDirectoryRow>();
+  const all = rows.results ?? [];
+  return { rows: all.slice(0, limit), hasMore: all.length > limit };
+}
+
 export function encodeCursor(value: string): string {
   return btoa(value).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
@@ -413,4 +466,34 @@ export function decodeLeaderboardCursor(cursor: string): LeaderboardCursor {
     throw new ProblemError("validation", "Cursor is not readable", [{ field: "cursor", detail: "invalid cursor" }]);
   }
   return { offset };
+}
+
+export function encodeRoomDirectoryCursor(cursor: RoomDirectoryCursor): string {
+  return encodeCursor(JSON.stringify({ v: 1, u: cursor.updatedAt, r: cursor.roomCode }));
+}
+
+export function decodeRoomDirectoryCursor(cursor: string): RoomDirectoryCursor {
+  const unreadable = (): ProblemError =>
+    new ProblemError("bad-request", "Cursor is not readable", [{ field: "cursor", detail: "invalid cursor" }]);
+  let payload: unknown;
+  try {
+    payload = decodeCursorPayload(cursor);
+  } catch {
+    throw unreadable();
+  }
+  if (payload === null || typeof payload !== "object" || Array.isArray(payload)) throw unreadable();
+  const record = payload as Record<string, unknown>;
+  const updatedAt = record["u"];
+  const timestamp = typeof updatedAt === "string" ? Date.parse(updatedAt) : Number.NaN;
+  if (
+    record["v"] !== 1 ||
+    typeof updatedAt !== "string" ||
+    Number.isNaN(timestamp) ||
+    new Date(timestamp).toISOString() !== updatedAt ||
+    typeof record["r"] !== "string" ||
+    !/^[A-HJ-NP-Z2-9]{6}$/.test(record["r"])
+  ) {
+    throw unreadable();
+  }
+  return { updatedAt, roomCode: record["r"] };
 }

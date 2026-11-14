@@ -32,6 +32,7 @@ Generated from story frontmatter — run `node .agents/scripts/verify-docs.mjs -
 | [US-ROOM-008](US-ROOM-008-split-the-room-object.md) | Split the room object into collaborators | P2 | L | done | US-ROOM-003, US-ROOM-005, US-ROOM-006, US-ROOM-007, US-RANK-001 |
 | [US-ROOM-011](US-ROOM-011-a-quiet-room-must-not-spin.md) | A quiet room must not spin on its own alarm | P0 | S | done | US-ROOM-005 |
 | [US-ROOM-012](US-ROOM-012-an-empty-room-sleeps-until-expiry.md) | A room with nobody in it should sleep until its expiry | P2 | S | ready | US-ROOM-011 |
+| [US-ROOM-013](US-ROOM-013-browse-public-rooms-on-demand.md) | Browse public rooms on demand | P2 | M | done | US-ROOM-001, US-ROOM-002, US-ROOM-007 |
 <!-- /cpt:epic-stories -->
 
 ## Out of scope

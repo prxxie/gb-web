@@ -159,7 +159,10 @@ export class FakeRooms {
   private readonly contexts = new Map<string, RouteContext>();
   private readonly secret: string;
 
-  constructor(secret: string = TEST_SECRET) {
+  constructor(
+    private readonly db?: D1Database,
+    secret: string = TEST_SECRET,
+  ) {
     this.secret = secret;
   }
 
@@ -182,6 +185,7 @@ export class FakeRooms {
     const ctx = new RouteContext();
     const room = new Room(ctx as unknown as ConstructorParameters<typeof Room>[0], {
       SESSION_TOKEN_SECRET: this.secret,
+      ...(this.db ? { GBW_DB: this.db } : {}),
     } as unknown as ConstructorParameters<typeof Room>[1]);
     await ctx.ready();
     this.contexts.set(code, ctx);
@@ -214,7 +218,7 @@ export interface RigOptions {
 /** A fresh Worker environment per test: new database, new Durable Objects, empty rate-limit buckets. */
 export function createRig(options: RigOptions = {}): TestRig {
   const db = new FakeDb();
-  const rooms = new FakeRooms();
+  const rooms = new FakeRooms(db as unknown as D1Database);
   const env = {
     GBW_DB: db as unknown as Env["GBW_DB"],
     ROOMS: rooms.namespace,
