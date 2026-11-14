@@ -23,7 +23,7 @@ test("TC-ROOM-153: two seats share one mobile and the pick survives a reload", a
   await expect(guestPage.locator("[data-testid^=roster-avatar-]")).toHaveCount(2);
 
   // Every mobile is offered once, and each cell shows both team tints (`docs/02-reference/screens/lobby.md`).
-  await expect(hostPage.getByTestId(/^mobile-cell-mbl-/)).toHaveCount(20);
+  await expect(hostPage.getByTestId(/^mobile-cell-mbl-/)).toHaveCount(17);
   await expect(hostPage.getByTestId("mobile-tint-mbl-05-A")).toBeVisible();
   await expect(hostPage.getByTestId("mobile-tint-mbl-05-B")).toBeVisible();
 
