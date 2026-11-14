@@ -4,7 +4,7 @@ Questions that block or shape the work and that only the product owner, client, 
 `cpt-decide`. Format: [.agents/rules/02-docs-navigation.md § 5](../../.agents/rules/02-docs-navigation.md#5-open-questions).
 
 <!-- cpt:oq-summary -->
-**Open: 13 · Blocking: 0 · Answered: 30 · Withdrawn: 1**
+**Open: 13 · Blocking: 0 · Answered: 31 · Withdrawn: 1**
 
 | Id | Question | Status | Blocking |
 |---|---|---|---|
@@ -52,6 +52,7 @@ Questions that block or shape the work and that only the product owner, client, 
 | [OQ-42](open-questions.md#oq-42--do-accounts-own-avatar-parts-and-does-the-match-record-keep-the-bonus-totals) | Do accounts own avatar parts, and does the match record keep the bonus totals? | answered | — |
 | [OQ-43](open-questions.md#oq-43--can-a-draw-or-an-abandonment-be-recorded-at-all) | Can a draw or an abandonment be recorded at all? | open | — |
 | [OQ-44](open-questions.md#oq-44--is-the-per-machine-wind-coefficient-proportional-to-winddrag-or-inverse-to-it) | Is the per-machine wind coefficient proportional to `windDrag` or inverse to it? | answered | — |
+| [OQ-45](open-questions.md#oq-45--should-the-integrator-match-the-closed-form-more-tightly-or-should-the-oracle-record-the-25-ms-models-error) | Should the integrator match the closed form more tightly, or should the oracle record the 25 ms model's error? | answered | — |
 <!-- /cpt:oq-summary -->
 
 ---
@@ -585,3 +586,21 @@ Questions that block or shape the work and that only the product owner, client, 
   whose drag is `0.046` reads `4.826`, the mid-weight `0.0555` reads `5.82`, and Boomer's `0.0950` reads `9.966` — AC5's
   number, 1.71× the mid-weight. The § 4 table of `US-BAL-005` is implemented exactly as printed; `US-BAL-004` AC2 and
   `ADR-0007` § 4 are amended to match. Answered by the product owner on 2026-11-13.
+
+## OQ-45 — Should the integrator match the closed form more tightly, or should the oracle record the 25 ms model's error?
+
+- **Status**: answered
+- **Raised**: 2026-11-14 by cpt-ship
+- **Blocks**: US-BAL-008
+- **Context**: `US-BAL-008` AC1 asks the semi-implicit 25 ms integrator to agree with the flat-ground algebra within 1 %
+  for every angle 30–75° and bar 1–4. The new oracle measures up to **4.73 % range error** at 30°/bar 1 and many fixtures
+  exceed 1 %; the cause is the half-step gravity offset inherent in the semi-implicit update that `ADR-0007` § 5
+  specifies. The options are: (a) replace the position update with the exact constant-acceleration step, which changes
+  every trajectory and needs a ruleset bump plus revalidation; (b) keep the shipped semi-implicit model and revise the
+  oracle's per-fixture tolerance/AC to measure the model it actually runs; or (c) restrict the 1 % assertion to the
+  calibration-scale shots and add a separate coarse bound for short shots. Recommended: (b), because `US-BAL-008` is a
+  measurement guard, not a physics retune, while the test still rejects a 5 % gravity perturbation.
+- **Assumption**: none
+- **Answer**: Keep the shipped semi-implicit 25 ms physics. Revise the oracle's acceptance criteria to the model's
+  step-sized range and flight-time budgets instead of a 1 % bound across the whole envelope; the calibration fixture
+  must still fail when gravity is perturbed by 5 % (user, 2026-11-14).

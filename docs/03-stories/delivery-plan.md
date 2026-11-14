@@ -24,7 +24,7 @@ order, then priority. Each wave lists the **gates** — open questions that must
 | **W5** — full battles (M2) | 8–11 | 17 | `US-CORE-010`, `US-CORE-011`, `US-CORE-012`, `US-CORE-013`, `US-MATCH-006`, `US-NET-003`, `US-NET-004`, `US-AUTH-002`, `US-PWA-003` | `OQ-26` (Clerk app + privacy policy) |
 | **W6** — identity + ranks | 10–13 | 14 | `US-AUTH-003`, `US-AUTH-004`, `US-CORE-005`, `US-MATCH-004`, `US-PWA-001`, `US-RANK-001`, `US-RANK-002`, `US-RANK-005` | — |
 | **W7** — polish + go-live (M3) | 13–17 | 15.5 | `US-RANK-003`, `US-RANK-004`, `US-PWA-002`, `US-PWA-004`, `US-OPS-001`, `US-OPS-002`, `US-OPS-003`, `US-OPS-004` | `OQ-33` (load target) |
-| **W8** — ballistics of the original | post-`M3` | 19.5 | `US-BAL-001` → `US-BAL-003` (6.0) · `US-BAL-004`, `US-BAL-008` (3.5) · `US-BAL-005`, `US-BAL-006` (5.0) · `US-BAL-007` (2.5), `US-BAL-009` (1.0) | none — the two forks were answered by the client on 2026-11-13 |
+| **W8** — ballistics of the original | post-`M3` | 19.5 | `US-BAL-001` → `US-BAL-003` (6.0) · `US-BAL-004`, `US-BAL-008` (3.5) · `US-BAL-005`, `US-BAL-006` (5.0) · `US-BAL-007` (2.5), `US-BAL-009` (1.0) | none — `OQ-45` answered 2026-11-14 |
 
 ## Re-plan 2026-11-13 — the ballistics of the original (`EPIC-09`)
 
